@@ -34,7 +34,7 @@ export class EventsService {
   /** Kształt instancji wg kontraktu Personal OS (lista). */
   private async toContractInstance(inst: {
     id: string; seriesId: string; title: unknown; startsAt: Date; endsAt: Date;
-    location: string | null; status: string; capacity: number | null; currency: string;
+    location: string | null; status: string; capacity: number | null;
   }) {
     const agg = await this.instanceAggregates(inst.id);
     return {
@@ -49,7 +49,7 @@ export class EventsService {
       registeredCount: agg.registeredCount,
       confirmedCount: agg.confirmedCount,
       revenue: agg.revenue,
-      currency: inst.currency || 'EUR',
+      currency: 'PLN',
     };
   }
 
@@ -167,7 +167,7 @@ export class EventsService {
       instances.map(
         (i: {
           id: string; seriesId: string; title: unknown; startsAt: Date; endsAt: Date;
-          location: string | null; status: string; capacity: number | null; currency: string;
+          location: string | null; status: string; capacity: number | null;
         }) => this.toContractInstance(i),
       ),
     );
