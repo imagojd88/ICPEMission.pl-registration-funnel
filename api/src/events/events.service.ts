@@ -194,15 +194,15 @@ export class EventsService {
         recurrence: dto.recurrence,
         instances: {
           create: {
-            title: dto.title,
-            description: dto.description ?? null,
+            title: dto.title as any,
+            description: (dto.description ?? undefined) as any,
             startsAt: new Date(dto.startsAt),
             endsAt: new Date(dto.endsAt),
             location: dto.location,
             nights: dto.nights,
             capacity: dto.capacity,
             paymentMethods: dto.paymentMethods as ('ONLINE' | 'BANK_TRANSFER')[],
-            pricingConfig: dto.pricingConfig as object,
+            pricingConfig: dto.pricingConfig as any,
             registrationOpensAt: new Date(dto.registrationOpensAt),
             registrationClosesAt: new Date(dto.registrationClosesAt),
             status: 'DRAFT',
@@ -218,15 +218,15 @@ export class EventsService {
     return this.prisma.eventInstance.create({
       data: {
         seriesId: src.seriesId,
-        title: src.title as object,
-        description: (src.description as object | null) ?? undefined,
+        title: src.title as any,
+        description: (src.description as any | null) ?? undefined,
         startsAt: src.startsAt,
         endsAt: src.endsAt,
         location: src.location ?? undefined,
         nights: src.nights,
         capacity: src.capacity ?? undefined,
         paymentMethods: src.paymentMethods,
-        pricingConfig: src.pricingConfig as object,
+        pricingConfig: src.pricingConfig as any,
         registrationOpensAt: src.registrationOpensAt,
         registrationClosesAt: src.registrationClosesAt,
         status: 'DRAFT',
@@ -251,17 +251,17 @@ export class EventsService {
         seriesId,
         slug: dto.slug,
         isEvergreen: dto.isEvergreen,
-        theme: (dto.theme as object) ?? undefined,
-        enabledFields: dto.enabledFields as object,
-        customFields: (dto.customFields as object) ?? undefined,
+        theme: (dto.theme as any) ?? undefined,
+        enabledFields: dto.enabledFields as any,
+        customFields: (dto.customFields as any) ?? undefined,
         locales: dto.locales,
         published: false,
       },
       update: {
         slug: dto.slug,
-        theme: (dto.theme as object) ?? undefined,
-        enabledFields: dto.enabledFields as object,
-        customFields: (dto.customFields as object) ?? undefined,
+        theme: (dto.theme as any) ?? undefined,
+        enabledFields: dto.enabledFields as any,
+        customFields: (dto.customFields as any) ?? undefined,
         locales: dto.locales,
       },
     });
@@ -277,7 +277,7 @@ export class EventsService {
   async updatePricing(instanceId: string, pricingConfig: unknown) {
     return this.prisma.eventInstance.update({
       where: { id: instanceId },
-      data: { pricingConfig: pricingConfig as object },
+      data: { pricingConfig: pricingConfig as any },
     });
   }
 }
