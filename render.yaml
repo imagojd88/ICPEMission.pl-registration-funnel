@@ -12,8 +12,8 @@ services:
     runtime: node
     plan: free          # darmowy web usypia po bezczynności; do produkcji zmień na płatny
     rootDir: .
-    buildCommand: npm install && npm --workspace=api run build && npx prisma generate --schema=api/prisma/schema.prisma
-    startCommand: npx prisma db push --schema=api/prisma/schema.prisma --skip-generate && node api/dist/main.js
+    buildCommand: npm install && npm --workspace=api run build
+    startCommand: cd api && npx prisma db push --skip-generate && node dist/main.js
     healthCheckPath: /docs
     envVars:
       - key: DATABASE_URL
