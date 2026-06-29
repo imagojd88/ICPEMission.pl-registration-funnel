@@ -1,0 +1,50 @@
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
+  darkMode: 'class',
+  theme: {
+    extend: {
+      colors: {
+        bg: 'var(--bg)',
+        surface: 'var(--surface)',
+        'surface-2': 'var(--surface-2)',
+        'surface-3': 'var(--surface-3)',
+        ink: 'var(--ink)',
+        muted: 'var(--muted)',
+        faint: 'var(--faint)',
+        border: 'var(--border)',
+        'border-2': 'var(--border-2)',
+        brand: 'var(--brand)',
+        'brand-2': 'var(--brand-2)',
+        'brand-soft': 'var(--brand-soft)',
+        accent: 'var(--accent)',
+        'accent-2': 'var(--accent-2)',
+        'accent-soft': 'var(--accent-soft)',
+        ok: 'var(--ok)',
+        'ok-soft': 'var(--ok-soft)',
+        warn: 'var(--warn)',
+        'warn-soft': 'var(--warn-soft)',
+        err: 'var(--err)',
+        'err-soft': 'var(--err-soft)',
+        'hero-1': 'var(--hero-1)',
+        'hero-2': 'var(--hero-2)',
+        'hero-title': 'var(--hero-title)',
+      },
+      fontFamily: {
+        serif: ['Newsreader', 'serif'],
+        sans: ['Plus Jakarta Sans', 'sans-serif'],
+      },
+      borderRadius: {
+        card: '15px',
+        'card-lg': '20px',
+        pill: '99px',
+      },
+      boxShadow: {
+        card: '0 1px 4px 0 rgba(0,0,0,.06), 0 4px 16px 0 rgba(0,0,0,.06)',
+        'card-lg': '0 2px 8px 0 rgba(0,0,0,.07), 0 8px 32px 0 rgba(0,0,0,.09)',
+        cta: '0 4px 16px 0 rgba(28,93,153,.30), 0 1px 4px 0 rgba(28,93,153,.20)',
+      },
+    },
+  },
+  plugins: [],
+}

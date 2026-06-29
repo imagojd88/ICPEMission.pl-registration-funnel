@@ -1,0 +1,40 @@
+# Render Blueprint — backend ICPE + baza PostgreSQL.
+# W Render: New ▸ Blueprint ▸ wskaż to repo. Wartości ADMIN_* uzupełnisz w panelu.
+databases:
+  - name: icpe-db
+    databaseName: icpe
+    user: icpe
+    plan: free          # uwaga: darmowa baza Render wygasa po ~30 dniach — później zmień na płatną
+
+services:
+  - type: web
+    name: icpe-api
+    runtime: node
+    plan: free          # darmowy web usypia po bezczynności; do produkcji zmień na płatny
+    rootDir: .
+    buildCommand: npm install && npm --workspace=api run build && npx prisma generate --schema=api/prisma/schema.prisma
+    startCommand: npx prisma db push --schema=api/prisma/schema.prisma --skip-generate && node api/dist/main.js
+    healthCheckPath: /docs
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: icpe-db
+          property: connectionString
+      - key: NODE_VERSION
+        value: "20"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: SERVICE_TOKEN          # token dla Personal OS — odczytasz go z panelu Render
+        generateValue: true
+      - key: ADMIN_EMAIL            # login do panelu admina — ustaw w panelu Render
+        sync: false
+      - key: ADMIN_PASSWORD         # hasło do panelu admina — ustaw w panelu Render
+        sync: false
+      - key: CORS_ORIGIN
+        value: https://rejestracja.icpemission.pl
+      - key: PAYMENTS_MODE
+        value: mock
+      - key: MAIL_MODE
+        value: log

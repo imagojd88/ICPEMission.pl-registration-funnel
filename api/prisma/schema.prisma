@@ -1,0 +1,354 @@
+// ICPE Registration — Prisma Schema
+// Provider: postgresql
+// Pricing config stored as JSON (PricingConfig from @icpe/shared)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum AdminRole {
+  SUPER_ADMIN
+  ADMIN
+  COORDINATOR
+}
+
+enum EventType {
+  ONE_TIME
+  EVERGREEN
+  STANDALONE
+}
+
+enum RsvpResponse {
+  YES
+  NO
+}
+
+enum InstanceStatus {
+  DRAFT
+  OPEN
+  CLOSED
+  ARCHIVED
+}
+
+enum PaymentMethod {
+  ONLINE
+  BANK_TRANSFER
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  AWAITING_TRANSFER
+  FAILED
+  REFUNDED
+}
+
+enum RegistrationStatus {
+  DRAFT
+  PENDING_PAYMENT
+  AWAITING_TRANSFER
+  CONFIRMED
+  WAITLIST
+  CANCELLED
+}
+
+enum PricingModel {
+  PER_PERSON
+  PER_ROOM
+  PER_PERSON_PER_NIGHT
+  SINGLE_SUPPLEMENT
+}
+
+enum GenderPolicy {
+  ANY
+  MALE
+  FEMALE
+  FAMILY
+}
+
+enum ParticipantType {
+  ADULT
+  CHILD
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  EXCUSED
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────────
+
+model Organization {
+  id          String  @id @default(cuid())
+  name        String
+  currency    String  @default("PLN")
+  bankDetails Json?
+  branding    Json?
+  settings    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model AdminUser {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  role         AdminRole
+  locale       String    @default("pl")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model ServiceToken {
+  id         String   @id @default(cuid())
+  name       String
+  tokenHash  String   @unique
+  scopes     String[]
+  lastUsedAt DateTime?
+  createdAt  DateTime @default(now())
+}
+
+model GuestAccount {
+  id           String         @id @default(cuid())
+  email        String         @unique
+  passwordHash String?
+  firstName    String
+  lastName     String
+  phone        String?
+  address      Json?
+  locale       String         @default("pl")
+  profile      Json?
+  registrations Registration[]
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+}
+
+model EventSeries {
+  id                          String          @id @default(cuid())
+  type                        EventType
+  recurrence                  String?
+  registrationOpenOffsetDays  Int?
+  registrationCloseOffsetDays Int?
+  defaultSettings             Json?
+  page                        RegistrationPage?
+  instances                   EventInstance[]
+  translations                Translation[]
+  createdAt                   DateTime        @default(now())
+  updatedAt                   DateTime        @updatedAt
+}
+
+model EventInstance {
+  id                   String          @id @default(cuid())
+  seriesId             String
+  series               EventSeries     @relation(fields: [seriesId], references: [id])
+  title                Json
+  description          Json?
+  startsAt             DateTime
+  endsAt               DateTime
+  location             String?
+  nights               Int             @default(0)
+  capacity             Int?
+  status               InstanceStatus  @default(DRAFT)
+  registrationOpensAt  DateTime
+  registrationClosesAt DateTime
+  paymentMethods       PaymentMethod[]
+  // PricingConfig JSON from @icpe/shared — canonical pricing engine config
+  pricingConfig        Json
+  options              Json?
+  roomTypes            RoomType[]
+  rooms                Room[]
+  registrations        Registration[]
+  rsvps                EventRsvp[]
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+}
+
+// Lekkie potwierdzenie obecności dla eventów typu STANDALONE (bez noclegu, bezpłatne).
+model EventRsvp {
+  id         String        @id @default(cuid())
+  instanceId String
+  instance   EventInstance @relation(fields: [instanceId], references: [id])
+  name       String
+  email      String?
+  response   RsvpResponse
+  guestId    String?
+  locale     String        @default("pl")
+  editToken  String        @unique @default(cuid())
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  @@index([instanceId])
+}
+
+model RegistrationPage {
+  id            String      @id @default(cuid())
+  seriesId      String      @unique
+  series        EventSeries @relation(fields: [seriesId], references: [id])
+  slug          String      @unique
+  isEvergreen   Boolean
+  theme         Json?
+  enabledFields Json
+  customFields  Json?
+  locales       String[]
+  published     Boolean     @default(false)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model RoomType {
+  id           String       @id @default(cuid())
+  instanceId   String
+  instance     EventInstance @relation(fields: [instanceId], references: [id])
+  name         Json
+  capacity     Int
+  pricingModel PricingModel
+  price        Decimal      @db.Decimal(10, 2)
+  genderPolicy GenderPolicy @default(ANY)
+  quantity     Int
+  rooms        Room[]
+  createdAt    DateTime     @default(now())
+}
+
+model Room {
+  id          String        @id @default(cuid())
+  instanceId  String
+  instance    EventInstance @relation(fields: [instanceId], references: [id])
+  roomTypeId  String
+  roomType    RoomType      @relation(fields: [roomTypeId], references: [id])
+  label       String
+  capacity    Int
+  assignments RoomAssignment[]
+  createdAt   DateTime      @default(now())
+}
+
+model Registration {
+  id                  String             @id @default(cuid())
+  instanceId          String
+  instance            EventInstance      @relation(fields: [instanceId], references: [id])
+  guestId             String?
+  guest               GuestAccount?      @relation(fields: [guestId], references: [id])
+  status              RegistrationStatus @default(DRAFT)
+  locale              String
+  contact             Json
+  preferredRoomTypeId String?
+  dietaryNotes        String?
+  totalPrice          Decimal            @db.Decimal(10, 2)
+  currency            String             @default("PLN")
+  paymentMethod       PaymentMethod?
+  editToken           String             @unique @default(cuid())
+  participants        Participant[]
+  payments            Payment[]
+  assignments         RoomAssignment[]
+  notifications       Notification[]
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+}
+
+model Participant {
+  id             String          @id @default(cuid())
+  registrationId String
+  registration   Registration    @relation(fields: [registrationId], references: [id])
+  type           ParticipantType
+  firstName      String
+  lastName       String
+  birthDate      DateTime?
+  age            Int?
+  gender         Gender
+  dietary        String?
+  assignment     RoomAssignment?
+  createdAt      DateTime        @default(now())
+}
+
+model RoomAssignment {
+  id             String       @id @default(cuid())
+  roomId         String
+  room           Room         @relation(fields: [roomId], references: [id])
+  registrationId String
+  registration   Registration @relation(fields: [registrationId], references: [id])
+  participantId  String?      @unique
+  participant    Participant? @relation(fields: [participantId], references: [id])
+  assignedBy     String
+  assignedAt     DateTime     @default(now())
+}
+
+model Payment {
+  id             String        @id @default(cuid())
+  registrationId String
+  registration   Registration  @relation(fields: [registrationId], references: [id])
+  provider       String
+  method         PaymentMethod
+  amount         Decimal       @db.Decimal(10, 2)
+  currency       String        @default("PLN")
+  status         PaymentStatus @default(PENDING)
+  externalId     String?
+  raw            Json?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+}
+
+model MeetingSeries {
+  id          String              @id @default(cuid())
+  title       Json
+  recurrence  String
+  occurrences MeetingOccurrence[]
+  createdAt   DateTime            @default(now())
+}
+
+model MeetingOccurrence {
+  id         String            @id @default(cuid())
+  seriesId   String
+  series     MeetingSeries     @relation(fields: [seriesId], references: [id])
+  date       DateTime
+  attendance AttendanceRecord[]
+  createdAt  DateTime          @default(now())
+}
+
+model AttendanceRecord {
+  id              String           @id @default(cuid())
+  occurrenceId    String
+  occurrence      MeetingOccurrence @relation(fields: [occurrenceId], references: [id])
+  guestId         String?
+  participantName String?
+  status          AttendanceStatus
+  channel         String
+  createdAt       DateTime         @default(now())
+}
+
+model Translation {
+  id       String @id @default(cuid())
+  entity   String
+  entityId String
+  locale   String
+  value    String
+
+  series EventSeries? @relation(fields: [entityId], references: [id])
+
+  @@unique([entity, entityId, locale])
+}
+
+model Notification {
+  id             String        @id @default(cuid())
+  type           String
+  channel        String
+  to             String
+  locale         String
+  status         String        @default("QUEUED")
+  payload        Json
+  registrationId String?
+  registration   Registration? @relation(fields: [registrationId], references: [id])
+  createdAt      DateTime      @default(now())
+}

@@ -1,0 +1,20 @@
+# Wgraj ten plik jako ".htaccess" do katalogu subdomeny rejestracja.icpemission.pl
+# (obok index.html). Zapewnia działanie tras aplikacji (React Router) i HTTPS.
+
+# Wymuś HTTPS
+RewriteEngine On
+RewriteCond %{HTTPS} off
+RewriteRule ^(.*)$ https://%{HTTP_HOST}/$1 [R=301,L]
+
+# SPA fallback — każda ścieżka, która nie jest plikiem/katalogiem → index.html
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.html [L]
+
+# Cache zasobów z hashem w nazwie (foldery /assets/)
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType text/css "access plus 30 days"
+  ExpiresByType application/javascript "access plus 30 days"
+  ExpiresByType image/svg+xml "access plus 30 days"
+</IfModule>

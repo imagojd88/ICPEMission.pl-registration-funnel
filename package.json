@@ -1,0 +1,16 @@
+{
+  "name": "icpe-registration-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": ["shared", "app", "api"],
+  "scripts": {
+    "dev": "npm run dev --workspace=api & npm run dev --workspace=app",
+    "dev:api": "npm run dev --workspace=api",
+    "dev:app": "npm run dev --workspace=app",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4"
+  }
+}

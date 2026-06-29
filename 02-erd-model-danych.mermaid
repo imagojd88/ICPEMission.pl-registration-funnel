@@ -1,0 +1,167 @@
+erDiagram
+    Organization ||--o{ AdminUser : has
+    Organization ||--o{ EventSeries : owns
+
+    AdminUser ||--o{ RoomAssignment : "assigns (audit)"
+
+    EventSeries ||--o{ EventInstance : "generates editions"
+    EventSeries ||--o| RegistrationPage : "has generated page"
+    EventSeries ||--o{ Translation : "PL/EN/IT"
+
+    EventInstance ||--o{ RoomType : defines
+    EventInstance ||--o{ Room : "has pool"
+    EventInstance ||--o{ Registration : receives
+    EventInstance ||--o{ Translation : "PL/EN/IT"
+
+    RoomType ||--o{ Room : "instantiated as"
+
+    GuestAccount ||--o{ Registration : "submits (optional)"
+
+    Registration ||--o{ Participant : includes
+    Registration ||--o{ Payment : "paid via"
+    Registration ||--o{ RoomAssignment : "assigned to rooms"
+
+    Participant ||--o| RoomAssignment : "placed in room"
+
+    Room ||--o{ RoomAssignment : "occupied by"
+
+    MeetingSeries ||--o{ MeetingOccurrence : "recurs into"
+    MeetingOccurrence ||--o{ AttendanceRecord : tracks
+    GuestAccount ||--o{ AttendanceRecord : "checks in"
+
+    EventInstance ||--o{ Notification : triggers
+
+    Organization {
+        string id PK
+        string name
+        string currency
+        json bankDetails
+        json branding
+    }
+    EventSeries {
+        string id PK
+        enum type "ONE_TIME|EVERGREEN"
+        string recurrence "RRULE"
+        int registrationOpenOffsetDays
+        int registrationCloseOffsetDays
+    }
+    EventInstance {
+        string id PK
+        string seriesId FK
+        json title "pl,en,it"
+        datetime startsAt
+        datetime endsAt
+        int nights
+        int capacity
+        enum status "DRAFT|OPEN|CLOSED|ARCHIVED"
+        datetime registrationOpensAt
+        datetime registrationClosesAt
+        json ageBrackets
+    }
+    RegistrationPage {
+        string id PK
+        string seriesId FK
+        string slug UK
+        bool isEvergreen
+        json theme
+        json enabledFields
+        json customFields
+        array locales
+        bool published
+    }
+    RoomType {
+        string id PK
+        string instanceId FK
+        json name
+        int capacity
+        enum pricingModel "PER_PERSON|PER_ROOM|PER_PERSON_PER_NIGHT|SINGLE_SUPPLEMENT"
+        decimal price
+        enum genderPolicy "ANY|MALE|FEMALE|FAMILY"
+        int quantity
+    }
+    Room {
+        string id PK
+        string roomTypeId FK
+        string label
+        int capacity
+    }
+    GuestAccount {
+        string id PK
+        string email UK
+        string firstName
+        string lastName
+        string phone
+        json address
+        string locale
+        json profile "saved children data"
+    }
+    Registration {
+        string id PK
+        string instanceId FK
+        string guestId FK "nullable"
+        enum status "DRAFT|PENDING_PAYMENT|AWAITING_TRANSFER|CONFIRMED|WAITLIST|CANCELLED"
+        string locale
+        json contact "name,email,phone,address"
+        string preferredRoomTypeId
+        decimal totalPrice
+        enum paymentMethod "ONLINE|BANK_TRANSFER"
+        string editToken UK "magic-link"
+    }
+    Participant {
+        string id PK
+        string registrationId FK
+        enum type "ADULT|CHILD"
+        string firstName
+        string lastName
+        int age
+        enum gender "MALE|FEMALE|OTHER"
+        string dietary "diet/allergies"
+    }
+    RoomAssignment {
+        string id PK
+        string roomId FK
+        string registrationId FK
+        string participantId FK "nullable"
+        string assignedBy
+        datetime assignedAt
+    }
+    Payment {
+        string id PK
+        string registrationId FK
+        string provider "p24|payu|stripe|manual"
+        enum method "ONLINE|BANK_TRANSFER"
+        decimal amount
+        enum status "PENDING|PAID|AWAITING_TRANSFER|FAILED|REFUNDED"
+        string externalId
+    }
+    MeetingSeries {
+        string id PK
+        json title
+        string recurrence "RRULE"
+    }
+    MeetingOccurrence {
+        string id PK
+        string seriesId FK
+        datetime date
+    }
+    AttendanceRecord {
+        string id PK
+        string occurrenceId FK
+        string guestId FK "nullable"
+        enum status "PRESENT|ABSENT|EXCUSED"
+        string channel "self|coordinator|qr"
+    }
+    Translation {
+        string id PK
+        string entity
+        string entityId
+        string locale
+        string value
+    }
+    Notification {
+        string id PK
+        string type "CONFIRMATION|PAYMENT_REMINDER|EVENT_REMINDER"
+        string channel "email|sms"
+        string locale
+        string status
+    }
