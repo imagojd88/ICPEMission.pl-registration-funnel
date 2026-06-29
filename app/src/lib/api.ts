@@ -17,6 +17,37 @@ import type {
 const API_URL = (import.meta as ImportMeta & { env: Record<string, string> }).env.VITE_API_URL ?? ''
 
 // ---------------------------------------------------------------------------
+// Auth token management
+// ---------------------------------------------------------------------------
+
+const TOKEN_KEY = 'icpe_admin_token'
+
+let _authToken: string | null = (() => {
+  try {
+    return localStorage.getItem(TOKEN_KEY)
+  } catch {
+    return null
+  }
+})()
+
+export function setAuthToken(token: string | null): void {
+  _authToken = token
+  try {
+    if (token) {
+      localStorage.setItem(TOKEN_KEY, token)
+    } else {
+      localStorage.removeItem(TOKEN_KEY)
+    }
+  } catch {
+    // ignore storage errors
+  }
+}
+
+export function getAuthToken(): string | null {
+  return _authToken
+}
+
+// ---------------------------------------------------------------------------
 // HTTP helper
 // ---------------------------------------------------------------------------
 
@@ -26,6 +57,10 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
     headers: { 'Content-Type': 'application/json', ...init?.headers },
     ...init,
   })
+  if (res.status === 401) {
+    setAuthToken(null)
+    throw new Error(`API 401: Unauthorized`)
+  }
   if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`)
   return res.json() as Promise<T>
 }
@@ -362,52 +397,45 @@ export async function startCheckout(
 // Admin endpoints
 // ---------------------------------------------------------------------------
 
+function authHeaders(token?: string): Record<string, string> {
+  const tok = token ?? getAuthToken()
+  return tok ? { Authorization: `Bearer ${tok}` } : {}
+}
+
 export async function getAdminSummary(token?: string): Promise<AdminSummaryDto> {
-  try {
-    return await apiFetch<AdminSummaryDto>('/admin/summary', {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    })
-  } catch {
-    return MOCK_ADMIN_SUMMARY
-  }
+  return apiFetch<AdminSummaryDto>('/admin/summary', {
+    headers: authHeaders(token),
+  })
 }
 
 export async function getAdminInstances(
   status?: string,
   token?: string,
 ): Promise<EventInstanceDto[]> {
-  try {
-    const qs = status ? `?status=${status}` : ''
-    return await apiFetch<EventInstanceDto[]>(`/admin/instances${qs}`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    })
-  } catch {
-    return [MOCK_INSTANCE]
-  }
+  const qs = status ? `?status=${status}` : ''
+  return apiFetch<EventInstanceDto[]>(`/admin/instances${qs}`, {
+    headers: authHeaders(token),
+  })
 }
 
 export async function getAdminRegistrations(
   instanceId: string,
   opts?: { status?: string; q?: string; token?: string },
 ): Promise<RegistrationDto[]> {
-  try {
-    const params = new URLSearchParams()
-    if (opts?.status) params.set('status', opts.status)
-    if (opts?.q) params.set('q', opts.q)
-    const qs = params.toString() ? `?${params.toString()}` : ''
-    return await apiFetch<RegistrationDto[]>(
-      `/admin/instances/${instanceId}/registrations${qs}`,
-      { headers: opts?.token ? { Authorization: `Bearer ${opts.token}` } : {} },
-    )
-  } catch {
-    return MOCK_REGISTRATIONS
-  }
+  const params = new URLSearchParams()
+  if (opts?.status) params.set('status', opts.status)
+  if (opts?.q) params.set('q', opts.q)
+  const qs = params.toString() ? `?${params.toString()}` : ''
+  return apiFetch<RegistrationDto[]>(
+    `/admin/instances/${instanceId}/registrations${qs}`,
+    { headers: authHeaders(opts?.token) },
+  )
 }
 
 export async function markRegistrationPaid(id: string, token?: string): Promise<void> {
   await apiFetch(`/admin/registrations/${id}/mark-paid`, {
     method: 'POST',
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    headers: authHeaders(token),
   })
 }
 
@@ -418,8 +446,90 @@ export async function patchRegistrationStatus(
 ): Promise<void> {
   await apiFetch(`/admin/registrations/${id}/status`, {
     method: 'PATCH',
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    headers: authHeaders(token),
     body: JSON.stringify({ status }),
+  })
+}
+
+// ── New admin write endpoints ────────────────────────────────────────────────
+
+export interface CreateSeriesPayload {
+  type: 'ONE_TIME' | 'EVERGREEN' | 'STANDALONE'
+  title: { pl: string; en?: string; it?: string }
+  description?: { pl?: string; en?: string; it?: string }
+  startsAt: string
+  endsAt: string
+  location?: string
+  nights: number
+  capacity?: number
+  paymentMethods: string[]
+  pricingConfig: PricingConfig
+  registrationOpensAt: string
+  registrationClosesAt: string
+  recurrence?: string
+}
+
+export interface SeriesWithInstance {
+  id: string
+  instances: Array<{ id: string }>
+}
+
+export async function createEventSeries(
+  payload: CreateSeriesPayload,
+  token?: string,
+): Promise<SeriesWithInstance> {
+  return apiFetch<SeriesWithInstance>('/admin/series', {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: JSON.stringify(payload),
+  })
+}
+
+export interface ConfigurePagePayload {
+  slug: string
+  theme?: unknown
+  enabledFields: Record<string, boolean>
+  customFields?: unknown
+  locales: string[]
+  isEvergreen: boolean
+}
+
+export async function configureSeriesPage(
+  seriesId: string,
+  payload: ConfigurePagePayload,
+  token?: string,
+): Promise<unknown> {
+  return apiFetch<unknown>(`/admin/series/${seriesId}/page`, {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: JSON.stringify(payload),
+  })
+}
+
+export interface AddRoomTypePayload {
+  name: Record<string, string>
+  capacity: number
+  pricingModel: 'PER_PERSON_PER_NIGHT' | 'PER_ROOM' | 'PER_PERSON' | 'SINGLE_SUPPLEMENT'
+  price: number
+  quantity: number
+  genderPolicy?: 'ANY' | 'MALE' | 'FEMALE' | 'FAMILY'
+}
+
+export async function addRoomType(
+  instanceId: string,
+  payload: AddRoomTypePayload,
+  token?: string,
+): Promise<unknown> {
+  return apiFetch<unknown>(`/admin/instances/${instanceId}/room-types`, {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function getInstanceDetail(id: string, token?: string): Promise<EventInstanceDto> {
+  return apiFetch<EventInstanceDto>(`/admin/instances/${id}`, {
+    headers: authHeaders(token),
   })
 }
 
@@ -433,5 +543,5 @@ export async function adminLogin(
   })
 }
 
-// Re-export mock data for use in components/stories
+// Re-export mock data for use in components/stories (public funnel fallbacks only)
 export { MOCK_INSTANCE, MOCK_ROOM_TYPES, MOCK_PRICING, MOCK_REGISTRATIONS, MOCK_ADMIN_SUMMARY }

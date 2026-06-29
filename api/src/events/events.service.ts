@@ -205,7 +205,8 @@ export class EventsService {
             pricingConfig: dto.pricingConfig as any,
             registrationOpensAt: new Date(dto.registrationOpensAt),
             registrationClosesAt: new Date(dto.registrationClosesAt),
-            status: 'DRAFT',
+            // Utworzony event jest od razu OPEN — widoczny publicznie po slug.
+            status: (dto as { status?: string }).status === 'DRAFT' ? 'DRAFT' : 'OPEN',
           },
         },
       },

@@ -43,9 +43,10 @@ const NAV_ITEMS: NavItem[] = [
 interface AdminSidebarProps {
   activeScreen: AdminScreen
   onNavigate: (screen: AdminScreen) => void
+  onLogout?: () => void
 }
 
-export default function AdminSidebar({ activeScreen, onNavigate }: AdminSidebarProps) {
+export default function AdminSidebar({ activeScreen, onNavigate, onLogout }: AdminSidebarProps) {
   const [isDark, setIsDark] = useState(() => getTheme() === 'dark')
 
   function handleThemeToggle() {
@@ -198,6 +199,7 @@ export default function AdminSidebar({ activeScreen, onNavigate }: AdminSidebarP
             className="p-1 rounded-[8px] hover:bg-[var(--surface-3)] transition-colors"
             style={{ color: 'var(--faint)' }}
             title="Wyloguj"
+            onClick={onLogout}
           >
             <LogOut size={15} />
           </button>

@@ -1,8 +1,11 @@
 import { useState } from 'react'
-import { X, Plus } from 'lucide-react'
+import { X, Plus, CheckCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
+import { createEventSeries, configureSeriesPage, addRoomType } from '@/lib/api'
+import { DEFAULT_PRICING } from '@icpe/shared'
+import type { PricingConfig } from '@icpe/shared'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -23,7 +26,8 @@ interface WizardState {
   eventType: EventType
   // step 1
   name: string
-  date: string
+  dateStart: string
+  dateEnd: string
   nights: string
   location: string
   capacity: string
@@ -32,7 +36,6 @@ interface WizardState {
   // step 2
   rooms: RoomRow[]
   newRoom: Omit<RoomRow, 'id'>
-  // step 3 (read-only display here)
   // step 4
   slug: string
   color: ColorSwatch
@@ -74,12 +77,42 @@ const AGE_BRACKETS = [
 const STEP_LABELS = ['Typ', 'Szczegóły', 'Pokoje', 'Cennik', 'Strona']
 const FIELD_CHECKS = ['Telefon', 'Adres', 'Dieta', 'Dzieci', 'Parafia', 'Transport']
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function mapEventType(t: EventType): 'ONE_TIME' | 'EVERGREEN' | 'STANDALONE' {
+  if (t === 'evergreen') return 'EVERGREEN'
+  if (t === 'standalone') return 'STANDALONE'
+  return 'ONE_TIME'
+}
+
+function mapPricingModel(m: PricingModel): 'PER_PERSON_PER_NIGHT' | 'PER_ROOM' | 'PER_PERSON' | 'SINGLE_SUPPLEMENT' {
+  if (m === 'za pokój') return 'PER_ROOM'
+  if (m === 'za osobę') return 'PER_PERSON'
+  if (m === 'dopłata 1-os') return 'SINGLE_SUPPLEMENT'
+  return 'PER_PERSON_PER_NIGHT'
+}
+
+function buildPricingConfig(rooms: RoomRow[], nights: number): PricingConfig {
+  const roomDefs = rooms.map((r) => ({
+    id: r.id,
+    name: r.name,
+    cap: parseInt(r.capacity) || 1,
+    perPerson: parseFloat(r.price) || 0,
+    model: r.model,
+  }))
+  return {
+    ...DEFAULT_PRICING,
+    nights,
+    rooms: roomDefs.length > 0 ? roomDefs : DEFAULT_PRICING.rooms,
+  }
+}
+
 // ── Live Preview ──────────────────────────────────────────────────────────────
 
 function LivePreview({ state }: { state: WizardState }) {
   const heroColor = COLOR_MAP[state.color]
   const heroDark = COLOR_DARK_MAP[state.color]
-  const minPrice = 80
+  const minPrice = state.rooms.length > 0 ? Math.min(...state.rooms.map((r) => parseFloat(r.price) || 0)) : 0
   const slug = state.slug || 'nowy-event'
   const langs: string[] = [
     state.langPL && 'PL',
@@ -96,7 +129,6 @@ function LivePreview({ state }: { state: WizardState }) {
         background: 'var(--surface)',
       }}
     >
-      {/* Hero mini */}
       <div
         className="flex flex-col items-start justify-end px-5 pb-4"
         style={{
@@ -115,7 +147,6 @@ function LivePreview({ state }: { state: WizardState }) {
         </span>
       </div>
 
-      {/* Content */}
       <div className="p-5 flex flex-col gap-3">
         <div className="flex items-center gap-2 flex-wrap">
           <span
@@ -139,17 +170,19 @@ function LivePreview({ state }: { state: WizardState }) {
           ))}
         </div>
 
-        <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-          cena od {minPrice} zł
-        </p>
+        {minPrice > 0 && (
+          <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+            cena od {minPrice} zł
+          </p>
+        )}
 
         <p className="text-xs" style={{ color: 'var(--faint)', fontFamily: 'monospace' }}>
-          icpe.pl/r/{slug}
+          rejestracja.icpemission.pl/r/{slug}
         </p>
 
-        {state.date && (
+        {state.dateStart && (
           <p className="text-xs" style={{ color: 'var(--muted)' }}>
-            {new Date(state.date).toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' })}
+            {new Date(state.dateStart).toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' })}
           </p>
         )}
       </div>
@@ -170,7 +203,7 @@ function Step0Type({ state, update }: { state: WizardState; update: (p: Partial<
           [
             { id: 'one_time', label: 'Event jednorazowy', desc: 'Konkretna data, jedna edycja' },
             { id: 'evergreen', label: 'Event cykliczny (evergreen)', desc: 'Powtarza się automatycznie wg harmonogramu' },
-            { id: 'standalone', label: 'Standalone (bez noclegu)', desc: 'Bezpłatne, proste RSVP „Będę / Nie będę”' },
+            { id: 'standalone', label: 'Standalone (bez noclegu)', desc: 'Bezpłatne, proste RSVP „Będę / Nie będę"' },
           ] as const
         ).map((opt) => (
           <button
@@ -247,20 +280,26 @@ function Step1Details({ state, update }: { state: WizardState; update: (p: Parti
       />
       <div className="grid grid-cols-2 gap-4">
         <Input
-          label="Data"
+          label="Data rozpoczęcia"
           type="date"
-          value={state.date}
-          onChange={(e) => update({ date: e.target.value })}
+          value={state.dateStart}
+          onChange={(e) => update({ dateStart: e.target.value })}
         />
         <Input
-          label="Liczba nocy"
-          type="number"
-          min={0}
-          value={state.nights}
-          onChange={(e) => update({ nights: e.target.value })}
-          placeholder="1"
+          label="Data zakończenia"
+          type="date"
+          value={state.dateEnd}
+          onChange={(e) => update({ dateEnd: e.target.value })}
         />
       </div>
+      <Input
+        label="Liczba nocy"
+        type="number"
+        min={0}
+        value={state.nights}
+        onChange={(e) => update({ nights: e.target.value })}
+        placeholder="1"
+      />
       <Input
         label="Miejsce"
         value={state.location}
@@ -426,7 +465,6 @@ function Step2Rooms({ state, update }: { state: WizardState; update: (p: Partial
 function Step3Pricing() {
   return (
     <div className="flex flex-col gap-5">
-      {/* Age brackets */}
       <div>
         <p className="text-sm font-semibold mb-2" style={{ color: 'var(--ink)' }}>
           Progi wiekowe
@@ -460,7 +498,6 @@ function Step3Pricing() {
         </div>
       </div>
 
-      {/* Options */}
       <div>
         <p className="text-sm font-semibold mb-2" style={{ color: 'var(--ink)' }}>
           Opcje dodatkowe
@@ -478,7 +515,6 @@ function Step3Pricing() {
         </div>
       </div>
 
-      {/* Discount codes */}
       <div>
         <p className="text-sm font-semibold mb-2" style={{ color: 'var(--ink)' }}>
           Kody rabatowe
@@ -513,7 +549,7 @@ function Step4Page({ state, update }: { state: WizardState; update: (p: Partial<
             className="flex items-center px-3 h-[46px] rounded-l-[12px] border border-r-0 text-sm"
             style={{ background: 'var(--surface-3)', color: 'var(--faint)', borderColor: 'var(--border)' }}
           >
-            icpe.pl/r/
+            /r/
           </span>
           <input
             value={state.slug}
@@ -530,7 +566,6 @@ function Step4Page({ state, update }: { state: WizardState; update: (p: Partial<
         </div>
       </div>
 
-      {/* Color swatches */}
       <div>
         <p className="text-sm font-semibold mb-2" style={{ color: 'var(--ink)' }}>
           Kolor strony
@@ -558,7 +593,6 @@ function Step4Page({ state, update }: { state: WizardState; update: (p: Partial<
         </div>
       </div>
 
-      {/* Field checklist */}
       <div>
         <p className="text-sm font-semibold mb-2" style={{ color: 'var(--ink)' }}>
           Pola formularza
@@ -573,7 +607,6 @@ function Step4Page({ state, update }: { state: WizardState; update: (p: Partial<
         </div>
       </div>
 
-      {/* Languages */}
       <div>
         <p className="text-sm font-semibold mb-2" style={{ color: 'var(--ink)' }}>
           Języki strony
@@ -605,18 +638,49 @@ function Step4Page({ state, update }: { state: WizardState; update: (p: Partial<
   )
 }
 
+// ── Success screen ────────────────────────────────────────────────────────────
+
+function SuccessScreen({ slug, onClose }: { slug: string; onClose: () => void }) {
+  const publicUrl = `https://rejestracja.icpemission.pl/r/${slug}`
+  return (
+    <div className="flex flex-col items-center gap-5 py-8 px-4 text-center">
+      <CheckCircle size={48} style={{ color: 'var(--ok)' }} />
+      <div>
+        <p className="font-bold text-lg" style={{ color: 'var(--ink)' }}>Event utworzony!</p>
+        <p className="text-sm mt-1" style={{ color: 'var(--muted)' }}>
+          Strona rejestracyjna jest dostępna pod adresem:
+        </p>
+      </div>
+      <a
+        href={publicUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="px-4 py-2 rounded-[12px] text-sm font-mono break-all transition-colors hover:opacity-80"
+        style={{ background: 'var(--brand-soft)', color: 'var(--brand)' }}
+      >
+        {publicUrl}
+      </a>
+      <Button onClick={onClose} size="sm" className="mt-2">
+        Zamknij
+      </Button>
+    </div>
+  )
+}
+
 // ── EventWizard ───────────────────────────────────────────────────────────────
 
 interface EventWizardProps {
   onCancel: () => void
+  onSuccess?: () => void
 }
 
-export default function EventWizard({ onCancel }: EventWizardProps) {
+export default function EventWizard({ onCancel, onSuccess }: EventWizardProps) {
   const [step, setStep] = useState(0)
   const [state, setState] = useState<WizardState>({
     eventType: 'one_time',
     name: '',
-    date: '',
+    dateStart: '',
+    dateEnd: '',
     nights: '1',
     location: '',
     capacity: '',
@@ -630,12 +694,103 @@ export default function EventWizard({ onCancel }: EventWizardProps) {
     langEN: false,
     langIT: false,
   })
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [createdSlug, setCreatedSlug] = useState<string | null>(null)
 
   function update(partial: Partial<WizardState>) {
     setState((prev) => ({ ...prev, ...partial }))
   }
 
   const isLast = step === STEP_LABELS.length - 1
+
+  async function handlePublish() {
+    if (!state.name) { setSubmitError('Podaj nazwę eventu.'); return }
+    if (!state.slug) { setSubmitError('Podaj slug (adres strony).'); return }
+    if (!state.dateStart) { setSubmitError('Podaj datę rozpoczęcia.'); return }
+
+    setSubmitting(true)
+    setSubmitError(null)
+
+    try {
+      const nights = parseInt(state.nights) || 0
+      const paymentMethods: string[] = []
+      if (state.payOnline) paymentMethods.push('ONLINE')
+      if (state.payTransfer) paymentMethods.push('BANK_TRANSFER')
+
+      // Compute endsAt: if dateEnd provided use it, else dateStart + nights days
+      let endsAt = state.dateEnd
+        ? new Date(`${state.dateEnd}T22:00:00`).toISOString()
+        : new Date(new Date(`${state.dateStart}T14:00:00`).getTime() + nights * 86400000 + 8 * 3600000).toISOString()
+      const startsAt = new Date(`${state.dateStart}T14:00:00`).toISOString()
+
+      // Step 1: create series
+      const series = await createEventSeries({
+        type: mapEventType(state.eventType),
+        title: { pl: state.name },
+        startsAt,
+        endsAt,
+        location: state.location || undefined,
+        nights,
+        capacity: state.capacity ? parseInt(state.capacity) : undefined,
+        paymentMethods,
+        pricingConfig: buildPricingConfig(state.rooms, nights),
+        registrationOpensAt: new Date().toISOString(),
+        registrationClosesAt: startsAt,
+      })
+
+      const seriesId = series.id
+      const instanceId = series.instances[0]?.id
+      if (!instanceId) throw new Error('Backend nie zwrócił instanceId')
+
+      // Step 2: add room types
+      for (const r of state.rooms) {
+        await addRoomType(instanceId, {
+          name: { pl: r.name },
+          capacity: parseInt(r.capacity) || 1,
+          pricingModel: mapPricingModel(r.model),
+          price: parseFloat(r.price) || 0,
+          quantity: parseInt(r.quantity) || 1,
+        })
+      }
+
+      // Step 3: configure page
+      const locales: string[] = []
+      if (state.langPL) locales.push('pl')
+      if (state.langEN) locales.push('en')
+      if (state.langIT) locales.push('it')
+      if (locales.length === 0) locales.push('pl')
+
+      await configureSeriesPage(seriesId, {
+        slug: state.slug,
+        enabledFields: { phone: true, address: true, dietary: true, children: true },
+        locales,
+        isEvergreen: state.eventType === 'evergreen',
+      })
+
+      setCreatedSlug(state.slug)
+      onSuccess?.()
+    } catch (e: unknown) {
+      setSubmitError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  if (createdSlug) {
+    return (
+      <div
+        className="rounded-[20px] border"
+        style={{
+          background: 'var(--surface)',
+          borderColor: 'var(--border)',
+          boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+        }}
+      >
+        <SuccessScreen slug={createdSlug} onClose={onCancel} />
+      </div>
+    )
+  }
 
   return (
     <div className="grid gap-6" style={{ gridTemplateColumns: '1fr 360px' }}>
@@ -702,6 +857,16 @@ export default function EventWizard({ onCancel }: EventWizardProps) {
           {step === 4 && <Step4Page state={state} update={update} />}
         </div>
 
+        {/* Error */}
+        {submitError && (
+          <div
+            className="mx-6 mb-2 px-4 py-3 rounded-[12px] text-sm"
+            style={{ background: 'var(--err-soft)', color: 'var(--err)', border: '1px solid var(--err)' }}
+          >
+            {submitError}
+          </div>
+        )}
+
         {/* Footer */}
         <div
           className="flex items-center justify-between px-6 py-4"
@@ -711,15 +876,23 @@ export default function EventWizard({ onCancel }: EventWizardProps) {
             variant="ghost"
             size="sm"
             onClick={() => (step === 0 ? onCancel() : setStep(step - 1))}
+            disabled={submitting}
           >
             ← {step === 0 ? 'Anuluj' : 'Wstecz'}
           </Button>
           <Button
             variant={isLast ? 'cta' : 'default'}
             size="sm"
-            onClick={() => !isLast && setStep(step + 1)}
+            onClick={() => {
+              if (isLast) {
+                void handlePublish()
+              } else {
+                setStep(step + 1)
+              }
+            }}
+            disabled={submitting}
           >
-            {isLast ? 'Publikuj stronę ✓' : 'Dalej →'}
+            {isLast ? (submitting ? 'Tworzenie...' : 'Publikuj stronę ✓') : 'Dalej →'}
           </Button>
         </div>
       </div>

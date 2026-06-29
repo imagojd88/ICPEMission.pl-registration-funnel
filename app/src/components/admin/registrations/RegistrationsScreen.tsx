@@ -1,9 +1,14 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Search, X, ChevronRight, ChevronLeft } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
-import { MOCK_REGISTRATIONS } from '@/lib/api'
-import type { RegistrationDto } from '@icpe/shared'
+import {
+  getAdminInstances,
+  getAdminRegistrations,
+  markRegistrationPaid,
+  patchRegistrationStatus,
+} from '@/lib/api'
+import type { RegistrationDto, EventInstanceDto } from '@icpe/shared'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -24,17 +29,58 @@ function payStatusMatch(r: RegistrationDto, filter: PayStatus): boolean {
   return false
 }
 
+function resolveTitle(title: unknown): string {
+  if (typeof title === 'string') return title
+  if (title && typeof title === 'object') {
+    const t = title as Record<string, string>
+    return t.pl ?? t.en ?? t.it ?? ''
+  }
+  return ''
+}
+
 // ── Registration Drawer ───────────────────────────────────────────────────────
 
 function RegistrationDrawer({
   registration,
   onClose,
+  onMarkPaid,
+  onStatusChange,
 }: {
   registration: RegistrationDto
   onClose: () => void
+  onMarkPaid: (id: string) => Promise<void>
+  onStatusChange: (id: string, status: string) => Promise<void>
 }) {
   const r = registration
   const fullName = `${r.contact.firstName} ${r.contact.lastName}`
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  async function handleMarkPaid() {
+    setBusy(true)
+    setActionError(null)
+    try {
+      await onMarkPaid(r.id)
+      onClose()
+    } catch (e: unknown) {
+      setActionError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleCancel() {
+    setBusy(true)
+    setActionError(null)
+    try {
+      await onStatusChange(r.id, 'CANCELLED')
+      onClose()
+    } catch (e: unknown) {
+      setActionError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
 
   return (
     <>
@@ -65,7 +111,7 @@ function RegistrationDrawer({
               Zgłoszenie
             </p>
             <p className="font-bold text-base mt-0.5" style={{ color: 'var(--ink)' }}>
-              REG-2026-{r.id.replace('reg-', '').padStart(4, '0')}
+              {r.id}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -187,6 +233,15 @@ function RegistrationDrawer({
               ))}
             </div>
           </section>
+
+          {actionError && (
+            <div
+              className="px-4 py-3 rounded-[12px] text-sm"
+              style={{ background: 'var(--err-soft)', color: 'var(--err)', border: '1px solid var(--err)' }}
+            >
+              {actionError}
+            </div>
+          )}
         </div>
 
         {/* Actions footer */}
@@ -195,8 +250,14 @@ function RegistrationDrawer({
           style={{ background: 'var(--surface)', borderTop: '1px solid var(--border)' }}
         >
           <div className="grid grid-cols-2 gap-2">
-            <Button size="sm" variant="default" style={{ background: 'var(--ok)' }}>
-              Oznacz opłacone
+            <Button
+              size="sm"
+              variant="default"
+              style={{ background: 'var(--ok)' }}
+              onClick={() => { void handleMarkPaid() }}
+              disabled={busy || r.paymentStatus === 'PAID'}
+            >
+              {busy ? 'Zapisuję...' : 'Oznacz opłacone'}
             </Button>
             <Button size="sm" variant="outline">
               Przydziel pokój
@@ -206,7 +267,12 @@ function RegistrationDrawer({
             <Button size="sm" variant="outline">
               Wyślij e-mail
             </Button>
-            <Button size="sm" variant="destructive">
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => { void handleCancel() }}
+              disabled={busy}
+            >
               Anuluj zgłoszenie
             </Button>
           </div>
@@ -231,8 +297,54 @@ export default function RegistrationsScreen() {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [openDrawer, setOpenDrawer] = useState<RegistrationDto | null>(null)
 
-  const allRows = MOCK_REGISTRATIONS
-  const filtered = allRows.filter((r) => {
+  const [instances, setInstances] = useState<EventInstanceDto[]>([])
+  const [selectedInstanceId, setSelectedInstanceId] = useState<string>('')
+  const [regs, setRegs] = useState<RegistrationDto[]>([])
+  const [loadingInstances, setLoadingInstances] = useState(true)
+  const [loadingRegs, setLoadingRegs] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Load instances once
+  useEffect(() => {
+    setLoadingInstances(true)
+    getAdminInstances()
+      .then((list) => {
+        setInstances(list)
+        if (list.length > 0) setSelectedInstanceId(list[0].id)
+      })
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setLoadingInstances(false))
+  }, [])
+
+  // Load registrations when instance changes
+  const loadRegs = useCallback((instanceId: string) => {
+    if (!instanceId) return
+    setLoadingRegs(true)
+    setError(null)
+    getAdminRegistrations(instanceId)
+      .then(setRegs)
+      .catch((e: unknown) => {
+        setError(e instanceof Error ? e.message : String(e))
+        setRegs([])
+      })
+      .finally(() => setLoadingRegs(false))
+  }, [])
+
+  useEffect(() => {
+    if (selectedInstanceId) loadRegs(selectedInstanceId)
+  }, [selectedInstanceId, loadRegs])
+
+  async function handleMarkPaid(id: string) {
+    await markRegistrationPaid(id)
+    loadRegs(selectedInstanceId)
+  }
+
+  async function handleStatusChange(id: string, status: string) {
+    await patchRegistrationStatus(id, status)
+    loadRegs(selectedInstanceId)
+  }
+
+  const filtered = regs.filter((r) => {
     const q = search.toLowerCase()
     const matchSearch =
       !q ||
@@ -263,6 +375,41 @@ export default function RegistrationsScreen() {
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Instance selector */}
+      <div className="flex items-center gap-3">
+        <label className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
+          Event:
+        </label>
+        {loadingInstances ? (
+          <span className="text-sm" style={{ color: 'var(--faint)' }}>Ładowanie...</span>
+        ) : instances.length === 0 ? (
+          <span className="text-sm" style={{ color: 'var(--faint)' }}>Brak eventów</span>
+        ) : (
+          <select
+            value={selectedInstanceId}
+            onChange={(e) => setSelectedInstanceId(e.target.value)}
+            className="rounded-[12px] border px-3 py-2 text-sm"
+            style={{ borderColor: 'var(--border)', background: 'var(--surface)', color: 'var(--ink)' }}
+          >
+            {instances.map((inst) => (
+              <option key={inst.id} value={inst.id}>
+                {resolveTitle(inst.title)} ({inst.status})
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
+
+      {/* Error */}
+      {error && (
+        <div
+          className="px-4 py-3 rounded-[12px] text-sm"
+          style={{ background: 'var(--err-soft)', color: 'var(--err)', border: '1px solid var(--err)' }}
+        >
+          {error}
+        </div>
+      )}
+
       {/* Filter bar */}
       <div className="flex items-center gap-3 flex-wrap">
         {/* Search */}
@@ -346,75 +493,87 @@ export default function RegistrationsScreen() {
           boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
         }}
       >
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm" style={{ borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface-2)' }}>
-                <th className="px-4 py-2.5 w-10">
-                  <input
-                    type="checkbox"
-                    checked={allSelected}
-                    onChange={toggleAll}
-                    className="accent-[var(--brand)] w-4 h-4"
-                  />
-                </th>
-                {['Zgłaszający', 'Osoby', 'Pokój', 'Kwota', 'Płatność', ''].map((h) => (
-                  <th
-                    key={h}
-                    className="px-4 py-2.5 text-left text-xs font-semibold"
-                    style={{ color: 'var(--faint)' }}
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((r, i) => (
-                <tr
-                  key={r.id}
-                  className="cursor-pointer hover:bg-[var(--surface-2)] transition-colors"
-                  style={{ borderBottom: i < filtered.length - 1 ? '1px solid var(--border-2)' : undefined }}
-                  onClick={() => setOpenDrawer(r)}
-                >
-                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+        {loadingRegs ? (
+          <div className="px-5 py-8 text-center">
+            <p className="text-sm" style={{ color: 'var(--faint)' }}>Ładowanie zgłoszeń...</p>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="px-5 py-8 text-center">
+            <p className="text-sm" style={{ color: 'var(--faint)' }}>
+              {regs.length === 0 ? 'Brak zgłoszeń dla tego eventu.' : 'Brak zgłoszeń pasujących do filtrów.'}
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm" style={{ borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface-2)' }}>
+                  <th className="px-4 py-2.5 w-10">
                     <input
                       type="checkbox"
-                      checked={selected.has(r.id)}
-                      onChange={() => toggleSelect(r.id)}
+                      checked={allSelected}
+                      onChange={toggleAll}
                       className="accent-[var(--brand)] w-4 h-4"
                     />
-                  </td>
-                  <td className="px-4 py-3">
-                    <p className="font-medium" style={{ color: 'var(--ink)' }}>
-                      {r.contact.firstName} {r.contact.lastName}
-                    </p>
-                    <p className="text-xs" style={{ color: 'var(--faint)' }}>{r.contact.email}</p>
-                  </td>
-                  <td className="px-4 py-3 text-center" style={{ color: 'var(--ink)' }}>
-                    {r.participants.length}
-                  </td>
-                  <td className="px-4 py-3" style={{ color: 'var(--muted)' }}>
-                    {r.preferredRoomId ?? '—'}
-                  </td>
-                  <td className="px-4 py-3 font-medium" style={{ color: 'var(--ink)' }}>
-                    {r.totalPrice} zł
-                  </td>
-                  <td className="px-4 py-3">{payBadge(r)}</td>
-                  <td className="px-4 py-3">
-                    <ChevronRight size={15} style={{ color: 'var(--faint)' }} />
-                  </td>
+                  </th>
+                  {['Zgłaszający', 'Osoby', 'Pokój', 'Kwota', 'Płatność', ''].map((h) => (
+                    <th
+                      key={h}
+                      className="px-4 py-2.5 text-left text-xs font-semibold"
+                      style={{ color: 'var(--faint)' }}
+                    >
+                      {h}
+                    </th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {filtered.map((r, i) => (
+                  <tr
+                    key={r.id}
+                    className="cursor-pointer hover:bg-[var(--surface-2)] transition-colors"
+                    style={{ borderBottom: i < filtered.length - 1 ? '1px solid var(--border-2)' : undefined }}
+                    onClick={() => setOpenDrawer(r)}
+                  >
+                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selected.has(r.id)}
+                        onChange={() => toggleSelect(r.id)}
+                        className="accent-[var(--brand)] w-4 h-4"
+                      />
+                    </td>
+                    <td className="px-4 py-3">
+                      <p className="font-medium" style={{ color: 'var(--ink)' }}>
+                        {r.contact.firstName} {r.contact.lastName}
+                      </p>
+                      <p className="text-xs" style={{ color: 'var(--faint)' }}>{r.contact.email}</p>
+                    </td>
+                    <td className="px-4 py-3 text-center" style={{ color: 'var(--ink)' }}>
+                      {r.participants.length}
+                    </td>
+                    <td className="px-4 py-3" style={{ color: 'var(--muted)' }}>
+                      {r.preferredRoomId ?? '—'}
+                    </td>
+                    <td className="px-4 py-3 font-medium" style={{ color: 'var(--ink)' }}>
+                      {r.totalPrice} zł
+                    </td>
+                    <td className="px-4 py-3">{payBadge(r)}</td>
+                    <td className="px-4 py-3">
+                      <ChevronRight size={15} style={{ color: 'var(--faint)' }} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Footer */}
       <div className="flex items-center justify-between">
         <p className="text-sm" style={{ color: 'var(--muted)' }}>
-          Pokazano {filtered.length} z 52
+          Pokazano {filtered.length} z {regs.length}
         </p>
         <div className="flex items-center gap-1">
           <button
@@ -437,6 +596,8 @@ export default function RegistrationsScreen() {
         <RegistrationDrawer
           registration={openDrawer}
           onClose={() => setOpenDrawer(null)}
+          onMarkPaid={handleMarkPaid}
+          onStatusChange={handleStatusChange}
         />
       )}
     </div>

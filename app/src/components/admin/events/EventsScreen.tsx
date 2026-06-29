@@ -1,61 +1,49 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { ExternalLink } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import EventWizard from './EventWizard'
+import { getAdminInstances } from '@/lib/api'
+import type { EventInstanceDto } from '@icpe/shared'
 
-type FilterTab = 'all' | 'one_time' | 'evergreen'
+type FilterTab = 'all' | 'one_time' | 'evergreen' | 'standalone'
 
-interface EventRow {
-  id: string
-  name: string
-  slug: string
-  type: 'jednorazowy' | 'cykliczny'
-  registrations: number
-  capacity: number
-  status: 'Otwarty' | 'Wkrótce' | 'Szkic'
+function resolveTitle(title: unknown): string {
+  if (typeof title === 'string') return title
+  if (title && typeof title === 'object') {
+    const t = title as Record<string, string>
+    return t.pl ?? t.en ?? t.it ?? ''
+  }
+  return ''
 }
 
-const MOCK_EVENTS: EventRow[] = [
-  {
-    id: '1',
-    name: 'Dzień Formacji 2026',
-    slug: 'dzien-formacji-2026',
-    type: 'jednorazowy',
-    registrations: 52,
-    capacity: 80,
-    status: 'Otwarty',
-  },
-  {
-    id: '2',
-    name: 'Rekolekcje Adwentowe',
-    slug: 'rekolekcje-adwentowe-2026',
-    type: 'jednorazowy',
-    registrations: 12,
-    capacity: 40,
-    status: 'Wkrótce',
-  },
-  {
-    id: '3',
-    name: 'Wyjazd Misyjny',
-    slug: 'wyjazd-misyjny',
-    type: 'cykliczny',
-    registrations: 8,
-    capacity: 20,
-    status: 'Szkic',
-  },
-]
+function instanceTypeLabel(type: string): 'jednorazowy' | 'cykliczny' | 'standalone' {
+  if (type === 'EVERGREEN') return 'cykliczny'
+  if (type === 'STANDALONE') return 'standalone'
+  return 'jednorazowy'
+}
 
-function statusBadge(status: EventRow['status']) {
-  if (status === 'Otwarty') return <Badge variant="ok">{status}</Badge>
-  if (status === 'Wkrótce') return <Badge variant="warn">{status}</Badge>
-  return <Badge variant="muted">{status}</Badge>
+function mapStatus(status: string): 'Otwarty' | 'Wkrótce' | 'Szkic' | 'Zamknięty' {
+  switch (status) {
+    case 'OPEN': return 'Otwarty'
+    case 'DRAFT': return 'Wkrótce'
+    case 'CLOSED': return 'Zamknięty'
+    default: return 'Szkic'
+  }
+}
+
+function statusBadge(status: string) {
+  if (status === 'Otwarty' || status === 'OPEN') return <Badge variant="ok">Otwarty</Badge>
+  if (status === 'Wkrótce' || status === 'DRAFT') return <Badge variant="warn">Wkrótce</Badge>
+  if (status === 'Zamknięty' || status === 'CLOSED') return <Badge variant="err">Zamknięty</Badge>
+  return <Badge variant="muted">Szkic</Badge>
 }
 
 const FILTER_TABS: { id: FilterTab; label: string }[] = [
   { id: 'all', label: 'Wszystkie' },
   { id: 'one_time', label: 'Jednorazowe' },
   { id: 'evergreen', label: 'Cykliczne' },
+  { id: 'standalone', label: 'Standalone' },
 ]
 
 interface EventsScreenProps {
@@ -66,10 +54,28 @@ interface EventsScreenProps {
 
 export default function EventsScreen({ onOpenWizard, showWizard, onCloseWizard }: EventsScreenProps) {
   const [filter, setFilter] = useState<FilterTab>('all')
+  const [instances, setInstances] = useState<EventInstanceDto[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const filtered = MOCK_EVENTS.filter((ev) => {
-    if (filter === 'one_time') return ev.type === 'jednorazowy'
-    if (filter === 'evergreen') return ev.type === 'cykliczny'
+  const loadInstances = useCallback(() => {
+    setLoading(true)
+    setError(null)
+    getAdminInstances()
+      .then(setInstances)
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setLoading(false))
+  }, [])
+
+  useEffect(() => {
+    loadInstances()
+  }, [loadInstances])
+
+  const filtered = instances.filter((inst) => {
+    const t = instanceTypeLabel(inst.type ?? 'ONE_TIME')
+    if (filter === 'one_time') return t === 'jednorazowy'
+    if (filter === 'evergreen') return t === 'cykliczny'
+    if (filter === 'standalone') return t === 'standalone'
     return true
   })
 
@@ -89,7 +95,13 @@ export default function EventsScreen({ onOpenWizard, showWizard, onCloseWizard }
             Nowy event
           </span>
         </div>
-        <EventWizard onCancel={onCloseWizard} />
+        <EventWizard
+          onCancel={onCloseWizard}
+          onSuccess={() => {
+            onCloseWizard()
+            loadInstances()
+          }}
+        />
       </div>
     )
   }
@@ -114,6 +126,16 @@ export default function EventsScreen({ onOpenWizard, showWizard, onCloseWizard }
         ))}
       </div>
 
+      {/* Error */}
+      {error && (
+        <div
+          className="px-4 py-3 rounded-[12px] text-sm"
+          style={{ background: 'var(--err-soft)', color: 'var(--err)', border: '1px solid var(--err)' }}
+        >
+          {error}
+        </div>
+      )}
+
       {/* Table */}
       <div
         className="rounded-[15px] border overflow-hidden"
@@ -128,83 +150,116 @@ export default function EventsScreen({ onOpenWizard, showWizard, onCloseWizard }
           style={{ borderBottom: '1px solid var(--border)' }}
         >
           <p className="font-bold text-base" style={{ color: 'var(--ink)' }}>
-            Eventy ({filtered.length})
+            Eventy ({loading ? '…' : filtered.length})
           </p>
           <Button size="sm" onClick={onOpenWizard}>
             + Nowy event
           </Button>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm" style={{ borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface-2)' }}>
-                {['Nazwa', 'Typ', 'Zgłoszenia', 'Status', ''].map((h) => (
-                  <th
-                    key={h}
-                    className="px-5 py-2.5 text-left text-xs font-semibold"
-                    style={{ color: 'var(--faint)' }}
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((ev, i) => (
-                <tr
-                  key={ev.id}
-                  className="hover:bg-[var(--surface-2)] transition-colors"
-                  style={{ borderBottom: i < filtered.length - 1 ? '1px solid var(--border-2)' : undefined }}
-                >
-                  <td className="px-5 py-3.5">
-                    <p className="font-medium" style={{ color: 'var(--ink)' }}>{ev.name}</p>
-                    <p className="text-xs font-mono mt-0.5" style={{ color: 'var(--faint)', fontSize: 11 }}>
-                      /r/{ev.slug}
-                    </p>
-                  </td>
-                  <td className="px-5 py-3.5">
-                    {ev.type === 'jednorazowy' ? (
-                      <Badge variant="brand">Jednorazowy</Badge>
-                    ) : (
-                      <Badge variant="accent">Cykliczny</Badge>
-                    )}
-                  </td>
-                  <td className="px-5 py-3.5">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold" style={{ color: 'var(--ink)' }}>
-                        {ev.registrations}
-                      </span>
-                      <span style={{ color: 'var(--faint)' }}>/</span>
-                      <span style={{ color: 'var(--muted)' }}>{ev.capacity}</span>
-                      {/* Progress bar */}
-                      <div
-                        className="rounded-full overflow-hidden"
-                        style={{ width: 50, height: 4, background: 'var(--border)' }}
-                      >
-                        <div
-                          className="h-full rounded-full"
-                          style={{
-                            width: `${Math.round((ev.registrations / ev.capacity) * 100)}%`,
-                            background: 'var(--brand)',
-                          }}
-                        />
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-5 py-3.5">{statusBadge(ev.status)}</td>
-                  <td className="px-5 py-3.5">
-                    <button
-                      className="flex items-center gap-1 text-xs font-medium transition-colors hover:text-[var(--brand)]"
-                      style={{ color: 'var(--muted)' }}
+
+        {loading ? (
+          <div className="px-5 py-8 text-center">
+            <p className="text-sm" style={{ color: 'var(--faint)' }}>Ładowanie eventów...</p>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="px-5 py-8 text-center flex flex-col items-center gap-3">
+            <p className="text-sm font-medium" style={{ color: 'var(--ink)' }}>Brak eventów</p>
+            <p className="text-sm" style={{ color: 'var(--faint)' }}>
+              {instances.length === 0 ? 'Utwórz pierwszy event klikając „+ Nowy event".' : 'Brak eventów w tej kategorii.'}
+            </p>
+            {instances.length === 0 && (
+              <Button size="sm" onClick={onOpenWizard} className="mt-1">
+                + Utwórz pierwszy event
+              </Button>
+            )}
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm" style={{ borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface-2)' }}>
+                  {['Nazwa', 'Typ', 'Zgłoszenia', 'Status', ''].map((h) => (
+                    <th
+                      key={h}
+                      className="px-5 py-2.5 text-left text-xs font-semibold"
+                      style={{ color: 'var(--faint)' }}
                     >
-                      Otwórz <ExternalLink size={12} />
-                    </button>
-                  </td>
+                      {h}
+                    </th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {filtered.map((ev, i) => {
+                  const typeLabel = instanceTypeLabel(ev.type ?? 'ONE_TIME')
+                  const statusStr = mapStatus(ev.status)
+                  const name = resolveTitle(ev.title)
+                  const slug = (ev as EventInstanceDto & { slug?: string }).slug ?? ''
+                  const cap = ev.capacity ?? 0
+                  const reg = ev.registeredCount ?? 0
+                  return (
+                    <tr
+                      key={ev.id}
+                      className="hover:bg-[var(--surface-2)] transition-colors"
+                      style={{ borderBottom: i < filtered.length - 1 ? '1px solid var(--border-2)' : undefined }}
+                    >
+                      <td className="px-5 py-3.5">
+                        <p className="font-medium" style={{ color: 'var(--ink)' }}>{name}</p>
+                        {slug && (
+                          <p className="text-xs font-mono mt-0.5" style={{ color: 'var(--faint)', fontSize: 11 }}>
+                            /r/{slug}
+                          </p>
+                        )}
+                      </td>
+                      <td className="px-5 py-3.5">
+                        {typeLabel === 'jednorazowy' && <Badge variant="brand">Jednorazowy</Badge>}
+                        {typeLabel === 'cykliczny' && <Badge variant="accent">Cykliczny</Badge>}
+                        {typeLabel === 'standalone' && <Badge variant="muted">Standalone</Badge>}
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold" style={{ color: 'var(--ink)' }}>{reg}</span>
+                          {cap > 0 && (
+                            <>
+                              <span style={{ color: 'var(--faint)' }}>/</span>
+                              <span style={{ color: 'var(--muted)' }}>{cap}</span>
+                              <div
+                                className="rounded-full overflow-hidden"
+                                style={{ width: 50, height: 4, background: 'var(--border)' }}
+                              >
+                                <div
+                                  className="h-full rounded-full"
+                                  style={{
+                                    width: `${Math.min(100, Math.round((reg / cap) * 100))}%`,
+                                    background: 'var(--brand)',
+                                  }}
+                                />
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-5 py-3.5">{statusBadge(statusStr)}</td>
+                      <td className="px-5 py-3.5">
+                        {slug && (
+                          <a
+                            href={`https://rejestracja.icpemission.pl/r/${slug}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 text-xs font-medium transition-colors hover:text-[var(--brand)]"
+                            style={{ color: 'var(--muted)' }}
+                          >
+                            Otwórz <ExternalLink size={12} />
+                          </a>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   )

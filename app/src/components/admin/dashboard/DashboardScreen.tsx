@@ -1,10 +1,16 @@
+import { useEffect, useState } from 'react'
 import {
   CalendarDays,
   UserPlus,
   TrendingUp,
   BedDouble,
 } from 'lucide-react'
-import { MOCK_ADMIN_SUMMARY, MOCK_REGISTRATIONS } from '@/lib/api'
+import {
+  getAdminSummary,
+  getAdminInstances,
+  getAdminRegistrations,
+} from '@/lib/api'
+import type { AdminSummaryDto, EventInstanceDto, RegistrationDto } from '@icpe/shared'
 
 // ── KPI Tile ─────────────────────────────────────────────────────────────────
 
@@ -78,7 +84,6 @@ function TrendChart() {
   const paddingBottom = 24
   const totalW = paddingLeft + TREND_DATA.length * (barW + gap) - gap + 8
 
-  // Y-axis ticks
   const ticks = [0, Math.round(maxVal / 2), maxVal]
 
   return (
@@ -98,7 +103,6 @@ function TrendChart() {
           viewBox={`0 0 ${totalW} ${chartH + paddingBottom}`}
           style={{ width: '100%', minWidth: totalW, height: chartH + paddingBottom }}
         >
-          {/* Y-axis labels + gridlines */}
           {ticks.map((tick) => {
             const y = chartH - (tick / maxVal) * chartH
             return (
@@ -125,7 +129,6 @@ function TrendChart() {
             )
           })}
 
-          {/* Bars */}
           {TREND_DATA.map((val, i) => {
             const barH = Math.max(4, (val / maxVal) * chartH)
             const x = paddingLeft + i * (barW + gap)
@@ -142,7 +145,6 @@ function TrendChart() {
                   fill={isRecent ? 'var(--accent)' : i % 2 === 0 ? 'var(--brand)' : 'var(--brand-soft)'}
                   opacity={isRecent ? 1 : 0.8}
                 />
-                {/* Day label */}
                 <text
                   x={x + barW / 2}
                   y={chartH + paddingBottom - 6}
@@ -166,34 +168,43 @@ function TrendChart() {
 
 // ── Nearest Events ────────────────────────────────────────────────────────────
 
-interface EventItem {
-  day: string
-  month: string
-  name: string
-  status: 'ok' | 'warn' | 'muted'
-  statusLabel: string
-}
-
-const NEAREST_EVENTS: EventItem[] = [
-  { day: '4', month: 'wrz', name: 'Dzień Formacji 2026', status: 'ok', statusLabel: 'Otwarty' },
-  { day: '28', month: 'lis', name: 'Rekolekcje Adwentowe', status: 'warn', statusLabel: 'Wkrótce' },
-  { day: '15', month: 'gru', name: 'Dzień Skupienia', status: 'muted', statusLabel: 'Szkic' },
-]
-
-function statusStyle(status: 'ok' | 'warn' | 'muted' | 'err'): { background: string; color: string } {
+function statusStyle(status: string): { background: string; color: string } {
   switch (status) {
     case 'ok':
+    case 'OPEN':
       return { background: 'var(--ok-soft)', color: 'var(--ok)' }
     case 'warn':
+    case 'DRAFT':
       return { background: 'var(--warn-soft)', color: 'var(--warn)' }
     case 'err':
+    case 'CLOSED':
+    case 'ARCHIVED':
       return { background: 'var(--err-soft)', color: 'var(--err)' }
     default:
       return { background: 'var(--surface-3)', color: 'var(--ink)' }
   }
 }
 
-function NearestEvents() {
+function statusLabel(status: string): string {
+  switch (status) {
+    case 'OPEN': return 'Otwarty'
+    case 'DRAFT': return 'Wkrótce'
+    case 'CLOSED': return 'Zamknięty'
+    case 'ARCHIVED': return 'Archiwalny'
+    default: return status
+  }
+}
+
+function resolveTitle(title: unknown): string {
+  if (typeof title === 'string') return title
+  if (title && typeof title === 'object') {
+    const t = title as Record<string, string>
+    return t.pl ?? t.en ?? t.it ?? ''
+  }
+  return ''
+}
+
+function NearestEvents({ instances, loading }: { instances: EventInstanceDto[]; loading: boolean }) {
   return (
     <div
       className="p-5 rounded-[15px] border h-full"
@@ -206,38 +217,44 @@ function NearestEvents() {
       <p className="font-bold text-base mb-4" style={{ color: 'var(--ink)' }}>
         Najbliższe terminy
       </p>
-      <ul className="flex flex-col gap-3">
-        {NEAREST_EVENTS.map((ev) => (
-          <li key={ev.name} className="flex items-center gap-3">
-            {/* Date cube */}
-            <div
-              className="flex flex-col items-center justify-center rounded-[10px] shrink-0"
-              style={{ width: 44, height: 44, background: 'var(--brand-soft)' }}
-            >
-              <span
-                className="font-bold leading-none"
-                style={{ fontSize: 17, color: 'var(--brand)' }}
-              >
-                {ev.day}
-              </span>
-              <span className="text-xs uppercase" style={{ color: 'var(--brand)', fontSize: 9 }}>
-                {ev.month}
-              </span>
-            </div>
-            {/* Name */}
-            <p className="flex-1 text-sm font-medium" style={{ color: 'var(--ink)' }}>
-              {ev.name}
-            </p>
-            {/* Status pill */}
-            <span
-              className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold"
-              style={statusStyle(ev.status)}
-            >
-              {ev.statusLabel}
-            </span>
-          </li>
-        ))}
-      </ul>
+      {loading ? (
+        <p className="text-sm" style={{ color: 'var(--faint)' }}>Ładowanie...</p>
+      ) : instances.length === 0 ? (
+        <p className="text-sm" style={{ color: 'var(--faint)' }}>Brak otwartych eventów</p>
+      ) : (
+        <ul className="flex flex-col gap-3">
+          {instances.slice(0, 5).map((ev) => {
+            const d = new Date(ev.startsAt)
+            const day = d.getDate().toString()
+            const month = d.toLocaleDateString('pl-PL', { month: 'short' }).replace('.', '')
+            const name = resolveTitle(ev.title)
+            return (
+              <li key={ev.id} className="flex items-center gap-3">
+                <div
+                  className="flex flex-col items-center justify-center rounded-[10px] shrink-0"
+                  style={{ width: 44, height: 44, background: 'var(--brand-soft)' }}
+                >
+                  <span className="font-bold leading-none" style={{ fontSize: 17, color: 'var(--brand)' }}>
+                    {day}
+                  </span>
+                  <span className="text-xs uppercase" style={{ color: 'var(--brand)', fontSize: 9 }}>
+                    {month}
+                  </span>
+                </div>
+                <p className="flex-1 text-sm font-medium" style={{ color: 'var(--ink)' }}>
+                  {name}
+                </p>
+                <span
+                  className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold"
+                  style={statusStyle(ev.status)}
+                >
+                  {statusLabel(ev.status)}
+                </span>
+              </li>
+            )
+          })}
+        </ul>
+      )}
     </div>
   )
 }
@@ -255,27 +272,36 @@ interface RegistrationRow {
   statusLabel: string
 }
 
-function buildRows(): RegistrationRow[] {
-  return MOCK_REGISTRATIONS.slice(0, 5).map((r) => {
+function buildRows(regs: RegistrationDto[], instanceTitle: string): RegistrationRow[] {
+  return regs.slice(0, 5).map((r) => {
     let status: 'ok' | 'warn' | 'err' = 'warn'
-    let statusLabel = 'Oczekuje'
-    if (r.paymentStatus === 'PAID') { status = 'ok'; statusLabel = 'Opłacone' }
-    else if (r.status === 'WAITLIST') { status = 'err'; statusLabel = 'Oczekuje' }
+    let sl = 'Oczekuje'
+    if (r.paymentStatus === 'PAID') { status = 'ok'; sl = 'Opłacone' }
+    else if (r.status === 'WAITLIST') { status = 'err'; sl = 'Lista oczek.' }
     return {
       id: r.id,
       name: `${r.contact.firstName} ${r.contact.lastName}`,
       email: r.contact.email,
-      event: 'Dzień Formacji 2026',
+      event: instanceTitle,
       people: r.participants.length,
       amount: `${r.totalPrice} zł`,
       status,
-      statusLabel,
+      statusLabel: sl,
     }
   })
 }
 
-function RecentRegistrations() {
-  const rows = buildRows()
+function RecentRegistrations({
+  regs,
+  loading,
+  instanceTitle,
+}: {
+  regs: RegistrationDto[]
+  loading: boolean
+  instanceTitle: string
+}) {
+  const rows = buildRows(regs, instanceTitle)
+
   return (
     <div
       className="rounded-[15px] border"
@@ -290,56 +316,66 @@ function RecentRegistrations() {
           Ostatnie zgłoszenia
         </p>
       </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm" style={{ borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ borderBottom: '1px solid var(--border)' }}>
-              {['Zgłaszający', 'Event', 'Osoby', 'Kwota', 'Status'].map((h) => (
-                <th
-                  key={h}
-                  className="px-5 py-2.5 text-left font-semibold text-xs"
-                  style={{ color: 'var(--faint)' }}
-                >
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, idx) => (
-              <tr
-                key={row.id}
-                style={{
-                  borderBottom: idx < rows.length - 1 ? '1px solid var(--border-2)' : undefined,
-                }}
-                className="hover:bg-[var(--surface-2)] transition-colors"
-              >
-                <td className="px-5 py-3">
-                  <p className="font-medium" style={{ color: 'var(--ink)' }}>{row.name}</p>
-                  <p className="text-xs" style={{ color: 'var(--faint)' }}>{row.email}</p>
-                </td>
-                <td className="px-5 py-3" style={{ color: 'var(--muted)' }}>
-                  {row.event}
-                </td>
-                <td className="px-5 py-3 text-center" style={{ color: 'var(--ink)' }}>
-                  {row.people}
-                </td>
-                <td className="px-5 py-3 font-medium" style={{ color: 'var(--ink)' }}>
-                  {row.amount}
-                </td>
-                <td className="px-5 py-3">
-                  <span
-                    className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold"
-                    style={statusStyle(row.status)}
+      {loading ? (
+        <div className="px-5 pb-5">
+          <p className="text-sm" style={{ color: 'var(--faint)' }}>Ładowanie...</p>
+        </div>
+      ) : rows.length === 0 ? (
+        <div className="px-5 pb-5">
+          <p className="text-sm" style={{ color: 'var(--faint)' }}>Brak zgłoszeń</p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm" style={{ borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                {['Zgłaszający', 'Event', 'Osoby', 'Kwota', 'Status'].map((h) => (
+                  <th
+                    key={h}
+                    className="px-5 py-2.5 text-left font-semibold text-xs"
+                    style={{ color: 'var(--faint)' }}
                   >
-                    {row.statusLabel}
-                  </span>
-                </td>
+                    {h}
+                  </th>
+                ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {rows.map((row, idx) => (
+                <tr
+                  key={row.id}
+                  style={{
+                    borderBottom: idx < rows.length - 1 ? '1px solid var(--border-2)' : undefined,
+                  }}
+                  className="hover:bg-[var(--surface-2)] transition-colors"
+                >
+                  <td className="px-5 py-3">
+                    <p className="font-medium" style={{ color: 'var(--ink)' }}>{row.name}</p>
+                    <p className="text-xs" style={{ color: 'var(--faint)' }}>{row.email}</p>
+                  </td>
+                  <td className="px-5 py-3" style={{ color: 'var(--muted)' }}>
+                    {row.event}
+                  </td>
+                  <td className="px-5 py-3 text-center" style={{ color: 'var(--ink)' }}>
+                    {row.people}
+                  </td>
+                  <td className="px-5 py-3 font-medium" style={{ color: 'var(--ink)' }}>
+                    {row.amount}
+                  </td>
+                  <td className="px-5 py-3">
+                    <span
+                      className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold"
+                      style={statusStyle(row.status)}
+                    >
+                      {row.statusLabel}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   )
 }
@@ -347,30 +383,94 @@ function RecentRegistrations() {
 // ── Dashboard Screen ──────────────────────────────────────────────────────────
 
 export default function DashboardScreen() {
-  const s = MOCK_ADMIN_SUMMARY
+  const [summary, setSummary] = useState<AdminSummaryDto | null>(null)
+  const [instances, setInstances] = useState<EventInstanceDto[]>([])
+  const [regs, setRegs] = useState<RegistrationDto[]>([])
+  const [loadingSummary, setLoadingSummary] = useState(true)
+  const [loadingInstances, setLoadingInstances] = useState(true)
+  const [loadingRegs, setLoadingRegs] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setLoadingSummary(true)
+    getAdminSummary()
+      .then(setSummary)
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setLoadingSummary(false))
+
+    setLoadingInstances(true)
+    getAdminInstances('OPEN')
+      .then(async (list) => {
+        setInstances(list)
+        setLoadingInstances(false)
+        if (list.length > 0) {
+          setLoadingRegs(true)
+          try {
+            const r = await getAdminRegistrations(list[0].id)
+            setRegs(r)
+          } catch {
+            setRegs([])
+          } finally {
+            setLoadingRegs(false)
+          }
+        }
+      })
+      .catch(() => {
+        setInstances([])
+        setLoadingInstances(false)
+      })
+  }, [])
+
+  const s = summary ?? { openInstances: 0, registrationsToday: 0, revenue: 0, currency: 'PLN', occupancyPct: 0 }
+  const firstInstanceTitle = instances.length > 0 ? resolveTitle(instances[0].title) : ''
+
   return (
     <div className="flex flex-col gap-6">
+      {error && (
+        <div
+          className="px-4 py-3 rounded-[12px] text-sm"
+          style={{ background: 'var(--err-soft)', color: 'var(--err)', border: '1px solid var(--err)' }}
+        >
+          {error}
+        </div>
+      )}
+
       {/* KPI row */}
       <div className="grid grid-cols-4 gap-4">
-        <KpiTile label="Otwarte edycje" value={String(s.openInstances)} delta="+1" icon={CalendarDays} />
-        <KpiTile label="Zgłoszenia dziś" value={String(s.registrationsToday)} delta="+24%" icon={UserPlus} />
         <KpiTile
-          label="Przychód (wrzesień)"
-          value={`${new Intl.NumberFormat('pl-PL').format(s.revenue)} zł`}
-          delta="+12%"
+          label="Otwarte edycje"
+          value={loadingSummary ? '—' : String(s.openInstances)}
+          icon={CalendarDays}
+        />
+        <KpiTile
+          label="Zgłoszenia dziś"
+          value={loadingSummary ? '—' : String(s.registrationsToday)}
+          icon={UserPlus}
+        />
+        <KpiTile
+          label="Przychód (bieżący)"
+          value={loadingSummary ? '—' : `${new Intl.NumberFormat('pl-PL').format(s.revenue)} zł`}
           icon={TrendingUp}
         />
-        <KpiTile label="Obłożenie pokoi" value={`${s.occupancyPct}%`} icon={BedDouble} />
+        <KpiTile
+          label="Obłożenie pokoi"
+          value={loadingSummary ? '—' : `${s.occupancyPct}%`}
+          icon={BedDouble}
+        />
       </div>
 
       {/* Chart + Events */}
       <div className="grid gap-4" style={{ gridTemplateColumns: '1fr 340px' }}>
         <TrendChart />
-        <NearestEvents />
+        <NearestEvents instances={instances} loading={loadingInstances} />
       </div>
 
       {/* Registrations table */}
-      <RecentRegistrations />
+      <RecentRegistrations
+        regs={regs}
+        loading={loadingRegs}
+        instanceTitle={firstInstanceTitle}
+      />
     </div>
   )
 }
