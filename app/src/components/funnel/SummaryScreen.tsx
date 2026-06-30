@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { computePrice, formatZl, DEFAULT_PRICING, buildIcs, googleCalendarUrl } from '@icpe/shared'
-import type { EventInstanceDto } from '@icpe/shared'
+import { computePrice, formatZl, buildIcs, googleCalendarUrl } from '@icpe/shared'
+import type { EventInstanceDto, PricingConfig, PriceLine } from '@icpe/shared'
 import type { StepperState } from '../../pages/PublicFunnel'
 
 interface Props {
   state: StepperState
   event: EventInstanceDto
+  pricingConfig: PricingConfig
   onSubmit: () => void
   onEdit: (step: number) => void
   onBack: () => void
@@ -38,20 +39,40 @@ function CopyButton({ text }: { text: string }) {
   )
 }
 
-export default function SummaryScreen({ state, event, onSubmit, onEdit, onBack }: Props) {
+export default function SummaryScreen({ state, event, pricingConfig, onSubmit, onEdit, onBack }: Props) {
   const { t } = useTranslation()
 
-  const price = computePrice(
-    {
-      participants: state.participants.map((p) => ({ type: p.type, age: p.age })),
-      roomId: state.roomId || DEFAULT_PRICING.rooms[0].id,
-      options: { transport: state.options.transport, bedding: state.options.bedding },
-      discountCode: state.discountApplied ? state.discountCode : '',
-    },
-    DEFAULT_PRICING,
-  )
+  const priceInput = {
+    rooms: state.rooms.map((r) => ({
+      roomId: r.roomId,
+      participants: r.participantIndexes
+        .filter((idx) => idx >= 0 && idx < state.participants.length)
+        .map((idx) => ({
+          type: state.participants[idx].type,
+          age: state.participants[idx].age,
+        })),
+    })),
+    options: { transport: state.options.transport, bedding: state.options.bedding },
+    discountCode: state.discountApplied ? state.discountCode : '',
+  }
 
-  const selectedRoom = DEFAULT_PRICING.rooms.find((r) => r.id === state.roomId) ?? DEFAULT_PRICING.rooms[0]
+  const price = computePrice(priceInput, pricingConfig)
+
+  /**
+   * Budujemy mapę: participantIndex → PriceLine
+   * Linie są generowane w kolejności pokoi × osób w pokoju (taką samą jak priceInput).
+   */
+  const participantLineMap = new Map<number, PriceLine>()
+  let lineIdx = 0
+  for (const room of state.rooms) {
+    for (const pIdx of room.participantIndexes) {
+      if (pIdx >= 0 && pIdx < state.participants.length) {
+        const line = price.lines[lineIdx]
+        if (line) participantLineMap.set(pIdx, line)
+        lineIdx++
+      }
+    }
+  }
 
   const isOnline = state.paymentMethod === 'online'
 
@@ -109,11 +130,11 @@ export default function SummaryScreen({ state, event, onSubmit, onEdit, onBack }
           style={{ background: 'var(--brand-soft)', border: '1px solid var(--brand)' }}
         >
           <span className="text-sm font-medium" style={{ color: 'var(--brand)' }}>
-            📅 {typeof event.title === 'string' ? event.title : 'Dzień Formacji 2026'}
+            {typeof event.title === 'string' ? event.title : 'Dzień Formacji 2026'}
           </span>
         </div>
 
-        {/* Participants */}
+        {/* Uczestnicy */}
         <div
           className="rounded-[15px] overflow-hidden"
           style={{ border: '1px solid var(--border)' }}
@@ -131,50 +152,95 @@ export default function SummaryScreen({ state, event, onSubmit, onEdit, onBack }
             </button>
           </div>
           {state.participants.map((p, i) => {
-            const line = price.lines[i]
+            const line = participantLineMap.get(i)
             return (
               <div
                 key={p.id}
-                className="flex items-center justify-between px-4 py-3"
+                className="flex flex-col px-4 py-3"
                 style={{ borderTop: i === 0 ? 'none' : '1px solid var(--border)' }}
               >
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
-                    {p.name || (p.type === 'adult' ? 'Dorosły' : 'Dziecko')}
-                  </span>
-                  <span className="text-xs" style={{ color: 'var(--muted)' }}>
-                    {p.type === 'adult' ? 'Dorosły' : `Dziecko · ${p.age} lat`}
+                <div className="flex items-center justify-between">
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
+                      {p.name || (p.type === 'adult' ? 'Dorosły' : 'Dziecko')}
+                    </span>
+                    <span className="text-xs" style={{ color: 'var(--muted)' }}>
+                      {p.type === 'adult' ? 'Dorosły' : `Dziecko · ${p.age} lat`}
+                    </span>
+                  </div>
+                  <span className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+                    {formatZl(line?.total ?? 0)}
                   </span>
                 </div>
-                <span className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-                  {formatZl(line?.total ?? 0)}
-                </span>
+                {/* Rozbicie ceny per osoba wg PriceLine */}
+                {line && line.total > 0 && (
+                  <div className="flex gap-3 mt-1.5 flex-wrap">
+                    <span className="text-xs" style={{ color: 'var(--muted)' }}>
+                      Formacja: {formatZl(line.formation)}
+                    </span>
+                    <span className="text-xs" style={{ color: 'var(--muted)' }}>
+                      Nocleg: {formatZl(line.accommodation)}
+                    </span>
+                    <span className="text-xs" style={{ color: 'var(--muted)' }}>
+                      Wyżywienie: {formatZl(line.meals)}
+                    </span>
+                  </div>
+                )}
               </div>
             )
           })}
         </div>
 
-        {/* Room */}
-        <div
-          className="flex items-center justify-between rounded-[12px] px-4 py-3"
-          style={{ border: '1px solid var(--border)', background: 'var(--surface)' }}
-        >
-          <div className="flex flex-col gap-0.5">
-            <span className="text-xs" style={{ color: 'var(--muted)' }}>
-              {t('room.title')}
-            </span>
-            <span className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
-              {selectedRoom.name}
-            </span>
-          </div>
-          <button
-            onClick={() => onEdit(3)}
-            className="text-xs font-semibold"
-            style={{ color: 'var(--brand)', background: 'none', border: 'none', cursor: 'pointer' }}
+        {/* Pokoje */}
+        {state.rooms.length > 0 && (
+          <div
+            className="rounded-[15px] overflow-hidden"
+            style={{ border: '1px solid var(--border)' }}
           >
-            {t('summary.change')}
-          </button>
-        </div>
+            <div className="flex items-center justify-between px-4 py-3" style={{ background: 'var(--surface-2)' }}>
+              <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--muted)' }}>
+                {t('room.title')}
+              </span>
+              <button
+                onClick={() => onEdit(3)}
+                className="text-xs font-semibold"
+                style={{ color: 'var(--brand)', background: 'none', border: 'none', cursor: 'pointer' }}
+              >
+                {t('summary.change')}
+              </button>
+            </div>
+            {state.rooms.map((room, ri) => {
+              const roomType = pricingConfig.rooms.find((rt) => rt.id === room.roomId)
+              const assignedNames = room.participantIndexes
+                .filter((idx) => idx >= 0 && idx < state.participants.length)
+                .map((idx) => {
+                  const p = state.participants[idx]
+                  return p.name.trim() || (p.type === 'adult' ? 'Dorosły' : 'Dziecko')
+                })
+              return (
+                <div
+                  key={room.uid}
+                  className="flex flex-col gap-0.5 px-4 py-3"
+                  style={{ borderTop: ri === 0 ? 'none' : '1px solid var(--border)' }}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
+                      Pokój {ri + 1}: {roomType?.name ?? room.roomId}
+                    </span>
+                    <span className="text-sm font-semibold" style={{ color: 'var(--muted)' }}>
+                      {roomType ? `${roomType.perPerson} zł/os/noc` : ''}
+                    </span>
+                  </div>
+                  {assignedNames.length > 0 && (
+                    <span className="text-xs" style={{ color: 'var(--muted)' }}>
+                      {assignedNames.join(', ')}
+                    </span>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
 
         {/* Price breakdown */}
         <div
@@ -182,13 +248,13 @@ export default function SummaryScreen({ state, event, onSubmit, onEdit, onBack }
           style={{ border: '1px solid var(--border)', background: 'var(--surface)' }}
         >
           <div className="flex flex-col divide-y" style={{ borderColor: 'var(--border)' }}>
-            {/* Participants fee */}
+            {/* Formation */}
             <div className="flex justify-between items-center px-4 py-3">
               <span className="text-sm" style={{ color: 'var(--muted)' }}>
-                {t('summary.participants_fee')}
+                Opłata formacyjna
               </span>
               <span className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
-                {formatZl(price.participants)}
+                {formatZl(price.formation)}
               </span>
             </div>
 
@@ -199,6 +265,16 @@ export default function SummaryScreen({ state, event, onSubmit, onEdit, onBack }
               </span>
               <span className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
                 {formatZl(price.accommodation)}
+              </span>
+            </div>
+
+            {/* Meals */}
+            <div className="flex justify-between items-center px-4 py-3">
+              <span className="text-sm" style={{ color: 'var(--muted)' }}>
+                Wyżywienie
+              </span>
+              <span className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
+                {formatZl(price.meals)}
               </span>
             </div>
 
@@ -221,7 +297,7 @@ export default function SummaryScreen({ state, event, onSubmit, onEdit, onBack }
                   {t('summary.discount')}
                 </span>
                 <span className="text-sm font-semibold" style={{ color: 'var(--ok)' }}>
-                  −{formatZl(price.discount)}
+                  -{formatZl(price.discount)}
                 </span>
               </div>
             )}
@@ -276,7 +352,6 @@ export default function SummaryScreen({ state, event, onSubmit, onEdit, onBack }
                 {t('summary.transfer_title')}
               </h3>
 
-              {/* Recipient */}
               <div className="flex flex-col gap-0.5">
                 <span className="text-xs" style={{ color: 'var(--muted)' }}>
                   {t('summary.recipient')}
@@ -286,39 +361,30 @@ export default function SummaryScreen({ state, event, onSubmit, onEdit, onBack }
                 </span>
               </div>
 
-              {/* Account number */}
               <div className="flex items-center justify-between gap-2">
                 <div className="flex flex-col gap-0.5 min-w-0">
                   <span className="text-xs" style={{ color: 'var(--muted)' }}>
                     {t('summary.account')}
                   </span>
-                  <span
-                    className="text-sm font-medium font-mono truncate"
-                    style={{ color: 'var(--ink)' }}
-                  >
+                  <span className="text-sm font-medium font-mono truncate" style={{ color: 'var(--ink)' }}>
                     PL 12 1234 5678 9012 3456 7890 1234
                   </span>
                 </div>
                 <CopyButton text="PL12123456789012345678901234" />
               </div>
 
-              {/* Reference */}
               <div className="flex items-center justify-between gap-2">
                 <div className="flex flex-col gap-0.5">
                   <span className="text-xs" style={{ color: 'var(--muted)' }}>
                     {t('summary.ref_title')}
                   </span>
-                  <span
-                    className="text-sm font-semibold font-mono"
-                    style={{ color: 'var(--accent-2, var(--accent))' }}
-                  >
+                  <span className="text-sm font-semibold font-mono" style={{ color: 'var(--accent-2, var(--accent))' }}>
                     REG-2026-0148
                   </span>
                 </div>
                 <CopyButton text="REG-2026-0148" />
               </div>
 
-              {/* Amount */}
               <div className="flex flex-col gap-0.5">
                 <span className="text-xs" style={{ color: 'var(--muted)' }}>
                   {t('summary.amount_label')}
@@ -328,7 +394,6 @@ export default function SummaryScreen({ state, event, onSubmit, onEdit, onBack }
                 </span>
               </div>
 
-              {/* Deadline */}
               <div className="flex flex-col gap-0.5">
                 <span className="text-xs" style={{ color: 'var(--muted)' }}>
                   {t('summary.deadline')}
@@ -339,7 +404,6 @@ export default function SummaryScreen({ state, event, onSubmit, onEdit, onBack }
               </div>
             </div>
 
-            {/* Submit transfer button */}
             <button
               onClick={onSubmit}
               className="w-full text-white text-sm font-semibold rounded-[16px] py-4 transition-all duration-150 active:scale-[0.98] hover:opacity-90"
@@ -364,7 +428,7 @@ export default function SummaryScreen({ state, event, onSubmit, onEdit, onBack }
               textDecoration: 'none',
             }}
           >
-            📆 {t('summary.add_google')}
+            {t('summary.add_google')}
           </a>
           <button
             onClick={handleIcsDownload}
@@ -376,7 +440,7 @@ export default function SummaryScreen({ state, event, onSubmit, onEdit, onBack }
               cursor: 'pointer',
             }}
           >
-            ⬇ {t('summary.download_ics')}
+            {t('summary.download_ics')}
           </button>
         </div>
 

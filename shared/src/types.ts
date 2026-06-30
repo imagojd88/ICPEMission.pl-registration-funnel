@@ -87,13 +87,22 @@ export interface RegistrationDto {
   createdAt: string;
 }
 
+/** Jeden pokój w komponowanym zgłoszeniu: typ pokoju + indeksy osób z `participants`. */
+export interface RoomCompositionEntry {
+  /** id typu pokoju (RoomType.id lub klucz z PricingConfig.rooms) */
+  roomId: string;
+  /** indeksy uczestników (pozycje w tablicy participants) przypisanych do tego pokoju */
+  participantIndexes: number[];
+}
+
 /** Wejście publicznego POST /registrations. */
 export interface CreateRegistrationDto {
   instanceId: string;
   locale: Locale;
   contact: Contact;
   participants: ParticipantDto[];
-  preferredRoomId: string;
+  /** komponowane pokoje — każdy z typem i listą przypisanych osób */
+  rooms: RoomCompositionEntry[];
   dietaryNotes?: string;
   dietaryTags?: string[];
   options?: { transport?: boolean; bedding?: boolean };

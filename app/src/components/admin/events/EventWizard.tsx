@@ -5,7 +5,7 @@ import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import { createEventSeries, configureSeriesPage, addRoomType } from '@/lib/api'
 import { DEFAULT_PRICING } from '@icpe/shared'
-import type { PricingConfig } from '@icpe/shared'
+import type { PricingConfig, AgeBracket } from '@icpe/shared'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -20,6 +20,27 @@ interface RoomRow {
   capacity: string
   price: string
   quantity: string
+  tag?: string
+}
+
+/** Wiersz progu wiekowego w formularzu */
+interface AgeBracketRow {
+  id: string
+  ltAge: string      // górna granica (wyłącznie) — string dla inputa
+  multiplier: string // ułamek np. "0.7"
+}
+
+/** Opcje dodatkowe w formularzu */
+interface OptionsForm {
+  transport: string  // kwota zł
+  bedding: string    // kwota zł/os
+}
+
+/** Kody rabatowe w formularzu */
+interface DiscountRow {
+  id: string
+  code: string
+  pct: string  // procent np. "10" → 0.1
 }
 
 interface WizardState {
@@ -36,6 +57,12 @@ interface WizardState {
   // step 2
   rooms: RoomRow[]
   newRoom: Omit<RoomRow, 'id'>
+  // step 3 — cennik
+  formationFee: string
+  mealsFee: string
+  ageBrackets: AgeBracketRow[]
+  optionsForm: OptionsForm
+  discountRows: DiscountRow[]
   // step 4
   slug: string
   color: ColorSwatch
@@ -67,15 +94,18 @@ const COLOR_DARK_MAP: Record<ColorSwatch, string> = {
   purple: '#5E3E81',
 }
 
-const AGE_BRACKETS = [
-  { range: '< 3 lata', pct: '0%' },
-  { range: '3–11 lat', pct: '70%' },
-  { range: '12–17 lat', pct: '90%' },
-  { range: '18+ lat', pct: '100%' },
-]
-
 const STEP_LABELS = ['Typ', 'Szczegóły', 'Pokoje', 'Cennik', 'Strona']
 const FIELD_CHECKS = ['Telefon', 'Adres', 'Dieta', 'Dzieci', 'Parafia', 'Transport']
+
+// ── Default age brackets from DEFAULT_PRICING ─────────────────────────────────
+
+function defaultAgeBrackets(): AgeBracketRow[] {
+  return DEFAULT_PRICING.childBrackets.map((b, i) => ({
+    id: `bracket-${i}`,
+    ltAge: String(b.ltAge),
+    multiplier: String(b.multiplier),
+  }))
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -92,18 +122,46 @@ function mapPricingModel(m: PricingModel): 'PER_PERSON_PER_NIGHT' | 'PER_ROOM' |
   return 'PER_PERSON_PER_NIGHT'
 }
 
-function buildPricingConfig(rooms: RoomRow[], nights: number): PricingConfig {
-  const roomDefs = rooms.map((r) => ({
+function buildPricingConfig(state: WizardState): PricingConfig {
+  const nights = parseInt(state.nights) || 0
+
+  const roomDefs = state.rooms.map((r) => ({
     id: r.id,
     name: r.name,
     cap: parseInt(r.capacity) || 1,
     perPerson: parseFloat(r.price) || 0,
     model: r.model,
+    tag: r.tag,
   }))
+
+  // Parse age brackets (sort by ltAge ascending)
+  const parsedBrackets: AgeBracket[] = state.ageBrackets
+    .map((b) => ({
+      ltAge: parseInt(b.ltAge) || 0,
+      multiplier: parseFloat(b.multiplier) ?? 0,
+    }))
+    .filter((b) => b.ltAge > 0)
+    .sort((a, b) => a.ltAge - b.ltAge)
+
+  // Parse discount codes
+  const discountCodes: Record<string, number> = {}
+  for (const row of state.discountRows) {
+    const code = row.code.trim().toUpperCase()
+    const frac = parseFloat(row.pct) / 100
+    if (code && !isNaN(frac)) discountCodes[code] = frac
+  }
+
   return {
-    ...DEFAULT_PRICING,
+    formationFee: parseFloat(state.formationFee) || DEFAULT_PRICING.formationFee,
+    mealsFee: parseFloat(state.mealsFee) || DEFAULT_PRICING.mealsFee,
     nights,
+    childBrackets: parsedBrackets.length > 0 ? parsedBrackets : DEFAULT_PRICING.childBrackets,
     rooms: roomDefs.length > 0 ? roomDefs : DEFAULT_PRICING.rooms,
+    options: {
+      transport: parseFloat(state.optionsForm.transport) || DEFAULT_PRICING.options.transport,
+      bedding: parseFloat(state.optionsForm.bedding) || DEFAULT_PRICING.options.bedding,
+    },
+    discountCodes: Object.keys(discountCodes).length > 0 ? discountCodes : DEFAULT_PRICING.discountCodes,
   }
 }
 
@@ -348,7 +406,7 @@ function Step2Rooms({ state, update }: { state: WizardState; update: (p: Partial
   function addRoom() {
     if (!state.newRoom.name) return
     const room: RoomRow = { ...state.newRoom, id: Date.now().toString() }
-    update({ rooms: [...state.rooms, room], newRoom: { name: '', model: 'os/noc', capacity: '', price: '', quantity: '' } })
+    update({ rooms: [...state.rooms, room], newRoom: { name: '', model: 'os/noc', capacity: '', price: '', quantity: '', tag: '' } })
   }
 
   function removeRoom(id: string) {
@@ -413,6 +471,12 @@ function Step2Rooms({ state, update }: { state: WizardState; update: (p: Partial
             placeholder="10"
           />
         </div>
+        <Input
+          label="Tag (opcjonalny)"
+          value={state.newRoom.tag ?? ''}
+          onChange={(e) => update({ newRoom: { ...state.newRoom, tag: e.target.value } })}
+          placeholder="np. Najpopularniejsze"
+        />
         <Button size="sm" onClick={addRoom} className="self-start gap-1.5">
           <Plus size={14} />
           Dodaj
@@ -462,76 +526,254 @@ function Step2Rooms({ state, update }: { state: WizardState; update: (p: Partial
   )
 }
 
-function Step3Pricing() {
+// ── Step3Pricing — edytowalny cennik ─────────────────────────────────────────
+
+function Step3Pricing({ state, update }: { state: WizardState; update: (p: Partial<WizardState>) => void }) {
+  function addBracket() {
+    const newBracket: AgeBracketRow = {
+      id: `bracket-${Date.now()}`,
+      ltAge: '',
+      multiplier: '1',
+    }
+    update({ ageBrackets: [...state.ageBrackets, newBracket] })
+  }
+
+  function removeBracket(id: string) {
+    update({ ageBrackets: state.ageBrackets.filter((b) => b.id !== id) })
+  }
+
+  function updateBracket(id: string, patch: Partial<AgeBracketRow>) {
+    update({
+      ageBrackets: state.ageBrackets.map((b) => (b.id === id ? { ...b, ...patch } : b)),
+    })
+  }
+
+  function addDiscountRow() {
+    update({
+      discountRows: [...state.discountRows, { id: `dc-${Date.now()}`, code: '', pct: '10' }],
+    })
+  }
+
+  function removeDiscountRow(id: string) {
+    update({ discountRows: state.discountRows.filter((r) => r.id !== id) })
+  }
+
+  function updateDiscountRow(id: string, patch: { code?: string; pct?: string }) {
+    update({
+      discountRows: state.discountRows.map((r) => (r.id === id ? { ...r, ...patch } : r)),
+    })
+  }
+
   return (
-    <div className="flex flex-col gap-5">
-      <div>
-        <p className="text-sm font-semibold mb-2" style={{ color: 'var(--ink)' }}>
-          Progi wiekowe
+    <div className="flex flex-col gap-6">
+      {/* Opłaty bazowe */}
+      <div className="flex flex-col gap-3">
+        <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+          Opłaty bazowe
+        </p>
+        <div className="grid grid-cols-2 gap-3">
+          <Input
+            label="Opłata formacyjna (zł/os)"
+            type="number"
+            min={0}
+            value={state.formationFee}
+            onChange={(e) => update({ formationFee: e.target.value })}
+            placeholder={String(DEFAULT_PRICING.formationFee)}
+          />
+          <Input
+            label="Wyżywienie (zł/os, cały pobyt)"
+            type="number"
+            min={0}
+            value={state.mealsFee}
+            onChange={(e) => update({ mealsFee: e.target.value })}
+            placeholder={String(DEFAULT_PRICING.mealsFee)}
+          />
+        </div>
+        <p className="text-xs" style={{ color: 'var(--muted)' }}>
+          Nocleg konfigurowany jest per typ pokoju (krok Pokoje). Cena nocna × liczba nocy × mnożnik wiekowy.
+        </p>
+      </div>
+
+      {/* Progi wiekowe */}
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+            Progi wiekowe (dzieci)
+          </p>
+          <Button size="sm" variant="outline" onClick={addBracket} className="gap-1.5">
+            <Plus size={13} />
+            Dodaj próg
+          </Button>
+        </div>
+        <p className="text-xs" style={{ color: 'var(--muted)' }}>
+          Mnożnik stosowany na nocleg + wyżywienie. Próg „do wieku" wyłącznie (np. 4 = 0–3 lat).
+          Mnożnik 0 = gratis (też opłata formacyjna).
         </p>
         <div className="rounded-[12px] border overflow-hidden" style={{ borderColor: 'var(--border)' }}>
           <table className="w-full text-sm" style={{ borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: 'var(--surface-2)', borderBottom: '1px solid var(--border)' }}>
-                <th className="px-4 py-2 text-left text-xs font-semibold" style={{ color: 'var(--faint)' }}>Wiek</th>
-                <th className="px-4 py-2 text-left text-xs font-semibold" style={{ color: 'var(--faint)' }}>% ceny</th>
+                <th className="px-4 py-2 text-left text-xs font-semibold" style={{ color: 'var(--faint)' }}>
+                  Do wieku (wyłącznie)
+                </th>
+                <th className="px-4 py-2 text-left text-xs font-semibold" style={{ color: 'var(--faint)' }}>
+                  Mnożnik (np. 0.7 = 70%)
+                </th>
+                <th className="px-4 py-2 w-10" />
               </tr>
             </thead>
             <tbody>
-              {AGE_BRACKETS.map((b, i) => (
+              {state.ageBrackets.map((b, i) => (
                 <tr
-                  key={b.range}
-                  style={{ borderBottom: i < AGE_BRACKETS.length - 1 ? '1px solid var(--border-2)' : undefined }}
+                  key={b.id}
+                  style={{ borderBottom: i < state.ageBrackets.length - 1 ? '1px solid var(--border-2)' : undefined }}
                 >
-                  <td className="px-4 py-2.5" style={{ color: 'var(--ink)' }}>{b.range}</td>
-                  <td className="px-4 py-2.5">
+                  <td className="px-3 py-2">
                     <input
-                      defaultValue={b.pct}
-                      className="w-20 rounded-[8px] border px-2 py-1 text-sm"
+                      type="number"
+                      min={1}
+                      max={120}
+                      value={b.ltAge}
+                      onChange={(e) => updateBracket(b.id, { ltAge: e.target.value })}
+                      className="w-24 rounded-[8px] border px-2 py-1 text-sm"
                       style={{ borderColor: 'var(--border)', background: 'var(--surface-2)', color: 'var(--ink)' }}
+                      placeholder="np. 4"
                     />
+                  </td>
+                  <td className="px-3 py-2">
+                    <input
+                      type="number"
+                      min={0}
+                      max={1}
+                      step={0.05}
+                      value={b.multiplier}
+                      onChange={(e) => updateBracket(b.id, { multiplier: e.target.value })}
+                      className="w-24 rounded-[8px] border px-2 py-1 text-sm"
+                      style={{ borderColor: 'var(--border)', background: 'var(--surface-2)', color: 'var(--ink)' }}
+                      placeholder="0.7"
+                    />
+                  </td>
+                  <td className="px-3 py-2">
+                    <button
+                      onClick={() => removeBracket(b.id)}
+                      className="p-1 hover:text-[var(--err)] transition-colors"
+                    >
+                      <X size={14} style={{ color: 'var(--faint)' }} />
+                    </button>
                   </td>
                 </tr>
               ))}
+              {state.ageBrackets.length === 0 && (
+                <tr>
+                  <td colSpan={3} className="px-4 py-3 text-xs text-center" style={{ color: 'var(--muted)' }}>
+                    Brak progów — wszyscy traktowani jak dorośli (mnożnik 1.0)
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
       </div>
 
-      <div>
-        <p className="text-sm font-semibold mb-2" style={{ color: 'var(--ink)' }}>
+      {/* Opcje dodatkowe */}
+      <div className="flex flex-col gap-3">
+        <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
           Opcje dodatkowe
         </p>
-        <div className="flex gap-2 flex-wrap">
-          {['Transport', 'Pościel'].map((opt) => (
-            <button
-              key={opt}
-              className="px-3 py-1.5 rounded-full text-sm border font-medium transition-colors"
-              style={{ borderColor: 'var(--brand)', color: 'var(--brand)', background: 'var(--brand-soft)' }}
-            >
-              {opt}
-            </button>
-          ))}
+        <div className="grid grid-cols-2 gap-3">
+          <Input
+            label="Transport (zł / zgłoszenie)"
+            type="number"
+            min={0}
+            value={state.optionsForm.transport}
+            onChange={(e) => update({ optionsForm: { ...state.optionsForm, transport: e.target.value } })}
+            placeholder={String(DEFAULT_PRICING.options.transport)}
+          />
+          <Input
+            label="Pościel (zł / osoba)"
+            type="number"
+            min={0}
+            value={state.optionsForm.bedding}
+            onChange={(e) => update({ optionsForm: { ...state.optionsForm, bedding: e.target.value } })}
+            placeholder={String(DEFAULT_PRICING.options.bedding)}
+          />
         </div>
       </div>
 
-      <div>
-        <p className="text-sm font-semibold mb-2" style={{ color: 'var(--ink)' }}>
-          Kody rabatowe
-        </p>
-        <div
-          className="rounded-[12px] border p-3 flex flex-col gap-2"
-          style={{ borderColor: 'var(--border)', background: 'var(--surface-2)' }}
-        >
-          <div className="flex items-center justify-between text-sm">
-            <span className="font-mono" style={{ color: 'var(--ink)' }}>ICPE10</span>
-            <span style={{ color: 'var(--muted)' }}>–10%</span>
-          </div>
-          <Button size="sm" variant="outline" className="self-start gap-1.5 mt-1">
+      {/* Kody rabatowe */}
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+            Kody rabatowe
+          </p>
+          <Button size="sm" variant="outline" onClick={addDiscountRow} className="gap-1.5">
             <Plus size={13} />
             Dodaj kod
           </Button>
         </div>
+        {state.discountRows.length > 0 ? (
+          <div
+            className="rounded-[12px] border overflow-hidden"
+            style={{ borderColor: 'var(--border)' }}
+          >
+            <table className="w-full text-sm" style={{ borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: 'var(--surface-2)', borderBottom: '1px solid var(--border)' }}>
+                  <th className="px-4 py-2 text-left text-xs font-semibold" style={{ color: 'var(--faint)' }}>
+                    Kod
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-semibold" style={{ color: 'var(--faint)' }}>
+                    Rabat (%)
+                  </th>
+                  <th className="px-4 py-2 w-10" />
+                </tr>
+              </thead>
+              <tbody>
+                {state.discountRows.map((row, i) => (
+                  <tr
+                    key={row.id}
+                    style={{ borderBottom: i < state.discountRows.length - 1 ? '1px solid var(--border-2)' : undefined }}
+                  >
+                    <td className="px-3 py-2">
+                      <input
+                        type="text"
+                        value={row.code}
+                        onChange={(e) => updateDiscountRow(row.id, { code: e.target.value.toUpperCase() })}
+                        className="w-28 rounded-[8px] border px-2 py-1 text-sm font-mono uppercase"
+                        style={{ borderColor: 'var(--border)', background: 'var(--surface-2)', color: 'var(--ink)' }}
+                        placeholder="ICPE10"
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      <input
+                        type="number"
+                        min={1}
+                        max={100}
+                        value={row.pct}
+                        onChange={(e) => updateDiscountRow(row.id, { pct: e.target.value })}
+                        className="w-20 rounded-[8px] border px-2 py-1 text-sm"
+                        style={{ borderColor: 'var(--border)', background: 'var(--surface-2)', color: 'var(--ink)' }}
+                        placeholder="10"
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      <button
+                        onClick={() => removeDiscountRow(row.id)}
+                        className="p-1 hover:text-[var(--err)] transition-colors"
+                      >
+                        <X size={14} style={{ color: 'var(--faint)' }} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="text-xs" style={{ color: 'var(--muted)' }}>
+            Brak kodów rabatowych. Kliknij „Dodaj kod", by dodać.
+          </p>
+        )}
       </div>
     </div>
   )
@@ -687,7 +929,20 @@ export default function EventWizard({ onCancel, onSuccess }: EventWizardProps) {
     payOnline: true,
     payTransfer: true,
     rooms: [],
-    newRoom: { name: '', model: 'os/noc', capacity: '', price: '', quantity: '' },
+    newRoom: { name: '', model: 'os/noc', capacity: '', price: '', quantity: '', tag: '' },
+    // Cennik — domyślne wartości z DEFAULT_PRICING
+    formationFee: String(DEFAULT_PRICING.formationFee),
+    mealsFee: String(DEFAULT_PRICING.mealsFee),
+    ageBrackets: defaultAgeBrackets(),
+    optionsForm: {
+      transport: String(DEFAULT_PRICING.options.transport),
+      bedding: String(DEFAULT_PRICING.options.bedding),
+    },
+    discountRows: Object.entries(DEFAULT_PRICING.discountCodes).map(([code, frac], i) => ({
+      id: `dc-init-${i}`,
+      code,
+      pct: String(Math.round(frac * 100)),
+    })),
     slug: '',
     color: 'blue',
     langPL: true,
@@ -719,10 +974,13 @@ export default function EventWizard({ onCancel, onSuccess }: EventWizardProps) {
       if (state.payTransfer) paymentMethods.push('BANK_TRANSFER')
 
       // Compute endsAt: if dateEnd provided use it, else dateStart + nights days
-      let endsAt = state.dateEnd
+      const endsAt = state.dateEnd
         ? new Date(`${state.dateEnd}T22:00:00`).toISOString()
         : new Date(new Date(`${state.dateStart}T14:00:00`).getTime() + nights * 86400000 + 8 * 3600000).toISOString()
       const startsAt = new Date(`${state.dateStart}T14:00:00`).toISOString()
+
+      // Build full pricing config from wizard state
+      const pricingConfig = buildPricingConfig(state)
 
       // Step 1: create series
       const series = await createEventSeries({
@@ -734,7 +992,7 @@ export default function EventWizard({ onCancel, onSuccess }: EventWizardProps) {
         nights,
         capacity: state.capacity ? parseInt(state.capacity) : undefined,
         paymentMethods,
-        pricingConfig: buildPricingConfig(state.rooms, nights),
+        pricingConfig,
         registrationOpensAt: new Date().toISOString(),
         registrationClosesAt: startsAt,
       })
@@ -849,11 +1107,11 @@ export default function EventWizard({ onCancel, onSuccess }: EventWizardProps) {
         </div>
 
         {/* Step content */}
-        <div className="flex-1 p-6">
+        <div className="flex-1 p-6 overflow-y-auto">
           {step === 0 && <Step0Type state={state} update={update} />}
           {step === 1 && <Step1Details state={state} update={update} />}
           {step === 2 && <Step2Rooms state={state} update={update} />}
-          {step === 3 && <Step3Pricing />}
+          {step === 3 && <Step3Pricing state={state} update={update} />}
           {step === 4 && <Step4Page state={state} update={update} />}
         </div>
 
@@ -878,7 +1136,7 @@ export default function EventWizard({ onCancel, onSuccess }: EventWizardProps) {
             onClick={() => (step === 0 ? onCancel() : setStep(step - 1))}
             disabled={submitting}
           >
-            ← {step === 0 ? 'Anuluj' : 'Wstecz'}
+            {step === 0 ? 'Anuluj' : 'Wstecz'}
           </Button>
           <Button
             variant={isLast ? 'cta' : 'default'}
@@ -892,7 +1150,7 @@ export default function EventWizard({ onCancel, onSuccess }: EventWizardProps) {
             }}
             disabled={submitting}
           >
-            {isLast ? (submitting ? 'Tworzenie...' : 'Publikuj stronę ✓') : 'Dalej →'}
+            {isLast ? (submitting ? 'Tworzenie...' : 'Publikuj stronę') : 'Dalej'}
           </Button>
         </div>
       </div>

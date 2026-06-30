@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import type { EventInstanceDto } from '@icpe/shared'
 import { computePrice, DEFAULT_PRICING } from '@icpe/shared'
-import { getEventBySlug } from '../lib/api'
+import type { PricingConfig } from '@icpe/shared'
+import { getEventBySlug, getEventConfig } from '../lib/api'
 import { Skeleton } from '../components/ui/Skeleton'
 
 // Screen components
@@ -43,6 +44,16 @@ export interface Participant {
   diet: string
 }
 
+/** Jeden pokój w komponowanym zgłoszeniu. */
+export interface RoomEntry {
+  /** lokalny id (na potrzeby UI) */
+  uid: string
+  /** id typu pokoju z PricingConfig.rooms */
+  roomId: string
+  /** indeksy uczestników z tablicy participants */
+  participantIndexes: number[]
+}
+
 export interface StepperState {
   step: number
   applicant: Applicant
@@ -50,7 +61,7 @@ export interface StepperState {
   dietaryTags: string[]
   dietaryNotes: string
   extraNotes: string
-  roomId: string
+  rooms: RoomEntry[]
   options: { transport: boolean; bedding: boolean }
   discountCode: string
   discountApplied: boolean
@@ -60,21 +71,23 @@ export interface StepperState {
 
 // ─── Initial state ──────────────────────────────────────────────────────────
 
-const INITIAL_STEPPER: StepperState = {
-  step: 0,
-  applicant: { firstName: '', lastName: '', email: '', phone: '', address: '' },
-  participants: [
-    { id: 'p-1', type: 'adult', name: '', age: 30, gender: 'M', diet: '' },
-  ],
-  dietaryTags: [],
-  dietaryNotes: '',
-  extraNotes: '',
-  roomId: DEFAULT_PRICING.rooms[0].id,
-  options: { transport: false, bedding: false },
-  discountCode: '',
-  discountApplied: false,
-  consents: { rodo: false, regulamin: false },
-  paymentMethod: null,
+function buildInitialStepper(): StepperState {
+  return {
+    step: 0,
+    applicant: { firstName: '', lastName: '', email: '', phone: '', address: '' },
+    participants: [
+      { id: 'p-1', type: 'adult', name: '', age: 30, gender: 'M', diet: '' },
+    ],
+    dietaryTags: [],
+    dietaryNotes: '',
+    extraNotes: '',
+    rooms: [],
+    options: { transport: false, bedding: false },
+    discountCode: '',
+    discountApplied: false,
+    consents: { rodo: false, regulamin: false },
+    paymentMethod: null,
+  }
 }
 
 const STEPS = 5
@@ -122,12 +135,15 @@ function FunnelError({ onRetry }: { onRetry: () => void }) {
 
 function StepperView({
   state,
+  event,
+  pricingConfig,
   onChange,
   onBack,
   onNext,
 }: {
   state: StepperState
   event: EventInstanceDto
+  pricingConfig: PricingConfig
   onChange: (patch: Partial<StepperState>) => void
   onBack: () => void
   onNext: () => void
@@ -162,8 +178,10 @@ function StepperView({
       case 3:
         return (
           <Step3Room
-            roomId={state.roomId}
-            onChange={(roomId) => onChange({ roomId })}
+            rooms={state.rooms}
+            participants={state.participants}
+            pricingConfig={pricingConfig}
+            onChange={(rooms) => onChange({ rooms })}
           />
         )
       case 4:
@@ -173,6 +191,7 @@ function StepperView({
             discountCode={state.discountCode}
             discountApplied={state.discountApplied}
             consents={state.consents}
+            pricingConfig={pricingConfig}
             onOptionsChange={(options) => onChange({ options })}
             onDiscountChange={(discountCode) => onChange({ discountCode })}
             onDiscountApply={(discountApplied) => onChange({ discountApplied })}
@@ -188,7 +207,7 @@ function StepperView({
     <div className="flex flex-col min-h-screen" style={{ background: 'var(--bg)' }}>
       <StepperHeader step={state.step} totalSteps={STEPS} onBack={onBack} />
       <div style={{ paddingBottom: 80 }}>{renderStep()}</div>
-      <StickyPriceBar state={state} onNext={onNext} />
+      <StickyPriceBar state={state} pricingConfig={pricingConfig} onNext={onNext} />
     </div>
   )
 }
@@ -198,17 +217,23 @@ function StepperView({
 export default function PublicFunnel() {
   const { slug } = useParams<{ slug: string }>()
   const [screen, setScreen] = useState<PublicScreen>('landing')
-  const [stepper, setStepper] = useState<StepperState>(INITIAL_STEPPER)
+  const [stepper, setStepper] = useState<StepperState>(buildInitialStepper())
   const [event, setEvent] = useState<EventInstanceDto | null>(null)
+  const [pricingConfig, setPricingConfig] = useState<PricingConfig>(DEFAULT_PRICING)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
 
   const loadEvent = () => {
     setLoading(true)
     setError(false)
-    getEventBySlug(slug ?? 'dzien-formacji-2026')
-      .then((e) => {
+    const effectiveSlug = slug ?? 'dzien-formacji-2026'
+    Promise.all([
+      getEventBySlug(effectiveSlug),
+      getEventConfig(effectiveSlug),
+    ])
+      .then(([e, cfg]) => {
         setEvent(e)
+        setPricingConfig(cfg.pricing)
         setLoading(false)
       })
       .catch(() => {
@@ -227,7 +252,7 @@ export default function PublicFunnel() {
   }
 
   const handleStartRegister = () => {
-    setStepper(INITIAL_STEPPER)
+    setStepper(buildInitialStepper())
     setScreen('stepper')
   }
 
@@ -275,17 +300,22 @@ export default function PublicFunnel() {
     setScreen('landing')
   }
 
-  const finalPrice = event
-    ? computePrice(
-        {
-          participants: stepper.participants.map((p) => ({ type: p.type, age: p.age })),
-          roomId: stepper.roomId || DEFAULT_PRICING.rooms[0].id,
-          options: { transport: stepper.options.transport, bedding: stepper.options.bedding },
-          discountCode: stepper.discountApplied ? stepper.discountCode : '',
-        },
-        DEFAULT_PRICING,
-      )
-    : null
+  // Buduj PriceInput z nowego formatu rooms
+  const priceInput = {
+    rooms: stepper.rooms.map((r) => ({
+      roomId: r.roomId,
+      participants: r.participantIndexes
+        .filter((idx) => idx >= 0 && idx < stepper.participants.length)
+        .map((idx) => ({
+          type: stepper.participants[idx].type,
+          age: stepper.participants[idx].age,
+        })),
+    })),
+    options: { transport: stepper.options.transport, bedding: stepper.options.bedding },
+    discountCode: stepper.discountApplied ? stepper.discountCode : '',
+  }
+
+  const finalPrice = event ? computePrice(priceInput, pricingConfig) : null
 
   if (loading) {
     return (
@@ -324,6 +354,7 @@ export default function PublicFunnel() {
         <StepperView
           state={stepper}
           event={event}
+          pricingConfig={pricingConfig}
           onChange={patchStepper}
           onBack={handleStepperBack}
           onNext={handleStepperNext}
@@ -343,6 +374,7 @@ export default function PublicFunnel() {
         <SummaryScreen
           state={stepper}
           event={event}
+          pricingConfig={pricingConfig}
           onSubmit={handleSummarySubmit}
           onEdit={handleEditStep}
           onBack={handleSummaryBack}

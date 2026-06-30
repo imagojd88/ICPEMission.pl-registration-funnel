@@ -117,20 +117,23 @@ const MOCK_ROOM_TYPES: RoomTypeDto[] = [
   },
 ]
 
-// Canonical pricing config — matches DEFAULT_PRICING from @icpe/shared
+/**
+ * Canonical pricing config — nowy format z progami wiekowymi (childBrackets)
+ * i pokojem jako listą do komponowania.
+ */
 const MOCK_PRICING: PricingConfig = {
   formationFee: 50,
   mealsFee: 80,
   nights: 1,
   childBrackets: [
-    { ltAge: 3, multiplier: 0 },
-    { ltAge: 12, multiplier: 0.7 },
-    { ltAge: 18, multiplier: 0.9 },
+    { ltAge: 4, multiplier: 0 },   // 0–3 gratis
+    { ltAge: 13, multiplier: 0.7 }, // 4–12 → 70%
+    { ltAge: 18, multiplier: 0.9 }, // 13–17 → 90%
   ],
   rooms: [
-    { id: 'double', name: 'Pokój 2-osobowy', cap: 2, perPerson: 80, model: 'os / noc', tag: 'Najpopularniejsze' },
-    { id: 'single', name: 'Pokój 1-osobowy', cap: 1, perPerson: 100, model: 'noc', tag: '' },
-    { id: 'family', name: 'Pokój rodzinny (4 os.)', cap: 4, perPerson: 70, model: 'os / noc', tag: 'Dla rodzin' },
+    { id: 'double', name: 'Miejsce w pokoju 2-osobowym', desc: 'Wspólny pokój dla dwóch osób.', cap: 2, perPerson: 80, model: 'os / noc', tag: 'Najpopularniejsze' },
+    { id: 'single', name: 'Pokój 1-osobowy', desc: 'Pokój dla jednej osoby.', cap: 1, perPerson: 100, model: 'noc', tag: '' },
+    { id: 'family', name: 'Pokój rodzinny (4 os.)', desc: 'Większy pokój dla rodziny.', cap: 4, perPerson: 70, model: 'os / noc', tag: 'Dla rodzin' },
   ],
   options: { transport: 40, bedding: 15 },
   discountCodes: { ICPE10: 0.1 },
@@ -349,6 +352,10 @@ export async function getEventConfig(slug: string, locale = 'pl'): Promise<Event
   }
 }
 
+/**
+ * Pobiera wycenę z backendu (nowy format PriceInput z komponentami pokoi).
+ * Fallback: oblicza lokalnie przez computePrice z @icpe/shared i MOCK_PRICING.
+ */
 export async function getQuote(input: PriceInput): Promise<PriceResult> {
   try {
     return await apiFetch<PriceResult>('/pricing/quote', {
@@ -356,7 +363,6 @@ export async function getQuote(input: PriceInput): Promise<PriceResult> {
       body: JSON.stringify(input),
     })
   } catch {
-    // Inline fallback — mirrors computePrice from @icpe/shared
     const { computePrice } = await import('@icpe/shared')
     return computePrice(input, MOCK_PRICING)
   }

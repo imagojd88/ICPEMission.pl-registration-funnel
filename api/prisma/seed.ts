@@ -162,7 +162,7 @@ async function main() {
                  : reg.roomTypeId === rtFamily.id ? 'family'
                  : 'double';
 
-    const price = computePrice({ participants, roomId });
+    const price = computePrice({ rooms: [{ roomId, participants }] });
 
     await prisma.registration.create({
       data: {

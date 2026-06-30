@@ -1,4 +1,4 @@
-import { IsString, IsArray, IsOptional, IsBoolean, IsIn, ValidateNested, IsEmail, IsNumber, Min, Max } from 'class-validator';
+import { IsString, IsArray, IsOptional, IsBoolean, IsIn, ValidateNested, IsEmail, IsNumber, Min, Max, ArrayNotEmpty, IsInt } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 
@@ -29,13 +29,21 @@ export class ConsentsDto {
   @IsBoolean() regulamin!: boolean;
 }
 
+/** Jeden pokój w komponowanym zgłoszeniu: typ pokoju + indeksy osób z tablicy participants. */
+export class RoomCompositionEntryDto {
+  @IsString() @ApiProperty() roomId!: string;
+  @IsArray() @ArrayNotEmpty() @IsInt({ each: true }) @Min(0, { each: true }) @ApiProperty({ type: [Number] }) participantIndexes!: number[];
+}
+
 export class CreateRegistrationDto {
   @IsString() @ApiProperty() instanceId!: string;
   @IsIn(['pl', 'en', 'it']) @ApiProperty() locale!: 'pl' | 'en' | 'it';
   @ValidateNested() @Type(() => ContactDto) @ApiProperty() contact!: ContactDto;
   @IsArray() @ValidateNested({ each: true }) @Type(() => ParticipantInputDto) @ApiProperty({ type: [ParticipantInputDto] }) participants!: ParticipantInputDto[];
-  @IsString() @ApiProperty() preferredRoomId!: string;
+  /** Komponowane pokoje — każdy z typem i listą indeksów uczestników z tablicy participants. */
+  @IsArray() @ArrayNotEmpty() @ValidateNested({ each: true }) @Type(() => RoomCompositionEntryDto) @ApiProperty({ type: [RoomCompositionEntryDto] }) rooms!: RoomCompositionEntryDto[];
   @IsOptional() @IsString() dietaryNotes?: string;
+  @IsOptional() @IsArray() @IsString({ each: true }) dietaryTags?: string[];
   @IsOptional() @ValidateNested() @Type(() => OptionsDto) options?: OptionsDto;
   @IsOptional() @IsString() discountCode?: string;
   @IsIn(['ONLINE', 'BANK_TRANSFER']) @ApiProperty() paymentMethod!: 'ONLINE' | 'BANK_TRANSFER';

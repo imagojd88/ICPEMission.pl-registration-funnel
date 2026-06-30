@@ -1,12 +1,17 @@
 /**
- * Kanoniczny silnik wyceny ICPE — odtworzony 1:1 z handoffu Claude Design.
- * Używany przez frontend (podgląd ceny na żywo) i backend (cena wiążąca).
+ * Kanoniczny silnik wyceny ICPE — model z komponowaniem pokoi.
+ * Używany przez frontend (podgląd na żywo) i backend (cena wiążąca).
  *
- * Model (wg README handoffu, sekcja "Logika cennika"):
- *  cena osoby = (opłata formacyjna + nocleg_per_os × noce + wyżywienie) × mnożnik_wiekowy
- *  mnożnik: <3 lata → 0 | 3–11 → 0.7 | 12–17 → 0.9 | dorosły 18+ → 1.0
- *  opcje: transport +40 (na zgłoszenie), pościel +15 × liczba osób
- *  rabat: kod ICPE10 → −10% od sumy (po opcjach)
+ * Model ceny osoby:
+ *   cena_osoby = opłata_formacyjna* + (nocleg_per_os × noce + wyżywienie) × mnożnik_wiekowy
+ *   *opłata formacyjna jest PEŁNA dla każdego, z wyjątkiem progu „gratis" (mnożnik 0),
+ *    dla którego cała cena osoby = 0.
+ *
+ * Mnożnik wiekowy (domyślnie): 0–3 → 0 (gratis) | 4–12 → 0.7 | 13–17 → 0.9 | 18+ → 1.0
+ * Mnożnik działa na NOCLEG + WYŻYWIENIE (nie na opłatę formacyjną, poza progiem gratis).
+ *
+ * Goście komponują pokoje: każdy pokój ma typ i listę przypisanych osób.
+ * Cena zakwaterowania liczona per osoba w danym pokoju (stawka typu pokoju × noce × mnożnik).
  */
 
 import type { ParticipantType } from './types';
@@ -20,10 +25,11 @@ export interface RoomTypeDef {
   id: string;
   name: string;
   desc?: string;
+  /** maksymalna liczba osób w pokoju */
   cap: number;
-  /** cena per osoba/noc (dla pokoju 1-os. = cena pokoju/noc) */
+  /** cena za osobę za noc (dla pokoju 1-os. = cena pokoju/noc) */
   perPerson: number;
-  /** etykieta modelu cenowego (informacyjna): 'os / noc' | 'noc' | ... */
+  /** etykieta modelu cenowego (informacyjna) */
   model?: string;
   tag?: string;
 }
@@ -35,13 +41,13 @@ export interface AgeBracket {
 }
 
 export interface PricingConfig {
-  /** opłata formacyjna per osoba */
+  /** opłata formacyjna per osoba (stała; zerowana tylko dla progu gratis) */
   formationFee: number;
-  /** wyżywienie per osoba (pełne, za cały pobyt) */
+  /** wyżywienie per osoba (pełne, za cały pobyt) — podlega mnożnikowi wieku */
   mealsFee: number;
   /** liczba nocy */
   nights: number;
-  /** progi wiekowe (mnożnik na całą cenę osoby) — tylko dla type === 'child' */
+  /** progi wiekowe (mnożnik na nocleg + wyżywienie) — tylko dla type === 'child' */
   childBrackets: AgeBracket[];
   rooms: RoomTypeDef[];
   options: {
@@ -54,20 +60,20 @@ export interface PricingConfig {
   discountCodes: Record<string, number>;
 }
 
-/** Ustawienia domyślne = wartości eventu "Dzień Formacji 2026" z handoffu. */
+/** Ustawienia domyślne (wg ustaleń: nocleg 80/100/70, wyżywienie 80, formacja 50, 1 noc). */
 export const DEFAULT_PRICING: PricingConfig = {
   formationFee: 50,
-  mealsFee: 80,
+  mealsFee: 80, // np. śniadanie 20 + obiad 40 + kolacja 20
   nights: 1,
   childBrackets: [
-    { ltAge: 3, multiplier: 0 },
-    { ltAge: 12, multiplier: 0.7 },
-    { ltAge: 18, multiplier: 0.9 },
+    { ltAge: 4, multiplier: 0 }, // 0–3 gratis
+    { ltAge: 13, multiplier: 0.7 }, // 4–12
+    { ltAge: 18, multiplier: 0.9 }, // 13–17
   ],
   rooms: [
-    { id: 'double', name: 'Miejsce w pokoju 2-osobowym', desc: 'Wspólny pokój dla dwóch osób — najczęstszy wybór.', cap: 2, perPerson: 80, model: 'os / noc', tag: 'Najpopularniejsze' },
-    { id: 'single', name: 'Pokój 1-osobowy', desc: 'Prywatny pokój dla osób potrzebujących ciszy i skupienia.', cap: 1, perPerson: 100, model: 'noc', tag: '' },
-    { id: 'family', name: 'Pokój rodzinny (4 os.)', desc: 'Większy pokój dla rodziny z dziećmi, dwa łóżka + dostawki.', cap: 4, perPerson: 70, model: 'os / noc', tag: 'Dla rodzin' },
+    { id: 'double', name: 'Miejsce w pokoju 2-osobowym', desc: 'Wspólny pokój dla dwóch osób.', cap: 2, perPerson: 80, model: 'os / noc', tag: 'Najpopularniejsze' },
+    { id: 'single', name: 'Pokój 1-osobowy', desc: 'Pokój dla jednej osoby.', cap: 1, perPerson: 100, model: 'noc', tag: '' },
+    { id: 'family', name: 'Pokój rodzinny (4 os.)', desc: 'Większy pokój dla rodziny.', cap: 4, perPerson: 70, model: 'os / noc', tag: 'Dla rodzin' },
   ],
   options: { transport: 40, bedding: 15 },
   discountCodes: { ICPE10: 0.1 },
@@ -78,24 +84,36 @@ export interface PriceOptions {
   bedding?: boolean;
 }
 
-export interface PriceInput {
-  participants: PricedParticipant[];
+/** Jeden pokój w komponowanym zgłoszeniu wraz z przypisanymi osobami. */
+export interface RoomBooking {
   roomId: string;
+  participants: PricedParticipant[];
+}
+
+export interface PriceInput {
+  /** komponowane pokoje — każdy z typem i listą osób */
+  rooms: RoomBooking[];
   options?: PriceOptions;
   /** kod rabatowy wpisany przez użytkownika (case-insensitive) */
   discountCode?: string;
 }
 
 export interface PriceLine extends PricedParticipant {
+  roomId: string;
   multiplier: number;
+  formation: number;
+  accommodation: number;
+  meals: number;
   total: number;
 }
 
 export interface PriceResult {
-  /** opłaty uczestników (formacja + wyżywienie), po mnożnikach */
-  participants: number;
-  /** zakwaterowanie, po mnożnikach */
+  /** suma opłat formacyjnych */
+  formation: number;
+  /** suma zakwaterowania (po mnożnikach) */
   accommodation: number;
+  /** suma wyżywienia (po mnożnikach) */
+  meals: number;
   /** opcje dodatkowe */
   options: number;
   /** kwota rabatu (>= 0) */
@@ -104,6 +122,8 @@ export interface PriceResult {
   subtotal: number;
   /** kwota do zapłaty */
   total: number;
+  /** liczba osób */
+  people: number;
   /** rozbicie per osoba */
   lines: PriceLine[];
   currency: string;
@@ -119,50 +139,80 @@ export function ageMultiplier(p: PricedParticipant, brackets: AgeBracket[]): num
 }
 
 /**
- * Wylicza cenę zgłoszenia. Deterministyczna i czysta — bez side-effectów.
- * Zaokrąglenia jak w prototypie: rabat = round(subtotal * frac).
+ * Wylicza cenę zgłoszenia z komponowanych pokoi. Czysta i deterministyczna.
  */
 export function computePrice(input: PriceInput, config: PricingConfig = DEFAULT_PRICING): PriceResult {
-  const room = config.rooms.find((r) => r.id === input.roomId) ?? config.rooms[0];
-  let fee = 0;
-  let acc = 0;
-  let meals = 0;
+  const lines: PriceLine[] = [];
 
-  const lines: PriceLine[] = input.participants.map((p) => {
-    const m = ageMultiplier(p, config.childBrackets);
-    const f = config.formationFee * m;
-    const a = room.perPerson * config.nights * m;
-    const ml = config.mealsFee * m;
-    fee += f;
-    acc += a;
-    meals += ml;
-    return { ...p, multiplier: m, total: f + a + ml };
-  });
+  for (const booking of input.rooms ?? []) {
+    const room = config.rooms.find((r) => r.id === booking.roomId) ?? config.rooms[0];
+    for (const p of booking.participants) {
+      const m = ageMultiplier(p, config.childBrackets);
+      // Próg „gratis" (mnożnik 0) → cała cena osoby = 0 (w tym opłata formacyjna).
+      const formation = m === 0 ? 0 : config.formationFee;
+      const accommodation = room.perPerson * config.nights * m;
+      const meals = config.mealsFee * m;
+      lines.push({
+        ...p,
+        roomId: room.id,
+        multiplier: m,
+        formation,
+        accommodation,
+        meals,
+        total: formation + accommodation + meals,
+      });
+    }
+  }
+
+  const people = lines.length;
+  const formation = lines.reduce((s, l) => s + l.formation, 0);
+  const accommodation = lines.reduce((s, l) => s + l.accommodation, 0);
+  const meals = lines.reduce((s, l) => s + l.meals, 0);
 
   let opts = 0;
   if (input.options?.transport) opts += config.options.transport;
-  if (input.options?.bedding) opts += config.options.bedding * input.participants.length;
+  if (input.options?.bedding) opts += config.options.bedding * people;
 
-  const participants = fee + meals;
-  const subtotal = participants + acc + opts;
+  const subtotal = formation + accommodation + meals + opts;
 
   const code = (input.discountCode ?? '').trim().toUpperCase();
   const frac = config.discountCodes[code] ?? 0;
   const discount = frac > 0 ? Math.round(subtotal * frac) : 0;
 
   return {
-    participants,
-    accommodation: acc,
+    formation,
+    accommodation,
+    meals,
     options: opts,
     discount,
     subtotal,
     total: subtotal - discount,
+    people,
     lines,
     currency: 'PLN',
   };
 }
 
-/** Formatowanie waluty jak w handoffie: Intl pl-PL + " zł". */
+/** Walidacja pojemności: każdy pokój nie przekracza limitu osób swojego typu. */
+export function validateRoomCapacity(input: PriceInput, config: PricingConfig = DEFAULT_PRICING): { ok: boolean; errors: string[] } {
+  const errors: string[] = [];
+  for (const booking of input.rooms ?? []) {
+    const room = config.rooms.find((r) => r.id === booking.roomId);
+    if (!room) {
+      errors.push(`Nieznany typ pokoju: ${booking.roomId}`);
+      continue;
+    }
+    if (booking.participants.length === 0) {
+      errors.push(`Pokój „${room.name}" nie ma przypisanych osób.`);
+    }
+    if (booking.participants.length > room.cap) {
+      errors.push(`Pokój „${room.name}" mieści maks. ${room.cap} os., przypisano ${booking.participants.length}.`);
+    }
+  }
+  return { ok: errors.length === 0, errors };
+}
+
+/** Formatowanie waluty: Intl pl-PL + " zł". */
 export function formatZl(n: number): string {
   return new Intl.NumberFormat('pl-PL').format(Math.round(n)) + ' zł';
 }

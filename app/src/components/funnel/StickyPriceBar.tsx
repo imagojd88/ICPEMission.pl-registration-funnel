@@ -1,34 +1,43 @@
 import { useTranslation } from 'react-i18next'
-import { computePrice, formatZl, DEFAULT_PRICING } from '@icpe/shared'
+import { computePrice, formatZl } from '@icpe/shared'
+import type { PricingConfig } from '@icpe/shared'
 import type { StepperState } from '../../pages/PublicFunnel'
 
 interface Props {
   state: StepperState
+  pricingConfig: PricingConfig
   onNext: () => void
   disabled?: boolean
 }
 
-export default function StickyPriceBar({ state, onNext, disabled }: Props) {
+export default function StickyPriceBar({ state, pricingConfig, onNext, disabled }: Props) {
   const { t } = useTranslation()
 
   const priceResult = computePrice(
     {
-      participants: state.participants.map((p) => ({
-        type: p.type,
-        age: p.age,
+      rooms: state.rooms.map((r) => ({
+        roomId: r.roomId,
+        participants: r.participantIndexes
+          .filter((idx) => idx >= 0 && idx < state.participants.length)
+          .map((idx) => ({
+            type: state.participants[idx].type,
+            age: state.participants[idx].age,
+          })),
       })),
-      roomId: state.roomId || DEFAULT_PRICING.rooms[0].id,
       options: {
         transport: state.options.transport,
         bedding: state.options.bedding,
       },
       discountCode: state.discountApplied ? state.discountCode : '',
     },
-    DEFAULT_PRICING,
+    pricingConfig,
   )
 
   const isLastStep = state.step === 4
   const label = isLastStep ? t('stepper.to_payment') : t('stepper.next')
+
+  // Dodatkowe info: formacja + nocleg + wyżywienie
+  const hasPrice = priceResult.people > 0
 
   return (
     <div
@@ -53,6 +62,11 @@ export default function StickyPriceBar({ state, onNext, disabled }: Props) {
           >
             {formatZl(priceResult.total)}
           </span>
+          {hasPrice && (
+            <span className="text-xs leading-none mt-0.5" style={{ color: 'var(--muted)' }}>
+              {formatZl(priceResult.formation)} form. + {formatZl(priceResult.accommodation)} nocl. + {formatZl(priceResult.meals)} wyż.
+            </span>
+          )}
         </div>
 
         {/* Next button */}

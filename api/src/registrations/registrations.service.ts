@@ -5,6 +5,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { buildIcs, googleCalendarUrl } from '../shared';
 import { CreateRegistrationDto } from './dto/create-registration.dto';
 import { v4 as uuid } from 'uuid';
+import { PriceInput } from '../shared';
 import {
   mapRegStatus,
   mapPaymentStatus,
@@ -31,16 +32,21 @@ export class RegistrationsService {
     });
     if (!instance) throw new NotFoundException('Event instance not found');
 
-    // Binding price computed server-side
-    const priceResult = await this.pricing.quote(
-      {
-        participants: dto.participants.map(p => ({ type: p.type, age: p.age })),
-        roomId: dto.preferredRoomId,
-        options: dto.options,
-        discountCode: dto.discountCode,
-      },
-      dto.instanceId,
-    );
+    // Buduj PriceInput z nowego modelu kompozycji pokoi
+    const priceInput: PriceInput = {
+      rooms: dto.rooms.map(entry => ({
+        roomId: entry.roomId,
+        participants: entry.participantIndexes.map(i => ({
+          type: dto.participants[i].type,
+          age: dto.participants[i].age ?? 0,
+        })),
+      })),
+      options: dto.options,
+      discountCode: dto.discountCode,
+    };
+
+    // Cena wiążąca — obliczona server-side na podstawie config eventu (lub DEFAULT_PRICING)
+    const priceResult = await this.pricing.quote(priceInput, dto.instanceId);
 
     const editToken = uuid();
 
@@ -49,7 +55,8 @@ export class RegistrationsService {
         instanceId: dto.instanceId,
         locale: dto.locale,
         contact: dto.contact as object,
-        preferredRoomTypeId: dto.preferredRoomId,
+        // roomsJson — skład pokoi (nowy model kompozycji); pole dodane do schematu Prisma
+        ...(({ roomsJson: dto.rooms as unknown }) as { roomsJson: unknown }),
         dietaryNotes: dto.dietaryNotes,
         totalPrice: priceResult.total,
         currency: priceResult.currency,
@@ -66,7 +73,7 @@ export class RegistrationsService {
             dietary: p.dietary,
           })),
         },
-      },
+      } as any,
       include: { participants: true },
     });
 

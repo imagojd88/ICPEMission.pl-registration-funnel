@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { DEFAULT_PRICING } from '@icpe/shared'
+import type { PricingConfig } from '@icpe/shared'
 import { Input } from '../../ui/Input'
 
 interface Options {
@@ -18,6 +18,7 @@ interface Props {
   discountCode: string
   discountApplied: boolean
   consents: Consents
+  pricingConfig: PricingConfig
   onOptionsChange: (opts: Options) => void
   onDiscountChange: (code: string) => void
   onDiscountApply: (applied: boolean) => void
@@ -88,6 +89,7 @@ export default function Step4Options({
   discountCode,
   discountApplied,
   consents,
+  pricingConfig,
   onOptionsChange,
   onDiscountChange,
   onDiscountApply,
@@ -98,7 +100,7 @@ export default function Step4Options({
 
   const applyDiscount = () => {
     const code = discountCode.trim().toUpperCase()
-    const isValid = code in DEFAULT_PRICING.discountCodes
+    const isValid = code in pricingConfig.discountCodes
     setDiscountError(!isValid)
     onDiscountApply(isValid)
   }
@@ -110,8 +112,11 @@ export default function Step4Options({
   }
 
   const discountPct = discountApplied
-    ? Math.round((DEFAULT_PRICING.discountCodes[discountCode.trim().toUpperCase()] ?? 0) * 100)
+    ? Math.round((pricingConfig.discountCodes[discountCode.trim().toUpperCase()] ?? 0) * 100)
     : 0
+
+  const transportPrice = pricingConfig.options.transport
+  const beddingPrice = pricingConfig.options.bedding
 
   return (
     <div className="flex flex-col gap-5 px-[22px] py-5">
@@ -122,7 +127,7 @@ export default function Step4Options({
       {/* Transport */}
       <CheckRow
         label={t('options.transport')}
-        price={t('options.transport_price')}
+        price={`+${transportPrice} zł`}
         checked={options.transport}
         onChange={(v) => onOptionsChange({ ...options, transport: v })}
       />
@@ -130,7 +135,7 @@ export default function Step4Options({
       {/* Bedding */}
       <CheckRow
         label={t('options.bedding')}
-        price={t('options.bedding_price')}
+        price={`+${beddingPrice} zł/os`}
         checked={options.bedding}
         onChange={(v) => onOptionsChange({ ...options, bedding: v })}
       />
