@@ -60,6 +60,26 @@ export function getAdminEmail(): string | null {
   }
 }
 
+/**
+ * Wgrywa obrazek (np. tło hero) do backendu i zwraca PEŁNY URL do niego.
+ * Używa multipart/form-data (nie ustawiamy Content-Type — przeglądarka doda boundary).
+ */
+export async function uploadImage(file: File): Promise<string> {
+  const form = new FormData()
+  form.append('file', file)
+  const headers: Record<string, string> = {}
+  const tok = _authToken
+  if (tok) headers['Authorization'] = `Bearer ${tok}`
+  const res = await fetch(`${API_URL}/admin/uploads`, { method: 'POST', headers, body: form })
+  if (res.status === 401) {
+    setAuthToken(null)
+    throw new Error('API 401: Unauthorized')
+  }
+  if (!res.ok) throw new Error(`Upload ${res.status}: ${res.statusText}`)
+  const data = (await res.json()) as { path: string }
+  return `${API_URL}${data.path}`
+}
+
 // ---------------------------------------------------------------------------
 // HTTP helper
 // ---------------------------------------------------------------------------

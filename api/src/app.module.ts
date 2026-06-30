@@ -12,6 +12,7 @@ import { AttendanceModule } from './attendance/attendance.module';
 import { GuestsModule } from './guests/guests.module';
 import { AdminModule } from './admin/admin.module';
 import { RsvpModule } from './rsvp/rsvp.module';
+import { UploadsModule } from './uploads/uploads.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { RsvpModule } from './rsvp/rsvp.module';
     GuestsModule,
     AdminModule,
     RsvpModule,
+    UploadsModule,
   ],
 })
 export class AppModule {}

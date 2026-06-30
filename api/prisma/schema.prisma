@@ -93,6 +93,15 @@ enum AttendanceStatus {
 
 // ─── Models ───────────────────────────────────────────────────────────────────
 
+// Przesłane obrazki (np. tło hero eventu) — trzymane w bazie, bo dysk Rendera jest ulotny.
+model Upload {
+  id        String   @id @default(cuid())
+  mimeType  String
+  size      Int
+  data      Bytes
+  createdAt DateTime @default(now())
+}
+
 model Organization {
   id          String  @id @default(cuid())
   name        String

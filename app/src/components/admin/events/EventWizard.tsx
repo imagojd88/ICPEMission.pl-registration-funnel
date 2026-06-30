@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useState, type ChangeEvent } from 'react'
 import { X, Plus, CheckCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
-import { createEventSeries, configureSeriesPage, addRoomType } from '@/lib/api'
+import { createEventSeries, configureSeriesPage, addRoomType, uploadImage } from '@/lib/api'
 import { DEFAULT_PRICING } from '@icpe/shared'
 import type { PricingConfig, AgeBracket } from '@icpe/shared'
 
@@ -166,6 +166,45 @@ function buildPricingConfig(state: WizardState): PricingConfig {
     },
     discountCodes: Object.keys(discountCodes).length > 0 ? discountCodes : DEFAULT_PRICING.discountCodes,
   }
+}
+
+// ── Upload zdjęcia hero (alternatywa do wklejania URL) ────────────────────────
+
+function HeroUpload({ onUploaded }: { onUploaded: (url: string) => void }) {
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  async function handle(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setErr(null)
+    setBusy(true)
+    try {
+      const url = await uploadImage(file)
+      onUploaded(url)
+    } catch {
+      setErr('Nie udało się wgrać pliku (maks. 5 MB, tylko obrazki).')
+    } finally {
+      setBusy(false)
+      e.target.value = ''
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
+        …lub wgraj zdjęcie z dysku
+      </label>
+      <label
+        className="inline-flex items-center justify-center h-[46px] px-4 text-sm font-semibold rounded-[12px] border cursor-pointer transition-colors"
+        style={{ borderColor: 'var(--border)', background: 'var(--surface-2)', color: 'var(--ink)', width: 'fit-content' }}
+      >
+        {busy ? 'Wgrywanie…' : 'Wybierz plik (maks. 5 MB)'}
+        <input type="file" accept="image/*" onChange={handle} disabled={busy} className="hidden" />
+      </label>
+      {err && <span className="text-xs" style={{ color: 'var(--err)' }}>{err}</span>}
+    </div>
+  )
 }
 
 // ── Live Preview ──────────────────────────────────────────────────────────────
@@ -877,6 +916,8 @@ function Step4Page({ state, update }: { state: WizardState; update: (p: Partial<
           placeholder="https://... (wklej URL zdjęcia, np. wgranego na serwer)"
         />
       </div>
+
+      <HeroUpload onUploaded={(url) => update({ heroImageUrl: url })} />
 
       <div className="flex flex-col gap-1.5">
         <label className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
