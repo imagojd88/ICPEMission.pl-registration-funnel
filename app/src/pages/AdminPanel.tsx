@@ -7,6 +7,7 @@ import EmptyModuleState from '@/components/admin/EmptyModuleState'
 import DashboardScreen from '@/components/admin/dashboard/DashboardScreen'
 import EventsScreen from '@/components/admin/events/EventsScreen'
 import RegistrationsScreen from '@/components/admin/registrations/RegistrationsScreen'
+import SettingsScreen from '@/components/admin/settings/SettingsScreen'
 
 type AdminScreen =
   | 'dashboard'
@@ -82,7 +83,7 @@ export default function AdminPanel() {
       case 'attendance':
         return <EmptyModuleState description="Moduł obecności jest w przygotowaniu." />
       case 'settings':
-        return <EmptyModuleState description="Ustawienia systemowe są w przygotowaniu." />
+        return <SettingsScreen onLogout={handleLogout} />
       default:
         return <EmptyModuleState />
     }

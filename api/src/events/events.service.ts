@@ -38,9 +38,16 @@ export class EventsService {
     location: string | null; status: string; capacity: number | null;
   }) {
     const agg = await this.instanceAggregates(inst.id);
+    // slug strony rejestracji (z RegistrationPage po seriesId) — potrzebny, by panel
+    // i Personal OS mogły pokazać/skopiować link publiczny /r/<slug>.
+    const page = await this.prisma.registrationPage.findUnique({
+      where: { seriesId: inst.seriesId },
+      select: { slug: true },
+    });
     return {
       id: inst.id,
       seriesId: inst.seriesId,
+      slug: page?.slug ?? null,
       title: toLocalized(inst.title),
       startsAt: iso(inst.startsAt),
       endsAt: iso(inst.endsAt),
