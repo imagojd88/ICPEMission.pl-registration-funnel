@@ -1,9 +1,22 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
-import type { EventInstanceDto } from '@icpe/shared'
+import type { EventInstanceDto, CreateRegistrationDto, RegistrationStatus, PaymentMethod } from '@icpe/shared'
 import { computePrice, DEFAULT_PRICING } from '@icpe/shared'
 import type { PricingConfig } from '@icpe/shared'
-import { getEventBySlug, getEventConfig, type EventConfig } from '../lib/api'
+import { getEventBySlug, getEventConfig, createRegistration, registerGuest, type EventConfig } from '../lib/api'
+
+/** Rozdziela „Imię Nazwisko" na pola DTO. */
+function splitName(full: string): { firstName: string; lastName?: string } {
+  const parts = full.trim().split(/\s+/).filter(Boolean)
+  if (parts.length <= 1) return { firstName: parts[0] ?? '' }
+  return { firstName: parts[0], lastName: parts.slice(1).join(' ') }
+}
+
+function toPaymentMethod(m: 'online' | 'transfer' | 'cash' | null): PaymentMethod {
+  if (m === 'online') return 'ONLINE'
+  if (m === 'cash') return 'CASH'
+  return 'BANK_TRANSFER'
+}
 import { Skeleton } from '../components/ui/Skeleton'
 
 // Screen components
@@ -161,6 +174,7 @@ function StepperView({
         return (
           <Step1Participants
             participants={state.participants}
+            applicant={state.applicant}
             onChange={(participants) => onChange({ participants })}
           />
         )
@@ -229,6 +243,9 @@ export default function PublicFunnel() {
   const [pricingConfig, setPricingConfig] = useState<PricingConfig>(DEFAULT_PRICING)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [result, setResult] = useState<{ regId: string; status: RegistrationStatus; total: number } | null>(null)
 
   const loadEvent = () => {
     setLoading(true)
@@ -299,8 +316,52 @@ export default function PublicFunnel() {
     setScreen('payment_method')
   }
 
-  const handleSummarySubmit = () => {
-    setScreen('success')
+  const handleSummarySubmit = async () => {
+    if (!event || submitting) return
+    setSubmitting(true)
+    setSubmitError(null)
+    try {
+      const dto: CreateRegistrationDto = {
+        instanceId: event.id,
+        locale: 'pl',
+        contact: {
+          firstName: stepper.applicant.firstName,
+          lastName: stepper.applicant.lastName,
+          email: stepper.applicant.email,
+          phone: stepper.applicant.phone || undefined,
+          address: stepper.applicant.address || undefined,
+        },
+        participants: stepper.participants.map((p) => {
+          const n = splitName(p.name)
+          return {
+            type: p.type,
+            firstName: n.firstName,
+            lastName: n.lastName,
+            age: p.age,
+            gender: p.gender,
+            dietary: p.diet || undefined,
+          }
+        }),
+        rooms: stepper.rooms.map((r) => ({ roomId: r.roomId, participantIndexes: r.participantIndexes })),
+        dietaryNotes: stepper.dietaryNotes || undefined,
+        dietaryTags: stepper.dietaryTags,
+        options: { transport: stepper.options.transport, bedding: stepper.options.bedding },
+        discountCode: stepper.discountApplied ? stepper.discountCode : undefined,
+        paymentMethod: toPaymentMethod(stepper.paymentMethod),
+        consents: stepper.consents,
+      }
+      const res = await createRegistration(dto)
+      setResult({
+        regId: res.registration.id,
+        status: res.registration.status,
+        total: res.summary?.total ?? res.registration.totalPrice ?? 0,
+      })
+      setScreen('success')
+    } catch (e: unknown) {
+      setSubmitError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const handleEditStep = (step: number) => {
@@ -310,6 +371,16 @@ export default function PublicFunnel() {
 
   const handleBackToLanding = () => {
     setScreen('landing')
+  }
+
+  const handleCreateAccount = async () => {
+    await registerGuest({
+      email: stepper.applicant.email,
+      firstName: stepper.applicant.firstName,
+      lastName: stepper.applicant.lastName,
+      phone: stepper.applicant.phone || undefined,
+      locale: 'pl',
+    })
   }
 
   // Buduj PriceInput z nowego formatu rooms
@@ -362,7 +433,7 @@ export default function PublicFunnel() {
             theme={eventConfig?.theme}
             title={getEventTitle(event.title)}
           />
-          <LandingScreen event={event} onRegister={handleStartRegister} />
+          <LandingScreen event={event} onRegister={handleStartRegister} pricingConfig={pricingConfig} />
         </>
       )}
 
@@ -395,6 +466,8 @@ export default function PublicFunnel() {
           onSubmit={handleSummarySubmit}
           onEdit={handleEditStep}
           onBack={handleSummaryBack}
+          submitting={submitting}
+          submitError={submitError}
         />
       )}
 
@@ -402,8 +475,11 @@ export default function PublicFunnel() {
         <SuccessScreen
           paymentMethod={stepper.paymentMethod}
           email={stepper.applicant.email}
-          total={finalPrice?.total ?? 0}
+          total={result?.total ?? finalPrice?.total ?? 0}
+          regNumber={result?.regId}
+          status={result?.status}
           onBack={handleBackToLanding}
+          onCreateAccount={handleCreateAccount}
         />
       )}
     </div>

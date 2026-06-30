@@ -1,7 +1,8 @@
 import { useState, useEffect, type ChangeEvent } from 'react'
-import { Plus, Trash2, Upload } from 'lucide-react'
+import { Plus, Trash2, Upload, Images } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
+import ImageGalleryPicker from '@/components/admin/ImageGalleryPicker'
 import {
   getEventEditConfig,
   updateEventInstance,
@@ -97,6 +98,7 @@ export default function EventEditForm({
   const [titleColor, setTitleColor] = useState('#FFFFFF')
   const [heroImageUrl, setHeroImageUrl] = useState('')
   const [uploadingHero, setUploadingHero] = useState(false)
+  const [showGallery, setShowGallery] = useState(false)
   const [langPL, setLangPL] = useState(true)
   const [langEN, setLangEN] = useState(false)
   const [langIT, setLangIT] = useState(false)
@@ -404,6 +406,14 @@ export default function EventEditForm({
                 <Upload size={14} /> {uploadingHero ? '…' : 'Wgraj'}
                 <input type="file" accept="image/*" className="hidden" onChange={handleHeroUpload} />
               </label>
+              <button
+                type="button"
+                onClick={() => setShowGallery(true)}
+                className="flex items-center gap-1 px-3 py-2 rounded-[10px] text-sm shrink-0"
+                style={{ background: 'var(--surface-2)', color: 'var(--muted)', border: '1px solid var(--border)', cursor: 'pointer' }}
+              >
+                <Images size={14} /> Galeria
+              </button>
             </div>
           </Field>
         </div>
@@ -422,6 +432,13 @@ export default function EventEditForm({
         </Button>
         <Button variant="outline" onClick={onCancel} disabled={saving}>Anuluj</Button>
       </div>
+
+      {showGallery && (
+        <ImageGalleryPicker
+          onSelect={(url) => setHeroImageUrl(url)}
+          onClose={() => setShowGallery(false)}
+        />
+      )}
     </div>
   )
 }

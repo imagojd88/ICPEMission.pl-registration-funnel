@@ -1120,13 +1120,13 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
     payCash: false,
     rooms: [],
     newRoom: { name: '', model: 'os/noc', capacity: '', price: '', quantity: '', tag: '' },
-    // Cennik — domyślne wartości z DEFAULT_PRICING
-    formationFee: String(DEFAULT_PRICING.formationFee),
-    mealsFee: String(DEFAULT_PRICING.mealsFee),
+    // Cennik — pola kwotowe startują PUSTE (admin wpisuje sam, bez auto-wypełniania).
+    formationFee: '',
+    mealsFee: '',
     ageBrackets: defaultAgeBrackets(),
     optionsForm: {
-      transport: String(DEFAULT_PRICING.options.transport),
-      bedding: String(DEFAULT_PRICING.options.bedding),
+      transport: '',
+      bedding: '',
     },
     discountRows: Object.entries(DEFAULT_PRICING.discountCodes).map(([code, frac], i) => ({
       id: `dc-init-${i}`,

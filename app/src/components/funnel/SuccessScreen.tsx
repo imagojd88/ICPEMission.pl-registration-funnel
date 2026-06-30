@@ -1,18 +1,36 @@
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { UserPlus } from 'lucide-react'
 import { formatZl } from '@icpe/shared'
+import type { RegistrationStatus } from '@icpe/shared'
 
 interface Props {
   paymentMethod: 'online' | 'transfer' | 'cash' | null
   email: string
   total: number
+  regNumber?: string
+  status?: RegistrationStatus
   onBack: () => void
+  onCreateAccount?: () => Promise<void>
 }
 
-export default function SuccessScreen({ paymentMethod, email, total, onBack }: Props) {
+export default function SuccessScreen({ paymentMethod, email, total, regNumber, status, onBack, onCreateAccount }: Props) {
   const { t } = useTranslation()
+  const [acct, setAcct] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
 
-  const isPaid = paymentMethod === 'online'
-  const regNumber = 'REG-2026-0148'
+  const isPaid = status ? status === 'CONFIRMED' : paymentMethod === 'online'
+  const displayReg = regNumber ?? '—'
+
+  async function handleAccount() {
+    if (!onCreateAccount || acct === 'loading' || acct === 'done') return
+    setAcct('loading')
+    try {
+      await onCreateAccount()
+      setAcct('done')
+    } catch {
+      setAcct('error')
+    }
+  }
 
   return (
     <div
@@ -66,7 +84,7 @@ export default function SuccessScreen({ paymentMethod, email, total, onBack }: P
             className="text-sm font-semibold font-mono"
             style={{ color: 'var(--ink)' }}
           >
-            {regNumber}
+            {displayReg}
           </span>
         </div>
 
@@ -102,6 +120,34 @@ export default function SuccessScreen({ paymentMethod, email, total, onBack }: P
       <p className="text-xs text-center" style={{ color: 'var(--muted)' }}>
         {t('success.email_sent', { email })}
       </p>
+
+      {/* Załóż konto (powtórzone z poprzedniego kroku) */}
+      {onCreateAccount && (
+        <div className="w-full flex flex-col items-center gap-2 mt-1">
+          {acct === 'done' ? (
+            <p className="text-sm text-center font-medium" style={{ color: 'var(--ok)' }}>
+              Konto założone — sprawdź e-mail, aby ustawić dostęp.
+            </p>
+          ) : (
+            <button
+              onClick={() => { void handleAccount() }}
+              disabled={acct === 'loading'}
+              className="w-full text-white text-sm font-semibold rounded-[12px] py-3 transition-all duration-150 active:scale-[0.98] hover:opacity-90 flex items-center justify-center gap-2"
+              style={{ background: 'var(--brand)', border: 'none', cursor: 'pointer' }}
+            >
+              <UserPlus size={16} /> {acct === 'loading' ? 'Zakładam konto…' : 'Załóż konto'}
+            </button>
+          )}
+          {acct === 'error' && (
+            <p className="text-xs text-center" style={{ color: 'var(--err)' }}>
+              Nie udało się założyć konta. Spróbuj później.
+            </p>
+          )}
+          <p className="text-xs text-center" style={{ color: 'var(--faint)' }}>
+            Konto pozwoli zarządzać zgłoszeniem i szybciej zapisać się następnym razem.
+          </p>
+        </div>
+      )}
 
       {/* Back button */}
       <button

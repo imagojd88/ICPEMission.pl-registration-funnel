@@ -443,6 +443,34 @@ export async function createRegistration(
   return apiFetch('/registrations', { method: 'POST', body: JSON.stringify(data) })
 }
 
+/** Zakłada konto gościa (bezhasłowo — dostęp przez e-mail/magic-link). */
+export async function registerGuest(data: {
+  email: string
+  firstName: string
+  lastName: string
+  phone?: string
+  locale?: string
+}): Promise<unknown> {
+  return apiFetch('/auth/guest/register', { method: 'POST', body: JSON.stringify(data) })
+}
+
+export interface UploadItem {
+  id: string
+  path: string
+  url: string
+  mimeType: string
+  size: number
+  createdAt: string
+}
+
+/** Lista wgranych obrazków (galeria) — zwraca pełne URL-e. */
+export async function listUploads(token?: string): Promise<UploadItem[]> {
+  const rows = await apiFetch<Array<Omit<UploadItem, 'url'>>>('/admin/uploads', {
+    headers: authHeaders(token),
+  })
+  return rows.map((r) => ({ ...r, url: `${API_URL}${r.path}` }))
+}
+
 export async function getRegistration(id: string, token: string): Promise<RegistrationDto> {
   return apiFetch(`/registrations/${id}?token=${token}`)
 }

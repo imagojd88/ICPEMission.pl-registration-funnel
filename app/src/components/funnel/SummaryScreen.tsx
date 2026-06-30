@@ -8,9 +8,11 @@ interface Props {
   state: StepperState
   event: EventInstanceDto
   pricingConfig: PricingConfig
-  onSubmit: () => void
+  onSubmit: () => void | Promise<void>
   onEdit: (step: number) => void
   onBack: () => void
+  submitting?: boolean
+  submitError?: string | null
 }
 
 function CopyButton({ text }: { text: string }) {
@@ -39,7 +41,7 @@ function CopyButton({ text }: { text: string }) {
   )
 }
 
-export default function SummaryScreen({ state, event, pricingConfig, onSubmit, onEdit, onBack }: Props) {
+export default function SummaryScreen({ state, event, pricingConfig, onSubmit, onEdit, onBack, submitting, submitError }: Props) {
   const { t } = useTranslation()
 
   const priceInput = {
@@ -323,11 +325,22 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
           </div>
         </div>
 
+        {/* Błąd zapisu */}
+        {submitError && (
+          <div
+            className="px-4 py-3 rounded-[12px] text-sm"
+            style={{ background: 'var(--err-soft)', color: 'var(--err)', border: '1px solid var(--err)' }}
+          >
+            Nie udało się zapisać zgłoszenia: {submitError}. Spróbuj ponownie.
+          </div>
+        )}
+
         {/* Payment block */}
         {isOnline ? (
           <div className="flex flex-col gap-3">
             <button
               onClick={onSubmit}
+              disabled={submitting}
               className="w-full text-white text-sm font-semibold rounded-[16px] py-4 transition-all duration-150 active:scale-[0.98] hover:opacity-90"
               style={{
                 background: 'var(--accent)',
@@ -359,6 +372,7 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
 
             <button
               onClick={onSubmit}
+              disabled={submitting}
               className="w-full text-white text-sm font-semibold rounded-[16px] py-4 transition-all duration-150 active:scale-[0.98] hover:opacity-90"
               style={{ background: 'var(--accent)', border: 'none', cursor: 'pointer' }}
             >
@@ -430,6 +444,7 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
 
             <button
               onClick={onSubmit}
+              disabled={submitting}
               className="w-full text-white text-sm font-semibold rounded-[16px] py-4 transition-all duration-150 active:scale-[0.98] hover:opacity-90"
               style={{ background: 'var(--accent)', border: 'none', cursor: 'pointer' }}
             >

@@ -117,6 +117,8 @@ export default function Step4Options({
 
   const transportPrice = pricingConfig.options.transport
   const beddingPrice = pricingConfig.options.bedding
+  const showTransport = transportPrice > 0
+  const showBedding = beddingPrice > 0
 
   return (
     <div className="flex flex-col gap-5 px-[22px] py-5">
@@ -124,21 +126,25 @@ export default function Step4Options({
         {t('options.title')}
       </h2>
 
-      {/* Transport */}
-      <CheckRow
-        label={t('options.transport')}
-        price={`+${transportPrice} zł`}
-        checked={options.transport}
-        onChange={(v) => onOptionsChange({ ...options, transport: v })}
-      />
+      {/* Transport — tylko gdy ma cenę */}
+      {showTransport && (
+        <CheckRow
+          label={t('options.transport')}
+          price={`+${transportPrice} zł`}
+          checked={options.transport}
+          onChange={(v) => onOptionsChange({ ...options, transport: v })}
+        />
+      )}
 
-      {/* Bedding */}
-      <CheckRow
-        label={t('options.bedding')}
-        price={`+${beddingPrice} zł/os`}
-        checked={options.bedding}
-        onChange={(v) => onOptionsChange({ ...options, bedding: v })}
-      />
+      {/* Bedding — tylko gdy ma cenę */}
+      {showBedding && (
+        <CheckRow
+          label={t('options.bedding')}
+          price={`+${beddingPrice} zł/os`}
+          checked={options.bedding}
+          onChange={(v) => onOptionsChange({ ...options, bedding: v })}
+        />
+      )}
 
       {/* Discount code */}
       <div className="flex flex-col gap-2">

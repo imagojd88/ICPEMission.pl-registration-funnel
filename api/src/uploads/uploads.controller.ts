@@ -20,6 +20,14 @@ export class UploadsController {
     return this.uploads.save(file);
   }
 
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Get('admin/uploads')
+  @ApiOperation({ summary: 'Lista wgranych obrazków (galeria)' })
+  list() {
+    return this.uploads.list();
+  }
+
   @Get('uploads/:id')
   @ApiOperation({ summary: 'Pobierz wgrany obrazek' })
   async serve(@Param('id') id: string, @Res() res: Response) {
