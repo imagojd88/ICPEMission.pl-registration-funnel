@@ -105,5 +105,21 @@ Zacznij od przeczytania plików z Kroku 0 i krótkiego planu (jakie pliki utworz
 
 ---
 
+## Dodatkowo: warunkowy keep-alive Rendera (oszczędność darmowego planu)
+
+Backend działa na darmowym Render, który **usypia po ~15 min bezczynności** (pierwszy request po przerwie ~40–50 s). Chcemy utrzymywać go „obudzonego" **tylko wtedy, gdy istnieje otwarty event** (czyli trwa okno rejestracji), a poza tym pozwalać mu spać.
+
+Po stronie backendu jest już druga połowa: przy tworzeniu/otwarciu eventu backend sam **wznawia** monitor UptimeRobota. Personal OS odpowiada za **pingowanie i pauzowanie**:
+
+1. **Sprawdzanie stanu otwartych eventów.** Integracja i tak pobiera `GET /admin/instances?status=OPEN`. Wyznacz flagę `hasOpenEvents = lista.length > 0`.
+2. **Ping keep-alive co 10 min, gdy `hasOpenEvents`** (i gdy app jest uruchomiona). Wystarczy lekkie żądanie do API (samo odpytanie `/admin/instances` lub `/admin/summary` budzi Rendera). Interwał **< 15 min** (np. 10 min).
+3. **Pauzowanie monitora UptimeRobota, gdy `hasOpenEvents === false`.** Wywołaj UptimeRobot API:
+   `POST https://api.uptimerobot.com/v2/editMonitor` z body `api_key=<UPTIMEROBOT_API_KEY>&id=<UPTIMEROBOT_MONITOR_ID>&status=0` (0 = pauza). Wznawianie (status=1) robi backend, więc Personal OS musi tylko **pauzować**, gdy nie ma już otwartych eventów.
+4. **Konfiguracja (secrets):** `UPTIMEROBOT_API_KEY`, `UPTIMEROBOT_MONITOR_ID` — przechowaj jak inne sekrety (keytar). Brak konfiguracji → krok 3 jest no-op (sam ping z kroku 2 zostaje).
+
+Efekt: jest otwarty event → backend obudzony 24/7 (UptimeRobot pinguje); brak otwartych eventów → monitor spauzowany, Render śpi, darmowe godziny niezużywane. Ograniczenie: pingi z Personal OS lecą tylko gdy aplikacja działa — całodobowe utrzymanie zapewnia UptimeRobot (wznowiony przez backend), a Personal OS dba o pauzę i ewentualny dodatkowy ping w godzinach pracy.
+
+---
+
 ## Uwaga o spójności obu systemów
 Backend ICPE (osobny projekt — patrz `01-architektura-backend.md`) musi wystawić **token serwisowy admina** dla Personal OS oraz endpointy `/admin/*` opisane wyżej. To jedyny punkt styku — Personal OS nie łączy się bezpośrednio z bazą rejestracji, tylko przez REST API (czysta granica, bezpieczne, łatwe do utrzymania).

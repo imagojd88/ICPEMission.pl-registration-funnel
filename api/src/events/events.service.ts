@@ -7,6 +7,7 @@ import {
   num,
   iso,
 } from '../admin/personal-os.mapper';
+import { resumeUptimeMonitor } from '../integrations/uptime-keepalive';
 
 @Injectable()
 export class EventsService {
@@ -188,7 +189,7 @@ export class EventsService {
     registrationClosesAt: string;
     recurrence?: string;
   }) {
-    return this.prisma.eventSeries.create({
+    const series = await this.prisma.eventSeries.create({
       data: {
         type: dto.type as 'ONE_TIME' | 'EVERGREEN',
         recurrence: dto.recurrence,
@@ -212,6 +213,9 @@ export class EventsService {
       },
       include: { instances: true },
     });
+    // Otwarto nowy event → wznów monitor keep-alive (best-effort).
+    void resumeUptimeMonitor();
+    return series;
   }
 
   async cloneInstance(id: string) {
@@ -269,10 +273,12 @@ export class EventsService {
   }
 
   async publishSeries(seriesId: string) {
-    return this.prisma.registrationPage.update({
+    const page = await this.prisma.registrationPage.update({
       where: { seriesId },
       data: { published: true },
     });
+    void resumeUptimeMonitor();
+    return page;
   }
 
   async updatePricing(instanceId: string, pricingConfig: unknown) {
