@@ -32,8 +32,12 @@ async function bootstrap() {
   });
 
   // Global validation
+  // whitelist=false: nie obcinamy pól ciała żądania. Endpointy admina (createSeries,
+  // configureSeriesPage, addRoomType...) używają luźnego body bez klasy-DTO — przy
+  // whitelist=true ValidationPipe usuwał z nich wszystkie pola (stąd puste createSeries).
+  // Walidacja DTO z dekoratorami (np. rejestracja) nadal działa.
   app.useGlobalPipes(new ValidationPipe({
-    whitelist: true,
+    whitelist: false,
     forbidNonWhitelisted: false,
     transform: true,
   }));
