@@ -23,9 +23,13 @@ async function bootstrap() {
   // CORS — frontend (przeglądarka) + klient desktopowy Personal OS (Electron).
   // Electron wysyła requesty z origin 'null'/file:// lub bez origin; token jest w nagłówku
   // Authorization (Bearer), nie używamy ciasteczek → bezpiecznie odbić dowolny origin.
-  const corsEnv = process.env.CORS_ORIGIN; // np. "https://app.icpe.pl,http://localhost:5173"
+  // CORS: API jest token-based (Bearer w Authorization, bez ciasteczek), więc
+  // bezpiecznie odbijamy KAŻDY origin. Front może stać pod dowolną domeną
+  // (Render Static, własna rejestracja.icpemission.pl, Electron z origin 'null').
+  // NIE zależymy już od CORS_ORIGIN — w Blueprincie (render.yaml) bywał nadpisywany
+  // i blokował nowe originy (np. *.onrender.com), przez co publiczny funnel pokazywał mock.
   app.enableCors({
-    origin: corsEnv ? corsEnv.split(',').map((o) => o.trim()) : true,
+    origin: true, // reflect request origin → allow all
     credentials: false,
     allowedHeaders: ['Authorization', 'Content-Type'],
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
