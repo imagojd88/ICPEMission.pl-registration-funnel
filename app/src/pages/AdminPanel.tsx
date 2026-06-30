@@ -10,6 +10,7 @@ import RegistrationsScreen from '@/components/admin/registrations/RegistrationsS
 import SettingsScreen from '@/components/admin/settings/SettingsScreen'
 import AttendanceScreen from '@/components/admin/attendance/AttendanceScreen'
 import AccommodationScreen from '@/components/admin/accommodation/AccommodationScreen'
+import PaymentsScreen from '@/components/admin/payments/PaymentsScreen'
 
 type AdminScreen =
   | 'dashboard'
@@ -81,7 +82,7 @@ export default function AdminPanel() {
       case 'accommodation':
         return <AccommodationScreen />
       case 'payments':
-        return <EmptyModuleState description="Moduł płatności jest w przygotowaniu." />
+        return <PaymentsScreen />
       case 'attendance':
         return <AttendanceScreen />
       case 'settings':
