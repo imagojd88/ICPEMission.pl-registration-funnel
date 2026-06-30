@@ -499,6 +499,19 @@ export async function patchRegistrationStatus(
   })
 }
 
+/** Obecność: przełącz check-in zgłoszenia (present pominięte → toggle na backendzie). */
+export async function toggleRegistrationCheckIn(
+  id: string,
+  present?: boolean,
+  token?: string,
+): Promise<void> {
+  await apiFetch(`/admin/registrations/${id}/check-in`, {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: JSON.stringify(present === undefined ? {} : { present }),
+  })
+}
+
 // ── New admin write endpoints ────────────────────────────────────────────────
 
 export interface CreateSeriesPayload {

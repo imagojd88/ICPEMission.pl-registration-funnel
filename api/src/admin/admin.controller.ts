@@ -36,4 +36,10 @@ export class AdminController {
   ) {
     return this.admin.assignRoom(id, dto.roomId, undefined, dto.participantId);
   }
+
+  @Post('registrations/:id/check-in')
+  @ApiOperation({ summary: 'Toggle attendance check-in for registration' })
+  checkIn(@Param('id') id: string, @Body() dto?: { present?: boolean }) {
+    return this.admin.toggleCheckIn(id, dto?.present);
+  }
 }

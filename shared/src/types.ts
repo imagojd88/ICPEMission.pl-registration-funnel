@@ -84,6 +84,8 @@ export interface RegistrationDto {
   currency: string;
   paymentMethod?: PaymentMethod;
   paymentStatus: PaymentStatus;
+  /** Obecność: znacznik check-in (ISO) lub null, gdy nieobecny. */
+  checkedInAt?: string | null;
   createdAt: string;
 }
 

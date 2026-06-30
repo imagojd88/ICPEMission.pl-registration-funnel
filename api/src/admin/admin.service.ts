@@ -146,7 +146,21 @@ export class AdminService {
       currency: reg.currency || 'EUR',
       paymentMethod: mapPaymentMethod(reg.paymentMethod),
       paymentStatus: mapPaymentStatus(reg.status, reg.payments?.[0]?.status),
+      checkedInAt: reg.checkedInAt ? iso(reg.checkedInAt) : null,
       createdAt: iso(reg.createdAt),
     };
+  }
+
+  /** Obecność: przełącz check-in zgłoszenia. present=undefined → toggle. */
+  async toggleCheckIn(id: string, present?: boolean) {
+    const reg = await this.prisma.registration.findUnique({
+      where: { id },
+      select: { checkedInAt: true },
+    });
+    if (!reg) throw new NotFoundException('Registration not found');
+    const next =
+      present === undefined ? (reg.checkedInAt ? null : new Date()) : present ? new Date() : null;
+    await this.prisma.registration.update({ where: { id }, data: { checkedInAt: next } });
+    return this.loadContractRegistration(id);
   }
 }

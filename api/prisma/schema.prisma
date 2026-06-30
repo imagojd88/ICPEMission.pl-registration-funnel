@@ -260,6 +260,7 @@ model Registration {
   totalPrice          Decimal            @db.Decimal(10, 2)
   currency            String             @default("PLN")
   paymentMethod       PaymentMethod?
+  checkedInAt         DateTime?          // obecność: znacznik check-in na miejscu (null = nieobecny)
   editToken           String             @unique @default(cuid())
   participants        Participant[]
   payments            Payment[]

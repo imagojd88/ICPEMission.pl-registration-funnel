@@ -201,6 +201,7 @@ export class RegistrationsService {
     participants: Array<{ type: string; firstName: string; lastName: string; age: number | null; gender: string | null; dietary: string | null }>;
     preferredRoomTypeId?: string | null;
     totalPrice: { toString(): string }; currency: string; paymentMethod?: string | null;
+    checkedInAt?: Date | null;
     createdAt: Date;
     payments?: Array<{ status: string }>;
     assignments?: Array<{ room?: { label: string } | null }>;
@@ -231,6 +232,7 @@ export class RegistrationsService {
       currency: reg.currency || 'EUR',
       paymentMethod: mapPaymentMethod(reg.paymentMethod),
       paymentStatus: mapPaymentStatus(reg.status, reg.payments?.[0]?.status),
+      checkedInAt: reg.checkedInAt ? iso(reg.checkedInAt) : null,
       createdAt: iso(reg.createdAt),
     };
   }
