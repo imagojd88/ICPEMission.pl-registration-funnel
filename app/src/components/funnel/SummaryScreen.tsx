@@ -13,6 +13,7 @@ interface Props {
   onBack: () => void
   submitting?: boolean
   submitError?: string | null
+  bankInfo?: { recipient?: string; account?: string }
 }
 
 function CopyButton({ text }: { text: string }) {
@@ -41,8 +42,16 @@ function CopyButton({ text }: { text: string }) {
   )
 }
 
-export default function SummaryScreen({ state, event, pricingConfig, onSubmit, onEdit, onBack, submitting, submitError }: Props) {
+export default function SummaryScreen({ state, event, pricingConfig, onSubmit, onEdit, onBack, submitting, submitError, bankInfo }: Props) {
   const { t } = useTranslation()
+  const free = !!pricingConfig.free
+  const transferDeadline = (() => {
+    try {
+      return new Date(event.startsAt).toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' })
+    } catch {
+      return ''
+    }
+  })()
 
   const priceInput = {
     rooms: state.rooms.map((r) => ({
@@ -245,7 +254,8 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
           </div>
         )}
 
-        {/* Price breakdown */}
+        {/* Price breakdown — ukryte dla wydarzeń bezpłatnych */}
+        {!free && (
         <div
           className="rounded-[15px] overflow-hidden"
           style={{ border: '1px solid var(--border)', background: 'var(--surface)' }}
@@ -324,6 +334,18 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
             </div>
           </div>
         </div>
+        )}
+
+        {/* Bezpłatne — bez kosztów */}
+        {free && (
+          <div
+            className="rounded-[15px] px-4 py-4 text-center"
+            style={{ border: '1px solid var(--ok)', background: 'var(--ok-soft)' }}
+          >
+            <p className="text-sm font-semibold" style={{ color: 'var(--ok)' }}>Wydarzenie bezpłatne</p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>Nie pobieramy żadnych opłat.</p>
+          </div>
+        )}
 
         {/* Błąd zapisu */}
         {submitError && (
@@ -336,7 +358,16 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
         )}
 
         {/* Payment block */}
-        {isOnline ? (
+        {free ? (
+          <button
+            onClick={onSubmit}
+            disabled={submitting}
+            className="w-full text-white text-sm font-semibold rounded-[16px] py-4 transition-all duration-150 active:scale-[0.98] hover:opacity-90"
+            style={{ background: 'var(--accent)', border: 'none', cursor: 'pointer' }}
+          >
+            {submitting ? 'Wysyłanie…' : 'Wyślij zgłoszenie →'}
+          </button>
+        ) : isOnline ? (
           <div className="flex flex-col gap-3">
             <button
               onClick={onSubmit}
@@ -395,7 +426,7 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
                   {t('summary.recipient')}
                 </span>
                 <span className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
-                  ICPE Mission Polska
+                  {bankInfo?.recipient || 'ICPE Mission Polska'}
                 </span>
               </div>
 
@@ -405,22 +436,19 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
                     {t('summary.account')}
                   </span>
                   <span className="text-sm font-medium font-mono truncate" style={{ color: 'var(--ink)' }}>
-                    PL 12 1234 5678 9012 3456 7890 1234
+                    {bankInfo?.account || '—'}
                   </span>
                 </div>
-                <CopyButton text="PL12123456789012345678901234" />
+                {bankInfo?.account && <CopyButton text={bankInfo.account.replace(/\s/g, '')} />}
               </div>
 
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-xs" style={{ color: 'var(--muted)' }}>
-                    {t('summary.ref_title')}
-                  </span>
-                  <span className="text-sm font-semibold font-mono" style={{ color: 'var(--accent-2, var(--accent))' }}>
-                    REG-2026-0148
-                  </span>
-                </div>
-                <CopyButton text="REG-2026-0148" />
+              <div className="flex flex-col gap-0.5">
+                <span className="text-xs" style={{ color: 'var(--muted)' }}>
+                  {t('summary.ref_title')}
+                </span>
+                <span className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
+                  Numer zgłoszenia (otrzymasz po wysłaniu i w e-mailu)
+                </span>
               </div>
 
               <div className="flex flex-col gap-0.5">
@@ -432,14 +460,16 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
                 </span>
               </div>
 
-              <div className="flex flex-col gap-0.5">
-                <span className="text-xs" style={{ color: 'var(--muted)' }}>
-                  {t('summary.deadline')}
-                </span>
-                <span className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
-                  do 12 sierpnia 2026
-                </span>
-              </div>
+              {transferDeadline && (
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-xs" style={{ color: 'var(--muted)' }}>
+                    {t('summary.deadline')}
+                  </span>
+                  <span className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
+                    do {transferDeadline}
+                  </span>
+                </div>
+              )}
             </div>
 
             <button

@@ -147,8 +147,19 @@ export class AdminService {
       paymentMethod: mapPaymentMethod(reg.paymentMethod),
       paymentStatus: mapPaymentStatus(reg.status, reg.payments?.[0]?.status),
       checkedInAt: reg.checkedInAt ? iso(reg.checkedInAt) : null,
+      roomLabel: reg.roomLabel ?? null,
+      roomNote: reg.roomNote ?? null,
       createdAt: iso(reg.createdAt),
     };
+  }
+
+  /** Zakwaterowanie: ustaw numer pokoju i komentarz dla zgłoszenia. */
+  async setAccommodation(id: string, dto: { roomLabel?: string | null; roomNote?: string | null }) {
+    const data: { roomLabel?: string | null; roomNote?: string | null } = {};
+    if (dto.roomLabel !== undefined) data.roomLabel = dto.roomLabel?.trim() || null;
+    if (dto.roomNote !== undefined) data.roomNote = dto.roomNote?.trim() || null;
+    await this.prisma.registration.update({ where: { id }, data });
+    return this.loadContractRegistration(id);
   }
 
   /** Obecność: przełącz check-in zgłoszenia. present=undefined → toggle. */

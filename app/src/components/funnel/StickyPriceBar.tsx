@@ -33,11 +33,12 @@ export default function StickyPriceBar({ state, pricingConfig, onNext, disabled 
     pricingConfig,
   )
 
+  const free = !!pricingConfig.free
   const isLastStep = state.step === 4
-  const label = isLastStep ? t('stepper.to_payment') : t('stepper.next')
+  const label = isLastStep ? (free ? t('stepper.next') : t('stepper.to_payment')) : t('stepper.next')
 
   // Dodatkowe info: formacja + nocleg + wyżywienie
-  const hasPrice = priceResult.people > 0
+  const hasPrice = !free && priceResult.people > 0
 
   return (
     <div
@@ -60,7 +61,7 @@ export default function StickyPriceBar({ state, pricingConfig, onNext, disabled 
             className="font-serif font-semibold leading-none"
             style={{ fontSize: 23, color: 'var(--ink)' }}
           >
-            {formatZl(priceResult.total)}
+            {free ? 'Bezpłatne' : formatZl(priceResult.total)}
           </span>
           {hasPrice && (
             <span className="text-xs leading-none mt-0.5" style={{ color: 'var(--muted)' }}>

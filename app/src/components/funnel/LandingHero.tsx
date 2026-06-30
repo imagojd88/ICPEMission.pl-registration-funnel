@@ -77,7 +77,7 @@ export default function LandingHero({ isOpen, theme, title }: Props) {
               borderRadius: 99,
             }}
           >
-            {t('landing.pill')}
+            {theme?.badge || t('landing.pill')}
           </span>
 
           {/* Status badge */}
@@ -105,7 +105,7 @@ export default function LandingHero({ isOpen, theme, title }: Props) {
         {/* Bottom text */}
         <div className="flex flex-col gap-1">
           <p className="text-xs font-medium" style={{ color: 'rgba(255,255,255,0.85)' }}>
-            {t('landing.supertitle')}
+            {theme?.supertitle || t('landing.supertitle')}
           </p>
           <h1
             className="font-serif leading-tight"

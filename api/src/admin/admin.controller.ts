@@ -42,4 +42,10 @@ export class AdminController {
   checkIn(@Param('id') id: string, @Body() dto?: { present?: boolean }) {
     return this.admin.toggleCheckIn(id, dto?.present);
   }
+
+  @Patch('registrations/:id/accommodation')
+  @ApiOperation({ summary: 'Set room number + note (accommodation)' })
+  accommodation(@Param('id') id: string, @Body() dto: { roomLabel?: string | null; roomNote?: string | null }) {
+    return this.admin.setAccommodation(id, dto);
+  }
 }

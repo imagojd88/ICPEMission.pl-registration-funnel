@@ -41,6 +41,8 @@ export interface AgeBracket {
 }
 
 export interface PricingConfig {
+  /** wydarzenie bezpłatne — ukrywamy ceny/koszty i pomijamy płatność (np. standalone) */
+  free?: boolean;
   /** opłata formacyjna per osoba (stała; zerowana tylko dla progu gratis) */
   formationFee: number;
   /** wyżywienie per osoba (pełne, za cały pobyt) — podlega mnożnikowi wieku */
@@ -142,6 +144,12 @@ export function ageMultiplier(p: PricedParticipant, brackets: AgeBracket[]): num
  * Wylicza cenę zgłoszenia z komponowanych pokoi. Czysta i deterministyczna.
  */
 export function computePrice(input: PriceInput, config: PricingConfig = DEFAULT_PRICING): PriceResult {
+  // Wydarzenie bezpłatne → zero kosztów (ceny ukryte w UI, płatność pominięta).
+  if (config.free) {
+    const people = (input.rooms ?? []).reduce((s, b) => s + b.participants.length, 0);
+    return { formation: 0, accommodation: 0, meals: 0, options: 0, discount: 0, subtotal: 0, total: 0, people, lines: [], currency: 'PLN' };
+  }
+
   const lines: PriceLine[] = [];
 
   for (const booking of input.rooms ?? []) {

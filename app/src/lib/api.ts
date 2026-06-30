@@ -392,6 +392,10 @@ export interface EventTheme {
   primaryColor?: string
   titleColor?: string
   heroImageUrl?: string
+  /** Tag/kategoria (pigułka u góry hero), np. „ICPE Mission Polska" lub „Rekolekcje". */
+  badge?: string
+  /** Nadtytuł nad nazwą eventu, np. „Wyjazd formacyjny". */
+  supertitle?: string
 }
 
 export interface EventConfig {
@@ -399,6 +403,7 @@ export interface EventConfig {
   pricing: PricingConfig
   locales: string[]
   theme?: EventTheme
+  paymentInfo?: { recipient?: string; account?: string }
 }
 
 export async function getEventConfig(slug: string, locale = 'pl'): Promise<EventConfig> {
@@ -411,6 +416,7 @@ export async function getEventConfig(slug: string, locale = 'pl'): Promise<Event
       pricing: (raw.pricingConfig as PricingConfig) ?? (raw.pricing as PricingConfig) ?? MOCK_PRICING,
       locales: (raw.locales as string[]) ?? ['pl'],
       theme: raw.theme as EventTheme | undefined,
+      paymentInfo: raw.paymentInfo as { recipient?: string; account?: string } | undefined,
     }
   } catch {
     return {
@@ -469,6 +475,25 @@ export async function listUploads(token?: string): Promise<UploadItem[]> {
     headers: authHeaders(token),
   })
   return rows.map((r) => ({ ...r, url: `${API_URL}${r.path}` }))
+}
+
+export interface Place {
+  id: string
+  label: string
+}
+
+/** Lista zapisanych miejsc/lokalizacji. */
+export async function listPlaces(token?: string): Promise<Place[]> {
+  return apiFetch<Place[]>('/admin/places', { headers: authHeaders(token) })
+}
+
+/** Zapisuje nowe miejsce (idempotentnie po label). */
+export async function createPlace(label: string, token?: string): Promise<Place> {
+  return apiFetch<Place>('/admin/places', {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: JSON.stringify({ label }),
+  })
 }
 
 export async function getRegistration(id: string, token: string): Promise<RegistrationDto> {
@@ -567,6 +592,19 @@ export async function toggleRegistrationCheckIn(
   })
 }
 
+/** Zakwaterowanie: ustaw numer pokoju i komentarz dla zgłoszenia. */
+export async function setAccommodation(
+  id: string,
+  dto: { roomLabel?: string | null; roomNote?: string | null },
+  token?: string,
+): Promise<void> {
+  await apiFetch(`/admin/registrations/${id}/accommodation`, {
+    method: 'PATCH',
+    headers: authHeaders(token),
+    body: JSON.stringify(dto),
+  })
+}
+
 export interface UpdateInstancePayload {
   title?: { pl: string; en?: string; it?: string }
   description?: { pl?: string; en?: string; it?: string } | null
@@ -605,7 +643,8 @@ export interface EventEditConfig {
   pricingConfig: PricingConfig
   enabledFields?: Record<string, boolean>
   locales: string[]
-  theme?: { primaryColor?: string; heroImageUrl?: string; titleColor?: string }
+  theme?: { primaryColor?: string; heroImageUrl?: string; titleColor?: string; badge?: string; supertitle?: string }
+  paymentInfo?: { recipient?: string; account?: string } | null
 }
 
 /** Surowe dane eventu do edycji (bez fallbacku do mocka — błędy mają wyjść na wierzch). */
@@ -647,11 +686,17 @@ export async function createEventSeries(
   })
 }
 
+export interface BankInfo {
+  recipient?: string
+  account?: string
+}
+
 export interface ConfigurePagePayload {
   slug: string
   theme?: unknown
   enabledFields: Record<string, boolean>
   customFields?: unknown
+  paymentInfo?: BankInfo
   locales: string[]
   isEvergreen: boolean
 }

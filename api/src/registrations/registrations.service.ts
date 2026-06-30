@@ -214,6 +214,8 @@ export class RegistrationsService {
       roomsJson?: unknown;
       totalPrice: { toString(): string }; currency: string; paymentMethod?: string | null;
       checkedInAt?: Date | null;
+      roomLabel?: string | null;
+      roomNote?: string | null;
       createdAt: Date;
       payments?: Array<{ status: string }>;
       assignments?: Array<{ room?: { label: string } | null }>;
@@ -254,6 +256,8 @@ export class RegistrationsService {
       paymentMethod: mapPaymentMethod(reg.paymentMethod),
       paymentStatus: mapPaymentStatus(reg.status, reg.payments?.[0]?.status),
       checkedInAt: reg.checkedInAt ? iso(reg.checkedInAt) : null,
+      roomLabel: reg.roomLabel ?? null,
+      roomNote: reg.roomNote ?? null,
       createdAt: iso(reg.createdAt),
     };
   }

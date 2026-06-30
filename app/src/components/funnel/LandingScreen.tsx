@@ -178,22 +178,31 @@ export default function LandingScreen({ event, onRegister, pricingConfig }: Prop
 
       {/* Price + spots row */}
       <div className="flex items-end justify-between">
-        <div className="flex flex-col gap-0.5">
-          <span className="text-xs" style={{ color: 'var(--muted)' }}>
-            {t('landing.price_from')}
-          </span>
-          <div className="flex items-baseline gap-1">
-            <span
-              className="font-serif font-bold"
-              style={{ fontSize: 30, color: 'var(--brand)' }}
-            >
-              {fromPrice > 0 ? `${fromPrice} zł` : '—'}
+        {pricingConfig?.free ? (
+          <div className="flex flex-col gap-0.5">
+            <span className="font-serif font-bold" style={{ fontSize: 26, color: 'var(--brand)' }}>
+              Wstęp wolny
             </span>
-            <span className="text-sm" style={{ color: 'var(--muted)' }}>
-              {t('landing.per_person')}
-            </span>
+            <span className="text-xs" style={{ color: 'var(--muted)' }}>wydarzenie bezpłatne</span>
           </div>
-        </div>
+        ) : (
+          <div className="flex flex-col gap-0.5">
+            <span className="text-xs" style={{ color: 'var(--muted)' }}>
+              {t('landing.price_from')}
+            </span>
+            <div className="flex items-baseline gap-1">
+              <span
+                className="font-serif font-bold"
+                style={{ fontSize: 30, color: 'var(--brand)' }}
+              >
+                {fromPrice > 0 ? `${fromPrice} zł` : '—'}
+              </span>
+              <span className="text-sm" style={{ color: 'var(--muted)' }}>
+                {t('landing.per_person')}
+              </span>
+            </div>
+          </div>
+        )}
         {hasCapacity && (
           <div className="text-right">
             <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>

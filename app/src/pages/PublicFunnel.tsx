@@ -296,6 +296,10 @@ export default function PublicFunnel() {
   const handleStepperNext = () => {
     if (stepper.step < STEPS - 1) {
       patchStepper({ step: stepper.step + 1 })
+    } else if (pricingConfig.free) {
+      // Wydarzenie bezpłatne → pomijamy wybór płatności.
+      patchStepper({ paymentMethod: 'cash' })
+      setScreen('summary')
     } else {
       setScreen('payment_method')
     }
@@ -468,6 +472,7 @@ export default function PublicFunnel() {
           onBack={handleSummaryBack}
           submitting={submitting}
           submitError={submitError}
+          bankInfo={eventConfig?.paymentInfo}
         />
       )}
 

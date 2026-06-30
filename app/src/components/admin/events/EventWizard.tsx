@@ -10,10 +10,12 @@ import {
   uploadImage,
   updateEventInstance,
   getEventEditConfig,
+  listPlaces,
+  createPlace,
 } from '@/lib/api'
 import { DEFAULT_PRICING } from '@icpe/shared'
 import type { PricingConfig, AgeBracket } from '@icpe/shared'
-import type { EventEditConfig } from '@/lib/api'
+import type { EventEditConfig, Place } from '@/lib/api'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -64,6 +66,7 @@ interface WizardState {
   payOnline: boolean
   payTransfer: boolean
   payCash: boolean
+  payFree: boolean
   // step 2
   rooms: RoomRow[]
   newRoom: Omit<RoomRow, 'id'>
@@ -174,6 +177,7 @@ function mapEditConfigToState(prev: WizardState, cfg: EventEditConfig, slug: str
     payOnline: pm.includes('ONLINE'),
     payTransfer: pm.includes('BANK_TRANSFER'),
     payCash: pm.includes('CASH'),
+    payFree: !!pc?.free,
     rooms,
     formationFee: String(pc?.formationFee ?? prev.formationFee),
     mealsFee: String(pc?.mealsFee ?? prev.mealsFee),
@@ -234,6 +238,7 @@ function buildPricingConfig(state: WizardState): PricingConfig {
   }
 
   return {
+    free: state.payFree,
     formationFee: parseFloat(state.formationFee) || DEFAULT_PRICING.formationFee,
     mealsFee: parseFloat(state.mealsFee) || DEFAULT_PRICING.mealsFee,
     nights,
@@ -460,6 +465,22 @@ function Step0Type({ state, update }: { state: WizardState; update: (p: Partial<
 }
 
 function Step1Details({ state, update }: { state: WizardState; update: (p: Partial<WizardState>) => void }) {
+  const [places, setPlaces] = useState<Place[]>([])
+  useEffect(() => {
+    listPlaces().then(setPlaces).catch(() => {})
+  }, [])
+  async function handleSavePlace() {
+    const v = state.location.trim()
+    if (!v) return
+    try {
+      const p = await createPlace(v)
+      setPlaces((prev) =>
+        prev.some((x) => x.id === p.id) ? prev : [...prev, p].sort((a, b) => a.label.localeCompare(b.label)),
+      )
+    } catch {
+      /* ignoruj błąd zapisu miejsca */
+    }
+  }
   return (
     <div className="flex flex-col gap-4">
       <Input
@@ -516,6 +537,24 @@ function Step1Details({ state, update }: { state: WizardState; update: (p: Parti
         onChange={(e) => update({ location: e.target.value })}
         placeholder="Centrum Formacyjne, ul. ..."
       />
+      <div className="flex items-center gap-2 flex-wrap -mt-2">
+        {places.length > 0 && (
+          <select
+            value=""
+            onChange={(e) => { if (e.target.value) update({ location: e.target.value }) }}
+            className="rounded-[12px] px-3 py-2 text-sm"
+            style={{ border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--ink)', maxWidth: 320 }}
+          >
+            <option value="">— wybierz zapisane miejsce —</option>
+            {places.map((p) => (
+              <option key={p.id} value={p.label}>{p.label}</option>
+            ))}
+          </select>
+        )}
+        <Button size="sm" variant="outline" onClick={() => { void handleSavePlace() }} disabled={!state.location.trim()}>
+          Zapisz to miejsce
+        </Button>
+      </div>
       <Input
         label="Pojemność (max osób)"
         type="number"
@@ -527,6 +566,16 @@ function Step1Details({ state, update }: { state: WizardState; update: (p: Parti
         <p className="text-sm font-medium mb-2" style={{ color: 'var(--ink)' }}>
           Metody płatności
         </p>
+        <label className="flex items-center gap-2 cursor-pointer select-none text-sm font-medium mb-2" style={{ color: 'var(--ink)' }}>
+          <input
+            type="checkbox"
+            checked={state.payFree}
+            onChange={(e) => update({ payFree: e.target.checked })}
+            className="accent-[var(--brand)] w-4 h-4"
+          />
+          Bezpłatne — bez opłat (ukrywa ceny, pomija płatność)
+        </label>
+        {!state.payFree && (
         <div className="flex gap-3 flex-wrap">
           {(
             [
@@ -550,6 +599,7 @@ function Step1Details({ state, update }: { state: WizardState; update: (p: Parti
             </label>
           ))}
         </div>
+        )}
       </div>
     </div>
   )
@@ -1131,6 +1181,7 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
     payOnline: true,
     payTransfer: true,
     payCash: false,
+    payFree: false,
     rooms: [],
     newRoom: { name: '', model: 'os/noc', capacity: '', price: '', quantity: '', tag: '' },
     // Cennik — pola kwotowe startują PUSTE (admin wpisuje sam, bez auto-wypełniania).

@@ -213,6 +213,7 @@ model RegistrationPage {
   theme         Json?
   enabledFields Json
   customFields  Json?
+  paymentInfo   Json?       // dane przelewu: { recipient, account } (edytowalne per event)
   locales       String[]
   published     Boolean     @default(false)
   createdAt     DateTime    @default(now())
@@ -261,6 +262,8 @@ model Registration {
   currency            String             @default("PLN")
   paymentMethod       PaymentMethod?
   checkedInAt         DateTime?          // obecność: znacznik check-in na miejscu (null = nieobecny)
+  roomLabel           String?            // zakwaterowanie: numer/nazwa przydzielonego pokoju
+  roomNote            String?            // zakwaterowanie: opcjonalny komentarz
   editToken           String             @unique @default(cuid())
   participants        Participant[]
   payments            Payment[]
@@ -363,4 +366,11 @@ model Notification {
   registrationId String?
   registration   Registration? @relation(fields: [registrationId], references: [id])
   createdAt      DateTime      @default(now())
+}
+
+// Zapisane miejsca/lokalizacje — wybierane w kreatorze/edycji eventu.
+model Place {
+  id        String   @id @default(cuid())
+  label     String
+  createdAt DateTime @default(now())
 }

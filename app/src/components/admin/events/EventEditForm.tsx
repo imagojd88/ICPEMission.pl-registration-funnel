@@ -8,7 +8,10 @@ import {
   updateEventInstance,
   configureSeriesPage,
   uploadImage,
+  listPlaces,
+  createPlace,
   type EventEditConfig,
+  type Place,
 } from '@/lib/api'
 import { DEFAULT_PRICING } from '@icpe/shared'
 import type { PricingConfig } from '@icpe/shared'
@@ -87,6 +90,7 @@ export default function EventEditForm({
   const [payOnline, setPayOnline] = useState(false)
   const [payTransfer, setPayTransfer] = useState(false)
   const [payCash, setPayCash] = useState(false)
+  const [isFree, setIsFree] = useState(false)
   const [formationFee, setFormationFee] = useState(String(DEFAULT_PRICING.formationFee))
   const [mealsFee, setMealsFee] = useState(String(DEFAULT_PRICING.mealsFee))
   const [transport, setTransport] = useState(String(DEFAULT_PRICING.options.transport))
@@ -100,6 +104,30 @@ export default function EventEditForm({
   const [heroImageUrl, setHeroImageUrl] = useState('')
   const [uploadingHero, setUploadingHero] = useState(false)
   const [showGallery, setShowGallery] = useState(false)
+  const [bankRecipient, setBankRecipient] = useState('')
+  const [bankAccount, setBankAccount] = useState('')
+  const [badge, setBadge] = useState('')
+  const [supertitle, setSupertitle] = useState('')
+  const [places, setPlaces] = useState<Place[]>([])
+
+  useEffect(() => {
+    listPlaces().then(setPlaces).catch(() => {})
+  }, [])
+
+  async function handleSavePlace() {
+    const v = location.trim()
+    if (!v) return
+    try {
+      const p = await createPlace(v)
+      setPlaces((prev) =>
+        prev.some((x) => x.id === p.id)
+          ? prev
+          : [...prev, p].sort((a, b) => a.label.localeCompare(b.label)),
+      )
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+  }
   const [langPL, setLangPL] = useState(true)
   const [langEN, setLangEN] = useState(false)
   const [langIT, setLangIT] = useState(false)
@@ -122,6 +150,7 @@ export default function EventEditForm({
         setPayOnline(pm.includes('ONLINE'))
         setPayTransfer(pm.includes('BANK_TRANSFER'))
         setPayCash(pm.includes('CASH'))
+        setIsFree(!!pc?.free)
         setFormationFee(String(pc?.formationFee ?? DEFAULT_PRICING.formationFee))
         setMealsFee(String(pc?.mealsFee ?? DEFAULT_PRICING.mealsFee))
         setTransport(String(pc?.options?.transport ?? DEFAULT_PRICING.options.transport))
@@ -154,6 +183,10 @@ export default function EventEditForm({
         setPrimaryColor(cfg.theme?.primaryColor ?? '#1C5D99')
         setTitleColor(cfg.theme?.titleColor ?? '#FFFFFF')
         setHeroImageUrl(cfg.theme?.heroImageUrl ?? '')
+        setBankRecipient(cfg.paymentInfo?.recipient ?? '')
+        setBankAccount(cfg.paymentInfo?.account ?? '')
+        setBadge(cfg.theme?.badge || 'ICPE Mission Polska')
+        setSupertitle(cfg.theme?.supertitle ?? '')
         const loc = cfg.locales ?? ['pl']
         setLangPL(loc.includes('pl'))
         setLangEN(loc.includes('en'))
@@ -182,6 +215,7 @@ export default function EventEditForm({
   function buildPricing(): PricingConfig {
     const n = parseInt(nights) || 0
     return {
+      free: isFree,
       formationFee: parseFloat(formationFee) || 0,
       mealsFee: parseFloat(mealsFee) || 0,
       nights: n,
@@ -242,11 +276,14 @@ export default function EventEditForm({
       const theme: Record<string, string> = { primaryColor }
       if (heroImageUrl) theme.heroImageUrl = heroImageUrl
       if (titleColor) theme.titleColor = titleColor
+      theme.badge = badge
+      theme.supertitle = supertitle.trim()
 
       await configureSeriesPage(editTarget.seriesId, {
         slug,
         theme,
         enabledFields: { phone: true, address: true, dietary: true, children: true },
+        paymentInfo: { recipient: bankRecipient.trim(), account: bankAccount.trim() },
         locales,
         isEvergreen: false,
       })
@@ -314,23 +351,49 @@ export default function EventEditForm({
           </Field>
         </div>
         <Field label="Lokalizacja">
-          <Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Centrum…, ul. …, miasto" />
+          <div className="flex flex-col gap-2">
+            <Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Centrum…, ul. …, miasto" />
+            <div className="flex items-center gap-2 flex-wrap">
+              {places.length > 0 && (
+                <select
+                  value=""
+                  onChange={(e) => { if (e.target.value) setLocation(e.target.value) }}
+                  className={inputCls}
+                  style={{ ...inputStyle, maxWidth: 340 }}
+                >
+                  <option value="">— wybierz zapisane miejsce —</option>
+                  {places.map((p) => (
+                    <option key={p.id} value={p.label}>{p.label}</option>
+                  ))}
+                </select>
+              )}
+              <Button size="sm" variant="outline" onClick={() => { void handleSavePlace() }} disabled={!location.trim()}>
+                Zapisz to miejsce
+              </Button>
+            </div>
+          </div>
         </Field>
       </Section>
 
       <Section title="Metody płatności">
-        <div className="flex flex-col gap-2">
-          {[
-            { v: payCash, set: setPayCash, label: 'Gotówka (na miejscu)' },
-            { v: payTransfer, set: setPayTransfer, label: 'Przelew bankowy' },
-            { v: payOnline, set: setPayOnline, label: 'Płatność online' },
-          ].map((p) => (
-            <label key={p.label} className="flex items-center gap-2 text-sm" style={{ color: 'var(--ink)' }}>
-              <input type="checkbox" checked={p.v} onChange={(e) => p.set(e.target.checked)} className="accent-[var(--brand)] w-4 h-4" />
-              {p.label}
-            </label>
-          ))}
-        </div>
+        <label className="flex items-center gap-2 text-sm font-medium" style={{ color: 'var(--ink)' }}>
+          <input type="checkbox" checked={isFree} onChange={(e) => setIsFree(e.target.checked)} className="accent-[var(--brand)] w-4 h-4" />
+          Bezpłatne — bez opłat (ukrywa ceny i pomija krok płatności)
+        </label>
+        {!isFree && (
+          <div className="flex flex-col gap-2">
+            {[
+              { v: payCash, set: setPayCash, label: 'Gotówka (na miejscu)' },
+              { v: payTransfer, set: setPayTransfer, label: 'Przelew bankowy' },
+              { v: payOnline, set: setPayOnline, label: 'Płatność online' },
+            ].map((p) => (
+              <label key={p.label} className="flex items-center gap-2 text-sm" style={{ color: 'var(--ink)' }}>
+                <input type="checkbox" checked={p.v} onChange={(e) => p.set(e.target.checked)} className="accent-[var(--brand)] w-4 h-4" />
+                {p.label}
+              </label>
+            ))}
+          </div>
+        )}
       </Section>
 
       <Section title="Cennik">
@@ -395,6 +458,16 @@ export default function EventEditForm({
         <Field label="Slug (adres: /r/…)">
           <Input value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="np. dzien-formacji-2026" />
         </Field>
+        <Field label="Tag / kategoria (pigułka u góry strony)">
+          <select value={badge} onChange={(e) => setBadge(e.target.value)} className={inputCls} style={inputStyle}>
+            <option value="ICPE Mission">ICPE Mission</option>
+            <option value="ICPE Mission Polska">ICPE Mission Polska</option>
+            <option value="ICPE Mission Warszawa">ICPE Mission Warszawa</option>
+          </select>
+        </Field>
+        <Field label="Nadtytuł (nad nazwą eventu)">
+          <Input value={supertitle} onChange={(e) => setSupertitle(e.target.value)} placeholder="np. Wyjazd formacyjny" />
+        </Field>
         <Field label="Kolor główny">
           <div className="flex items-center gap-2">
             {COLOR_OPTIONS.map((c) => (
@@ -437,6 +510,18 @@ export default function EventEditForm({
             <label className="flex items-center gap-1.5"><input type="checkbox" checked={langIT} onChange={(e) => setLangIT(e.target.checked)} className="accent-[var(--brand)] w-4 h-4" /> IT</label>
           </div>
         </Field>
+      </Section>
+
+      <Section title="Dane do przelewu">
+        <Field label="Odbiorca">
+          <Input value={bankRecipient} onChange={(e) => setBankRecipient(e.target.value)} placeholder="np. ICPE Mission Polska" />
+        </Field>
+        <Field label="Numer konta (IBAN)">
+          <Input value={bankAccount} onChange={(e) => setBankAccount(e.target.value)} placeholder="PL00 0000 0000 0000 0000 0000 0000" />
+        </Field>
+        <p className="text-xs" style={{ color: 'var(--faint)' }}>
+          Pokazywane na stronie zapisów przy płatności przelewem. Tytuł przelewu (numer zgłoszenia) tworzy się automatycznie.
+        </p>
       </Section>
 
       <div className="flex items-center gap-3 pb-4">

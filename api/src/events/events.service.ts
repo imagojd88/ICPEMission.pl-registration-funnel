@@ -113,6 +113,7 @@ export class EventsService {
       })),
       enabledFields: page.enabledFields,
       customFields: page.customFields,
+      paymentInfo: page.paymentInfo,
       locales: page.locales,
       theme: page.theme,
     };
@@ -283,6 +284,7 @@ export class EventsService {
       theme?: unknown;
       enabledFields: unknown;
       customFields?: unknown;
+      paymentInfo?: unknown;
       locales: string[];
       isEvergreen: boolean;
     },
@@ -296,6 +298,7 @@ export class EventsService {
         theme: (dto.theme as any) ?? undefined,
         enabledFields: dto.enabledFields as any,
         customFields: (dto.customFields as any) ?? undefined,
+        paymentInfo: (dto.paymentInfo as any) ?? undefined,
         locales: dto.locales,
         published: false,
       },
@@ -304,6 +307,7 @@ export class EventsService {
         theme: (dto.theme as any) ?? undefined,
         enabledFields: dto.enabledFields as any,
         customFields: (dto.customFields as any) ?? undefined,
+        paymentInfo: (dto.paymentInfo as any) ?? undefined,
         locales: dto.locales,
       },
     });

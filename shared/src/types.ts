@@ -86,6 +86,9 @@ export interface RegistrationDto {
   paymentStatus: PaymentStatus;
   /** Obecność: znacznik check-in (ISO) lub null, gdy nieobecny. */
   checkedInAt?: string | null;
+  /** Zakwaterowanie: numer/nazwa przydzielonego pokoju i komentarz. */
+  roomLabel?: string | null;
+  roomNote?: string | null;
   createdAt: string;
 }
 
