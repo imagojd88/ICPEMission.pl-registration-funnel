@@ -1,14 +1,34 @@
 import { useTranslation } from 'react-i18next'
+import type { EventTheme } from '@/lib/api'
 
-export default function LandingHero({ isOpen }: { isOpen: boolean }) {
+interface Props {
+  isOpen: boolean
+  theme?: EventTheme
+  title?: string
+}
+
+export default function LandingHero({ isOpen, theme, title }: Props) {
   const { t } = useTranslation()
+
+  const heroImageUrl = theme?.heroImageUrl
+  const titleColor = theme?.titleColor
+
+  const backgroundStyle = heroImageUrl
+    ? {
+        backgroundImage: `linear-gradient(rgba(0,0,0,.35), rgba(0,0,0,.45)), url(${heroImageUrl})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+      }
+    : {
+        background: 'linear-gradient(160deg, var(--hero-1), var(--hero-2))',
+      }
 
   return (
     <div
       className="relative overflow-hidden"
       style={{
         height: 300,
-        background: 'linear-gradient(160deg, var(--hero-1), var(--hero-2))',
+        ...backgroundStyle,
       }}
     >
       {/* Stripe overlay */}
@@ -92,11 +112,11 @@ export default function LandingHero({ isOpen }: { isOpen: boolean }) {
             style={{
               fontSize: 38,
               fontWeight: 500,
-              color: 'var(--hero-title)',
+              color: titleColor ?? 'var(--hero-title)',
               lineHeight: 1.15,
             }}
           >
-            {t('landing.title')}
+            {title || t('landing.title')}
           </h1>
         </div>
       </div>

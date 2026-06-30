@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { getAuthToken, setAuthToken } from '@/lib/api'
 import LoginScreen from '@/components/admin/LoginScreen'
 import AdminSidebar from '@/components/admin/AdminSidebar'
@@ -31,6 +31,12 @@ export default function AdminPanel() {
   const [authed, setAuthed] = useState(!!getAuthToken())
   const [view, setView] = useState<AdminScreen>('dashboard')
   const [showWizard, setShowWizard] = useState(false)
+
+  useEffect(() => {
+    if (authed) {
+      document.title = 'Panel administratora — ICPE Mission'
+    }
+  }, [authed])
 
   function handleLogin() {
     setAuthed(true)

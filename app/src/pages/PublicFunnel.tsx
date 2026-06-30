@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom'
 import type { EventInstanceDto } from '@icpe/shared'
 import { computePrice, DEFAULT_PRICING } from '@icpe/shared'
 import type { PricingConfig } from '@icpe/shared'
-import { getEventBySlug, getEventConfig } from '../lib/api'
+import { getEventBySlug, getEventConfig, type EventConfig } from '../lib/api'
 import { Skeleton } from '../components/ui/Skeleton'
 
 // Screen components
@@ -66,7 +66,7 @@ export interface StepperState {
   discountCode: string
   discountApplied: boolean
   consents: { rodo: boolean; regulamin: boolean }
-  paymentMethod: 'online' | 'transfer' | null
+  paymentMethod: 'online' | 'transfer' | 'cash' | null
 }
 
 // ─── Initial state ──────────────────────────────────────────────────────────
@@ -214,11 +214,18 @@ function StepperView({
 
 // ─── Main container ───────────────────────────────────────────────────────────
 
+/** Odczytuje lokalny string z tytułu eventu (Localized lub string). */
+function getEventTitle(title: EventInstanceDto['title']): string {
+  if (typeof title === 'string') return title
+  return title.pl ?? title.en ?? title.it ?? ''
+}
+
 export default function PublicFunnel() {
   const { slug } = useParams<{ slug: string }>()
   const [screen, setScreen] = useState<PublicScreen>('landing')
   const [stepper, setStepper] = useState<StepperState>(buildInitialStepper())
   const [event, setEvent] = useState<EventInstanceDto | null>(null)
+  const [eventConfig, setEventConfig] = useState<EventConfig | null>(null)
   const [pricingConfig, setPricingConfig] = useState<PricingConfig>(DEFAULT_PRICING)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
@@ -233,7 +240,12 @@ export default function PublicFunnel() {
     ])
       .then(([e, cfg]) => {
         setEvent(e)
+        setEventConfig(cfg)
         setPricingConfig(cfg.pricing)
+        const title = getEventTitle(e.title)
+        document.title = title
+          ? `${title} — Rejestracja`
+          : 'Rejestracja — ICPE Mission'
         setLoading(false)
       })
       .catch(() => {
@@ -345,7 +357,11 @@ export default function PublicFunnel() {
     >
       {screen === 'landing' && (
         <>
-          <LandingHero isOpen={event.status === 'OPEN'} />
+          <LandingHero
+            isOpen={event.status === 'OPEN'}
+            theme={eventConfig?.theme}
+            title={getEventTitle(event.title)}
+          />
           <LandingScreen event={event} onRegister={handleStartRegister} />
         </>
       )}
@@ -367,6 +383,7 @@ export default function PublicFunnel() {
           onSelect={(method) => patchStepper({ paymentMethod: method })}
           onContinue={handlePaymentMethodContinue}
           onBack={handlePaymentMethodBack}
+          availableMethods={event.paymentMethods}
         />
       )}
 

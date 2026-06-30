@@ -54,6 +54,7 @@ interface WizardState {
   capacity: string
   payOnline: boolean
   payTransfer: boolean
+  payCash: boolean
   // step 2
   rooms: RoomRow[]
   newRoom: Omit<RoomRow, 'id'>
@@ -66,6 +67,8 @@ interface WizardState {
   // step 4
   slug: string
   color: ColorSwatch
+  heroImageUrl: string
+  titleColor: string
   langPL: boolean
   langEN: boolean
   langIT: boolean
@@ -178,6 +181,20 @@ function LivePreview({ state }: { state: WizardState }) {
     state.langIT && 'IT',
   ].filter(Boolean) as string[]
 
+  const heroStyle = state.heroImageUrl
+    ? {
+        height: 120,
+        backgroundImage: `linear-gradient(rgba(0,0,0,.35), rgba(0,0,0,.45)), url(${state.heroImageUrl})`,
+        backgroundSize: 'cover' as const,
+        backgroundPosition: 'center' as const,
+      }
+    : {
+        height: 120,
+        background: `linear-gradient(135deg, ${heroColor} 0%, ${heroDark} 100%)`,
+      }
+
+  const titleColorStyle = state.titleColor || '#FFFFFF'
+
   return (
     <div
       className="sticky top-4 rounded-[20px] border overflow-hidden"
@@ -189,12 +206,9 @@ function LivePreview({ state }: { state: WizardState }) {
     >
       <div
         className="flex flex-col items-start justify-end px-5 pb-4"
-        style={{
-          height: 120,
-          background: `linear-gradient(135deg, ${heroColor} 0%, ${heroDark} 100%)`,
-        }}
+        style={heroStyle}
       >
-        <p className="font-bold text-white text-base leading-tight">
+        <p className="font-bold text-base leading-tight" style={{ color: titleColorStyle }}>
           {state.name || 'Nazwa eventu'}
         </p>
         <span
@@ -341,12 +355,21 @@ function Step1Details({ state, update }: { state: WizardState; update: (p: Parti
           label="Data rozpoczęcia"
           type="date"
           value={state.dateStart}
-          onChange={(e) => update({ dateStart: e.target.value })}
+          onChange={(e) => {
+            const newStart = e.target.value
+            const patch: Partial<WizardState> = { dateStart: newStart }
+            // If dateEnd is empty or earlier than new start, set it to start
+            if (newStart && (!state.dateEnd || state.dateEnd < newStart)) {
+              patch.dateEnd = newStart
+            }
+            update(patch)
+          }}
         />
         <Input
           label="Data zakończenia"
           type="date"
           value={state.dateEnd}
+          min={state.dateStart || undefined}
           onChange={(e) => update({ dateEnd: e.target.value })}
         />
       </div>
@@ -375,11 +398,12 @@ function Step1Details({ state, update }: { state: WizardState; update: (p: Parti
         <p className="text-sm font-medium mb-2" style={{ color: 'var(--ink)' }}>
           Metody płatności
         </p>
-        <div className="flex gap-3">
+        <div className="flex gap-3 flex-wrap">
           {(
             [
               { key: 'payOnline', label: 'Online (karta / Przelewy24)' },
               { key: 'payTransfer', label: 'Przelew bankowy' },
+              { key: 'payCash', label: 'Gotówka (na miejscu)' },
             ] as const
           ).map((opt) => (
             <label
@@ -835,6 +859,49 @@ function Step4Page({ state, update }: { state: WizardState; update: (p: Partial<
         </div>
       </div>
 
+      <div className="flex flex-col gap-1.5">
+        <label className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
+          URL zdjęcia tła hero
+        </label>
+        <input
+          type="url"
+          value={state.heroImageUrl}
+          onChange={(e) => update({ heroImageUrl: e.target.value })}
+          className="w-full h-[46px] px-3 text-sm rounded-[12px] border"
+          style={{
+            borderColor: 'var(--border)',
+            background: 'var(--surface)',
+            color: 'var(--ink)',
+            outline: 'none',
+          }}
+          placeholder="https://... (wklej URL zdjęcia, np. wgranego na serwer)"
+        />
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <label className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
+          Kolor tytułu
+        </label>
+        <div className="flex items-center gap-3">
+          <input
+            type="color"
+            value={state.titleColor || '#FFFFFF'}
+            onChange={(e) => update({ titleColor: e.target.value })}
+            className="rounded-[8px] border cursor-pointer"
+            style={{
+              width: 46,
+              height: 46,
+              padding: 4,
+              borderColor: 'var(--border)',
+              background: 'var(--surface)',
+            }}
+          />
+          <span className="text-sm font-mono" style={{ color: 'var(--muted)' }}>
+            {state.titleColor || '#FFFFFF'}
+          </span>
+        </div>
+      </div>
+
       <div>
         <p className="text-sm font-semibold mb-2" style={{ color: 'var(--ink)' }}>
           Pola formularza
@@ -928,6 +995,7 @@ export default function EventWizard({ onCancel, onSuccess }: EventWizardProps) {
     capacity: '',
     payOnline: true,
     payTransfer: true,
+    payCash: false,
     rooms: [],
     newRoom: { name: '', model: 'os/noc', capacity: '', price: '', quantity: '', tag: '' },
     // Cennik — domyślne wartości z DEFAULT_PRICING
@@ -945,6 +1013,8 @@ export default function EventWizard({ onCancel, onSuccess }: EventWizardProps) {
     })),
     slug: '',
     color: 'blue',
+    heroImageUrl: '',
+    titleColor: '#FFFFFF',
     langPL: true,
     langEN: false,
     langIT: false,
@@ -972,6 +1042,7 @@ export default function EventWizard({ onCancel, onSuccess }: EventWizardProps) {
       const paymentMethods: string[] = []
       if (state.payOnline) paymentMethods.push('ONLINE')
       if (state.payTransfer) paymentMethods.push('BANK_TRANSFER')
+      if (state.payCash) paymentMethods.push('CASH')
 
       // Compute endsAt: if dateEnd provided use it, else dateStart + nights days
       const endsAt = state.dateEnd
@@ -1019,8 +1090,15 @@ export default function EventWizard({ onCancel, onSuccess }: EventWizardProps) {
       if (state.langIT) locales.push('it')
       if (locales.length === 0) locales.push('pl')
 
+      const theme: Record<string, string> = {
+        primaryColor: COLOR_MAP[state.color],
+      }
+      if (state.heroImageUrl) theme.heroImageUrl = state.heroImageUrl
+      if (state.titleColor) theme.titleColor = state.titleColor
+
       await configureSeriesPage(seriesId, {
         slug: state.slug,
+        theme,
         enabledFields: { phone: true, address: true, dietary: true, children: true },
         locales,
         isEvergreen: state.eventType === 'evergreen',

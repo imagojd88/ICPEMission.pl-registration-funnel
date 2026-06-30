@@ -6,7 +6,7 @@ export type ParticipantType = 'adult' | 'child';
 
 export type EventType = 'ONE_TIME' | 'EVERGREEN' | 'STANDALONE';
 export type InstanceStatus = 'DRAFT' | 'OPEN' | 'CLOSED' | 'ARCHIVED';
-export type PaymentMethod = 'ONLINE' | 'BANK_TRANSFER';
+export type PaymentMethod = 'ONLINE' | 'BANK_TRANSFER' | 'CASH';
 export type PaymentStatus =
   | 'PENDING'
   | 'PAID'

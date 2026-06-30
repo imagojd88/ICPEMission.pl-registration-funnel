@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { toggleTheme, getTheme } from '@/lib/theme'
 import { cn } from '@/lib/utils'
+import { getAdminEmail } from '@/lib/api'
 
 type AdminScreen =
   | 'dashboard'
@@ -48,6 +49,12 @@ interface AdminSidebarProps {
 
 export default function AdminSidebar({ activeScreen, onNavigate, onLogout }: AdminSidebarProps) {
   const [isDark, setIsDark] = useState(() => getTheme() === 'dark')
+
+  const adminEmail = getAdminEmail()
+  const displayName = adminEmail ?? 'Administrator'
+  const initials = adminEmail
+    ? adminEmail.split('@')[0].slice(0, 2).toUpperCase()
+    : 'AD'
 
   function handleThemeToggle() {
     toggleTheme()
@@ -185,11 +192,11 @@ export default function AdminSidebar({ activeScreen, onNavigate, onLogout }: Adm
             className="flex items-center justify-center rounded-full text-xs font-bold text-white shrink-0"
             style={{ width: 36, height: 36, background: 'var(--brand)' }}
           >
-            JP
+            {initials}
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold truncate" style={{ color: 'var(--ink)' }}>
-              Jan Paweł
+              {displayName}
             </p>
             <p className="text-xs" style={{ color: 'var(--faint)' }}>
               Admin

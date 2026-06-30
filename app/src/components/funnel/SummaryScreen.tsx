@@ -75,6 +75,7 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
   }
 
   const isOnline = state.paymentMethod === 'online'
+  const isCash = state.paymentMethod === 'cash'
 
   // Calendar helpers
   const calInput = {
@@ -340,6 +341,29 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
             <p className="text-xs text-center" style={{ color: 'var(--muted)' }}>
               {t('summary.payment_secure')}
             </p>
+          </div>
+        ) : isCash ? (
+          <div className="flex flex-col gap-4">
+            {/* Cash card */}
+            <div
+              className="rounded-[15px] p-4 flex flex-col gap-3"
+              style={{ border: '1px solid var(--border)', background: 'var(--surface)' }}
+            >
+              <h3 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+                Płatność gotówką na miejscu
+              </h3>
+              <p className="text-sm leading-relaxed" style={{ color: 'var(--muted)' }}>
+                Kwotę <span className="font-semibold" style={{ color: 'var(--ink)' }}>{formatZl(price.total)}</span> zapłacisz gotówką przy rejestracji na miejscu. Nie jest wymagana żadna przedpłata online.
+              </p>
+            </div>
+
+            <button
+              onClick={onSubmit}
+              className="w-full text-white text-sm font-semibold rounded-[16px] py-4 transition-all duration-150 active:scale-[0.98] hover:opacity-90"
+              style={{ background: 'var(--accent)', border: 'none', cursor: 'pointer' }}
+            >
+              Zgłoszenie z płatnością gotówką →
+            </button>
           </div>
         ) : (
           <div className="flex flex-col gap-4">

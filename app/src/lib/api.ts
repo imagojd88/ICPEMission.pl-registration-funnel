@@ -47,6 +47,19 @@ export function getAuthToken(): string | null {
   return _authToken
 }
 
+/** Odczytuje e-mail zalogowanego admina z payloadu JWT (bez zapytania do API). */
+export function getAdminEmail(): string | null {
+  const t = _authToken
+  if (!t) return null
+  try {
+    const payload = t.split('.')[1]
+    const json = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/'))) as { email?: string }
+    return json.email ?? null
+  } catch {
+    return null
+  }
+}
+
 // ---------------------------------------------------------------------------
 // HTTP helper
 // ---------------------------------------------------------------------------
@@ -334,10 +347,17 @@ export async function createRsvp(input: {
   }
 }
 
+export interface EventTheme {
+  primaryColor?: string
+  titleColor?: string
+  heroImageUrl?: string
+}
+
 export interface EventConfig {
   roomTypes: RoomTypeDto[]
   pricing: PricingConfig
   locales: string[]
+  theme?: EventTheme
 }
 
 export async function getEventConfig(slug: string, locale = 'pl'): Promise<EventConfig> {

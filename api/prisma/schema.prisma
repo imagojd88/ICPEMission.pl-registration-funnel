@@ -40,6 +40,7 @@ enum InstanceStatus {
 enum PaymentMethod {
   ONLINE
   BANK_TRANSFER
+  CASH
 }
 
 enum PaymentStatus {

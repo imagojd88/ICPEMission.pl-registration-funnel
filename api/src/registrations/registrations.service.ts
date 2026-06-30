@@ -62,7 +62,7 @@ export class RegistrationsService {
         currency: priceResult.currency,
         paymentMethod: dto.paymentMethod,
         editToken,
-        status: dto.paymentMethod === 'BANK_TRANSFER' ? 'AWAITING_TRANSFER' : 'PENDING_PAYMENT',
+        status: dto.paymentMethod === 'ONLINE' ? 'PENDING_PAYMENT' : 'AWAITING_TRANSFER',
         participants: {
           create: dto.participants.map(p => ({
             type: p.type === 'adult' ? 'ADULT' : 'CHILD' as 'ADULT' | 'CHILD',
@@ -94,9 +94,12 @@ export class RegistrationsService {
     return {
       registration: this.mapToDto(registration),
       summary: priceResult,
-      payment: dto.paymentMethod === 'BANK_TRANSFER'
-        ? { method: 'BANK_TRANSFER', transferTitle: `REG-${registration.id}` }
-        : { method: 'ONLINE', registrationId: registration.id },
+      payment:
+        dto.paymentMethod === 'BANK_TRANSFER'
+          ? { method: 'BANK_TRANSFER', transferTitle: `REG-${registration.id}` }
+          : dto.paymentMethod === 'CASH'
+            ? { method: 'CASH', note: 'Płatność gotówką na miejscu' }
+            : { method: 'ONLINE', registrationId: registration.id },
     };
   }
 

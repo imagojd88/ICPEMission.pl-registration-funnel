@@ -1,15 +1,17 @@
-import { CreditCard, Landmark } from 'lucide-react'
+import { CreditCard, Landmark, Banknote } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import type { PaymentMethod } from '@icpe/shared'
 
 interface Props {
-  selected: 'online' | 'transfer' | null
-  onSelect: (method: 'online' | 'transfer') => void
+  selected: 'online' | 'transfer' | 'cash' | null
+  onSelect: (method: 'online' | 'transfer' | 'cash') => void
   onContinue: () => void
   onBack: () => void
+  availableMethods?: PaymentMethod[]
 }
 
 interface CardProps {
-  id: 'online' | 'transfer'
+  id: 'online' | 'transfer' | 'cash'
   icon: typeof CreditCard
   title: string
   tags: string
@@ -79,8 +81,17 @@ function PaymentCard({ icon: Icon, title, tags, selected, onSelect }: CardProps)
   )
 }
 
-export default function PaymentMethodScreen({ selected, onSelect, onContinue, onBack }: Props) {
+export default function PaymentMethodScreen({ selected, onSelect, onContinue, onBack, availableMethods }: Props) {
   const { t } = useTranslation()
+
+  // Default: show all methods if not specified
+  const enabled = availableMethods && availableMethods.length > 0
+    ? availableMethods
+    : (['ONLINE', 'BANK_TRANSFER'] as PaymentMethod[])
+
+  const showOnline = enabled.includes('ONLINE')
+  const showTransfer = enabled.includes('BANK_TRANSFER')
+  const showCash = enabled.includes('CASH')
 
   return (
     <div className="flex flex-col min-h-screen" style={{ background: 'var(--bg)' }}>
@@ -106,22 +117,36 @@ export default function PaymentMethodScreen({ selected, onSelect, onContinue, on
 
         {/* Payment cards — stacked on mobile, can go side-by-side on wider */}
         <div className="flex flex-col gap-3">
-          <PaymentCard
-            id="online"
-            icon={CreditCard}
-            title={t('payment_method.online')}
-            tags={t('payment_method.online_tags')}
-            selected={selected === 'online'}
-            onSelect={() => onSelect('online')}
-          />
-          <PaymentCard
-            id="transfer"
-            icon={Landmark}
-            title={t('payment_method.transfer')}
-            tags={t('payment_method.transfer_tags')}
-            selected={selected === 'transfer'}
-            onSelect={() => onSelect('transfer')}
-          />
+          {showOnline && (
+            <PaymentCard
+              id="online"
+              icon={CreditCard}
+              title={t('payment_method.online')}
+              tags={t('payment_method.online_tags')}
+              selected={selected === 'online'}
+              onSelect={() => onSelect('online')}
+            />
+          )}
+          {showTransfer && (
+            <PaymentCard
+              id="transfer"
+              icon={Landmark}
+              title={t('payment_method.transfer')}
+              tags={t('payment_method.transfer_tags')}
+              selected={selected === 'transfer'}
+              onSelect={() => onSelect('transfer')}
+            />
+          )}
+          {showCash && (
+            <PaymentCard
+              id="cash"
+              icon={Banknote}
+              title={t('payment_method.cash', 'Gotówka na miejscu')}
+              tags={t('payment_method.cash_tags', 'Zapłać gotówką w dniu przyjazdu')}
+              selected={selected === 'cash'}
+              onSelect={() => onSelect('cash')}
+            />
+          )}
         </div>
 
         {/* CTA */}

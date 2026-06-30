@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { formatZl } from '@icpe/shared'
 
 interface Props {
-  paymentMethod: 'online' | 'transfer' | null
+  paymentMethod: 'online' | 'transfer' | 'cash' | null
   email: string
   total: number
   onBack: () => void

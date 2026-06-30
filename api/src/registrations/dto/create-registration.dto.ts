@@ -46,6 +46,6 @@ export class CreateRegistrationDto {
   @IsOptional() @IsArray() @IsString({ each: true }) dietaryTags?: string[];
   @IsOptional() @ValidateNested() @Type(() => OptionsDto) options?: OptionsDto;
   @IsOptional() @IsString() discountCode?: string;
-  @IsIn(['ONLINE', 'BANK_TRANSFER']) @ApiProperty() paymentMethod!: 'ONLINE' | 'BANK_TRANSFER';
+  @IsIn(['ONLINE', 'BANK_TRANSFER', 'CASH']) @ApiProperty() paymentMethod!: 'ONLINE' | 'BANK_TRANSFER' | 'CASH';
   @ValidateNested() @Type(() => ConsentsDto) @ApiProperty() consents!: ConsentsDto;
 }
