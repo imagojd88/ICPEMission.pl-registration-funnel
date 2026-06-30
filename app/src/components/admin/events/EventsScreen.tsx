@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { ExternalLink } from 'lucide-react'
+import { ExternalLink, Pencil } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import EventWizard from './EventWizard'
@@ -57,6 +57,16 @@ export default function EventsScreen({ onOpenWizard, showWizard, onCloseWizard }
   const [instances, setInstances] = useState<EventInstanceDto[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [editTarget, setEditTarget] = useState<{ instanceId: string; seriesId: string; slug: string } | null>(null)
+
+  function openNew() {
+    setEditTarget(null)
+    onOpenWizard()
+  }
+  function openEdit(instanceId: string, seriesId: string, slug: string) {
+    setEditTarget({ instanceId, seriesId, slug })
+    onOpenWizard()
+  }
 
   const loadInstances = useCallback(() => {
     setLoading(true)
@@ -92,12 +102,17 @@ export default function EventsScreen({ onOpenWizard, showWizard, onCloseWizard }
           </button>
           <span style={{ color: 'var(--faint)' }}>/</span>
           <span className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
-            Nowy event
+            {editTarget ? 'Edycja eventu' : 'Nowy event'}
           </span>
         </div>
         <EventWizard
-          onCancel={onCloseWizard}
+          editTarget={editTarget ?? undefined}
+          onCancel={() => {
+            setEditTarget(null)
+            onCloseWizard()
+          }}
           onSuccess={() => {
+            setEditTarget(null)
             onCloseWizard()
             loadInstances()
           }}
@@ -152,7 +167,7 @@ export default function EventsScreen({ onOpenWizard, showWizard, onCloseWizard }
           <p className="font-bold text-base" style={{ color: 'var(--ink)' }}>
             Eventy ({loading ? '…' : filtered.length})
           </p>
-          <Button size="sm" onClick={onOpenWizard}>
+          <Button size="sm" onClick={openNew}>
             + Nowy event
           </Button>
         </div>
@@ -168,7 +183,7 @@ export default function EventsScreen({ onOpenWizard, showWizard, onCloseWizard }
               {instances.length === 0 ? 'Utwórz pierwszy event klikając „+ Nowy event".' : 'Brak eventów w tej kategorii.'}
             </p>
             {instances.length === 0 && (
-              <Button size="sm" onClick={onOpenWizard} className="mt-1">
+              <Button size="sm" onClick={openNew} className="mt-1">
                 + Utwórz pierwszy event
               </Button>
             )}
@@ -195,6 +210,7 @@ export default function EventsScreen({ onOpenWizard, showWizard, onCloseWizard }
                   const statusStr = mapStatus(ev.status)
                   const name = resolveTitle(ev.title)
                   const slug = (ev as EventInstanceDto & { slug?: string }).slug ?? ''
+                  const seriesId = (ev as EventInstanceDto & { seriesId?: string }).seriesId ?? ''
                   const cap = ev.capacity ?? 0
                   const reg = ev.registeredCount ?? 0
                   return (
@@ -241,17 +257,28 @@ export default function EventsScreen({ onOpenWizard, showWizard, onCloseWizard }
                       </td>
                       <td className="px-5 py-3.5">{statusBadge(statusStr)}</td>
                       <td className="px-5 py-3.5">
-                        {slug && (
-                          <a
-                            href={`https://rejestracja.icpemission.pl/r/${slug}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-1 text-xs font-medium transition-colors hover:text-[var(--brand)]"
-                            style={{ color: 'var(--muted)' }}
-                          >
-                            Otwórz <ExternalLink size={12} />
-                          </a>
-                        )}
+                        <div className="flex items-center gap-3">
+                          {slug && seriesId && (
+                            <button
+                              onClick={() => openEdit(ev.id, seriesId, slug)}
+                              className="flex items-center gap-1 text-xs font-medium transition-colors hover:text-[var(--brand)]"
+                              style={{ color: 'var(--muted)' }}
+                            >
+                              <Pencil size={12} /> Edytuj
+                            </button>
+                          )}
+                          {slug && (
+                            <a
+                              href={`https://rejestracja.icpemission.pl/r/${slug}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1 text-xs font-medium transition-colors hover:text-[var(--brand)]"
+                              style={{ color: 'var(--muted)' }}
+                            >
+                              Otwórz <ExternalLink size={12} />
+                            </a>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   )

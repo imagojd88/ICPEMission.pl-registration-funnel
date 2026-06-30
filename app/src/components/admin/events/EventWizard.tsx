@@ -1,11 +1,19 @@
-import { useState, type ChangeEvent } from 'react'
+import { useState, useEffect, type ChangeEvent } from 'react'
 import { X, Plus, CheckCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
-import { createEventSeries, configureSeriesPage, addRoomType, uploadImage } from '@/lib/api'
+import {
+  createEventSeries,
+  configureSeriesPage,
+  addRoomType,
+  uploadImage,
+  updateEventInstance,
+  getEventEditConfig,
+} from '@/lib/api'
 import { DEFAULT_PRICING } from '@icpe/shared'
 import type { PricingConfig, AgeBracket } from '@icpe/shared'
+import type { EventEditConfig } from '@/lib/api'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -116,6 +124,76 @@ function mapEventType(t: EventType): 'ONE_TIME' | 'EVERGREEN' | 'STANDALONE' {
   if (t === 'evergreen') return 'EVERGREEN'
   if (t === 'standalone') return 'STANDALONE'
   return 'ONE_TIME'
+}
+
+function apiTypeToEventType(t: string): EventType {
+  if (t === 'EVERGREEN') return 'evergreen'
+  if (t === 'STANDALONE') return 'standalone'
+  return 'one_time'
+}
+
+function dateInput(iso?: string): string {
+  return iso ? iso.slice(0, 10) : ''
+}
+
+function colorFromHex(hex?: string): ColorSwatch {
+  const entry = (Object.entries(COLOR_MAP) as [ColorSwatch, string][]).find(
+    ([, v]) => v.toLowerCase() === (hex ?? '').toLowerCase(),
+  )
+  return entry ? entry[0] : 'blue'
+}
+
+/** Mapuje dane istniejącego eventu (z API) na stan kreatora — tryb edycji. */
+function mapEditConfigToState(prev: WizardState, cfg: EventEditConfig, slug: string): WizardState {
+  const pc = cfg.pricingConfig
+  const rooms: RoomRow[] = (pc?.rooms ?? []).map((r, i) => ({
+    id: `edit-room-${i}`,
+    name: r.name,
+    model: (r.model as PricingModel) || 'os/noc',
+    capacity: String(r.cap ?? 1),
+    price: String(r.perPerson ?? 0),
+    quantity: '1',
+    tag: r.tag || '',
+  }))
+  const ageBrackets: AgeBracketRow[] = (pc?.childBrackets ?? []).map((b, i) => ({
+    id: `edit-b-${i}`,
+    ltAge: String(b.ltAge),
+    multiplier: String(b.multiplier),
+  }))
+  const pm = cfg.paymentMethods ?? []
+  return {
+    ...prev,
+    eventType: apiTypeToEventType(cfg.type),
+    name: cfg.title?.pl ?? '',
+    dateStart: dateInput(cfg.startsAt),
+    dateEnd: dateInput(cfg.endsAt),
+    nights: String(cfg.nights ?? 1),
+    location: cfg.location ?? '',
+    capacity: cfg.capacity != null ? String(cfg.capacity) : '',
+    payOnline: pm.includes('ONLINE'),
+    payTransfer: pm.includes('BANK_TRANSFER'),
+    payCash: pm.includes('CASH'),
+    rooms,
+    formationFee: String(pc?.formationFee ?? prev.formationFee),
+    mealsFee: String(pc?.mealsFee ?? prev.mealsFee),
+    ageBrackets: ageBrackets.length > 0 ? ageBrackets : prev.ageBrackets,
+    optionsForm: {
+      transport: String(pc?.options?.transport ?? prev.optionsForm.transport),
+      bedding: String(pc?.options?.bedding ?? prev.optionsForm.bedding),
+    },
+    discountRows: Object.entries(pc?.discountCodes ?? {}).map(([code, frac], i) => ({
+      id: `edit-dc-${i}`,
+      code,
+      pct: String(Math.round((frac as number) * 100)),
+    })),
+    slug,
+    color: colorFromHex(cfg.theme?.primaryColor),
+    heroImageUrl: cfg.theme?.heroImageUrl ?? '',
+    titleColor: cfg.theme?.titleColor ?? '#FFFFFF',
+    langPL: (cfg.locales ?? ['pl']).includes('pl'),
+    langEN: (cfg.locales ?? []).includes('en'),
+    langIT: (cfg.locales ?? []).includes('it'),
+  }
 }
 
 function mapPricingModel(m: PricingModel): 'PER_PERSON_PER_NIGHT' | 'PER_ROOM' | 'PER_PERSON' | 'SINGLE_SUPPLEMENT' {
@@ -1022,9 +1100,12 @@ function SuccessScreen({ slug, onClose }: { slug: string; onClose: () => void })
 interface EventWizardProps {
   onCancel: () => void
   onSuccess?: () => void
+  /** Gdy ustawione → tryb edycji istniejącego eventu. */
+  editTarget?: { instanceId: string; seriesId: string; slug: string }
 }
 
-export default function EventWizard({ onCancel, onSuccess }: EventWizardProps) {
+export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWizardProps) {
+  const isEdit = !!editTarget
   const [step, setStep] = useState(0)
   const [state, setState] = useState<WizardState>({
     eventType: 'one_time',
@@ -1063,6 +1144,27 @@ export default function EventWizard({ onCancel, onSuccess }: EventWizardProps) {
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [createdSlug, setCreatedSlug] = useState<string | null>(null)
+  const [loadingEdit, setLoadingEdit] = useState(isEdit)
+
+  useEffect(() => {
+    if (!editTarget) return
+    let cancelled = false
+    setLoadingEdit(true)
+    getEventEditConfig(editTarget.slug)
+      .then((cfg) => {
+        if (!cancelled) setState((prev) => mapEditConfigToState(prev, cfg, editTarget.slug))
+      })
+      .catch((e: unknown) => {
+        if (!cancelled) setSubmitError(e instanceof Error ? e.message : String(e))
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingEdit(false)
+      })
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editTarget?.slug])
 
   function update(partial: Partial<WizardState>) {
     setState((prev) => ({ ...prev, ...partial }))
@@ -1094,6 +1196,42 @@ export default function EventWizard({ onCancel, onSuccess }: EventWizardProps) {
       // Build full pricing config from wizard state
       const pricingConfig = buildPricingConfig(state)
 
+      const locales: string[] = []
+      if (state.langPL) locales.push('pl')
+      if (state.langEN) locales.push('en')
+      if (state.langIT) locales.push('it')
+      if (locales.length === 0) locales.push('pl')
+
+      const theme: Record<string, string> = {
+        primaryColor: COLOR_MAP[state.color],
+      }
+      if (state.heroImageUrl) theme.heroImageUrl = state.heroImageUrl
+      if (state.titleColor) theme.titleColor = state.titleColor
+
+      // Tryb edycji — aktualizujemy istniejący event i kończymy.
+      if (editTarget) {
+        await updateEventInstance(editTarget.instanceId, {
+          title: { pl: state.name },
+          startsAt,
+          endsAt,
+          location: state.location || null,
+          nights,
+          capacity: state.capacity ? parseInt(state.capacity) : null,
+          paymentMethods,
+          pricingConfig,
+        })
+        await configureSeriesPage(editTarget.seriesId, {
+          slug: state.slug,
+          theme,
+          enabledFields: { phone: true, address: true, dietary: true, children: true },
+          locales,
+          isEvergreen: state.eventType === 'evergreen',
+        })
+        setCreatedSlug(state.slug)
+        onSuccess?.()
+        return
+      }
+
       // Step 1: create series
       const series = await createEventSeries({
         type: mapEventType(state.eventType),
@@ -1124,19 +1262,7 @@ export default function EventWizard({ onCancel, onSuccess }: EventWizardProps) {
         })
       }
 
-      // Step 3: configure page
-      const locales: string[] = []
-      if (state.langPL) locales.push('pl')
-      if (state.langEN) locales.push('en')
-      if (state.langIT) locales.push('it')
-      if (locales.length === 0) locales.push('pl')
-
-      const theme: Record<string, string> = {
-        primaryColor: COLOR_MAP[state.color],
-      }
-      if (state.heroImageUrl) theme.heroImageUrl = state.heroImageUrl
-      if (state.titleColor) theme.titleColor = state.titleColor
-
+      // Step 3: configure page (locales + theme policzone wyżej)
       await configureSeriesPage(seriesId, {
         slug: state.slug,
         theme,
@@ -1152,6 +1278,17 @@ export default function EventWizard({ onCancel, onSuccess }: EventWizardProps) {
     } finally {
       setSubmitting(false)
     }
+  }
+
+  if (loadingEdit) {
+    return (
+      <div
+        className="rounded-[20px] border px-6 py-16 text-center"
+        style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
+      >
+        <p className="text-sm" style={{ color: 'var(--faint)' }}>Wczytywanie danych eventu…</p>
+      </div>
+    )
   }
 
   if (createdSlug) {

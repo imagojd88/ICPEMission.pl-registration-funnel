@@ -512,6 +512,52 @@ export async function toggleRegistrationCheckIn(
   })
 }
 
+export interface UpdateInstancePayload {
+  title?: { pl: string; en?: string; it?: string }
+  description?: { pl?: string; en?: string; it?: string } | null
+  startsAt?: string
+  endsAt?: string
+  location?: string | null
+  nights?: number
+  capacity?: number | null
+  paymentMethods?: string[]
+  pricingConfig?: PricingConfig
+}
+
+/** Edycja istniejącego eventu (instancji). */
+export async function updateEventInstance(
+  instanceId: string,
+  payload: UpdateInstancePayload,
+  token?: string,
+): Promise<unknown> {
+  return apiFetch(`/admin/instances/${instanceId}`, {
+    method: 'PATCH',
+    headers: authHeaders(token),
+    body: JSON.stringify(payload),
+  })
+}
+
+export interface EventEditConfig {
+  type: string
+  title: { pl?: string; en?: string; it?: string }
+  description?: { pl?: string; en?: string; it?: string } | null
+  startsAt: string
+  endsAt: string
+  location?: string | null
+  nights: number
+  capacity?: number | null
+  paymentMethods: string[]
+  pricingConfig: PricingConfig
+  enabledFields?: Record<string, boolean>
+  locales: string[]
+  theme?: { primaryColor?: string; heroImageUrl?: string; titleColor?: string }
+}
+
+/** Surowe dane eventu do edycji (bez fallbacku do mocka — błędy mają wyjść na wierzch). */
+export async function getEventEditConfig(slug: string, token?: string): Promise<EventEditConfig> {
+  return apiFetch<EventEditConfig>(`/r/${slug}/config`, { headers: authHeaders(token) })
+}
+
 // ── New admin write endpoints ────────────────────────────────────────────────
 
 export interface CreateSeriesPayload {

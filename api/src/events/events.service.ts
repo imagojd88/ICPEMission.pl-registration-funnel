@@ -294,4 +294,39 @@ export class EventsService {
       data: { pricingConfig: pricingConfig as any },
     });
   }
+
+  /** Edycja istniejącego eventu (instancji) — pola podstawowe + cennik + metody płatności. */
+  async updateInstance(
+    instanceId: string,
+    dto: {
+      title?: Record<string, string>;
+      description?: Record<string, string> | null;
+      startsAt?: string;
+      endsAt?: string;
+      location?: string | null;
+      nights?: number;
+      capacity?: number | null;
+      paymentMethods?: string[];
+      pricingConfig?: unknown;
+      registrationOpensAt?: string;
+      registrationClosesAt?: string;
+      status?: string;
+    },
+  ) {
+    const data: Record<string, unknown> = {};
+    if (dto.title !== undefined) data.title = dto.title as any;
+    if (dto.description !== undefined) data.description = (dto.description ?? null) as any;
+    if (dto.startsAt !== undefined) data.startsAt = new Date(dto.startsAt);
+    if (dto.endsAt !== undefined) data.endsAt = new Date(dto.endsAt);
+    if (dto.location !== undefined) data.location = dto.location ?? null;
+    if (dto.nights !== undefined) data.nights = dto.nights;
+    if (dto.capacity !== undefined) data.capacity = dto.capacity ?? null;
+    if (dto.paymentMethods !== undefined) data.paymentMethods = dto.paymentMethods as any;
+    if (dto.pricingConfig !== undefined) data.pricingConfig = dto.pricingConfig as any;
+    if (dto.registrationOpensAt !== undefined) data.registrationOpensAt = new Date(dto.registrationOpensAt);
+    if (dto.registrationClosesAt !== undefined) data.registrationClosesAt = new Date(dto.registrationClosesAt);
+    if (dto.status !== undefined) data.status = dto.status as any;
+    await this.prisma.eventInstance.update({ where: { id: instanceId }, data });
+    return this.getInstanceContract(instanceId);
+  }
 }

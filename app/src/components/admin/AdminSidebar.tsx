@@ -34,7 +34,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'events', label: 'Eventy', icon: CalendarDays },
-  { id: 'registrations', label: 'Zgłoszenia', icon: ClipboardList, badge: '52' },
+  { id: 'registrations', label: 'Zgłoszenia', icon: ClipboardList },
   { id: 'accommodation', label: 'Zakwaterowanie', icon: BedDouble },
   { id: 'payments', label: 'Płatności', icon: CreditCard },
   { id: 'attendance', label: 'Obecność', icon: UserCheck },
