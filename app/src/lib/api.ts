@@ -333,6 +333,25 @@ function isStandaloneSlug(slug: string): boolean {
   return slug.includes('spotkanie') || slug.includes('standalone') || slug.includes('rsvp')
 }
 
+export interface PublicEventTile {
+  slug: string
+  title: { pl?: string; en?: string; it?: string } | string
+  startsAt: string
+  endsAt: string
+  location: string
+  heroImageUrl: string | null
+  primaryColor: string | null
+}
+
+/** Publiczna lista aktywnych eventów do strony głównej (kafelki). */
+export async function getPublicActiveEvents(): Promise<PublicEventTile[]> {
+  try {
+    return await apiFetch<PublicEventTile[]>('/events')
+  } catch {
+    return []
+  }
+}
+
 export async function getEventBySlug(slug: string): Promise<EventInstanceDto> {
   try {
     const res = await apiFetch<EventInstanceDto | { instance: EventInstanceDto }>(`/r/${slug}`)
@@ -384,7 +403,15 @@ export interface EventConfig {
 
 export async function getEventConfig(slug: string, locale = 'pl'): Promise<EventConfig> {
   try {
-    return await apiFetch<EventConfig>(`/r/${slug}/config?locale=${locale}`)
+    // Backend zwraca `pricingConfig` (nie `pricing`) → mapujemy, inaczej funnel dostaje
+    // undefined i krok „Pokój" się wywala (pusta strona).
+    const raw = await apiFetch<Record<string, unknown>>(`/r/${slug}/config?locale=${locale}`)
+    return {
+      roomTypes: (raw.roomTypes as EventConfig['roomTypes']) ?? MOCK_ROOM_TYPES,
+      pricing: (raw.pricingConfig as PricingConfig) ?? (raw.pricing as PricingConfig) ?? MOCK_PRICING,
+      locales: (raw.locales as string[]) ?? ['pl'],
+      theme: raw.theme as EventTheme | undefined,
+    }
   } catch {
     return {
       roomTypes: MOCK_ROOM_TYPES,

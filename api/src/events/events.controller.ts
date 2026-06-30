@@ -8,6 +8,12 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 export class EventsController {
   constructor(private readonly events: EventsService) {}
 
+  @Get('events')
+  @ApiOperation({ summary: 'Public list of active (OPEN) events — homepage tiles' })
+  listPublicActive() {
+    return this.events.listPublicActive();
+  }
+
   @Get('r/:slug')
   @ApiOperation({ summary: 'Resolve registration page → active instance' })
   getBySlug(@Param('slug') slug: string) {

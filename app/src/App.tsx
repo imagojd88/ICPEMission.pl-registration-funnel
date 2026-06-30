@@ -5,6 +5,7 @@ import Spinner from './components/ui/Spinner'
 
 const PublicFunnel = lazy(() => import('./pages/PublicFunnel'))
 const AdminPanel = lazy(() => import('./pages/AdminPanel'))
+const PublicHome = lazy(() => import('./pages/PublicHome'))
 
 function LoadingFallback() {
   return (
@@ -28,8 +29,8 @@ export default function App() {
               hostingu (LiteSpeed cache trzyma stare /admin i /index.html). */}
           <Route path="/panel.html" element={<AdminPanel />} />
           <Route path="/admin/*" element={<AdminPanel />} />
-          <Route path="/" element={<Navigate to="/r/dzien-formacji-2026" replace />} />
-          <Route path="*" element={<Navigate to="/r/dzien-formacji-2026" replace />} />
+          <Route path="/" element={<PublicHome />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>
     </BrowserRouter>

@@ -181,6 +181,36 @@ export class EventsService {
     );
   }
 
+  /** Publiczna lista aktywnych eventów (OPEN, z opublikowaną stroną) — do strony głównej. */
+  async listPublicActive() {
+    const instances = await this.prisma.eventInstance.findMany({
+      where: { status: 'OPEN' },
+      orderBy: { startsAt: 'asc' },
+    });
+    const out: Array<{
+      slug: string; title: unknown; startsAt: string; endsAt: string;
+      location: string; heroImageUrl: string | null; primaryColor: string | null;
+    }> = [];
+    for (const inst of instances) {
+      const page = await this.prisma.registrationPage.findUnique({
+        where: { seriesId: inst.seriesId },
+        select: { slug: true, theme: true },
+      });
+      if (!page?.slug) continue;
+      const theme = (page.theme ?? {}) as { heroImageUrl?: string; primaryColor?: string };
+      out.push({
+        slug: page.slug,
+        title: toLocalized(inst.title),
+        startsAt: iso(inst.startsAt),
+        endsAt: iso(inst.endsAt),
+        location: inst.location ?? '',
+        heroImageUrl: theme.heroImageUrl ?? null,
+        primaryColor: theme.primaryColor ?? null,
+      });
+    }
+    return out;
+  }
+
   async createSeries(dto: {
     type: string;
     title: Record<string, string>;
