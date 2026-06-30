@@ -87,8 +87,10 @@ export async function uploadImage(file: File): Promise<string> {
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   if (!API_URL) throw new Error('No API URL configured')
   const res = await fetch(`${API_URL}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...init?.headers },
     ...init,
+    // headers MUSZĄ być po ...init, inaczej init.headers (np. Authorization)
+    // nadpisuje cały obiekt i gubi Content-Type → serwer nie parsuje JSON body.
+    headers: { 'Content-Type': 'application/json', ...init?.headers },
   })
   if (res.status === 401) {
     setAuthToken(null)

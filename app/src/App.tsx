@@ -24,6 +24,9 @@ export default function App() {
       <Suspense fallback={<LoadingFallback />}>
         <Routes>
           <Route path="/r/:slug" element={<PublicFunnel />} />
+          {/* Wejście panelu przez prawdziwy plik panel.html — omija zatruty cache
+              hostingu (LiteSpeed cache trzyma stare /admin i /index.html). */}
+          <Route path="/panel.html" element={<AdminPanel />} />
           <Route path="/admin/*" element={<AdminPanel />} />
           <Route path="/" element={<Navigate to="/r/dzien-formacji-2026" replace />} />
           <Route path="*" element={<Navigate to="/r/dzien-formacji-2026" replace />} />
