@@ -181,7 +181,7 @@ function RegistrationDrawer({
             >
               <p className="text-xs" style={{ color: 'var(--faint)' }}>Pokój</p>
               <p className="text-sm font-semibold mt-0.5" style={{ color: 'var(--ink)' }}>
-                {r.preferredRoomId ?? '—'}
+                {r.assignedRoom ?? '—'}
               </p>
             </div>
             <div
@@ -553,7 +553,7 @@ export default function RegistrationsScreen() {
                       {r.participants.length}
                     </td>
                     <td className="px-4 py-3" style={{ color: 'var(--muted)' }}>
-                      {r.preferredRoomId ?? '—'}
+                      {r.assignedRoom ?? '—'}
                     </td>
                     <td className="px-4 py-3 font-medium" style={{ color: 'var(--ink)' }}>
                       {r.totalPrice} zł

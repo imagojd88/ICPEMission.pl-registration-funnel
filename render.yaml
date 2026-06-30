@@ -36,5 +36,19 @@ services:
         value: https://rejestracja.icpemission.pl
       - key: PAYMENTS_MODE
         value: mock
-      - key: MAIL_MODE
-        value: log
+      # Mail: ustaw w panelu Render (Blueprint nie nadpisuje — sync:false).
+      # MAIL_MODE=smtp + dane SMTP, żeby maile faktycznie wychodziły (domyślnie tylko log).
+      - key: MAIL_MODE          # 'log' (domyślnie) albo 'smtp'
+        sync: false
+      - key: MAIL_FROM          # np. "ICPE Mission <rejestracja@icpemission.pl>"
+        sync: false
+      - key: SMTP_HOST          # np. smtp.poczta-domeny.pl
+        sync: false
+      - key: SMTP_PORT          # 587 (STARTTLS) lub 465 (SSL)
+        sync: false
+      - key: SMTP_SECURE        # 'true' dla portu 465, w innym wypadku 'false'
+        sync: false
+      - key: SMTP_USER          # login skrzynki
+        sync: false
+      - key: SMTP_PASS          # hasło skrzynki
+        sync: false

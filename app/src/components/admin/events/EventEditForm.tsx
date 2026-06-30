@@ -78,6 +78,7 @@ export default function EventEditForm({
 
   // Pola
   const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
   const [dateStart, setDateStart] = useState('')
   const [dateEnd, setDateEnd] = useState('')
   const [nights, setNights] = useState('1')
@@ -111,6 +112,7 @@ export default function EventEditForm({
         if (cancelled) return
         const pc = cfg.pricingConfig
         setName(cfg.title?.pl ?? '')
+        setDescription(cfg.description?.pl ?? '')
         setDateStart(cfg.startsAt ? cfg.startsAt.slice(0, 10) : '')
         setDateEnd(cfg.endsAt ? cfg.endsAt.slice(0, 10) : '')
         setNights(String(cfg.nights ?? 1))
@@ -222,6 +224,7 @@ export default function EventEditForm({
 
       await updateEventInstance(editTarget.instanceId, {
         title: { pl: name },
+        description: description.trim() ? { pl: description } : null,
         startsAt,
         endsAt,
         location: location || null,
@@ -283,6 +286,16 @@ export default function EventEditForm({
       <Section title="Szczegóły">
         <Field label="Nazwa eventu">
           <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="np. Dzień Formacji Wspólnoty" />
+        </Field>
+        <Field label="Opis (pokazywany na stronie zapisów)">
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={4}
+            placeholder="Krótki opis wydarzenia — np. zaproszenie, program, miejsce…"
+            className={inputCls}
+            style={{ ...inputStyle, resize: 'vertical' }}
+          />
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Data rozpoczęcia">

@@ -161,10 +161,20 @@ export default function LandingScreen({ event, onRegister, pricingConfig }: Prop
         <MetaRow icon={MapPin} title={event.location || t('landing.place_name')} />
       </div>
 
-      {/* Description */}
-      <p className="text-sm leading-relaxed" style={{ color: 'var(--muted)' }}>
-        {t('landing.desc')}
-      </p>
+      {/* Description — opis eventu z bazy (gdy ustawiony) */}
+      {(() => {
+        const desc =
+          typeof event.description === 'string'
+            ? event.description
+            : event.description
+              ? (event.description.pl ?? event.description.en ?? event.description.it ?? '')
+              : ''
+        return desc ? (
+          <p className="text-sm leading-relaxed whitespace-pre-line" style={{ color: 'var(--muted)' }}>
+            {desc}
+          </p>
+        ) : null
+      })()}
 
       {/* Price + spots row */}
       <div className="flex items-end justify-between">

@@ -89,7 +89,7 @@ function buildInitialStepper(): StepperState {
     step: 0,
     applicant: { firstName: '', lastName: '', email: '', phone: '', address: '' },
     participants: [
-      { id: 'p-1', type: 'adult', name: '', age: 30, gender: 'M', diet: '' },
+      { id: 'p-1', type: 'adult', name: '', age: 0, gender: 'M', diet: '' },
     ],
     dietaryTags: [],
     dietaryNotes: '',

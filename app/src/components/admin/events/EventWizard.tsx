@@ -55,6 +55,7 @@ interface WizardState {
   eventType: EventType
   // step 1
   name: string
+  description: string
   dateStart: string
   dateEnd: string
   nights: string
@@ -467,6 +468,17 @@ function Step1Details({ state, update }: { state: WizardState; update: (p: Parti
         onChange={(e) => update({ name: e.target.value })}
         placeholder="np. Dzień Formacji 2026"
       />
+      <div className="flex flex-col gap-1.5">
+        <label className="text-sm font-medium" style={{ color: 'var(--ink)' }}>Opis (na stronie zapisów)</label>
+        <textarea
+          value={state.description}
+          onChange={(e) => update({ description: e.target.value })}
+          rows={4}
+          placeholder="Krótki opis wydarzenia — zaproszenie, program, miejsce…"
+          className="w-full rounded-[12px] px-3 py-[11px] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+          style={{ border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--ink)', resize: 'vertical' }}
+        />
+      </div>
       <div className="grid grid-cols-2 gap-4">
         <Input
           label="Data rozpoczęcia"
@@ -1110,6 +1122,7 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
   const [state, setState] = useState<WizardState>({
     eventType: 'one_time',
     name: '',
+    description: '',
     dateStart: '',
     dateEnd: '',
     nights: '1',
@@ -1236,6 +1249,7 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
       const series = await createEventSeries({
         type: mapEventType(state.eventType),
         title: { pl: state.name },
+        description: state.description.trim() ? { pl: state.description } : undefined,
         startsAt,
         endsAt,
         location: state.location || undefined,

@@ -18,7 +18,7 @@ function newParticipant(): Participant {
     id: `p-${++idCounter}`,
     type: 'adult',
     name: '',
-    age: 30,
+    age: 0,
     gender: 'M',
     diet: '',
   }
@@ -53,7 +53,7 @@ function ParticipantCard({ p, index, canRemove, onUpdate, onRemove, applicantNam
           {(['adult', 'child'] as const).map((type) => (
             <button
               key={type}
-              onClick={() => onUpdate({ ...p, type, age: type === 'adult' ? 30 : 8 })}
+              onClick={() => onUpdate({ ...p, type })}
               className="px-3 py-1.5 text-xs font-semibold rounded-[8px] transition-all duration-150"
               style={{
                 background: p.type === type ? 'var(--surface)' : 'transparent',
@@ -122,8 +122,9 @@ function ParticipantCard({ p, index, canRemove, onUpdate, onRemove, applicantNam
               type="number"
               min={0}
               max={120}
-              value={p.age}
-              onChange={(e) => onUpdate({ ...p, age: Number(e.target.value) })}
+              value={p.age || ''}
+              placeholder={isChild ? 'wiek dziecka' : 'opcjonalnie'}
+              onChange={(e) => onUpdate({ ...p, age: e.target.value === '' ? 0 : Number(e.target.value) })}
               className="w-full rounded-[12px] pr-9 pl-3 py-[13px] text-sm transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
               style={{
                 border: '1px solid var(--border)',

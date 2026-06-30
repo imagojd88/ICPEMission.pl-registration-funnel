@@ -173,6 +173,16 @@ export class RegistrationsService {
 
   async listForInstance(instanceId: string, status?: string, q?: string) {
     const statusSet = status ? contractStatusFilter(status) : undefined;
+    // Mapa id pokoju → nazwa (z cennika instancji) do podsumowania pokoi w zgłoszeniu.
+    const instance = await this.prisma.eventInstance.findUnique({
+      where: { id: instanceId },
+      select: { pricingConfig: true },
+    });
+    const roomNames = new Map<string, string>();
+    const pcRooms =
+      ((instance?.pricingConfig as { rooms?: Array<{ id: unknown; name: unknown }> })?.rooms) ?? [];
+    for (const r of pcRooms) roomNames.set(String(r.id), String(r.name));
+
     const regs = await this.prisma.registration.findMany({
       where: {
         instanceId,
@@ -191,22 +201,32 @@ export class RegistrationsService {
       orderBy: { createdAt: 'desc' },
     });
     return regs.map((r: Parameters<RegistrationsService['toContractRegistration']>[0]) =>
-      this.toContractRegistration(r),
+      this.toContractRegistration(r, roomNames),
     );
   }
 
   /** Mapowanie zgłoszenia → dokładny kontrakt Personal OS. */
-  private toContractRegistration(reg: {
-    id: string; instanceId: string; status: string; locale: string; contact: unknown;
-    participants: Array<{ type: string; firstName: string; lastName: string; age: number | null; gender: string | null; dietary: string | null }>;
-    preferredRoomTypeId?: string | null;
-    totalPrice: { toString(): string }; currency: string; paymentMethod?: string | null;
-    checkedInAt?: Date | null;
-    createdAt: Date;
-    payments?: Array<{ status: string }>;
-    assignments?: Array<{ room?: { label: string } | null }>;
-  }) {
+  private toContractRegistration(
+    reg: {
+      id: string; instanceId: string; status: string; locale: string; contact: unknown;
+      participants: Array<{ type: string; firstName: string; lastName: string; age: number | null; gender: string | null; dietary: string | null }>;
+      preferredRoomTypeId?: string | null;
+      roomsJson?: unknown;
+      totalPrice: { toString(): string }; currency: string; paymentMethod?: string | null;
+      checkedInAt?: Date | null;
+      createdAt: Date;
+      payments?: Array<{ status: string }>;
+      assignments?: Array<{ room?: { label: string } | null }>;
+    },
+    roomNames?: Map<string, string>,
+  ) {
     const c = (reg.contact ?? {}) as { firstName?: string; lastName?: string; email?: string; phone?: string };
+    // Skomponowane pokoje (roomsJson) → czytelne podsumowanie typów pokoi.
+    const comp = (Array.isArray(reg.roomsJson) ? reg.roomsJson : []) as Array<{ roomId?: string }>;
+    const summaryParts = comp
+      .map((rb) => roomNames?.get(String(rb.roomId)) ?? (rb.roomId ? String(rb.roomId) : ''))
+      .filter(Boolean);
+    const roomSummary = summaryParts.join(', ');
     return {
       id: reg.id,
       instanceId: reg.instanceId,
@@ -226,8 +246,9 @@ export class RegistrationsService {
         gender: mapGender(p.gender),
         dietary: p.dietary ?? undefined,
       })),
-      preferredRoomType: reg.preferredRoomTypeId ?? undefined,
-      assignedRoom: reg.assignments?.[0]?.room?.label ?? undefined,
+      preferredRoomType: reg.preferredRoomTypeId ?? (roomSummary || undefined),
+      assignedRoom: reg.assignments?.[0]?.room?.label ?? (roomSummary || undefined),
+      roomSummary: roomSummary || undefined,
       totalPrice: num(reg.totalPrice),
       currency: reg.currency || 'EUR',
       paymentMethod: mapPaymentMethod(reg.paymentMethod),
