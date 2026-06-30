@@ -1,11 +1,14 @@
-import { X } from 'lucide-react'
+import { useEffect } from 'react'
+import { X, UserPlus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Input } from '../../ui/Input'
-import type { Participant } from '../../../pages/PublicFunnel'
+import type { Participant, Applicant } from '../../../pages/PublicFunnel'
 
 interface Props {
   participants: Participant[]
   onChange: (participants: Participant[]) => void
+  /** Dane zgłaszającego z kroku 1 — do auto-uzupełnienia osoby #1. */
+  applicant?: Applicant
 }
 
 let idCounter = 100
@@ -27,9 +30,10 @@ interface CardProps {
   canRemove: boolean
   onUpdate: (updated: Participant) => void
   onRemove: () => void
+  applicantName?: string
 }
 
-function ParticipantCard({ p, index, canRemove, onUpdate, onRemove }: CardProps) {
+function ParticipantCard({ p, index, canRemove, onUpdate, onRemove, applicantName }: CardProps) {
   const { t } = useTranslation()
 
   const isChild = p.type === 'child'
@@ -96,6 +100,15 @@ function ParticipantCard({ p, index, canRemove, onUpdate, onRemove }: CardProps)
         onChange={(e) => onUpdate({ ...p, name: e.target.value })}
         placeholder="Jan Kowalski"
       />
+      {index === 0 && applicantName && applicantName !== p.name.trim() && (
+        <button
+          onClick={() => onUpdate({ ...p, name: applicantName })}
+          className="self-start flex items-center gap-1 text-xs font-medium -mt-1"
+          style={{ color: 'var(--brand)', background: 'none', border: 'none', cursor: 'pointer' }}
+        >
+          <UserPlus size={12} /> Wstaw moje dane ({applicantName})
+        </button>
+      )}
 
       {/* Age + gender row */}
       <div className="flex gap-3 items-end">
@@ -168,8 +181,19 @@ function ParticipantCard({ p, index, canRemove, onUpdate, onRemove }: CardProps)
   )
 }
 
-export default function Step1Participants({ participants, onChange }: Props) {
+export default function Step1Participants({ participants, onChange, applicant }: Props) {
   const { t } = useTranslation()
+  const applicantName = applicant ? `${applicant.firstName} ${applicant.lastName}`.trim() : ''
+
+  // Auto-uzupełnij osobę #1 danymi zgłaszającego, gdy pole jest jeszcze puste.
+  useEffect(() => {
+    if (applicantName && participants[0] && !participants[0].name.trim()) {
+      const next = [...participants]
+      next[0] = { ...next[0], name: applicantName }
+      onChange(next)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [applicantName])
 
   const update = (index: number, updated: Participant) => {
     const next = [...participants]
@@ -199,6 +223,7 @@ export default function Step1Participants({ participants, onChange }: Props) {
           canRemove={participants.length > 1}
           onUpdate={(updated) => update(i, updated)}
           onRemove={() => remove(i)}
+          applicantName={i === 0 ? applicantName : undefined}
         />
       ))}
 
