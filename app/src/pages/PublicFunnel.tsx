@@ -18,6 +18,7 @@ function toPaymentMethod(m: 'online' | 'transfer' | 'cash' | null): PaymentMetho
   return 'BANK_TRANSFER'
 }
 import { Skeleton } from '../components/ui/Skeleton'
+import ThemeToggle from '../components/ui/ThemeToggle'
 
 // Screen components
 import RsvpScreen from '../components/funnel/RsvpScreen'
@@ -420,6 +421,7 @@ export default function PublicFunnel() {
   if (event.type === 'STANDALONE') {
     return (
       <div className="min-h-screen mx-auto relative" style={{ maxWidth: 452, background: 'var(--bg)' }}>
+        <ThemeToggle />
         <RsvpScreen event={event} onBack={() => window.history.back()} />
       </div>
     )
@@ -430,6 +432,7 @@ export default function PublicFunnel() {
       className="min-h-screen mx-auto relative"
       style={{ maxWidth: 452, background: 'var(--bg)' }}
     >
+      <ThemeToggle />
       {screen === 'landing' && (
         <>
           <LandingHero

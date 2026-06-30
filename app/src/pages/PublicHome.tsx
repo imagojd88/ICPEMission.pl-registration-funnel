@@ -3,6 +3,7 @@ import { Link, Navigate } from 'react-router-dom'
 import { Calendar, MapPin, ArrowRight } from 'lucide-react'
 import { getPublicActiveEvents, type PublicEventTile } from '../lib/api'
 import Spinner from '../components/ui/Spinner'
+import ThemeToggle from '../components/ui/ThemeToggle'
 
 function title(t: PublicEventTile['title']): string {
   if (typeof t === 'string') return t
@@ -44,6 +45,7 @@ export default function PublicHome() {
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--bg)' }}>
+      <ThemeToggle />
       <div className="mx-auto px-5 py-12" style={{ maxWidth: 980 }}>
         <header className="text-center mb-10">
           <p className="text-sm font-semibold tracking-wide" style={{ color: 'var(--brand)' }}>
