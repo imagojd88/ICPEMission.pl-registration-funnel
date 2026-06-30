@@ -3,6 +3,7 @@ import { ExternalLink, Pencil } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import EventWizard from './EventWizard'
+import EventEditForm from './EventEditForm'
 import { getAdminInstances } from '@/lib/api'
 import type { EventInstanceDto } from '@icpe/shared'
 
@@ -105,18 +106,26 @@ export default function EventsScreen({ onOpenWizard, showWizard, onCloseWizard }
             {editTarget ? 'Edycja eventu' : 'Nowy event'}
           </span>
         </div>
-        <EventWizard
-          editTarget={editTarget ?? undefined}
-          onCancel={() => {
-            setEditTarget(null)
-            onCloseWizard()
-          }}
-          onSuccess={() => {
-            setEditTarget(null)
-            onCloseWizard()
-            loadInstances()
-          }}
-        />
+        {editTarget ? (
+          <EventEditForm
+            editTarget={editTarget}
+            onCancel={() => {
+              setEditTarget(null)
+              onCloseWizard()
+            }}
+            onSaved={() => {
+              loadInstances()
+            }}
+          />
+        ) : (
+          <EventWizard
+            onCancel={onCloseWizard}
+            onSuccess={() => {
+              onCloseWizard()
+              loadInstances()
+            }}
+          />
+        )}
       </div>
     )
   }
