@@ -4,19 +4,8 @@ import { Calendar, MapPin, Check } from 'lucide-react'
 import type { EventInstanceDto } from '@icpe/shared'
 import { Input } from '../ui/Input'
 import { matchInvite, pickLang, type EventContent } from '../../lib/api'
+import { formatDateRange } from '../../lib/utils'
 import EventContentBlocks from './EventContentBlocks'
-
-function dateRange(s: string, e: string): string {
-  try {
-    const a = new Date(s)
-    const b = new Date(e)
-    const full = (d: Date) => d.toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' })
-    if (a.toDateString() === b.toDateString()) return full(a)
-    return `${a.toLocaleDateString('pl-PL', { day: 'numeric', month: 'long' })} – ${full(b)}`
-  } catch {
-    return ''
-  }
-}
 
 export default function InviteMatchScreen({ event, slug, content }: { event: EventInstanceDto; slug: string; content?: EventContent | null }) {
   const { i18n } = useTranslation()
@@ -63,7 +52,7 @@ export default function InviteMatchScreen({ event, slug, content }: { event: Eve
     <div className="flex flex-col gap-5 px-[22px] py-5">
       <div className="flex flex-col gap-3">
         <div className="flex items-center gap-2.5 text-sm" style={{ color: 'var(--ink)' }}>
-          <Calendar size={16} style={{ color: 'var(--brand)' }} /> {dateRange(event.startsAt, event.endsAt)}
+          <Calendar size={16} style={{ color: 'var(--brand)' }} /> {formatDateRange(event.startsAt, event.endsAt, i18n.language)}
         </div>
         {event.location && (
           <div className="flex items-center gap-2.5 text-sm" style={{ color: 'var(--ink)' }}>

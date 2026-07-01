@@ -506,6 +506,7 @@ export default function PublicFunnel() {
           paymentMethod={stepper.paymentMethod}
           email={stepper.applicant.email}
           total={result?.total ?? finalPrice?.total ?? 0}
+          currency={pricingConfig.currency}
           regNumber={result?.regId}
           status={result?.status}
           onBack={handleBackToLanding}

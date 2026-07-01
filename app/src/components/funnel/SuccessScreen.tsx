@@ -1,21 +1,22 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { UserPlus } from 'lucide-react'
-import { formatZl } from '@icpe/shared'
+import { formatMoney } from '@icpe/shared'
 import type { RegistrationStatus } from '@icpe/shared'
 
 interface Props {
   paymentMethod: 'online' | 'transfer' | 'cash' | null
   email: string
   total: number
+  currency?: 'PLN' | 'EUR' | 'USD'
   regNumber?: string
   status?: RegistrationStatus
   onBack: () => void
   onCreateAccount?: () => Promise<void>
 }
 
-export default function SuccessScreen({ paymentMethod, email, total, regNumber, status, onBack, onCreateAccount }: Props) {
-  const { t } = useTranslation()
+export default function SuccessScreen({ paymentMethod, email, total, currency, regNumber, status, onBack, onCreateAccount }: Props) {
+  const { t, i18n } = useTranslation()
   const [acct, setAcct] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
 
   const isPaid = status ? status === 'CONFIRMED' : paymentMethod === 'online'
@@ -111,7 +112,7 @@ export default function SuccessScreen({ paymentMethod, email, total, regNumber, 
             {t('success.amount')}
           </span>
           <span className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-            {formatZl(total)}
+            {formatMoney(total, currency, i18n.language)}
           </span>
         </div>
       </div>

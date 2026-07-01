@@ -88,6 +88,7 @@ interface WizardState {
   payTransfer: boolean
   payCash: boolean
   payFree: boolean
+  currency: 'PLN' | 'EUR' | 'USD'
   // step 2
   rooms: RoomRow[]
   newRoom: Omit<RoomRow, 'id'>
@@ -210,6 +211,7 @@ function mapEditConfigToState(prev: WizardState, cfg: EventEditConfig, slug: str
     payTransfer: pm.includes('BANK_TRANSFER'),
     payCash: pm.includes('CASH'),
     payFree: !!pc?.free,
+    currency: (pc?.currency as 'PLN' | 'EUR' | 'USD') ?? 'PLN',
     rooms,
     formationFee: String(pc?.formationFee ?? prev.formationFee),
     mealsFee: String(pc?.mealsFee ?? prev.mealsFee),
@@ -271,6 +273,7 @@ function buildPricingConfig(state: WizardState): PricingConfig {
 
   return {
     free: state.payFree || state.eventType === 'invite',
+    currency: state.currency,
     formationFee: parseFloat(state.formationFee) || DEFAULT_PRICING.formationFee,
     mealsFee: parseFloat(state.mealsFee) || DEFAULT_PRICING.mealsFee,
     nights,
@@ -909,6 +912,21 @@ function Step3Pricing({ state, update }: { state: WizardState; update: (p: Parti
 
   return (
     <div className="flex flex-col gap-6">
+      {/* Waluta */}
+      <div className="flex flex-col gap-1.5">
+        <label className="text-sm font-medium" style={{ color: 'var(--ink)' }}>Waluta (kwoty wpisujesz w tej walucie)</label>
+        <select
+          value={state.currency}
+          onChange={(e) => update({ currency: e.target.value as 'PLN' | 'EUR' | 'USD' })}
+          className="rounded-[12px] border px-3 py-2 text-sm"
+          style={{ borderColor: 'var(--border)', background: 'var(--surface)', color: 'var(--ink)', maxWidth: 200 }}
+        >
+          <option value="PLN">PLN (zł)</option>
+          <option value="EUR">EUR (€)</option>
+          <option value="USD">USD ($)</option>
+        </select>
+      </div>
+
       {/* Opłaty bazowe */}
       <div className="flex flex-col gap-3">
         <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
@@ -1359,6 +1377,7 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
     payTransfer: true,
     payCash: false,
     payFree: false,
+    currency: 'PLN',
     rooms: [],
     newRoom: { name: '', model: 'os/noc', capacity: '', price: '', quantity: '', tag: '' },
     // Cennik — pola kwotowe startują PUSTE (admin wpisuje sam, bez auto-wypełniania).

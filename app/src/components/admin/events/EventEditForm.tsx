@@ -92,6 +92,7 @@ export default function EventEditForm({
   const [payTransfer, setPayTransfer] = useState(false)
   const [payCash, setPayCash] = useState(false)
   const [isFree, setIsFree] = useState(false)
+  const [currency, setCurrency] = useState<'PLN' | 'EUR' | 'USD'>('PLN')
   const [formationFee, setFormationFee] = useState(String(DEFAULT_PRICING.formationFee))
   const [mealsFee, setMealsFee] = useState(String(DEFAULT_PRICING.mealsFee))
   const [transport, setTransport] = useState(String(DEFAULT_PRICING.options.transport))
@@ -187,6 +188,7 @@ export default function EventEditForm({
         setPayTransfer(pm.includes('BANK_TRANSFER'))
         setPayCash(pm.includes('CASH'))
         setIsFree(!!pc?.free)
+        setCurrency((pc?.currency as 'PLN' | 'EUR' | 'USD') ?? 'PLN')
         setFormationFee(String(pc?.formationFee ?? DEFAULT_PRICING.formationFee))
         setMealsFee(String(pc?.mealsFee ?? DEFAULT_PRICING.mealsFee))
         setTransport(String(pc?.options?.transport ?? DEFAULT_PRICING.options.transport))
@@ -262,6 +264,7 @@ export default function EventEditForm({
     const n = parseInt(nights) || 0
     return {
       free: isFree,
+      currency,
       formationFee: parseFloat(formationFee) || 0,
       mealsFee: parseFloat(mealsFee) || 0,
       nights: n,
@@ -482,8 +485,15 @@ export default function EventEditForm({
       </Section>
 
       <Section title="Cennik">
+        <Field label="Waluta (kwoty wpisujesz w tej walucie)">
+          <select value={currency} onChange={(e) => setCurrency(e.target.value as 'PLN' | 'EUR' | 'USD')} className={inputCls} style={{ ...inputStyle, maxWidth: 200 }}>
+            <option value="PLN">PLN (zł)</option>
+            <option value="EUR">EUR (€)</option>
+            <option value="USD">USD ($)</option>
+          </select>
+        </Field>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Opłata formacyjna (zł)"><Input value={formationFee} onChange={(e) => setFormationFee(e.target.value)} inputMode="numeric" /></Field>
+          <Field label="Opłata formacyjna"><Input value={formationFee} onChange={(e) => setFormationFee(e.target.value)} inputMode="numeric" /></Field>
           <Field label="Wyżywienie / doba (zł)"><Input value={mealsFee} onChange={(e) => setMealsFee(e.target.value)} inputMode="numeric" /></Field>
           <Field label="Transport (zł)"><Input value={transport} onChange={(e) => setTransport(e.target.value)} inputMode="numeric" /></Field>
           <Field label="Pościel / os (zł)"><Input value={bedding} onChange={(e) => setBedding(e.target.value)} inputMode="numeric" /></Field>

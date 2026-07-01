@@ -43,6 +43,8 @@ export interface AgeBracket {
 export interface PricingConfig {
   /** wydarzenie bezpłatne — ukrywamy ceny/koszty i pomijamy płatność (np. standalone) */
   free?: boolean;
+  /** waluta cen wydarzenia (kwoty wpisuje organizator w tej walucie). Domyślnie PLN. */
+  currency?: 'PLN' | 'EUR' | 'USD';
   /** opłata formacyjna per osoba (stała; zerowana tylko dla progu gratis) */
   formationFee: number;
   /** wyżywienie per osoba (pełne, za cały pobyt) — podlega mnożnikowi wieku */
@@ -223,4 +225,22 @@ export function validateRoomCapacity(input: PriceInput, config: PricingConfig = 
 /** Formatowanie waluty: Intl pl-PL + " zł". */
 export function formatZl(n: number): string {
   return new Intl.NumberFormat('pl-PL').format(Math.round(n)) + ' zł';
+}
+
+/**
+ * Formatowanie kwoty zależne od waluty eventu i języka UI.
+ * Dla PLN w polskim locale daje „180 zł", w angielskim „PLN 180"; EUR/USD dostają swój symbol.
+ */
+export function formatMoney(n: number, currency: 'PLN' | 'EUR' | 'USD' = 'PLN', lng = 'pl'): string {
+  const l = (lng || 'pl').slice(0, 2);
+  const locale = l === 'en' ? 'en-GB' : l === 'it' ? 'it-IT' : 'pl-PL';
+  try {
+    return new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency,
+      maximumFractionDigits: 0,
+    }).format(Math.round(n));
+  } catch {
+    return `${new Intl.NumberFormat(locale).format(Math.round(n))} ${currency}`;
+  }
 }

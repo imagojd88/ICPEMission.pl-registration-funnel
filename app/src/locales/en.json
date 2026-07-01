@@ -14,6 +14,8 @@
     "per_person": "/ person",
     "spots_of": "of {{total}} total",
     "spots_free": "spots available",
+    "nights_one": "{{count}} night",
+    "nights_other": "{{count}} nights",
     "cta": "Register →",
     "cta_hint": "Registration takes approx. 3 minutes · please register on time",
     "next_date_title": "Next date",

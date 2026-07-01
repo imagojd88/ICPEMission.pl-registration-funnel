@@ -3,21 +3,13 @@ import { Calendar, MapPin, Clock, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { EventInstanceDto, PricingConfig } from '@icpe/shared'
 import { pickLang, type EventContent } from '../../lib/api'
+import { formatDateRange } from '../../lib/utils'
 
 interface Props {
   event: EventInstanceDto
   onRegister: () => void
   pricingConfig?: PricingConfig
   content?: EventContent | null
-}
-
-function fmtDateRange(startIso?: string, endIso?: string): string {
-  if (!startIso) return ''
-  const s = new Date(startIso)
-  const e = endIso ? new Date(endIso) : s
-  const full = (d: Date) => d.toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' })
-  if (s.toDateString() === e.toDateString()) return full(s)
-  return `${s.toLocaleDateString('pl-PL', { day: 'numeric', month: 'long' })} – ${full(e)}`
 }
 
 function MetaRow({
@@ -149,7 +141,7 @@ export default function LandingScreen({ event, onRegister, pricingConfig, conten
       <div className="flex flex-col gap-3">
         <MetaRow
           icon={Calendar}
-          title={`${fmtDateRange(event.startsAt, event.endsAt)}${nights > 0 ? ` · ${nights} ${nights === 1 ? 'noc' : 'nocy'}` : ''}`}
+          title={`${formatDateRange(event.startsAt, event.endsAt, lng)}${nights > 0 ? ` · ${t('landing.nights', { count: nights })}` : ''}`}
         />
         <MetaRow icon={MapPin} title={event.location || t('landing.place_name')} />
       </div>

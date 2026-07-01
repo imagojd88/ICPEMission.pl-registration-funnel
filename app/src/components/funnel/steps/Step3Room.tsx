@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { validateRoomCapacity } from '@icpe/shared'
+import { validateRoomCapacity, formatMoney } from '@icpe/shared'
 import type { PricingConfig, PriceInput } from '@icpe/shared'
 import type { Participant, RoomEntry } from '../../../pages/PublicFunnel'
 import { X, Plus } from 'lucide-react'
@@ -17,7 +17,8 @@ function newRoomUid() {
 }
 
 export default function Step3Room({ rooms, participants, pricingConfig, onChange }: Props) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const money = (n: number) => formatMoney(n, pricingConfig.currency, i18n.language)
 
   const roomTypes = pricingConfig.rooms
 
@@ -142,7 +143,7 @@ export default function Step3Room({ rooms, participants, pricingConfig, onChange
               >
                 {roomTypes.map((rt) => (
                   <option key={rt.id} value={rt.id}>
-                    {rt.name} — {rt.perPerson} zł/os/noc · maks. {rt.cap} os.
+                    {rt.name} — {money(rt.perPerson)}/os/noc · maks. {rt.cap} os.
                   </option>
                 ))}
               </select>
@@ -156,7 +157,7 @@ export default function Step3Room({ rooms, participants, pricingConfig, onChange
                   {selectedType.tag ? ` · ${selectedType.tag}` : ''}
                 </span>
                 <span className="text-sm font-bold font-serif" style={{ color: 'var(--brand)' }}>
-                  {selectedType.perPerson} zł
+                  {money(selectedType.perPerson)}
                   <span className="text-xs font-sans font-normal" style={{ color: 'var(--muted)' }}>
                     {' '}
                     {selectedType.model === 'noc'

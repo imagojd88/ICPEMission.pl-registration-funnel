@@ -1,28 +1,14 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Link, Navigate } from 'react-router-dom'
 import { Calendar, MapPin, ArrowRight } from 'lucide-react'
-import { getPublicActiveEvents, type PublicEventTile } from '../lib/api'
+import { getPublicActiveEvents, pickLang, type PublicEventTile } from '../lib/api'
+import { formatDateRange } from '../lib/utils'
 import Spinner from '../components/ui/Spinner'
 import ThemeToggle from '../components/ui/ThemeToggle'
 
-function title(t: PublicEventTile['title']): string {
-  if (typeof t === 'string') return t
-  return t.pl ?? t.en ?? t.it ?? ''
-}
-
-function dateRange(startIso: string, endIso: string): string {
-  try {
-    const s = new Date(startIso)
-    const e = new Date(endIso)
-    const fmt = (d: Date) => d.toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' })
-    if (s.toDateString() === e.toDateString()) return fmt(s)
-    return `${s.toLocaleDateString('pl-PL', { day: 'numeric', month: 'long' })} – ${fmt(e)}`
-  } catch {
-    return ''
-  }
-}
-
 export default function PublicHome() {
+  const { i18n } = useTranslation()
   const [events, setEvents] = useState<PublicEventTile[] | null>(null)
 
   useEffect(() => {
@@ -90,10 +76,10 @@ export default function PublicHome() {
                 />
                 <div className="flex flex-col gap-2 p-4 flex-1">
                   <h2 className="text-lg font-bold font-serif" style={{ color: 'var(--ink)' }}>
-                    {title(ev.title)}
+                    {pickLang(ev.title as string | Record<string, string>, i18n.language)}
                   </h2>
                   <div className="flex items-center gap-1.5 text-sm" style={{ color: 'var(--muted)' }}>
-                    <Calendar size={14} /> {dateRange(ev.startsAt, ev.endsAt)}
+                    <Calendar size={14} /> {formatDateRange(ev.startsAt, ev.endsAt, i18n.language)}
                   </div>
                   {ev.location && (
                     <div className="flex items-center gap-1.5 text-sm" style={{ color: 'var(--muted)' }}>

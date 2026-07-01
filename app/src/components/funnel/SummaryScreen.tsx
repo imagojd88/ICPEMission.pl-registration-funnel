@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { computePrice, formatZl, buildIcs, googleCalendarUrl } from '@icpe/shared'
+import { computePrice, formatMoney, buildIcs, googleCalendarUrl } from '@icpe/shared'
 import type { EventInstanceDto, PricingConfig, PriceLine } from '@icpe/shared'
 import type { StepperState } from '../../pages/PublicFunnel'
+import { bcp47 } from '../../lib/utils'
 
 interface Props {
   state: StepperState
@@ -43,11 +44,12 @@ function CopyButton({ text }: { text: string }) {
 }
 
 export default function SummaryScreen({ state, event, pricingConfig, onSubmit, onEdit, onBack, submitting, submitError, bankInfo }: Props) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const money = (n: number) => formatMoney(n, pricingConfig.currency, i18n.language)
   const free = !!pricingConfig.free
   const transferDeadline = (() => {
     try {
-      return new Date(event.startsAt).toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' })
+      return new Date(event.startsAt).toLocaleDateString(bcp47(i18n.language), { day: 'numeric', month: 'long', year: 'numeric' })
     } catch {
       return ''
     }
@@ -181,20 +183,20 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
                     </span>
                   </div>
                   <span className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-                    {formatZl(line?.total ?? 0)}
+                    {money(line?.total ?? 0)}
                   </span>
                 </div>
                 {/* Rozbicie ceny per osoba wg PriceLine */}
                 {line && line.total > 0 && (
                   <div className="flex gap-3 mt-1.5 flex-wrap">
                     <span className="text-xs" style={{ color: 'var(--muted)' }}>
-                      Formacja: {formatZl(line.formation)}
+                      Formacja: {money(line.formation)}
                     </span>
                     <span className="text-xs" style={{ color: 'var(--muted)' }}>
-                      Nocleg: {formatZl(line.accommodation)}
+                      Nocleg: {money(line.accommodation)}
                     </span>
                     <span className="text-xs" style={{ color: 'var(--muted)' }}>
-                      Wyżywienie: {formatZl(line.meals)}
+                      Wyżywienie: {money(line.meals)}
                     </span>
                   </div>
                 )}
@@ -240,7 +242,7 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
                       Pokój {ri + 1}: {roomType?.name ?? room.roomId}
                     </span>
                     <span className="text-sm font-semibold" style={{ color: 'var(--muted)' }}>
-                      {roomType ? `${roomType.perPerson} zł/os/noc` : ''}
+                      {roomType ? `${money(roomType.perPerson)}/os/noc` : ''}
                     </span>
                   </div>
                   {assignedNames.length > 0 && (
@@ -267,7 +269,7 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
                 Opłata formacyjna
               </span>
               <span className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
-                {formatZl(price.formation)}
+                {money(price.formation)}
               </span>
             </div>
 
@@ -277,7 +279,7 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
                 {t('summary.accommodation')}
               </span>
               <span className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
-                {formatZl(price.accommodation)}
+                {money(price.accommodation)}
               </span>
             </div>
 
@@ -287,7 +289,7 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
                 Wyżywienie
               </span>
               <span className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
-                {formatZl(price.meals)}
+                {money(price.meals)}
               </span>
             </div>
 
@@ -298,7 +300,7 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
                   {t('summary.extras')}
                 </span>
                 <span className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
-                  {formatZl(price.options)}
+                  {money(price.options)}
                 </span>
               </div>
             )}
@@ -310,7 +312,7 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
                   {t('summary.discount')}
                 </span>
                 <span className="text-sm font-semibold" style={{ color: 'var(--ok)' }}>
-                  -{formatZl(price.discount)}
+                  -{money(price.discount)}
                 </span>
               </div>
             )}
@@ -329,7 +331,7 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
                 className="font-serif font-bold"
                 style={{ fontSize: 29, color: 'var(--brand)' }}
               >
-                {formatZl(price.total)}
+                {money(price.total)}
               </span>
             </div>
           </div>
@@ -380,7 +382,7 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
                 boxShadow: '0 4px 16px rgba(197,106,58,0.30)',
               }}
             >
-              {t('summary.pay_now', { amount: formatZl(price.total) })}
+              {t('summary.pay_now', { amount: money(price.total) })}
             </button>
             <p className="text-xs text-center" style={{ color: 'var(--muted)' }}>
               {t('summary.payment_secure')}
@@ -397,7 +399,7 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
                 Płatność gotówką na miejscu
               </h3>
               <p className="text-sm leading-relaxed" style={{ color: 'var(--muted)' }}>
-                Kwotę <span className="font-semibold" style={{ color: 'var(--ink)' }}>{formatZl(price.total)}</span> zapłacisz gotówką przy rejestracji na miejscu. Nie jest wymagana żadna przedpłata online.
+                Kwotę <span className="font-semibold" style={{ color: 'var(--ink)' }}>{money(price.total)}</span> zapłacisz gotówką przy rejestracji na miejscu. Nie jest wymagana żadna przedpłata online.
               </p>
             </div>
 
@@ -456,7 +458,7 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
                   {t('summary.amount_label')}
                 </span>
                 <span className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-                  {formatZl(price.total)}
+                  {money(price.total)}
                 </span>
               </div>
 

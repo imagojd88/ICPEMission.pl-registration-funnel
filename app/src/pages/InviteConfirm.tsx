@@ -1,42 +1,15 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useParams } from 'react-router-dom'
 import { Calendar, MapPin, Check } from 'lucide-react'
-import { getInvitation, confirmInvitation, type InvitationView } from '../lib/api'
+import { getInvitation, confirmInvitation, pickLang, type InvitationView } from '../lib/api'
+import { formatDateRange } from '../lib/utils'
 import Spinner from '../components/ui/Spinner'
 import ThemeToggle from '../components/ui/ThemeToggle'
 import EventContentBlocks from '../components/funnel/EventContentBlocks'
 
-function resolveTitle(t: unknown): string {
-  if (typeof t === 'string') return t
-  if (t && typeof t === 'object') {
-    const o = t as Record<string, string>
-    return o.pl ?? o.en ?? o.it ?? ''
-  }
-  return ''
-}
-
-function resolveDesc(d: unknown): string {
-  if (typeof d === 'string') return d
-  if (d && typeof d === 'object') {
-    const o = d as Record<string, string>
-    return o.pl ?? o.en ?? o.it ?? ''
-  }
-  return ''
-}
-
-function dateRange(s: string, e: string): string {
-  try {
-    const a = new Date(s)
-    const b = new Date(e)
-    const full = (d: Date) => d.toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' })
-    if (a.toDateString() === b.toDateString()) return full(a)
-    return `${a.toLocaleDateString('pl-PL', { day: 'numeric', month: 'long' })} – ${full(b)}`
-  } catch {
-    return ''
-  }
-}
-
 export default function InviteConfirm() {
+  const { i18n } = useTranslation()
   const { token } = useParams<{ token: string }>()
   const [inv, setInv] = useState<InvitationView | null>(null)
   const [error, setError] = useState(false)
@@ -50,7 +23,7 @@ export default function InviteConfirm() {
       .then((v) => {
         setInv(v)
         if (v.confirmedAt) setConfirmed(true)
-        document.title = `Zaproszenie — ${resolveTitle(v.event.title)}`
+        document.title = `Zaproszenie — ${pickLang(v.event.title as string | Record<string, string>, i18n.language)}`
       })
       .catch(() => setError(true))
   }, [token])
@@ -88,7 +61,7 @@ export default function InviteConfirm() {
   }
 
   const hero = inv.event.theme?.heroImageUrl
-  const desc = resolveDesc(inv.event.description)
+  const desc = pickLang(inv.event.description as string | Record<string, string>, i18n.language)
 
   return (
     <div className="min-h-screen mx-auto relative" style={{ maxWidth: 452, background: 'var(--bg)' }}>
@@ -106,7 +79,7 @@ export default function InviteConfirm() {
         <div className="absolute bottom-0 left-0 right-0 p-5">
           <p className="text-xs font-medium" style={{ color: 'rgba(255,255,255,0.85)' }}>Zaproszenie imienne</p>
           <h1 className="font-serif leading-tight" style={{ fontSize: 30, fontWeight: 500, color: inv.event.theme?.titleColor ?? '#fff' }}>
-            {resolveTitle(inv.event.title)}
+            {pickLang(inv.event.title as string | Record<string, string>, i18n.language)}
           </h1>
         </div>
       </div>
@@ -118,7 +91,7 @@ export default function InviteConfirm() {
 
         <div className="flex flex-col gap-3">
           <div className="flex items-center gap-2.5 text-sm" style={{ color: 'var(--ink)' }}>
-            <Calendar size={16} style={{ color: 'var(--brand)' }} /> {dateRange(inv.event.startsAt, inv.event.endsAt)}
+            <Calendar size={16} style={{ color: 'var(--brand)' }} /> {formatDateRange(inv.event.startsAt, inv.event.endsAt, i18n.language)}
           </div>
           {inv.event.location && (
             <div className="flex items-center gap-2.5 text-sm" style={{ color: 'var(--ink)' }}>

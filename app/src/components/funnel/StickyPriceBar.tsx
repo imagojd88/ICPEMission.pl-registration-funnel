@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { computePrice, formatZl } from '@icpe/shared'
+import { computePrice, formatMoney } from '@icpe/shared'
 import type { PricingConfig } from '@icpe/shared'
 import type { StepperState } from '../../pages/PublicFunnel'
 
@@ -11,7 +11,8 @@ interface Props {
 }
 
 export default function StickyPriceBar({ state, pricingConfig, onNext, disabled }: Props) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const money = (n: number) => formatMoney(n, pricingConfig.currency, i18n.language)
 
   const priceResult = computePrice(
     {
@@ -61,11 +62,11 @@ export default function StickyPriceBar({ state, pricingConfig, onNext, disabled 
             className="font-serif font-semibold leading-none"
             style={{ fontSize: 23, color: 'var(--ink)' }}
           >
-            {free ? 'Bezpłatne' : formatZl(priceResult.total)}
+            {free ? 'Bezpłatne' : money(priceResult.total)}
           </span>
           {hasPrice && (
             <span className="text-xs leading-none mt-0.5" style={{ color: 'var(--muted)' }}>
-              {formatZl(priceResult.formation)} form. + {formatZl(priceResult.accommodation)} nocl. + {formatZl(priceResult.meals)} wyż.
+              {money(priceResult.formation)} form. + {money(priceResult.accommodation)} nocl. + {money(priceResult.meals)} wyż.
             </span>
           )}
         </div>

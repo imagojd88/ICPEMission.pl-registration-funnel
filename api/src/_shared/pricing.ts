@@ -43,6 +43,8 @@ export interface AgeBracket {
 export interface PricingConfig {
   /** wydarzenie bezpłatne — ukrywamy ceny/koszty i pomijamy płatność (np. standalone) */
   free?: boolean;
+  /** waluta cen wydarzenia (kwoty wpisuje organizator w tej walucie). Domyślnie PLN. */
+  currency?: 'PLN' | 'EUR' | 'USD';
   /** opłata formacyjna per osoba (stała; zerowana tylko dla progu gratis) */
   formationFee: number;
   /** wyżywienie per osoba (pełne, za cały pobyt) — podlega mnożnikowi wieku */

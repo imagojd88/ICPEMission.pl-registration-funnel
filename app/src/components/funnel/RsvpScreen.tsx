@@ -1,21 +1,19 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { EventInstanceDto } from '@icpe/shared'
 import { buildIcs, googleCalendarUrl } from '@icpe/shared'
-import { createRsvp } from '../../lib/api'
+import { createRsvp, pickLang } from '../../lib/api'
+import { bcp47 } from '../../lib/utils'
 
 type Response = 'YES' | 'NO'
 
-function localized(title: EventInstanceDto['title']): string {
-  if (typeof title === 'string') return title
-  return title.pl ?? title.en ?? title.it ?? 'Wydarzenie'
-}
-
-function formatRange(startsAt: string, endsAt: string): string {
+function formatRange(startsAt: string, endsAt: string, lng: string): string {
+  const loc = bcp47(lng)
   const s = new Date(startsAt)
   const e = new Date(endsAt)
-  const d = new Intl.DateTimeFormat('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' }).format(s)
+  const d = new Intl.DateTimeFormat(loc, { day: 'numeric', month: 'long', year: 'numeric' }).format(s)
   const t = (x: Date) =>
-    new Intl.DateTimeFormat('pl-PL', { hour: '2-digit', minute: '2-digit' }).format(x)
+    new Intl.DateTimeFormat(loc, { hour: '2-digit', minute: '2-digit' }).format(x)
   return `${d} · ${t(s)}–${t(e)}`
 }
 
@@ -31,8 +29,9 @@ export default function RsvpScreen({
   const [email, setEmail] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [done, setDone] = useState<Response | null>(null)
+  const { i18n } = useTranslation()
 
-  const title = localized(event.title)
+  const title = pickLang(event.title as string | Record<string, string>, i18n.language) || 'Wydarzenie'
 
   const submit = async () => {
     if (!response || !name.trim()) return
@@ -161,7 +160,7 @@ export default function RsvpScreen({
         {/* Meta */}
         <div className="flex flex-col gap-1">
           <p className="text-sm" style={{ color: 'var(--ink)', fontWeight: 600 }}>
-            {formatRange(event.startsAt, event.endsAt)}
+            {formatRange(event.startsAt, event.endsAt, i18n.language)}
           </p>
           {event.location && (
             <p className="text-sm" style={{ color: 'var(--muted)' }}>

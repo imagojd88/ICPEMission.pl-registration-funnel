@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { formatMoney } from '@icpe/shared'
 import type { PricingConfig } from '@icpe/shared'
 import { Input } from '../../ui/Input'
 
@@ -95,7 +96,8 @@ export default function Step4Options({
   onDiscountApply,
   onConsentsChange,
 }: Props) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const money = (n: number) => formatMoney(n, pricingConfig.currency, i18n.language)
   const [discountError, setDiscountError] = useState(false)
 
   const applyDiscount = () => {
@@ -130,7 +132,7 @@ export default function Step4Options({
       {showTransport && (
         <CheckRow
           label={t('options.transport')}
-          price={`+${transportPrice} zł`}
+          price={`+${money(transportPrice)}`}
           checked={options.transport}
           onChange={(v) => onOptionsChange({ ...options, transport: v })}
         />
@@ -140,7 +142,7 @@ export default function Step4Options({
       {showBedding && (
         <CheckRow
           label={t('options.bedding')}
-          price={`+${beddingPrice} zł/os`}
+          price={`+${money(beddingPrice)}/os`}
           checked={options.bedding}
           onChange={(v) => onOptionsChange({ ...options, bedding: v })}
         />
