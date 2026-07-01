@@ -104,6 +104,19 @@ export const getSettings = () =>
   get<SiteSettings>('/site/settings', { siteName: 'ICPE Mission Polska' });
 export const getUpcoming = () => get<UpcomingEvent[]>('/site/events/upcoming', []);
 
+export interface CommunityOverlay {
+  key: string;
+  name?: string;
+  ccPl?: string | null;
+  ccEn?: string | null;
+  tagPl?: string | null;
+  tagEn?: string | null;
+  notePl?: string | null;
+  noteEn?: string | null;
+}
+/** Edytowalne opisy wspólnot mapy (z Personal OS). Puste = mapa użyje danych wbudowanych. */
+export const getCommunities = () => get<CommunityOverlay[]>('/site/communities', []);
+
 /** Odczyt wielojęzycznego pola (fallback pl→en→it→pierwszy). */
 export function pickLang(v: LangText | undefined | null, lng = 'pl'): string {
   if (!v) return '';

@@ -1,150 +1,234 @@
 ---
-import BaseLayout from '../layouts/BaseLayout.astro';
-import Blocks from '../components/Blocks.astro';
-import EventCard from '../components/EventCard.astro';
-import { getPage, getUpcoming, getArticles, formatDateRange } from '../lib/api';
-
-// Strona główna: opcjonalna treść z Page o slug „home" + najbliższe wydarzenia + aktualności.
-const home = await getPage('home');
-const upcoming = await getUpcoming();
-const articles = await getArticles(3);
+import LandingLayout from '../layouts/LandingLayout.astro';
+import WorldMap from '../components/WorldMap.astro';
 ---
 
-<BaseLayout title={home?.seoTitle || undefined} description={home?.seoDesc || undefined} ogImage={home?.ogImageUrl}>
-  <!-- Hero -->
-  <section class="hero">
-    <div class="container hero-inner">
-      <p class="supertitle">ICPE Mission Polska</p>
-      <h1 class="hero-title">{home?.title || 'Formacja, wspólnota, misja'}</h1>
-      {upcoming.length > 0 && (
-        <a class="btn btn-accent hero-cta" href="#wydarzenia">Zobacz najbliższe wydarzenia</a>
-      )}
-    </div>
-  </section>
+<LandingLayout>
+  <div data-lang="pl" id="site-root" style="background:#F4EEE3; color:#241E1A; min-height:100vh; font-family:'Bricolage Grotesque',sans-serif;">
+    <div style="max-width:1320px; margin:0 auto; background:#F4EEE3; overflow:hidden;">
 
-  <!-- Treść strony głównej (bloki), jeśli ustawiona -->
-  {home && home.blocks.length > 0 && (
-    <section class="container section">
-      <Blocks blocks={home.blocks} />
-    </section>
-  )}
+      <!-- NAV -->
+      <nav style="display:flex; align-items:center; justify-content:space-between; padding:26px 72px; border-bottom:1px solid #E2D8C8; position:sticky; top:0; z-index:50; background:rgba(244,238,227,.9); backdrop-filter:blur(10px);">
+        <div style="display:flex; align-items:center; gap:11px;">
+          <img src="/assets/icpe-globe.png" alt="ICPE" style="height:40px; width:auto; display:block;" />
+          <div style="font-size:19px; font-weight:800; letter-spacing:-.02em;">ICPE Mission <span style="font-weight:400; color:#6B615A;">Warszawa</span></div>
+        </div>
+        <div class="nav-links" style="display:flex; align-items:center; gap:30px; font-size:15px; font-weight:500;">
+          <a href="#wspolnota" style="color:inherit; text-decoration:none;"><span data-pl>Wspólnota</span><span data-en>Community</span></a>
+          <a href="#mapa" style="color:inherit; text-decoration:none;"><span data-pl>Świat</span><span data-en>World</span></a>
+          <a href="#polska" style="color:inherit; text-decoration:none;"><span data-pl>Polska</span><span data-en>Poland</span></a>
+          <a href="#events" style="color:inherit; text-decoration:none;"><span data-pl>Wydarzenia</span><span data-en>Events</span></a>
+        </div>
+        <div style="display:flex; align-items:center; gap:18px; margin-left:32px;">
+          <div style="display:flex; align-items:center; gap:8px; font-family:'Space Mono',monospace; font-size:13px;">
+            <button data-langbtn="pl" style="background:none; border:none; font:inherit; color:inherit; padding:0;">PL</button>
+            <span style="color:#C4B8A6;">/</span>
+            <button data-langbtn="en" style="background:none; border:none; font:inherit; color:inherit; padding:0;">EN</button>
+          </div>
+          <a href="#kontakt" style="display:inline-flex; padding:11px 20px; border-radius:100px; background:#241E1A; color:#F4EEE3; font-size:14px; font-weight:600; text-decoration:none;"><span data-pl>Napisz do nas</span><span data-en>Get in touch</span></a>
+        </div>
+      </nav>
 
-  <!-- Najbliższe wydarzenia -->
-  {upcoming.length > 0 && (
-    <section id="wydarzenia" class="container section">
-      <h2 class="section-title">Najbliższe wydarzenia</h2>
-      <div class="grid">
-        {upcoming.map((ev) => <EventCard event={ev} />)}
+      <!-- HERO -->
+      <header class="hero" style="padding:76px 72px 64px; display:grid; grid-template-columns:1.45fr 1fr; gap:56px; align-items:center;">
+        <div>
+          <div style="display:flex; align-items:center; gap:16px; font-family:'Space Mono',monospace; font-size:13px; letter-spacing:.1em; text-transform:uppercase; color:#A0724F; margin-bottom:34px;">
+            <span style="width:46px; height:1px; background:#C0603C;"></span>
+            <span data-pl>Instytut Ewangelizacji Świata · od 1985</span><span data-en>Institute for World Evangelisation · since 1985</span>
+          </div>
+          <h1 style="margin:0; font-size:74px; line-height:0.98; letter-spacing:-.035em; font-weight:800;">
+            <span data-pl>W <em style="font-family:'Instrument Serif',serif; font-style:italic; font-weight:400; color:#C0603C;">wieczerniku</em> codziennego życia.</span>
+            <span data-en>In the <em style="font-family:'Instrument Serif',serif; font-style:italic; font-weight:400; color:#C0603C;">Upper Room</em> of everyday life.</span>
+          </h1>
+          <p style="margin:28px 0 0; font-size:19px; line-height:1.5; color:#4A4038; max-width:48ch;">
+            <span data-pl>Jesteśmy międzynarodową katolicką wspólnotą misyjną zaangażowaną w dzieła ewangelizacji i miłosierdzia na wszystkich kontynentach. Połączyło nas pragnienie przemiany świata przez radość Ewangelii.</span>
+            <span data-en>We are an international Catholic missionary community engaged in works of evangelisation and mercy on every continent. We are united by a desire to transform the world through the joy of the Gospel.</span>
+          </p>
+          <div class="hero-cta" style="display:flex; gap:14px; margin-top:38px;">
+            <a href="#mapa" style="display:inline-flex; align-items:center; gap:9px; padding:16px 28px; border-radius:100px; background:#241E1A; color:#F4EEE3; font-size:16px; font-weight:600; text-decoration:none;"><span data-pl>Zobacz mapę świata</span><span data-en>See the world map</span></a>
+            <a href="#wspolnota" style="display:inline-flex; align-items:center; gap:9px; padding:16px 28px; border-radius:100px; background:transparent; color:#241E1A; border:1px solid #C9BCA9; font-size:16px; font-weight:600; text-decoration:none;"><span data-pl>Poznaj wspólnotę</span><span data-en>Meet the community</span></a>
+          </div>
+        </div>
+        <aside style="border-left:2px solid #C0603C; padding:6px 0 6px 34px;">
+          <p style="margin:0; font-family:'Instrument Serif',serif; font-style:italic; font-weight:400; font-size:29px; line-height:1.34; color:#3A3028;">
+            <span data-pl>„Bo dla was jest obietnica i dla dzieci waszych, i dla wszystkich, którzy są daleko, a których Pan, Bóg nasz, powoła…"</span>
+            <span data-en>“For the promise is for you, for your children, and for all who are far away…”</span>
+          </p>
+          <div style="margin-top:20px; font-family:'Space Mono',monospace; font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:#A0724F;"><span data-pl>Dz 2,39 · Dzieje Apostolskie</span><span data-en>Acts 2:39</span></div>
+        </aside>
+      </header>
+
+      <!-- HERO IMAGE -->
+      <div style="padding:0 72px 20px;">
+        <div style="height:420px; border-radius:16px; border:1px solid #E2D8C8; overflow:hidden;">
+          <img src="/uploads/photo-1507692049790-de58290a4334.avif" alt="Wspólnota podczas wieczoru uwielbienia" style="width:100%; height:100%; object-fit:cover; object-position:center 40%; display:block;" />
+        </div>
       </div>
-    </section>
-  )}
 
-  <!-- Ostatnie aktualności -->
-  {articles.length > 0 && (
-    <section class="container section">
-      <div class="section-head">
-        <h2 class="section-title">Aktualności</h2>
-        <a href="/aktualnosci" class="more">Wszystkie →</a>
+      <!-- TICKER -->
+      <div style="padding:22px 72px 60px; border-bottom:1px solid #E2D8C8;">
+        <div style="font-family:'Space Mono',monospace; font-size:13px; letter-spacing:.04em; color:#8A7F73; line-height:2;">
+          Bangalore · Bogotá · Kota Kinabalu · Kraków · Kuala Lumpur · Kumasi · Lublin · Malta · Manila · Mannheim · Mysore · Oregon · Partinico · Seul · Singapur · Sydney · Warszawa · Wellington
+        </div>
       </div>
-      <div class="grid">
-        {articles.map((a) => (
-          <a class="card article" href={`/aktualnosci/${a.slug}`}>
-            {a.coverUrl && <div class="cover" style={`background-image:url(${a.coverUrl})`}></div>}
-            <div class="body">
-              {a.publishedAt && <p class="muted small">{formatDateRange(a.publishedAt)}</p>}
-              <h3 class="a-title">{a.title}</h3>
-              {a.excerpt && <p class="muted excerpt">{a.excerpt}</p>}
+
+      <!-- ETHOS -->
+      <section id="wspolnota" class="ethos" style="padding:80px 72px; display:grid; grid-template-columns:1.15fr 1fr; gap:72px;">
+        <div>
+          <div style="font-family:'Space Mono',monospace; font-size:13px; letter-spacing:.14em; text-transform:uppercase; color:#A0724F; margin-bottom:24px;"><span data-pl>Kim jesteśmy</span><span data-en>Who we are</span></div>
+          <p style="margin:0; font-family:'Instrument Serif',serif; font-style:italic; font-weight:400; font-size:27px; line-height:1.36; color:#3A3028;">
+            <span data-pl>„Wspólnota ICPE urodziła się z ziarenka Bożej obietnicy na małej wyspie na Morzu Śródziemnym. Kiedy zebrali się ludzie gotowi żyć tą obietnicą, zobaczyliśmy otwierające się drzwi — i dzięki łasce z wysoka dzisiaj docieramy do ludzi w potrzebie na całym świecie. Przyjdź i dołącz do nas!"</span>
+            <span data-en>“The ICPE Community was born from the seed of God's promise on a small island in the Mediterranean. When people gathered, ready to live that promise, we saw doors open, and by grace from on high, today we reach people in need around the world. Come and join us!”</span>
+          </p>
+          <div style="display:flex; align-items:center; gap:16px; margin-top:28px;">
+            <img src="/uploads/462623044_7856737674427104_2359881754499323139_n.jpg" alt="Anna i Mario Cappello" style="width:76px; height:76px; border-radius:50%; object-fit:cover; object-position:center 30%; border:2px solid #E2D8C8; flex:0 0 auto;" />
+            <div>
+              <div style="font-size:17px; font-weight:700; letter-spacing:-.01em;">Anna &amp; Mario Cappello</div>
+              <div style="font-family:'Space Mono',monospace; font-size:12px; letter-spacing:.04em; text-transform:uppercase; color:#A0724F; margin-top:3px;"><span data-pl>Założyciele · Malta</span><span data-en>Founders · Malta</span></div>
             </div>
-          </a>
-        ))}
-      </div>
-    </section>
-  )}
-</BaseLayout>
+          </div>
+        </div>
+        <div style="padding-top:8px;">
+          <p style="margin:0 0 34px; font-size:17px; line-height:1.6; color:#4A4038;">
+            <span data-pl>Instytut Ewangelizacji Świata – ICPE Mission powstał na Malcie w 1985 roku. W 2002, w uroczystość Zesłania Ducha Świętego, Stolica Apostolska nadała wspólnocie status międzynarodowego stowarzyszenia wiernych na prawie papieskim. Od 1998 roku wspólnota ICPE działa również w Polsce.</span>
+            <span data-en>The Institute for World Evangelisation – ICPE Mission was founded in Malta in 1985. In 2002, on the Feast of Pentecost, the Holy See granted it the status of an international association of the faithful of pontifical right. Since 1998, the ICPE community has also been present in Poland.</span>
+          </p>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:1px; background:#E2D8C8; border:1px solid #E2D8C8; border-radius:14px; overflow:hidden;">
+            <div style="background:#F4EEE3; padding:22px 24px;"><div style="font-family:'Space Mono',monospace; font-size:34px; font-weight:700; letter-spacing:-.02em;">1985</div><div style="font-size:13px; color:#8A7F73; margin-top:4px;"><span data-pl>Malta · początek</span><span data-en>Malta · beginning</span></div></div>
+            <div style="background:#F4EEE3; padding:22px 24px;"><div style="font-family:'Space Mono',monospace; font-size:34px; font-weight:700; letter-spacing:-.02em;">2002</div><div style="font-size:13px; color:#8A7F73; margin-top:4px;"><span data-pl>uznanie Watykanu</span><span data-en>Vatican recognition</span></div></div>
+            <div style="background:#F4EEE3; padding:22px 24px;"><div style="font-family:'Space Mono',monospace; font-size:34px; font-weight:700; letter-spacing:-.02em;">23</div><div style="font-size:13px; color:#8A7F73; margin-top:4px;"><span data-pl>wspólnoty</span><span data-en>communities</span></div></div>
+            <div style="background:#F4EEE3; padding:22px 24px;"><div style="font-family:'Space Mono',monospace; font-size:34px; font-weight:700; letter-spacing:-.02em;">6</div><div style="font-size:13px; color:#8A7F73; margin-top:4px;"><span data-pl>kontynentów</span><span data-en>continents</span></div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- PILLARS -->
+      <section style="padding:0 72px 84px;">
+        <div class="pillars" style="display:grid; grid-template-columns:repeat(4,1fr); gap:0; border-top:1px solid #241E1A;">
+          <div style="padding:30px 26px 0; border-right:1px solid #E2D8C8;"><div style="font-family:'Space Mono',monospace; font-size:12px; color:#A0724F;">01</div><div style="width:22px; height:22px; border-radius:50%; background:#C0603C; margin:26px 0 16px;"></div><div style="font-size:22px; font-weight:700; letter-spacing:-.01em;"><span data-pl>Uwielbienie</span><span data-en>Worship</span></div><p style="margin:8px 0 0; font-size:14px; line-height:1.5; color:#6B615A;"><span data-pl>Modlitwa i adoracja jako źródło wszystkiego, co robimy.</span><span data-en>Prayer and adoration as the source of all we do.</span></p></div>
+          <div style="padding:30px 26px 0; border-right:1px solid #E2D8C8;"><div style="font-family:'Space Mono',monospace; font-size:12px; color:#A0724F;">02</div><div style="width:22px; height:22px; background:#C0603C; margin:26px 0 16px;"></div><div style="font-size:22px; font-weight:700; letter-spacing:-.01em;"><span data-pl>Ewangelizacja</span><span data-en>Evangelisation</span></div><p style="margin:8px 0 0; font-size:14px; line-height:1.5; color:#6B615A;"><span data-pl>Dzielenie się wiarą prosto, po ludzku, tam gdzie żyjemy.</span><span data-en>Sharing faith simply, humanly, right where we live.</span></p></div>
+          <div style="padding:30px 26px 0; border-right:1px solid #E2D8C8;"><div style="font-family:'Space Mono',monospace; font-size:12px; color:#A0724F;">03</div><div style="width:22px; height:22px; border-radius:50%; border:5px solid #C0603C; box-sizing:border-box; margin:26px 0 16px;"></div><div style="font-size:22px; font-weight:700; letter-spacing:-.01em;"><span data-pl>Wspólnota</span><span data-en>Community</span></div><p style="margin:8px 0 0; font-size:14px; line-height:1.5; color:#6B615A;"><span data-pl>Życie razem: małe grupy, dom, codzienność i przyjaźń.</span><span data-en>Life together: small groups, home, the everyday, friendship.</span></p></div>
+          <div style="padding:30px 26px 0;"><div style="font-family:'Space Mono',monospace; font-size:12px; color:#A0724F;">04</div><div style="width:22px; height:22px; background:#C0603C; transform:rotate(45deg); margin:26px 0 16px;"></div><div style="font-size:22px; font-weight:700; letter-spacing:-.01em;"><span data-pl>Miłosierdzie</span><span data-en>Mercy</span></div><p style="margin:8px 0 0; font-size:14px; line-height:1.5; color:#6B615A;"><span data-pl>Konkretna miłość wobec ubogich i zranionych.</span><span data-en>Concrete love for the poor and the wounded.</span></p></div>
+        </div>
+      </section>
+
+      <!-- MAP (dark) -->
+      <section id="mapa" style="background:#201812; color:#EDE3D3; padding:80px 72px; border-radius:20px; margin:0 24px 24px;">
+        <div class="map-head" style="display:flex; align-items:flex-end; justify-content:space-between; gap:24px; margin-bottom:44px; flex-wrap:wrap;">
+          <div>
+            <div style="font-family:'Space Mono',monospace; font-size:13px; letter-spacing:.14em; text-transform:uppercase; color:#C0603C; margin-bottom:18px;"><span data-pl>Jedna wspólnota · cały świat</span><span data-en>One community · one world</span></div>
+            <h2 style="margin:0; font-size:56px; line-height:1; letter-spacing:-.03em; font-weight:800;"><span data-pl>Od Malty po Wellington.</span><span data-en>From Malta to Wellington.</span></h2>
+          </div>
+          <p style="margin:0; max-width:34ch; font-size:16px; line-height:1.55; color:rgba(237,227,211,.72);"><span data-pl>Warszawa to jeden z 23 domów tej samej rodziny. Zobacz, gdzie jeszcze bije jej serce.</span><span data-en>Warsaw is one of 23 homes in the same family. See where else its heart beats.</span></p>
+        </div>
+        <WorldMap />
+      </section>
+
+      <!-- FAITH IN ACTION -->
+      <section id="polska" style="padding:60px 72px 84px;">
+        <div style="font-family:'Space Mono',monospace; font-size:13px; letter-spacing:.14em; text-transform:uppercase; color:#A0724F; margin-bottom:30px;"><span data-pl>Wiara w działaniu</span><span data-en>Faith in action</span></div>
+        <div class="triptych" style="display:grid; grid-template-columns:repeat(3,1fr); gap:22px;">
+          <figure style="margin:0;">
+            <div style="height:440px; border-radius:16px; overflow:hidden; border:1px solid #E2D8C8;">
+              <img src="/uploads/jametlene-reskp-BkhIxji_bJE-unsplash.jpg" alt="Budowanie wspólnoty" style="width:100%; height:100%; object-fit:cover; object-position:center 35%; display:block;" />
+            </div>
+            <figcaption style="margin-top:16px; display:flex; align-items:baseline; gap:10px;">
+              <span style="font-family:'Space Mono',monospace; font-size:12px; color:#A0724F;">01</span>
+              <span style="font-size:21px; font-weight:700; letter-spacing:-.01em;"><span data-pl>Budowanie wspólnoty</span><span data-en>Community building</span></span>
+            </figcaption>
+          </figure>
+          <figure style="margin:0;">
+            <div style="height:440px; border-radius:16px; overflow:hidden; border:1px solid #E2D8C8;">
+              <img src="/uploads/476770027_625787609952534_2898397860552931423_n.jpg" alt="Dzieła miłosierdzia" style="width:100%; height:100%; object-fit:cover; object-position:center 40%; display:block;" />
+            </div>
+            <figcaption style="margin-top:16px; display:flex; align-items:baseline; gap:10px;">
+              <span style="font-family:'Space Mono',monospace; font-size:12px; color:#A0724F;">02</span>
+              <span style="font-size:21px; font-weight:700; letter-spacing:-.01em;"><span data-pl>Dzieła miłosierdzia</span><span data-en>Works of mercy</span></span>
+            </figcaption>
+          </figure>
+          <figure style="margin:0;">
+            <div style="height:440px; border-radius:16px; overflow:hidden; border:1px solid #E2D8C8;">
+              <img src="/uploads/486069211_964972129125452_2421238400579486683_n.jpg" alt="Ewangelizacja" style="width:100%; height:100%; object-fit:cover; object-position:32% 35%; display:block;" />
+            </div>
+            <figcaption style="margin-top:16px; display:flex; align-items:baseline; gap:10px;">
+              <span style="font-family:'Space Mono',monospace; font-size:12px; color:#A0724F;">03</span>
+              <span style="font-size:21px; font-weight:700; letter-spacing:-.01em;"><span data-pl>Ewangelizacja</span><span data-en>Evangelisation</span></span>
+            </figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <!-- EVENTS -->
+      <section id="events" style="padding:0 72px 84px;">
+        <div style="font-family:'Space Mono',monospace; font-size:13px; letter-spacing:.14em; text-transform:uppercase; color:#A0724F; margin-bottom:22px;"><span data-pl>Czego możesz doświadczyć</span><span data-en>What you can experience</span></div>
+        <div class="cards" style="display:grid; grid-template-columns:repeat(4,1fr); gap:20px;">
+          <div style="border:1px solid #E2D8C8; border-radius:16px; padding:26px; background:#FBF7EF;"><div style="font-family:'Space Mono',monospace; font-size:12px; color:#A0724F;">/ 01</div><div style="font-size:21px; font-weight:700; margin-top:34px; letter-spacing:-.01em; line-height:1.12; min-height:2.24em;"><span data-pl>Szkoły Misji</span><span data-en>Schools of Mission</span></div><p style="margin:8px 0 0; font-size:14px; line-height:1.5; color:#6B615A;"><span data-pl>Kilkumiesięczne szkoły ewangelizacji na całym świecie.</span><span data-en>Months-long schools of evangelisation around the world.</span></p></div>
+          <div style="border:1px solid #E2D8C8; border-radius:16px; padding:26px; background:#FBF7EF;"><div style="font-family:'Space Mono',monospace; font-size:12px; color:#A0724F;">/ 02</div><div style="font-size:21px; font-weight:700; margin-top:34px; letter-spacing:-.01em; line-height:1.12; min-height:2.24em;"><span data-pl>Lokalne wspólnoty</span><span data-en>Local communities</span></div><p style="margin:8px 0 0; font-size:14px; line-height:1.5; color:#6B615A;"><span data-pl>Spotkania formacyjne, małe grupy i wspólne uwielbienie.</span><span data-en>Formation meetings, small groups and shared worship.</span></p></div>
+          <div style="border:1px solid #E2D8C8; border-radius:16px; padding:26px; background:#FBF7EF;"><div style="font-family:'Space Mono',monospace; font-size:12px; color:#A0724F;">/ 03</div><div style="font-size:21px; font-weight:700; margin-top:34px; letter-spacing:-.01em; line-height:1.12; min-height:2.24em;"><span data-pl>Seminarium duchowne</span><span data-en>Seminary</span></div><p style="margin:8px 0 0; font-size:14px; line-height:1.5; color:#6B615A;"><span data-pl>Formacja do życia i kapłańskiej posługi w ramach ICPE.</span><span data-en>Formation for life and priestly ministry within ICPE.</span></p></div>
+          <div style="border:1px solid #E2D8C8; border-radius:16px; padding:26px; background:#FBF7EF;"><div style="font-family:'Space Mono',monospace; font-size:12px; color:#A0724F;">/ 04</div><div style="font-size:21px; font-weight:700; margin-top:34px; letter-spacing:-.01em; line-height:1.12; min-height:2.24em;"><span data-pl>HopeXchange</span><span data-en>HopeXchange</span></div><p style="margin:8px 0 0; font-size:14px; line-height:1.5; color:#6B615A;"><span data-pl>Wspieranie dzieł edukacyjnych, humanitarnych i medycznych.</span><span data-en>Supporting educational, humanitarian and medical works.</span></p></div>
+        </div>
+      </section>
+
+      <!-- CTA -->
+      <section class="cta" style="margin:0 72px 84px; background:#C0603C; color:#F4EEE3; border-radius:20px; padding:64px 60px; display:flex; align-items:center; justify-content:space-between; gap:40px; flex-wrap:wrap;">
+        <div>
+          <div style="font-family:'Space Mono',monospace; font-size:13px; letter-spacing:.1em; opacity:.8;">J 1,39</div>
+          <h2 style="margin:10px 0 0; font-size:52px; line-height:1; letter-spacing:-.03em; font-weight:800;"><span data-pl>„Przyjdź i zobacz."</span><span data-en>“Come and see.”</span></h2>
+          <p style="margin:16px 0 0; font-size:17px; max-width:44ch; opacity:.9;"><span data-pl>Napisz do wspólnoty warszawskiej albo przyjdź na najbliższy wieczór uwielbienia.</span><span data-en>Write to the Warsaw community, or come to the next worship evening.</span></p>
+        </div>
+        <a href="#kontakt" style="display:inline-flex; padding:17px 32px; border-radius:100px; background:#F4EEE3; color:#241E1A; font-size:16px; font-weight:700; text-decoration:none;"><span data-pl>Napisz do nas</span><span data-en>Get in touch</span></a>
+      </section>
+
+      <!-- FOOTER -->
+      <footer id="kontakt" style="background:#241E1A; color:#EDE3D3; padding:64px 72px 40px;">
+        <div class="footer-grid" style="display:grid; grid-template-columns:1.6fr 1fr 1fr; gap:40px;">
+          <div>
+            <div style="display:flex; align-items:center; gap:11px; margin-bottom:18px;"><img src="/assets/icpe-globe-cream.png" alt="ICPE" style="height:34px; width:auto; display:block;" /><div style="font-size:18px; font-weight:800;">ICPE Mission Warszawa</div></div>
+            <p style="margin:0; font-size:14px; line-height:1.6; color:rgba(237,227,211,.65); max-width:34ch;"><span data-pl>Część Instytutu Ewangelizacji Świata – ICPE Mission.</span><span data-en>Part of the Institute for World Evangelisation – ICPE Mission.</span></p>
+          </div>
+          <div><div style="font-family:'Space Mono',monospace; font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:rgba(237,227,211,.5); margin-bottom:14px;"><span data-pl>Nawigacja</span><span data-en>Navigate</span></div><div style="display:flex; flex-direction:column; gap:10px; font-size:15px;"><a href="#wspolnota" style="color:inherit; text-decoration:none;"><span data-pl>Wspólnota</span><span data-en>Community</span></a><a href="#mapa" style="color:inherit; text-decoration:none;"><span data-pl>Mapa świata</span><span data-en>World map</span></a><a href="#events" style="color:inherit; text-decoration:none;"><span data-pl>Wydarzenia</span><span data-en>Events</span></a></div></div>
+          <div><div style="font-family:'Space Mono',monospace; font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:rgba(237,227,211,.5); margin-bottom:14px;"><span data-pl>Kontakt</span><span data-en>Contact</span></div><div style="display:flex; flex-direction:column; gap:10px; font-size:15px;"><span>Instagram</span><span>Facebook</span></div></div>
+        </div>
+        <div style="margin-top:48px; padding-top:22px; border-top:1px solid #43372C; display:flex; justify-content:space-between; font-family:'Space Mono',monospace; font-size:12px; color:rgba(237,227,211,.45);"><span>© 2026 ICPE Polska</span><span>Warszawa · PL</span></div>
+      </footer>
+
+    </div>
+  </div>
+</LandingLayout>
 
 <style>
-  .hero {
-    background: linear-gradient(160deg, var(--hero-1), var(--hero-2));
-    color: var(--hero-title);
+  /* Responsywność — składanie gridów do 1 kolumny na mobile */
+  @media (max-width: 900px) {
+    .hero { grid-template-columns: 1fr !important; }
+    .ethos { grid-template-columns: 1fr !important; gap: 44px !important; }
+    .triptych { grid-template-columns: 1fr !important; }
+    .cards { grid-template-columns: 1fr 1fr !important; }
+    .pillars { grid-template-columns: 1fr 1fr !important; }
+    .footer-grid { grid-template-columns: 1fr !important; }
+    .nav-links { display: none !important; }
+    .map-head { flex-direction: column; align-items: flex-start; }
   }
-  .hero-inner {
-    padding: 84px 20px 92px;
-    text-align: center;
-  }
-  .supertitle {
-    text-transform: uppercase;
-    letter-spacing: 0.14em;
-    font-size: 13px;
-    opacity: 0.85;
-    margin: 0 0 12px;
-  }
-  .hero-title {
-    font-size: clamp(34px, 6vw, 56px);
-    margin: 0 auto;
-    max-width: 720px;
-    color: var(--hero-title);
-  }
-  .hero-cta {
-    margin-top: 28px;
-  }
-  .section {
-    padding: 48px 20px;
-  }
-  .section-title {
-    font-size: 28px;
-    margin: 0 0 24px;
-  }
-  .section-head {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    margin-bottom: 24px;
-  }
-  .section-head .section-title {
-    margin: 0;
-  }
-  .more {
-    font-weight: 600;
-    font-size: 15px;
-  }
-  .grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 22px;
-  }
-  .article {
-    display: flex;
-    flex-direction: column;
-    text-decoration: none;
-    color: inherit;
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
-  }
-  .article:hover {
-    text-decoration: none;
-    transform: translateY(-2px);
-    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.08);
-  }
-  .cover {
-    height: 160px;
-    background-size: cover;
-    background-position: center;
-  }
-  .body {
-    padding: 16px 18px 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
-  .small {
-    font-size: 13px;
-  }
-  .a-title {
-    font-size: 19px;
-    margin: 0;
-    color: var(--ink);
-  }
-  .excerpt {
-    font-size: 14px;
-    margin: 0;
+  @media (max-width: 560px) {
+    .cards { grid-template-columns: 1fr !important; }
+    .pillars { grid-template-columns: 1fr !important; }
+    .hero-cta { flex-wrap: wrap; }
+    /* zmniejsz duże nagłówki na mobile */
+    #site-root h1 { font-size: 44px !important; }
+    #site-root nav { padding: 20px 22px !important; }
+    #site-root .hero { padding: 40px 22px !important; }
   }
 </style>
+
+<script is:inline>
+  // Przełącznik języka PL/EN — ustawia data-lang na kontenerze (CSS steruje widocznością).
+  const root = document.getElementById('site-root');
+  document.querySelectorAll('[data-langbtn]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const lng = btn.getAttribute('data-langbtn');
+      if (root && lng) {
+        root.setAttribute('data-lang', lng);
+        document.documentElement.setAttribute('lang', lng);
+      }
+    });
+  });
+</script>

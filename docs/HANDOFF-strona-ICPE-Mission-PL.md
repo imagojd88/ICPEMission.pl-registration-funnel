@@ -33,7 +33,7 @@ Nowy projekt **`site/`** (Astro, SSG). Buduje się z `/site/*` i weryfikuje czys
 - `site/src/components/` — `Nav`, `Footer`, `Blocks` (dispatcher bloków: heading/paragraph/image/gallery/quote/button/eventCta/video/divider), `EventCard`.
 - `site/src/pages/` — `index.astro` (home = Page „home" + najbliższe wydarzenia + aktualności), `[slug].astro` (strony statyczne z `getStaticPaths`), `aktualnosci/index.astro` + `[slug].astro`.
 - `site/src/styles/global.css` — tokeny brandu ICPE (spójne z aplikacją).
-- Deploy: Render **Static Site**, Root `site`, Build `npm install && npm run build`, Publish `site/dist`, ENV `PUBLIC_API_URL`/`PUBLIC_REGISTRATION_URL`/`SITE_URL`. Po utworzeniu skopiuj **Deploy Hook** do `icpe-api` jako `SITE_DEPLOY_HOOK_URL`. Szczegóły: `site/README.md`.
+- Deploy: Render **Static Site**, Root Directory **puste**, Build `cd site && npm install && npm run build`, Publish `site/dist`, ENV `PUBLIC_API_URL`/`PUBLIC_REGISTRATION_URL`/`SITE_URL`. Po utworzeniu skopiuj **Deploy Hook** do `icpe-api` jako `SITE_DEPLOY_HOOK_URL`. Szczegóły: `site/README.md`.
 
 **Home:** treść strony głównej pochodzi z rekordu `Page` o `slug = "home"` (opcjonalny — bez niego pokazuje się domyślny hero + wydarzenia).
 

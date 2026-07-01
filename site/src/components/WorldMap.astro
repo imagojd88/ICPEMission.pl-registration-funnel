@@ -1,0 +1,319 @@
+---
+// Interaktywna mapa świata ICPE — 19 wspólnot. Port z prototypu (WorldMap.dc.html).
+// Ciemny wariant, akcent terakota. Dane + logika w kliencie; reaguje na przełącznik PL/EN.
+// Opisy (name/cc/tag/note) ciągną się z /site/communities (edytowalne w Personal OS);
+// współrzędne i grupa są bazowe w kodzie. Brak API → mapa użyje wbudowanych domyślnych.
+import { getCommunities } from '../lib/api';
+const communities = await getCommunities();
+---
+
+<div class="wm" data-worldmap data-communities={JSON.stringify(communities)}>
+  <div class="wm-map">
+    <canvas class="wm-canvas"></canvas>
+    <div class="wm-pins"></div>
+  </div>
+  <div class="wm-meta">
+    <span class="wm-hint"></span>
+    <span class="wm-count"></span>
+  </div>
+  <div class="wm-panel">
+    <div class="wm-current">
+      <div class="wm-tagline">
+        <span class="wm-tag"></span>
+        <span class="wm-coord"></span>
+      </div>
+      <div class="wm-name"></div>
+      <div class="wm-country"></div>
+      <p class="wm-note"></p>
+    </div>
+    <div>
+      <div class="wm-list-label"></div>
+      <div class="wm-chips"></div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .wm { width: 100%; display: flex; flex-direction: column; font-family: 'Bricolage Grotesque', sans-serif; }
+  .wm-map {
+    position: relative; width: 100%; padding-top: 52%;
+    border-radius: 14px; overflow: hidden;
+    background: #20181270; border: 1px solid rgba(237, 227, 211, 0.12);
+    touch-action: manipulation;
+  }
+  .wm-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .wm-pins { position: absolute; inset: 0; }
+  .wm-pin {
+    position: absolute; transform: translate(-50%, -50%);
+    width: 34px; height: 34px; padding: 0; margin: 0; border: none;
+    background: transparent; cursor: pointer;
+  }
+  .wm-ring { position: absolute; left: 50%; top: 50%; border-radius: 50%; animation: wm-pulse 2.8s ease-out infinite; }
+  .wm-dot { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); border-radius: 50%; transition: width .15s, height .15s; }
+  .wm-label {
+    position: absolute; left: 50%; top: calc(50% + 13px); transform: translateX(-50%);
+    white-space: nowrap; font-family: 'Space Mono', monospace; font-size: 10px;
+    letter-spacing: .04em; text-transform: uppercase; color: #ede3d3;
+    background: rgba(34, 26, 20, 0.85); padding: 2px 7px; border-radius: 100px; pointer-events: none;
+  }
+  .wm-meta {
+    display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 12px;
+    font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: .04em;
+    text-transform: uppercase; color: rgba(237, 227, 211, 0.55);
+  }
+  .wm-panel {
+    margin-top: 22px; padding-top: 26px; border-top: 1px solid rgba(237, 227, 211, 0.14);
+    display: grid; grid-template-columns: 1.35fr 1fr; gap: 44px; align-items: start;
+  }
+  .wm-current { min-height: 170px; }
+  .wm-tagline { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+  .wm-tag { font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: #c0603c; }
+  .wm-coord { font-family: 'Space Mono', monospace; font-size: 11px; color: rgba(237, 227, 211, 0.55); letter-spacing: .02em; }
+  .wm-name { font-size: 40px; line-height: 1.02; font-weight: 800; letter-spacing: -.025em; color: #f5efe4; margin-top: 12px; }
+  .wm-country { font-size: 15px; color: rgba(237, 227, 211, 0.7); margin-top: 3px; }
+  .wm-note { font-size: 16px; line-height: 1.55; color: rgba(237, 227, 211, 0.82); margin: 16px 0 0; max-width: 60ch; }
+  .wm-list-label { font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: rgba(237, 227, 211, 0.55); margin-bottom: 12px; }
+  .wm-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .wm-chip {
+    font-family: 'Space Mono', monospace; font-size: 12px; letter-spacing: .02em; text-transform: uppercase;
+    padding: 7px 12px; border-radius: 100px; cursor: pointer;
+  }
+  @media (max-width: 720px) {
+    .wm-panel { grid-template-columns: 1fr; gap: 28px; }
+    .wm-name { font-size: 32px; }
+  }
+</style>
+
+<script is:inline>
+  const ACCENT = '#C0603C';
+  const LATT = 80, LATB = -58, SPAN = 138;
+
+  const LAND = [
+    [[-168,65],[-150,71],[-125,71],[-100,73],[-82,73],[-60,66],[-55,52],[-66,46],[-72,42],[-76,36],[-81,26],[-97,18],[-106,23],[-112,30],[-120,34],[-124,42],[-130,52],[-140,60],[-155,60],[-168,65]],
+    [[-52,60],[-30,68],[-18,74],[-22,81],[-45,83],[-58,76],[-55,66],[-52,60]],
+    [[-78,9],[-70,11],[-60,10],[-50,0],[-35,-7],[-40,-22],[-48,-28],[-58,-38],[-66,-46],[-73,-53],[-76,-46],[-71,-33],[-70,-18],[-75,-5],[-80,2],[-78,9]],
+    [[-17,15],[-10,30],[10,37],[24,33],[32,31],[43,12],[51,12],[41,-2],[40,-15],[35,-24],[26,-34],[18,-35],[12,-17],[8,4],[-8,5],[-17,15]],
+    [[-10,37],[-9,44],[-2,49],[2,51],[-5,58],[5,62],[12,66],[28,71],[40,68],[38,55],[30,46],[28,41],[20,40],[10,44],[3,43],[-6,36],[-10,37]],
+    [[30,46],[38,55],[45,66],[70,73],[105,78],[140,73],[160,70],[170,66],[145,60],[135,55],[142,50],[130,43],[127,40],[122,31],[121,22],[110,20],[105,10],[98,8],[95,16],[90,22],[80,8],[77,8],[73,18],[68,24],[57,25],[48,30],[43,40],[36,42],[30,46]],
+    [[114,-22],[122,-18],[130,-12],[142,-11],[147,-20],[153,-28],[150,-37],[141,-38],[135,-35],[129,-32],[118,-35],[114,-28],[114,-22]],
+    [[130,31],[136,35],[140,38],[142,42],[140,44],[135,36],[131,32],[130,31]],
+    [[95,4],[104,-2],[114,-8],[106,-7],[100,0],[95,4]],
+    [[109,3],[117,4],[119,-2],[110,-4],[109,3]],
+    [[131,-2],[141,-3],[150,-9],[141,-9],[132,-8],[131,-2]],
+    [[166,-46],[171,-44],[175,-41],[178,-38],[174,-41],[168,-45],[166,-46]],
+    [[-8,50],[-3,53],[-2,58],[-7,58],[-9,54],[-8,50]],
+    [[43,-13],[50,-16],[47,-25],[44,-22],[43,-13]]
+  ];
+
+  const DATA = [
+    { id:0, name:'Warszawa', cc_pl:'Polska', cc_en:'Poland', lat:52.23, lng:21.01, g:'hub', tag_pl:'Ten dom · hub', tag_en:'This home · hub', n_pl:'Wspólnota warszawska ICPE Mission — ludzie świeccy, którzy pośród pracy i codzienności żyją wiarą razem. Spotykamy się na modlitwie, formacji i otwartych wieczorach uwielbienia. To z perspektywy Warszawy powstała ta strona.', n_en:'The Warsaw ICPE Mission community — lay people who live their faith together in the middle of work and everyday life. We gather for prayer, formation and open worship evenings. This site is told from Warsaw.' },
+    { id:1, name:'Kraków', cc_pl:'Polska', cc_en:'Poland', lat:50.06, lng:19.94, g:'pl', tag_pl:'Oddział · Polska', tag_en:'Branch · Poland', n_pl:'Krakowska wspólnota ICPE Mission. Grupa świeckich zaangażowanych w ewangelizację, wspólną modlitwę i codzienne życie wiarą w sercu Małopolski.', n_en:'The Kraków ICPE Mission community. Lay people engaged in evangelisation, shared prayer and everyday life of faith in the heart of Lesser Poland.' },
+    { id:2, name:'Lublin', cc_pl:'Polska · 2 wspólnoty', cc_en:'Poland · 2 communities', lat:51.25, lng:22.57, g:'pl', tag_pl:'Oddział · Polska', tag_en:'Branch · Poland', n_pl:'Dwie wspólnoty ICPE Mission w Lublinie — dwa domy jednej rodziny. Żyją modlitwą, formacją i posługą, dzieląc się wiarą we wschodniej Polsce.', n_en:'Two ICPE Mission communities in Lublin — two homes of one family. They live by prayer, formation and service, sharing faith in eastern Poland.' },
+    { id:3, name:'Malta', cc_pl:'Malta · dom macierzysty', cc_en:'Malta · motherhouse', lat:35.90, lng:14.51, g:'hq', tag_pl:'Serce wspólnoty', tag_en:'Heart of the community', n_pl:'Dom macierzysty wspólnoty. To tutaj w 1985 roku Mario i Anna Cappello wraz z grupą świeckich założyli Instytut Ewangelizacji Świata. Malta pozostaje sercem międzynarodowej rodziny ICPE.', n_en:'The motherhouse of the community. Here, in 1985, Mario and Anna Cappello together with a group of lay people founded the Institute for World Evangelisation. Malta remains the heart of the international ICPE family.' },
+    { id:4, name:'Fraternia kapłanów', cc_pl:'Malta', cc_en:'Malta', lat:35.88, lng:14.62, g:'hq', tag_pl:'Fraternia', tag_en:'Fraternity', n_pl:'Fraternia kapłanów ICPE Mission z siedzibą na Malcie. Kapłani, którzy towarzyszą świeckim wspólnotom na całym świecie — w formacji, sakramentach i wspólnej misji.', n_en:'The Fraternity of ICPE Mission priests, based in Malta. Priests who accompany the lay communities around the world — in formation, the sacraments and a shared mission.' },
+    { id:5, name:'Oregon', cc_pl:'USA', cc_en:'USA', lat:44.9, lng:-122.8, g:'world', tag_pl:'Oddział · USA', tag_en:'Branch · USA', n_pl:'Szkoła Świadectwa (School of Witness) w Oregonie. Miesięczna, w pełni stacjonarna szkoła formacji: modlitwa, życie we wspólnocie, studium i ewangelizacja, prowadząca do stania się świadkiem wiary.', n_en:'The School of Witness in Oregon. A month-long, fully residential school of formation: prayer, community life, study and outreach, leading participants to become witnesses of the faith.' },
+    { id:6, name:'Seul', cc_pl:'Korea Płd.', cc_en:'South Korea', lat:37.57, lng:126.98, g:'world', tag_pl:'Oddział · Azja', tag_en:'Branch · Asia', n_pl:'Wspólnota ICPE Mission w Korei Południowej. Świeccy misjonarze niosący Ewangelię w dynamicznym, wielkomiejskim kontekście azjatyckim.', n_en:'The ICPE Mission community in South Korea. Lay missionaries bringing the Gospel into a fast-moving, urban Asian context.' },
+    { id:7, name:'Singapur', cc_pl:'Singapur', cc_en:'Singapore', lat:1.35, lng:103.82, g:'world', tag_pl:'Oddział · od 1996', tag_en:'Branch · since 1996', n_pl:'Earthen Vessels Catholic Community — wspólnota ICPE Mission założona w 1996 roku jako grupa młodych dorosłych. Prowadzi rekolekcje i programy formacyjne, żyjąc słowami „skarb w naczyniach glinianych".', n_en:'Earthen Vessels Catholic Community — an ICPE Mission community founded in 1996 as a group of young adults. It runs retreats and formation programmes, living out the words “treasure in earthen vessels”.' },
+    { id:8, name:'Manila', cc_pl:'Filipiny', cc_en:'Philippines', lat:14.60, lng:120.98, g:'world', tag_pl:'Oddział · Azja', tag_en:'Branch · Asia', n_pl:'Wspólnota ICPE Mission na Filipinach — w kraju o żywej, ludowej wierze, gdzie ewangelizacja prowadzona przez świeckich ma szczególną siłę.', n_en:'The ICPE Mission community in the Philippines — a country of vibrant, popular faith where lay-led evangelisation has a special strength.' },
+    { id:9, name:'Wellington', cc_pl:'Nowa Zelandia', cc_en:'New Zealand', lat:-41.29, lng:174.78, g:'world', tag_pl:'Oddział · Oceania', tag_en:'Branch · Oceania', n_pl:'Wspólnota ICPE Mission w Nowej Zelandii — mały, ale gorliwy dom rodziny ICPE niemal na krańcu świata.', n_en:'The ICPE Mission community in New Zealand — a small but fervent home of the ICPE family, near the end of the world.' },
+    { id:10, name:'Kuala Lumpur', cc_pl:'Malezja', cc_en:'Malaysia', lat:3.14, lng:101.69, g:'world', tag_pl:'Oddział · Azja', tag_en:'Branch · Asia', n_pl:'Wspólnota ICPE Mission w Kuala Lumpur. Świadectwo chrześcijańskiej wspólnoty w wielokulturowej, wieloreligijnej Malezji.', n_en:'The ICPE Mission community in Kuala Lumpur. A witness of Christian community in multicultural, multi-religious Malaysia.' },
+    { id:11, name:'Kota Kinabalu', cc_pl:'Malezja', cc_en:'Malaysia', lat:5.98, lng:116.07, g:'world', tag_pl:'Oddział · Azja', tag_en:'Branch · Asia', n_pl:'Wspólnota ICPE Mission w Kota Kinabalu na Borneo. Drugi malezyjski dom rodziny, we wschodniej części kraju.', n_en:'The ICPE Mission community in Kota Kinabalu on Borneo. The family’s second Malaysian home, in the east of the country.' },
+    { id:12, name:'Partinico', cc_pl:'Włochy · Sycylia', cc_en:'Italy · Sicily', lat:38.05, lng:13.12, g:'world', tag_pl:'Oddział · Europa', tag_en:'Branch · Europe', n_pl:'Wspólnota ICPE Mission na Sycylii, w Partinico koło Palermo. Śródziemnomorski dom modlitwy i ewangelizacji.', n_en:'The ICPE Mission community in Sicily, in Partinico near Palermo. A Mediterranean home of prayer and evangelisation.' },
+    { id:13, name:'Mysore', cc_pl:'Indie', cc_en:'India', lat:12.30, lng:76.64, g:'world', tag_pl:'Oddział · Azja', tag_en:'Branch · Asia', n_pl:'Wspólnota ICPE Mission w Mysore. Jeden z indyjskich ośrodków formacji, z których wyrosło wielu świeckich ewangelizatorów.', n_en:'The ICPE Mission community in Mysore. One of the Indian centres of formation from which many lay evangelisers have grown.' },
+    { id:14, name:'Bangalore', cc_pl:'Indie', cc_en:'India', lat:12.97, lng:77.59, g:'world', tag_pl:'Oddział · Azja', tag_en:'Branch · Asia', n_pl:'Wspólnota ICPE Mission w Bangalore. Dom rodziny ICPE w dynamicznym, młodym mieście południowych Indii.', n_en:'The ICPE Mission community in Bangalore. A home of the ICPE family in a dynamic, young city of southern India.' },
+    { id:15, name:'Kumasi', cc_pl:'Ghana', cc_en:'Ghana', lat:6.69, lng:-1.62, g:'world', tag_pl:'Oddział · Afryka', tag_en:'Branch · Africa', n_pl:'Szkoła Ewangelizacji ICPE Mission w Kumasi. Jeden z afrykańskich ośrodków formacji świeckich, którzy niosą Ewangelię z wielką radością.', n_en:'The ICPE Mission School of Evangelisation in Kumasi. One of the African centres forming lay people who carry the Gospel with great joy.' },
+    { id:16, name:'Mannheim', cc_pl:'Niemcy', cc_en:'Germany', lat:49.49, lng:8.47, g:'world', tag_pl:'Oddział · Europa', tag_en:'Branch · Europe', n_pl:'Wspólnota ICPE Mission w Mannheim. Europejski dom rodziny, świadczący o wierze w zsekularyzowanym kontekście Niemiec.', n_en:'The ICPE Mission community in Mannheim. A European home of the family, witnessing to faith in Germany’s secular context.' },
+    { id:17, name:'Bogotá', cc_pl:'Kolumbia', cc_en:'Colombia', lat:4.71, lng:-74.07, g:'world', tag_pl:'Oddział · Ameryka Płd.', tag_en:'Branch · South America', n_pl:'Wspólnota ICPE Mission w Kolumbii. Latynoamerykański dom rodziny, pełen żywej, wyrazistej wiary.', n_en:'The ICPE Mission community in Colombia. A Latin American home of the family, full of vivid, expressive faith.' },
+    { id:18, name:'Sydney', cc_pl:'Australia', cc_en:'Australia', lat:-33.87, lng:151.21, g:'world', tag_pl:'Oddział · Oceania', tag_en:'Branch · Oceania', n_pl:'Wspólnota ICPE Mission w Sydney. Dom rodziny ICPE na antypodach, w wielokulturowej Australii.', n_en:'The ICPE Mission community in Sydney. A home of the ICPE family at the antipodes, in multicultural Australia.' }
+  ];
+
+  // Klucze łączące z edytowalnymi opisami z CMS (kolejność = kolejność DATA).
+  const KEYS = ['warszawa','krakow','lublin','malta','fraternia','oregon','seul','singapur','manila','wellington','kuala-lumpur','kota-kinabalu','partinico','mysore','bangalore','kumasi','mannheim','bogota','sydney'];
+  DATA.forEach((d, i) => { d.key = KEYS[i]; });
+
+  // Nakłada edytowalne opisy z CMS (z atrybutu data-communities) na dane bazowe po kluczu.
+  function applyOverlay(root) {
+    let cms = [];
+    try { cms = JSON.parse(root.getAttribute('data-communities') || '[]'); } catch (e) { cms = []; }
+    if (!Array.isArray(cms) || !cms.length) return;
+    const byKey = {};
+    cms.forEach((c) => { if (c && c.key) byKey[c.key] = c; });
+    DATA.forEach((d) => {
+      const o = byKey[d.key];
+      if (!o) return;
+      if (o.name) d.name = o.name;
+      if (o.ccPl != null) d.cc_pl = o.ccPl;
+      if (o.ccEn != null) d.cc_en = o.ccEn;
+      if (o.tagPl != null) d.tag_pl = o.tagPl;
+      if (o.tagEn != null) d.tag_en = o.tagEn;
+      if (o.notePl != null) d.n_pl = o.notePl;
+      if (o.noteEn != null) d.n_en = o.noteEn;
+    });
+  }
+
+  const hexA = (hex, a) => {
+    const h = hex.replace('#', '');
+    return `rgba(${parseInt(h.slice(0,2),16)},${parseInt(h.slice(2,4),16)},${parseInt(h.slice(4,6),16)},${a})`;
+  };
+  const xPct = (lng) => ((lng + 180) / 360) * 100;
+  const yPct = (lat) => ((LATT - lat) / SPAN) * 100;
+
+  function initWorldMap(root) {
+    applyOverlay(root);
+    const canvas = root.querySelector('.wm-canvas');
+    const pinsEl = root.querySelector('.wm-pins');
+    const ctx = canvas.getContext('2d');
+    const state = { activeId: 0, hoverId: null };
+    let W = 0, H = 0, dpr = 1, base = null;
+
+    const lang = () => (root.closest('[data-lang]')?.getAttribute('data-lang') === 'en' ? 'en' : 'pl');
+    const L = (pl, en) => (lang() === 'en' ? en : pl);
+    const toXY = (lng, lat) => ({ x: (lng + 180) / 360 * W, y: (LATT - lat) / SPAN * H });
+
+    const inPoly = (lng, lat, poly) => {
+      let c = false;
+      for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+        const xi = poly[i][0], yi = poly[i][1], xj = poly[j][0], yj = poly[j][1];
+        if (((yi > lat) !== (yj > lat)) && (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi)) c = !c;
+      }
+      return c;
+    };
+    const isLand = (lng, lat) => LAND.some((p) => inPoly(lng, lat, p));
+
+    function buildBase() {
+      const b = document.createElement('canvas');
+      b.width = W * dpr; b.height = H * dpr;
+      const c = b.getContext('2d');
+      c.setTransform(dpr, 0, 0, dpr, 0, 0);
+      c.strokeStyle = 'rgba(237,227,211,0.06)';
+      c.lineWidth = 1;
+      for (let lng = -150; lng <= 150; lng += 30) { const a = toXY(lng, LATT), z = toXY(lng, LATB); c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(z.x, z.y); c.stroke(); }
+      for (let lat = 60; lat >= -40; lat -= 30) { const a = toXY(-180, lat), z = toXY(180, lat); c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(z.x, z.y); c.stroke(); }
+      c.fillStyle = 'rgba(237,227,211,0.30)';
+      const stepDeg = W < 520 ? 3.0 : 2.2;
+      const r = W < 520 ? 0.9 : 1.15;
+      for (let lat = LATT; lat >= LATB; lat -= stepDeg) {
+        for (let lng = -178; lng <= 180; lng += stepDeg) {
+          if (isLand(lng, lat)) { const { x, y } = toXY(lng, lat); c.beginPath(); c.arc(x, y, r, 0, 6.2832); c.fill(); }
+        }
+      }
+      base = b;
+    }
+
+    function drawArcs() {
+      if (!ctx || !W) return;
+      ctx.clearRect(0, 0, W, H);
+      if (base) { ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(base, 0, 0); ctx.restore(); }
+      const currentId = state.hoverId != null ? state.hoverId : state.activeId;
+      const hp = toXY(DATA[0].lng, DATA[0].lat);
+      for (const d of DATA) {
+        if (d.id === 0) continue;
+        const p = toXY(d.lng, d.lat);
+        const mx = (hp.x + p.x) / 2, my = (hp.y + p.y) / 2;
+        const dist = Math.hypot(p.x - hp.x, p.y - hp.y);
+        const isA = d.id === currentId;
+        ctx.strokeStyle = isA ? hexA(ACCENT, 0.85) : hexA(ACCENT, 0.14);
+        ctx.lineWidth = isA ? 1.6 : 0.8;
+        ctx.beginPath(); ctx.moveTo(hp.x, hp.y); ctx.quadraticCurveTo(mx, my - dist * 0.18, p.x, p.y); ctx.stroke();
+      }
+    }
+
+    function resize() {
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const w = canvas.clientWidth, h = canvas.clientHeight;
+      if (!w || !h) return;
+      canvas.width = w * dpr; canvas.height = h * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      W = w; H = h;
+      buildBase();
+      drawArcs();
+    }
+
+    const worldDot = 'rgba(237,227,211,0.82)';
+    const colorFor = (g, isC) => (g === 'hub' || g === 'pl') ? ACCENT : (g === 'hq' ? '#C79A3E' : (isC ? ACCENT : worldDot));
+
+    function renderPins() {
+      const currentId = state.hoverId != null ? state.hoverId : state.activeId;
+      pinsEl.innerHTML = '';
+      for (const d of DATA) {
+        const isC = d.id === currentId;
+        const isPl = d.g === 'hub' || d.g === 'pl';
+        const isHub = d.g === 'hub';
+        const btn = document.createElement('button');
+        btn.className = 'wm-pin';
+        btn.setAttribute('aria-label', d.name);
+        btn.style.left = xPct(d.lng).toFixed(2) + '%';
+        btn.style.top = yPct(d.lat).toFixed(2) + '%';
+        btn.style.zIndex = isC ? 40 : (isHub ? 30 : (isPl ? 20 : 10));
+        const color = colorFor(d.g, isC);
+        const dot = isHub ? 15 : (isC ? 14 : (isPl ? 12 : 9));
+        const ring = isHub ? 15 : 12;
+        const showRing = isHub || isC;
+        const halo = isC ? 4 : 2;
+        const showLabel = isC || isHub;
+        btn.innerHTML =
+          (showRing ? `<span class="wm-ring" style="width:${ring}px;height:${ring}px;background:${color};opacity:.5;transform:translate(-50%,-50%);"></span>` : '') +
+          `<span class="wm-dot" style="width:${dot}px;height:${dot}px;background:${color};box-shadow:0 0 0 ${halo}px rgba(34,26,20,0.9),0 2px 8px rgba(0,0,0,.35);"></span>` +
+          (showLabel ? `<span class="wm-label">${d.name}</span>` : '');
+        btn.addEventListener('click', () => { state.activeId = d.id; render(); });
+        btn.addEventListener('mouseenter', () => { state.hoverId = d.id; render(); });
+        btn.addEventListener('mouseleave', () => { state.hoverId = null; render(); });
+        pinsEl.appendChild(btn);
+      }
+    }
+
+    function renderPanel() {
+      const currentId = state.hoverId != null ? state.hoverId : state.activeId;
+      const cur = DATA[currentId];
+      root.querySelector('.wm-tag').textContent = L(cur.tag_pl, cur.tag_en);
+      root.querySelector('.wm-coord').textContent =
+        `${Math.abs(cur.lat).toFixed(2)}° ${cur.lat >= 0 ? 'N' : 'S'}   ${Math.abs(cur.lng).toFixed(2)}° ${cur.lng >= 0 ? 'E' : 'W'}`;
+      root.querySelector('.wm-name').textContent = cur.name;
+      root.querySelector('.wm-country').textContent = L(cur.cc_pl, cur.cc_en);
+      root.querySelector('.wm-note').textContent = L(cur.n_pl, cur.n_en);
+      root.querySelector('.wm-hint').textContent = L('najedź kursorem na pinezkę lub kraj', 'hover a pin or a country');
+      root.querySelector('.wm-count').textContent = L('23 wspólnoty · 6 kontynentów', '23 communities · 6 continents');
+      root.querySelector('.wm-list-label').textContent = L('Wszystkie oddziały', 'All branches');
+    }
+
+    function renderChips() {
+      const currentId = state.hoverId != null ? state.hoverId : state.activeId;
+      const rank = (x) => x.g === 'hub' ? 0 : x.g === 'pl' ? 1 : x.g === 'hq' ? 2 : 3;
+      const order = [...DATA].sort((a, b) => {
+        const ra = rank(a), rb = rank(b);
+        if (ra !== rb) return ra - rb;
+        if (ra === 3) return a.name.localeCompare(b.name, 'pl');
+        return 0;
+      });
+      const wrap = root.querySelector('.wm-chips');
+      wrap.innerHTML = '';
+      for (const d of order) {
+        const isC = d.id === currentId;
+        const isPl = d.g === 'hub' || d.g === 'pl';
+        const chip = document.createElement('button');
+        chip.className = 'wm-chip';
+        chip.textContent = d.name;
+        chip.style.background = isC ? ACCENT : 'transparent';
+        chip.style.color = isC ? '#241E1A' : '#EDE3D3';
+        chip.style.border = '1px solid ' + (isC ? ACCENT : (isPl ? hexA(ACCENT, 0.5) : 'rgba(237,227,211,0.22)'));
+        chip.addEventListener('click', () => { state.activeId = d.id; render(); });
+        chip.addEventListener('mouseenter', () => { state.hoverId = d.id; render(); });
+        chip.addEventListener('mouseleave', () => { state.hoverId = null; render(); });
+        wrap.appendChild(chip);
+      }
+    }
+
+    function render() { renderPins(); renderPanel(); renderChips(); drawArcs(); }
+
+    // Init
+    render();
+    if (canvas.clientWidth) resize();
+    else requestAnimationFrame(resize);
+    new ResizeObserver(resize).observe(canvas);
+    // Re-render tekstów przy zmianie języka strony
+    const langHost = root.closest('[data-lang]');
+    if (langHost) new MutationObserver(() => { renderPanel(); renderChips(); }).observe(langHost, { attributes: true, attributeFilter: ['data-lang'] });
+  }
+
+  document.querySelectorAll('[data-worldmap]').forEach((el) => initWorldMap(el));
+</script>

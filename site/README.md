@@ -26,14 +26,17 @@ Fetch jest defensywny: gdy API jest niedostępne, strona zbuduje się z pustą t
 
 ## Deploy — Render Static Site
 
-1. Render ▸ **New ▸ Static Site** ▸ wskaż to repo.
-2. **Root Directory:** `site`
-3. **Build Command:** `npm install && npm run build`
+1. Render ▸ **New ▸ Static Site** ▸ wskaż to repo (`ICPEMission.pl registration funnel`).
+2. **Root Directory:** zostaw **puste**.
+3. **Build Command:** `cd site && npm install && npm run build`
 4. **Publish Directory:** `site/dist`
 5. **Environment:** ustaw `PUBLIC_API_URL`, `PUBLIC_REGISTRATION_URL`, `SITE_URL`.
 6. Po utworzeniu: **Settings ▸ Deploy Hook** → skopiuj URL i wklej w `icpe-api` jako
    `SITE_DEPLOY_HOOK_URL`. Od tego momentu publikacja treści w Personal OS
    automatycznie przebudowuje stronę (debounce ~15 s).
+
+> Wariant jednoznaczny (Build wchodzi do `site/`, publikujemy `site/dist`) — działa
+> niezależnie od tego, jak Render interpretuje „Root Directory".
 
 ## Model treści
 

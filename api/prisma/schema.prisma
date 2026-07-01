@@ -455,6 +455,25 @@ model MenuItem {
   @@index([location, order])
 }
 
+// Wspólnota na mapie świata (edytowalne opisy PL/EN dla landingu).
+// Struktura (współrzędne, grupa) jest bazowa w kodzie strony; tu edytujemy teksty.
+model Community {
+  id        String   @id @default(cuid())
+  key       String   @unique   // stabilny klucz łączący z pinem na mapie (np. "warszawa")
+  name      String
+  ccPl      String?
+  ccEn      String?
+  tagPl     String?
+  tagEn     String?
+  notePl    String?  @db.Text
+  noteEn    String?  @db.Text
+  lat       Float
+  lng       Float
+  grp       String   @default("world") // hub | pl | hq | world
+  order     Int      @default(0)
+  updatedAt DateTime @updatedAt
+}
+
 // Ustawienia globalne strony (jeden rekord, id="singleton").
 model SiteSettings {
   id                String   @id @default("singleton")

@@ -112,6 +112,19 @@ export class ContentAdminController {
     return this.content.putSettings(body);
   }
 
+  // Wspólnoty mapy (edytowalne opisy PL/EN)
+  @Get('communities')
+  @ApiOperation({ summary: 'Lista wspólnot mapy (seed 19 przy pierwszym użyciu)' })
+  listCommunities() {
+    return this.content.listCommunities();
+  }
+
+  @Patch('communities/:id')
+  @ApiOperation({ summary: 'Edytuj opis wspólnoty (name/cc/tag/note PL+EN) + rebuild' })
+  updateCommunity(@Param('id') id: string, @Body() body: Record<string, unknown>) {
+    return this.content.updateCommunity(id, body);
+  }
+
   // Podgląd szkicu (dowolny status)
   @Get('preview/page/:slug')
   previewPage(@Param('slug') slug: string) {

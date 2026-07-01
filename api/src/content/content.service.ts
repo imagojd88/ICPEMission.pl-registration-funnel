@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { DeployHookService } from './deploy-hook.service';
+import { COMMUNITY_SEED } from './community-seed';
 
 /** Luźne wejście z Personal OS (whitelist=false globalnie) — pola wybieramy ręcznie. */
 type AnyBody = Record<string, unknown>;
@@ -234,5 +235,45 @@ export class ContentService {
     const a = await this.prisma.article.findFirst({ where: { slug, status: 'PUBLISHED' } });
     if (!a) throw new NotFoundException('Artykuł nie istnieje lub nie jest opublikowany');
     return a;
+  }
+
+  // ── WSPÓLNOTY MAPY (edytowalne opisy PL/EN) ──────────────────────
+  /** Zasiewa 19 wspólnot przy pierwszym użyciu (gdy tabela pusta). */
+  private async seedCommunities() {
+    const count = await this.prisma.community.count();
+    if (count > 0) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await this.prisma.community.createMany({ data: COMMUNITY_SEED as any });
+  }
+
+  async listCommunities() {
+    await this.seedCommunities();
+    return this.prisma.community.findMany({ orderBy: { order: 'asc' } });
+  }
+
+  async updateCommunity(id: string, body: AnyBody) {
+    const d: Record<string, unknown> = {};
+    if (str(body.name) !== undefined) d.name = str(body.name);
+    if (strOrNull(body.ccPl) !== undefined) d.ccPl = strOrNull(body.ccPl);
+    if (strOrNull(body.ccEn) !== undefined) d.ccEn = strOrNull(body.ccEn);
+    if (strOrNull(body.tagPl) !== undefined) d.tagPl = strOrNull(body.tagPl);
+    if (strOrNull(body.tagEn) !== undefined) d.tagEn = strOrNull(body.tagEn);
+    if (strOrNull(body.notePl) !== undefined) d.notePl = strOrNull(body.notePl);
+    if (strOrNull(body.noteEn) !== undefined) d.noteEn = strOrNull(body.noteEn);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = await this.prisma.community.update({ where: { id }, data: d as any });
+    this.deploy.trigger(`community:update:${c.key}`);
+    return c;
+  }
+
+  async publicCommunities() {
+    await this.seedCommunities();
+    return this.prisma.community.findMany({
+      orderBy: { order: 'asc' },
+      select: {
+        key: true, name: true, ccPl: true, ccEn: true, tagPl: true, tagEn: true,
+        notePl: true, noteEn: true, lat: true, lng: true, grp: true, order: true,
+      },
+    });
   }
 }

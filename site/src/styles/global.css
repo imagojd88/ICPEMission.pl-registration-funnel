@@ -1,31 +1,30 @@
-/* ── Tokeny brandu ICPE (spójne z aplikacją rejestracji) ─────────────── */
+/* ── Design tokens — ICPE Mission PL (ciepły, editorialowy) ───────────── */
 :root {
-  --bg: #f6f1e9;
-  --surface: #ffffff;
-  --surface-2: #fbf7f0;
-  --surface-3: #f1eade;
-  --ink: #22262e;
-  --muted: #6e6a62;
-  --faint: #9c968b;
-  --border: #e6decf;
-  --brand: #1c5d99;
-  --brand-2: #174d80;
-  --brand-soft: #e8f0f8;
-  --accent: #c56a3a;
-  --accent-2: #ad592e;
-  --accent-soft: #f7eae0;
-  --hero-1: #1c5d99;
-  --hero-2: #164a78;
-  --hero-title: #ffffff;
-  --maxw: 1080px;
-  --radius: 16px;
+  --bg: #f4eee3;          /* ciepła kość słoniowa */
+  --surface: #fbf7ef;     /* karta jasna */
+  --surface-2: #fbf7ef;
+  --ink: #241e1a;         /* tekst bazowy */
+  --ink-2: #3a3028;
+  --ink-3: #4a4038;
+  --muted: #6b615a;
+  --faint: #8a7f73;
+  --border: #e2d8c8;
+  --border-2: #c9bca9;
+  --brand: #c0603c;       /* akcent terakota */
+  --brand-2: #a0724f;     /* ciemniejszy label akcentu */
+  --brand-soft: #f7eae0;
+  --gold: #c79a3e;        /* piny HQ mapy */
+  --dark: #201812;        /* ciemna sekcja mapy */
+  --ink-panel: #241e1a;   /* ciemne tło CTA/stopka */
+  --dark-line: #43372c;
+  --on-dark: #ede3d3;
+  --maxw: 1320px;
 }
 
-* {
-  box-sizing: border-box;
-}
+* { box-sizing: border-box; }
 
 html {
+  -webkit-font-smoothing: antialiased;
   scroll-behavior: smooth;
 }
 
@@ -33,83 +32,75 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--ink);
-  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
-  -webkit-font-smoothing: antialiased;
+  font-family: 'Bricolage Grotesque', system-ui, sans-serif;
   line-height: 1.6;
 }
 
-h1, h2, h3, .serif {
-  font-family: 'Newsreader', Georgia, serif;
-  font-weight: 500;
-  line-height: 1.2;
+h1, h2, h3 {
+  font-family: 'Bricolage Grotesque', sans-serif;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
 }
 
-a {
-  color: var(--brand);
-  text-decoration: none;
+.serif-italic {
+  font-family: 'Instrument Serif', Georgia, serif;
+  font-style: italic;
+  font-weight: 400;
 }
 
-a:hover {
-  text-decoration: underline;
+.mono {
+  font-family: 'Space Mono', ui-monospace, monospace;
 }
 
-img {
-  max-width: 100%;
-  height: auto;
-  display: block;
-}
+a { color: inherit; }
 
-.container {
-  max-width: var(--maxw);
-  margin: 0 auto;
-  padding: 0 20px;
-}
+img { max-width: 100%; height: auto; display: block; }
 
-.prose {
-  max-width: 720px;
-  margin: 0 auto;
-}
+.container { max-width: var(--maxw); margin: 0 auto; }
+.prose { max-width: 720px; margin: 0 auto; }
+.muted { color: var(--muted); }
 
-/* Przyciski */
+/* Przyciski (używane przez strony CMS) */
 .btn {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
   padding: 14px 26px;
-  border-radius: 14px;
+  border-radius: 100px;
   font-weight: 600;
   font-size: 15px;
   cursor: pointer;
   border: none;
+  text-decoration: none;
   transition: opacity 0.15s ease, transform 0.15s ease;
 }
-
-.btn:hover {
-  text-decoration: none;
-  opacity: 0.92;
-}
-
-.btn:active {
-  transform: scale(0.98);
-}
-
-.btn-accent {
-  background: var(--accent);
-  color: #fff;
-  box-shadow: 0 6px 18px rgba(197, 106, 58, 0.28);
-}
-
-.btn-outline {
-  background: transparent;
-  color: var(--brand);
-  border: 1.5px solid var(--brand);
-}
+.btn:hover { opacity: 0.92; text-decoration: none; }
+.btn:active { transform: scale(0.98); }
+.btn-accent { background: var(--ink-panel); color: var(--bg); }
+.btn-outline { background: transparent; color: var(--ink); border: 1px solid var(--border-2); }
 
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: 16px;
   overflow: hidden;
 }
 
-.muted {
-  color: var(--muted);
+/* ── Przełącznik języka PL/EN (bez frameworka — CSS steruje widocznością) ── */
+[data-lang='pl'] [data-en] { display: none !important; }
+[data-lang='en'] [data-pl] { display: none !important; }
+[data-langbtn] { opacity: 0.4; cursor: pointer; }
+[data-lang='pl'] [data-langbtn='pl'],
+[data-lang='en'] [data-langbtn='en'] {
+  opacity: 1;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+/* ── Animacja pulsu hubu mapy ─────────────────────────────────────────── */
+@keyframes wm-pulse {
+  0%   { transform: translate(-50%, -50%) scale(1);   opacity: 0.5; }
+  70%  { transform: translate(-50%, -50%) scale(2.6); opacity: 0; }
+  100% { opacity: 0; }
 }

@@ -42,6 +42,29 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — strona ICPE Mission PL (CMS)
 
+### Edytowalne opisy wspólnot mapy (z Personal OS)
+- Wymóg usera: opisy pod mapą (hover/klik) edytowalne z CRM. Struktura mapy (współrzędne/piny) zostaje w kodzie; teksty z CMS.
+- Backend: Prisma model `Community` (key unikalny, name, ccPl/En, tagPl/En, notePl/En @Text, lat, lng, grp, order). Seed 19 (`api/src/content/community-seed.ts`) auto-upsert przy pierwszym GET (gdy tabela pusta). ContentService: `listCommunities`, `updateCommunity` (PATCH pól tekstowych + trigger rebuild), `publicCommunities`. Endpointy: `/admin/content/communities` (GET, PATCH :id) + `/site/communities`. Rejestracja: bez zmian (w ContentModule).
+- Astro: `getCommunities()` w api.ts; `WorldMap.astro` pobiera przy buildzie i wstawia jako `data-communities` (JSON) na kontenerze; klient `applyOverlay` nakłada po `key` na dane bazowe (name/cc/tag/note), fallback do wbudowanych gdy API puste. Klucze KEYS w kolejności DATA.
+- Edycja opisu w Personal OS → PATCH → rebuild strony (Deploy Hook) → mapa pokazuje nowy tekst.
+- Prompt `docs/07` rozszerzony o sekcję „Wspólnoty mapy". Weryfikacja: api tsc OK (Prisma stub), astro build + check = 0 błędów.
+- Po pushu: Manual Deploy `icpe-api` (nowa tabela Community) + rebuild strony (albo poczekać na Deploy Hook).
+
+### Landing „ICPE Mission Warszawa" wg design handoffu (statyczny one-pager)
+- Źródło: `/Users/jacekdudzic/Downloads/design_handoff_icpe_polska` (README + `ICPE Polska - Wieczernik.dc.html` + `WorldMap.dc.html` + screenshots + assets/uploads). Ustalenie usera: na razie statyczny one-pager; CMS zostaje na przyszłe treści.
+- Styl: ciepły editorialowy — tło `#F4EEE3`, akcent terakota `#C0603C`, ink `#241E1A`; fonty Bricolage Grotesque + Instrument Serif (italic akcent) + Space Mono. Dwujęzyczny PL/EN (przełącznik CSS `data-lang`, treść w `data-pl`/`data-en`).
+- `site/src/pages/index.astro` → pełny landing (nav sticky + PL/EN + CTA, hero + cytat biblijny, hero image + ticker miast, „Kim jesteśmy" + założyciele + statystyki 2×2, 4 filary, ciemna sekcja mapy, triptych 3 zdjęć, 4 karty „Czego możesz doświadczyć", baner CTA, stopka). Inline style verbatim z handoffu = pixel-fidelity. Responsywność: gridy → 1 kol. na mobile.
+- `site/src/layouts/LandingLayout.astro` — head (fonty, SEO/OG), bez CMS-owego Nav/Footer (landing ma własne).
+- `site/src/components/WorldMap.astro` — port `WorldMap.dc.html` do czystego JS (`is:inline`): projekcja equirectangular, kropki lądów (LAND), łuki hub→oddziały na canvasie, piny jako buttony (Warszawa=hub pulsujący, PL=akcent, Malta/Fraternia=złoto, reszta=neutral), panel opisu (hover/klik, `hoverId ?? activeId`), chipy (kolejność: Warszawa/Kraków/Lublin/Malta/Fraternia, reszta alfabet.), dane 19 wspólnot PL/EN, reakcja na zmianę języka (MutationObserver).
+- `site/src/styles/global.css` — przemapowane na ciepłą paletę + fonty + CSS przełącznika `data-lang` + `@keyframes wm-pulse`.
+- Grafiki skopiowane do `site/public/assets` i `site/public/uploads` (globusy + 5 zdjęć). UWAGA licencje: część zdjęć to Unsplash/stock — potwierdzić prawa przed produkcją (flagowane w handoffie).
+- Weryfikacja: `astro build` OK + `astro check` = 0 błędów (w /tmp; skrypty mapy/toggle jako `is:inline` → nie są typowane strict). Do eyeballa po deployu: interaktywność mapy i pixel-fidelity sekcji.
+- CMS (index-owy „home" z `/site/*`) zastąpiony landingiem; `/aktualnosci` i `/{slug}` dalej z CMS. Uwaga: strony CMS używają BaseLayout ze starymi fontami (Newsreader/Plus Jakarta) — do ujednolicenia z brandem przy okazji.
+
+### Wdrożenie strony (Render Static Site) — ZROBIONE przez usera
+- Static Site założony na Render: Root puste, Build `cd site && npm install && npm run build`, Publish `site/dist`, ENV PUBLIC_API_URL/PUBLIC_REGISTRATION_URL/SITE_URL. Deploy Hook wpięty do `icpe-api` jako `SITE_DEPLOY_HOOK_URL`.
+- Do weryfikacji przy okazji: pierwszy build zielony + strona się serwuje; realny test Deploy Hooka nastąpi przy pierwszej publikacji treści z Personal OS (Faza 3).
+
 ### Faza 2: szkielet publicznej strony (Astro, SSG)
 - Nowy projekt `site/` (Astro 4, output static). Buduje się z `/site/*` i weryfikuje czysto: `astro build` OK + `astro check` = 0 błędów (walidacja w /tmp, bo w mount npm install pada na FUSE).
 - `site/src/lib/api.ts` — fetch `/site/*` (defensywny: pusta treść zamiast wywalonego builda, gdy API down), helpery `pickLang`, `formatDateRange`. ENV: `PUBLIC_API_URL`, `PUBLIC_REGISTRATION_URL`, `SITE_URL`.

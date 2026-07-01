@@ -44,6 +44,12 @@ export class ContentPublicController {
     return this.content.getSettings();
   }
 
+  @Get('communities')
+  @ApiOperation({ summary: 'Wspólnoty mapy świata (opisy PL/EN + współrzędne)' })
+  communities() {
+    return this.content.publicCommunities();
+  }
+
   @Get('events/upcoming')
   @ApiOperation({ summary: 'Najbliższe aktywne wydarzenia (reużywa listy z modułu events)' })
   upcoming() {
