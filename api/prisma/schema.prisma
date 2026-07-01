@@ -23,6 +23,7 @@ enum EventType {
   ONE_TIME
   EVERGREEN
   STANDALONE
+  INVITE
 }
 
 enum RsvpResponse {
@@ -183,6 +184,7 @@ model EventInstance {
   rooms                Room[]
   registrations        Registration[]
   rsvps                EventRsvp[]
+  invitations          Invitation[]
   createdAt            DateTime        @default(now())
   updatedAt            DateTime        @updatedAt
 }
@@ -373,4 +375,19 @@ model Place {
   id        String   @id @default(cuid())
   label     String
   createdAt DateTime @default(now())
+}
+
+// Zaproszenia dla eventów typu INVITE (na zaproszenie).
+model Invitation {
+  id          String    @id @default(cuid())
+  instanceId  String
+  instance    EventInstance @relation(fields: [instanceId], references: [id])
+  firstName   String
+  lastName    String
+  email       String
+  token       String    @unique @default(cuid())
+  confirmedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([instanceId])
 }

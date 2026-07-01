@@ -12,14 +12,35 @@ import {
   getEventEditConfig,
   listPlaces,
   createPlace,
+  createInvitations,
 } from '@/lib/api'
 import { DEFAULT_PRICING } from '@icpe/shared'
 import type { PricingConfig, AgeBracket } from '@icpe/shared'
-import type { EventEditConfig, Place } from '@/lib/api'
+import type { EventEditConfig, Place, InvitationItem, Invitee } from '@/lib/api'
+
+/** Parsuje listę zaproszonych: 1 wiersz = „Imię Nazwisko, email". */
+function parseInvitees(raw: string): Invitee[] {
+  return raw
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [namePart, emailPart] = line.split(',')
+      const names = (namePart ?? '').trim().split(/\s+/).filter(Boolean)
+      return {
+        firstName: names[0] ?? '',
+        lastName: names.slice(1).join(' '),
+        email: (emailPart ?? '').trim(),
+      }
+    })
+    .filter((i) => i.firstName && i.email)
+}
+
+const PUBLIC_BASE = 'https://rejestracja.icpemission.pl'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type EventType = 'one_time' | 'evergreen' | 'standalone'
+type EventType = 'one_time' | 'evergreen' | 'standalone' | 'invite'
 type PricingModel = 'os/noc' | 'za pokój' | 'za osobę' | 'dopłata 1-os'
 type ColorSwatch = 'blue' | 'amber' | 'green' | 'purple'
 
@@ -84,6 +105,8 @@ interface WizardState {
   langPL: boolean
   langEN: boolean
   langIT: boolean
+  // typ „na zaproszenie" — lista zaproszonych (surowy tekst, 1 osoba/wiersz)
+  invitees: string
 }
 
 // ── Color config ──────────────────────────────────────────────────────────────
@@ -124,15 +147,17 @@ function defaultAgeBrackets(): AgeBracketRow[] {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function mapEventType(t: EventType): 'ONE_TIME' | 'EVERGREEN' | 'STANDALONE' {
+function mapEventType(t: EventType): 'ONE_TIME' | 'EVERGREEN' | 'STANDALONE' | 'INVITE' {
   if (t === 'evergreen') return 'EVERGREEN'
   if (t === 'standalone') return 'STANDALONE'
+  if (t === 'invite') return 'INVITE'
   return 'ONE_TIME'
 }
 
 function apiTypeToEventType(t: string): EventType {
   if (t === 'EVERGREEN') return 'evergreen'
   if (t === 'STANDALONE') return 'standalone'
+  if (t === 'INVITE') return 'invite'
   return 'one_time'
 }
 
@@ -238,7 +263,7 @@ function buildPricingConfig(state: WizardState): PricingConfig {
   }
 
   return {
-    free: state.payFree,
+    free: state.payFree || state.eventType === 'invite',
     formationFee: parseFloat(state.formationFee) || DEFAULT_PRICING.formationFee,
     mealsFee: parseFloat(state.mealsFee) || DEFAULT_PRICING.mealsFee,
     nights,
@@ -399,6 +424,7 @@ function Step0Type({ state, update }: { state: WizardState; update: (p: Partial<
             { id: 'one_time', label: 'Event jednorazowy', desc: 'Konkretna data, jedna edycja' },
             { id: 'evergreen', label: 'Event cykliczny (evergreen)', desc: 'Powtarza się automatycznie wg harmonogramu' },
             { id: 'standalone', label: 'Standalone (bez noclegu)', desc: 'Bezpłatne, proste RSVP „Będę / Nie będę"' },
+            { id: 'invite', label: 'Na zaproszenie', desc: 'Imienne zaproszenia z unikalnym linkiem; potwierdzenie udziału' },
           ] as const
         ).map((opt) => (
           <button
@@ -423,6 +449,26 @@ function Step0Type({ state, update }: { state: WizardState; update: (p: Partial<
           </button>
         ))}
       </div>
+
+      {state.eventType === 'invite' && (
+        <div
+          className="mt-2 p-4 rounded-[12px] border flex flex-col gap-2"
+          style={{ borderColor: 'var(--border)', background: 'var(--surface-2)' }}
+        >
+          <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>Zaproszeni goście</p>
+          <p className="text-xs" style={{ color: 'var(--muted)' }}>
+            Jedna osoba na wiersz: <b>Imię Nazwisko, email</b>. Po zapisaniu eventu każdy dostanie unikalny link do potwierdzenia.
+          </p>
+          <textarea
+            value={state.invitees}
+            onChange={(e) => update({ invitees: e.target.value })}
+            rows={6}
+            placeholder={'Jan Kowalski, jan@example.com\nAnna Nowak, anna@example.com'}
+            className="w-full rounded-[12px] px-3 py-[11px] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+            style={{ border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--ink)', resize: 'vertical' }}
+          />
+        </div>
+      )}
 
       {state.eventType === 'evergreen' && (
         <div
@@ -1130,8 +1176,9 @@ function Step4Page({ state, update }: { state: WizardState; update: (p: Partial<
 
 // ── Success screen ────────────────────────────────────────────────────────────
 
-function SuccessScreen({ slug, onClose }: { slug: string; onClose: () => void }) {
-  const publicUrl = `https://rejestracja.icpemission.pl/r/${slug}`
+function SuccessScreen({ slug, onClose, invites }: { slug: string; onClose: () => void; invites?: InvitationItem[] }) {
+  const publicUrl = `${PUBLIC_BASE}/r/${slug}`
+  const hasInvites = (invites?.length ?? 0) > 0
   return (
     <div className="flex flex-col items-center gap-5 py-8 px-4 text-center">
       <CheckCircle size={48} style={{ color: 'var(--ok)' }} />
@@ -1150,6 +1197,42 @@ function SuccessScreen({ slug, onClose }: { slug: string; onClose: () => void })
       >
         {publicUrl}
       </a>
+
+      {hasInvites && (
+        <div className="w-full text-left flex flex-col gap-2 mt-1">
+          <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+            Linki dla zaproszonych ({invites!.length})
+          </p>
+          <p className="text-xs" style={{ color: 'var(--muted)' }}>Wyślij każdemu jego indywidualny link:</p>
+          <div className="flex flex-col gap-2 max-h-72 overflow-y-auto">
+            {invites!.map((inv) => {
+              const link = `${PUBLIC_BASE}/i/${inv.token}`
+              return (
+                <div
+                  key={inv.id}
+                  className="flex items-center justify-between gap-2 px-3 py-2 rounded-[10px]"
+                  style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate" style={{ color: 'var(--ink)' }}>
+                      {inv.firstName} {inv.lastName}
+                    </p>
+                    <p className="text-xs font-mono truncate" style={{ color: 'var(--faint)' }}>{link}</p>
+                  </div>
+                  <button
+                    onClick={() => { void navigator.clipboard.writeText(link) }}
+                    className="text-xs font-medium px-2.5 py-1 rounded-[8px] shrink-0"
+                    style={{ background: 'var(--surface)', color: 'var(--brand)', border: '1px solid var(--border)', cursor: 'pointer' }}
+                  >
+                    Kopiuj
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       <Button onClick={onClose} size="sm" className="mt-2">
         Zamknij
       </Button>
@@ -1204,10 +1287,12 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
     langPL: true,
     langEN: false,
     langIT: false,
+    invitees: '',
   })
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [createdSlug, setCreatedSlug] = useState<string | null>(null)
+  const [createdInvites, setCreatedInvites] = useState<InvitationItem[]>([])
   const [loadingEdit, setLoadingEdit] = useState(isEdit)
 
   useEffect(() => {
@@ -1336,6 +1421,15 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
         isEvergreen: state.eventType === 'evergreen',
       })
 
+      // Event „na zaproszenie" → utwórz zaproszenia i pokaż linki.
+      if (state.eventType === 'invite') {
+        const parsed = parseInvitees(state.invitees)
+        if (parsed.length > 0) {
+          const created = await createInvitations(instanceId, parsed)
+          setCreatedInvites(created)
+        }
+      }
+
       setCreatedSlug(state.slug)
       onSuccess?.()
     } catch (e: unknown) {
@@ -1366,7 +1460,7 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
           boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
         }}
       >
-        <SuccessScreen slug={createdSlug} onClose={onCancel} />
+        <SuccessScreen slug={createdSlug} onClose={onCancel} invites={createdInvites} />
       </div>
     )
   }

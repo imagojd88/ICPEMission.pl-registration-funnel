@@ -4,7 +4,7 @@ export type Locale = 'pl' | 'en' | 'it';
 export type Gender = 'F' | 'M' | 'other';
 export type ParticipantType = 'adult' | 'child';
 
-export type EventType = 'ONE_TIME' | 'EVERGREEN' | 'STANDALONE';
+export type EventType = 'ONE_TIME' | 'EVERGREEN' | 'STANDALONE' | 'INVITE';
 export type InstanceStatus = 'DRAFT' | 'OPEN' | 'CLOSED' | 'ARCHIVED';
 export type PaymentMethod = 'ONLINE' | 'BANK_TRANSFER' | 'CASH';
 export type PaymentStatus =

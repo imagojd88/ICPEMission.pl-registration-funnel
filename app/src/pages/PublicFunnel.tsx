@@ -23,6 +23,7 @@ import ThemeToggle from '../components/ui/ThemeToggle'
 // Screen components
 import RsvpScreen from '../components/funnel/RsvpScreen'
 import LandingHero from '../components/funnel/LandingHero'
+import InviteMatchScreen from '../components/funnel/InviteMatchScreen'
 import LandingScreen from '../components/funnel/LandingScreen'
 import StepperHeader from '../components/funnel/StepperHeader'
 import StickyPriceBar from '../components/funnel/StickyPriceBar'
@@ -423,6 +424,21 @@ export default function PublicFunnel() {
       <div className="min-h-screen mx-auto relative" style={{ maxWidth: 452, background: 'var(--bg)' }}>
         <ThemeToggle />
         <RsvpScreen event={event} onBack={() => window.history.back()} />
+      </div>
+    )
+  }
+
+  // Event „na zaproszenie" — bez linku: formularz dopasowania danych do zaproszenia.
+  if (event.type === 'INVITE') {
+    return (
+      <div className="min-h-screen mx-auto relative" style={{ maxWidth: 452, background: 'var(--bg)' }}>
+        <ThemeToggle />
+        <LandingHero
+          isOpen={event.status === 'OPEN'}
+          theme={eventConfig?.theme}
+          title={getEventTitle(event.title)}
+        />
+        <InviteMatchScreen event={event} slug={slug ?? ''} />
       </div>
     )
   }

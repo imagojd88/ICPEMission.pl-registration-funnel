@@ -496,6 +496,76 @@ export async function createPlace(label: string, token?: string): Promise<Place>
   })
 }
 
+// ── Zaproszenia (event typu INVITE) ──────────────────────────────────────────
+
+export interface Invitee {
+  firstName: string
+  lastName: string
+  email: string
+}
+
+export interface InvitationItem extends Invitee {
+  id: string
+  token: string
+  confirmedAt: string | null
+}
+
+export async function createInvitations(
+  instanceId: string,
+  invitees: Invitee[],
+  token?: string,
+): Promise<InvitationItem[]> {
+  return apiFetch<InvitationItem[]>(`/admin/instances/${instanceId}/invitations`, {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: JSON.stringify({ invitees }),
+  })
+}
+
+export async function listInvitations(instanceId: string, token?: string): Promise<InvitationItem[]> {
+  return apiFetch<InvitationItem[]>(`/admin/instances/${instanceId}/invitations`, {
+    headers: authHeaders(token),
+  })
+}
+
+export async function deleteInvitation(invId: string, token?: string): Promise<void> {
+  await apiFetch(`/admin/invitations/${invId}`, { method: 'DELETE', headers: authHeaders(token) })
+}
+
+export interface InvitationView {
+  firstName: string
+  lastName: string
+  email: string
+  confirmedAt: string | null
+  event: {
+    title: unknown
+    description: unknown
+    startsAt: string
+    endsAt: string
+    location: string | null
+    theme: EventTheme | null
+    slug: string | null
+  }
+}
+
+/** Publiczne: dane zaproszenia po tokenie (strona /i/:token). */
+export async function getInvitation(inviteToken: string): Promise<InvitationView> {
+  return apiFetch<InvitationView>(`/invite/${inviteToken}`)
+}
+
+/** Publiczne: potwierdź udział po linku. */
+export async function confirmInvitation(inviteToken: string): Promise<{ ok: boolean }> {
+  return apiFetch(`/invite/${inviteToken}/confirm`, { method: 'POST' })
+}
+
+/** Publiczne: dopasuj dane do zaproszenia (bez linku) i potwierdź. Rzuca, gdy brak dopasowania. */
+export async function matchInvite(
+  slug: string,
+  data: Invitee,
+): Promise<{ ok: boolean; token: string; firstName: string }> {
+  return apiFetch(`/r/${slug}/invite-match`, { method: 'POST', body: JSON.stringify(data) })
+}
+
 export async function getRegistration(id: string, token: string): Promise<RegistrationDto> {
   return apiFetch(`/registrations/${id}?token=${token}`)
 }
@@ -655,7 +725,7 @@ export async function getEventEditConfig(slug: string, token?: string): Promise<
 // ── New admin write endpoints ────────────────────────────────────────────────
 
 export interface CreateSeriesPayload {
-  type: 'ONE_TIME' | 'EVERGREEN' | 'STANDALONE'
+  type: 'ONE_TIME' | 'EVERGREEN' | 'STANDALONE' | 'INVITE'
   title: { pl: string; en?: string; it?: string }
   description?: { pl?: string; en?: string; it?: string }
   startsAt: string

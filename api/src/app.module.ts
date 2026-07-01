@@ -14,6 +14,7 @@ import { AdminModule } from './admin/admin.module';
 import { RsvpModule } from './rsvp/rsvp.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { PlacesModule } from './places/places.module';
+import { InvitationsModule } from './invitations/invitations.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { PlacesModule } from './places/places.module';
     RsvpModule,
     UploadsModule,
     PlacesModule,
+    InvitationsModule,
   ],
 })
 export class AppModule {}

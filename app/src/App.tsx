@@ -6,6 +6,7 @@ import Spinner from './components/ui/Spinner'
 const PublicFunnel = lazy(() => import('./pages/PublicFunnel'))
 const AdminPanel = lazy(() => import('./pages/AdminPanel'))
 const PublicHome = lazy(() => import('./pages/PublicHome'))
+const InviteConfirm = lazy(() => import('./pages/InviteConfirm'))
 
 function LoadingFallback() {
   return (
@@ -25,6 +26,7 @@ export default function App() {
       <Suspense fallback={<LoadingFallback />}>
         <Routes>
           <Route path="/r/:slug" element={<PublicFunnel />} />
+          <Route path="/i/:token" element={<InviteConfirm />} />
           {/* Wejście panelu przez prawdziwy plik panel.html — omija zatruty cache
               hostingu (LiteSpeed cache trzyma stare /admin i /index.html). */}
           <Route path="/panel.html" element={<AdminPanel />} />
