@@ -7,7 +7,7 @@ import EventEditForm from './EventEditForm'
 import { getAdminInstances } from '@/lib/api'
 import type { EventInstanceDto } from '@icpe/shared'
 
-type FilterTab = 'all' | 'one_time' | 'evergreen' | 'standalone'
+type FilterTab = 'all' | 'one_time' | 'evergreen' | 'standalone' | 'invite'
 
 function resolveTitle(title: unknown): string {
   if (typeof title === 'string') return title
@@ -18,9 +18,10 @@ function resolveTitle(title: unknown): string {
   return ''
 }
 
-function instanceTypeLabel(type: string): 'jednorazowy' | 'cykliczny' | 'standalone' {
+function instanceTypeLabel(type: string): 'jednorazowy' | 'cykliczny' | 'standalone' | 'na zaproszenie' {
   if (type === 'EVERGREEN') return 'cykliczny'
   if (type === 'STANDALONE') return 'standalone'
+  if (type === 'INVITE') return 'na zaproszenie'
   return 'jednorazowy'
 }
 
@@ -45,6 +46,7 @@ const FILTER_TABS: { id: FilterTab; label: string }[] = [
   { id: 'one_time', label: 'Jednorazowe' },
   { id: 'evergreen', label: 'Cykliczne' },
   { id: 'standalone', label: 'Standalone' },
+  { id: 'invite', label: 'Na zaproszenie' },
 ]
 
 interface EventsScreenProps {
@@ -87,6 +89,7 @@ export default function EventsScreen({ onOpenWizard, showWizard, onCloseWizard }
     if (filter === 'one_time') return t === 'jednorazowy'
     if (filter === 'evergreen') return t === 'cykliczny'
     if (filter === 'standalone') return t === 'standalone'
+    if (filter === 'invite') return t === 'na zaproszenie'
     return true
   })
 
@@ -240,6 +243,7 @@ export default function EventsScreen({ onOpenWizard, showWizard, onCloseWizard }
                         {typeLabel === 'jednorazowy' && <Badge variant="brand">Jednorazowy</Badge>}
                         {typeLabel === 'cykliczny' && <Badge variant="accent">Cykliczny</Badge>}
                         {typeLabel === 'standalone' && <Badge variant="muted">Standalone</Badge>}
+                        {typeLabel === 'na zaproszenie' && <Badge variant="accent">Na zaproszenie</Badge>}
                       </td>
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-2">

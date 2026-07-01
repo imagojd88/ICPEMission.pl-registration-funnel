@@ -38,16 +38,17 @@ export class EventsService {
     location: string | null; status: string; capacity: number | null;
   }) {
     const agg = await this.instanceAggregates(inst.id);
-    // slug strony rejestracji (z RegistrationPage po seriesId) — potrzebny, by panel
-    // i Personal OS mogły pokazać/skopiować link publiczny /r/<slug>.
-    const page = await this.prisma.registrationPage.findUnique({
-      where: { seriesId: inst.seriesId },
-      select: { slug: true },
+    // typ eventu + slug strony (z serii po seriesId) — potrzebne dla listy (kategoria)
+    // i linku publicznego /r/<slug>.
+    const series = await this.prisma.eventSeries.findUnique({
+      where: { id: inst.seriesId },
+      select: { type: true, page: { select: { slug: true } } },
     });
     return {
       id: inst.id,
       seriesId: inst.seriesId,
-      slug: page?.slug ?? null,
+      type: series?.type ?? 'ONE_TIME',
+      slug: series?.page?.slug ?? null,
       title: toLocalized(inst.title),
       startsAt: iso(inst.startsAt),
       endsAt: iso(inst.endsAt),
