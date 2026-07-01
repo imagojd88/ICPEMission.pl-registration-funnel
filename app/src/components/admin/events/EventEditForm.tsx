@@ -80,8 +80,9 @@ export default function EventEditForm({
   const [done, setDone] = useState(false)
 
   // Pola
-  const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
+  const [nameMap, setNameMap] = useState<Record<string, string>>({})
+  const [descMap, setDescMap] = useState<Record<string, string>>({})
+  const [editLang, setEditLang] = useState('pl')
   const [dateStart, setDateStart] = useState('')
   const [dateEnd, setDateEnd] = useState('')
   const [nights, setNights] = useState('1')
@@ -107,8 +108,8 @@ export default function EventEditForm({
   const [bankRecipient, setBankRecipient] = useState('')
   const [bankAccount, setBankAccount] = useState('')
   const [badge, setBadge] = useState('')
-  const [supertitle, setSupertitle] = useState('')
-  const [program, setProgram] = useState<{ id: string; time: string; item: string }[]>([])
+  const [superMap, setSuperMap] = useState<Record<string, string>>({})
+  const [program, setProgram] = useState<{ id: string; time: string; item: Record<string, string> }[]>([])
   const [specialGuestName, setSpecialGuestName] = useState('')
   const [specialGuestPhoto, setSpecialGuestPhoto] = useState('')
   const [uploadingGuest, setUploadingGuest] = useState(false)
@@ -127,9 +128,11 @@ export default function EventEditForm({
       setUploadingGuest(false)
     }
   }
-  const addProgramRow = () => setProgram((p) => [...p, { id: `pg-${Date.now()}`, time: '', item: '' }])
-  const updateProgramRow = (id: string, patch: Partial<{ time: string; item: string }>) =>
-    setProgram((p) => p.map((r) => (r.id === id ? { ...r, ...patch } : r)))
+  const addProgramRow = () => setProgram((p) => [...p, { id: `pg-${Date.now()}`, time: '', item: {} }])
+  const setProgramTime = (id: string, time: string) =>
+    setProgram((p) => p.map((r) => (r.id === id ? { ...r, time } : r)))
+  const setProgramItem = (id: string, val: string) =>
+    setProgram((p) => p.map((r) => (r.id === id ? { ...r, item: { ...r.item, [editLang]: val } } : r)))
   const removeProgramRow = (id: string) => setProgram((p) => p.filter((r) => r.id !== id))
 
   useEffect(() => {
@@ -154,6 +157,17 @@ export default function EventEditForm({
   const [langEN, setLangEN] = useState(false)
   const [langIT, setLangIT] = useState(false)
 
+  // Języki aktywne dla eventu (do zakładek edycji treści).
+  const activeLocales = [langPL && 'pl', langEN && 'en', langIT && 'it'].filter(Boolean) as string[]
+  useEffect(() => {
+    if (activeLocales.length > 0 && !activeLocales.includes(editLang)) setEditLang(activeLocales[0])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [langPL, langEN, langIT])
+
+  const LANG_LABEL: Record<string, string> = { pl: 'PL', en: 'EN', it: 'IT' }
+  const cleanMap = (m: Record<string, string>): Record<string, string> =>
+    Object.fromEntries(Object.entries(m).map(([k, v]) => [k, (v ?? '').trim()]).filter(([, v]) => v))
+
   useEffect(() => {
     let cancelled = false
     setLoading(true)
@@ -161,8 +175,8 @@ export default function EventEditForm({
       .then((cfg: EventEditConfig) => {
         if (cancelled) return
         const pc = cfg.pricingConfig
-        setName(cfg.title?.pl ?? '')
-        setDescription(cfg.description?.pl ?? '')
+        setNameMap((cfg.title as Record<string, string>) ?? {})
+        setDescMap((cfg.description as Record<string, string>) ?? {})
         setDateStart(cfg.startsAt ? cfg.startsAt.slice(0, 10) : '')
         setDateEnd(cfg.endsAt ? cfg.endsAt.slice(0, 10) : '')
         setNights(String(cfg.nights ?? 1))
@@ -208,8 +222,15 @@ export default function EventEditForm({
         setBankRecipient(cfg.paymentInfo?.recipient ?? '')
         setBankAccount(cfg.paymentInfo?.account ?? '')
         setBadge(cfg.theme?.badge || 'ICPE Mission Polska')
-        setSupertitle(cfg.theme?.supertitle ?? '')
-        setProgram((cfg.customFields?.program ?? []).map((p, i) => ({ id: `pg-${i}`, time: p.time, item: p.item })))
+        const st = cfg.theme?.supertitle
+        setSuperMap(typeof st === 'string' ? (st ? { pl: st } : {}) : (st ?? {}))
+        setProgram(
+          (cfg.customFields?.program ?? []).map((p, i) => ({
+            id: `pg-${i}`,
+            time: p.time,
+            item: typeof p.item === 'string' ? (p.item ? { pl: p.item } : {}) : (p.item ?? {}),
+          })),
+        )
         setSpecialGuestName(cfg.customFields?.specialGuest?.name ?? '')
         setSpecialGuestPhoto(cfg.customFields?.specialGuest?.photoUrl ?? '')
         const loc = cfg.locales ?? ['pl']
@@ -265,7 +286,8 @@ export default function EventEditForm({
   }
 
   async function handleSave() {
-    if (!name) { setError('Podaj nazwę eventu.'); return }
+    const titleClean = cleanMap(nameMap)
+    if (!Object.keys(titleClean).length) { setError('Podaj nazwę eventu.'); return }
     if (!slug) { setError('Podaj slug (adres strony).'); return }
     if (!dateStart) { setError('Podaj datę rozpoczęcia.'); return }
     setSaving(true)
@@ -281,9 +303,10 @@ export default function EventEditForm({
         ? new Date(`${dateEnd}T22:00:00`).toISOString()
         : new Date(new Date(`${dateStart}T14:00:00`).getTime() + n * 86400000 + 8 * 3600000).toISOString()
 
+      const descClean = cleanMap(descMap)
       await updateEventInstance(editTarget.instanceId, {
-        title: { pl: name },
-        description: description.trim() ? { pl: description } : null,
+        title: { pl: titleClean.pl ?? Object.values(titleClean)[0] ?? '', ...titleClean },
+        description: Object.keys(descClean).length ? descClean : null,
         startsAt,
         endsAt,
         location: location || null,
@@ -298,11 +321,11 @@ export default function EventEditForm({
       if (langEN) locales.push('en')
       if (langIT) locales.push('it')
       if (locales.length === 0) locales.push('pl')
-      const theme: Record<string, string> = { primaryColor }
+      const theme: Record<string, unknown> = { primaryColor }
       if (heroImageUrl) theme.heroImageUrl = heroImageUrl
       if (titleColor) theme.titleColor = titleColor
       theme.badge = badge
-      theme.supertitle = supertitle.trim()
+      theme.supertitle = cleanMap(superMap)
 
       await configureSeriesPage(editTarget.seriesId, {
         slug,
@@ -311,8 +334,8 @@ export default function EventEditForm({
         paymentInfo: { recipient: bankRecipient.trim(), account: bankAccount.trim() },
         customFields: {
           program: program
-            .filter((r) => r.time.trim() || r.item.trim())
-            .map((r) => ({ time: r.time.trim(), item: r.item.trim() })),
+            .filter((r) => r.time.trim() || Object.keys(cleanMap(r.item)).length)
+            .map((r) => ({ time: r.time.trim(), item: cleanMap(r.item) })),
           specialGuest:
             specialGuestName.trim() || specialGuestPhoto
               ? { name: specialGuestName.trim(), photoUrl: specialGuestPhoto }
@@ -354,14 +377,42 @@ export default function EventEditForm({
         </div>
       )}
 
+      {activeLocales.length > 1 && (
+        <div
+          className="flex items-center gap-2 rounded-[12px] px-3 py-2 sticky top-2 z-10"
+          style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}
+        >
+          <span className="text-xs font-semibold uppercase tracking-wider mr-1" style={{ color: 'var(--faint)' }}>Język treści</span>
+          {activeLocales.map((l) => {
+            const active = editLang === l
+            return (
+              <button
+                key={l}
+                onClick={() => setEditLang(l)}
+                className="text-xs font-semibold rounded-full px-3 py-1.5 transition-colors"
+                style={{
+                  background: active ? 'var(--brand)' : 'transparent',
+                  color: active ? '#fff' : 'var(--muted)',
+                  border: `1px solid ${active ? 'var(--brand)' : 'var(--border)'}`,
+                  cursor: 'pointer',
+                }}
+              >
+                {LANG_LABEL[l]}
+              </button>
+            )
+          })}
+          <span className="text-xs ml-auto" style={{ color: 'var(--faint)' }}>edytujesz: {LANG_LABEL[editLang]}</span>
+        </div>
+      )}
+
       <Section title="Szczegóły">
-        <Field label="Nazwa eventu">
-          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="np. Dzień Formacji Wspólnoty" />
+        <Field label={`Nazwa eventu${activeLocales.length > 1 ? ` (${LANG_LABEL[editLang]})` : ''}`}>
+          <Input value={nameMap[editLang] ?? ''} onChange={(e) => setNameMap((m) => ({ ...m, [editLang]: e.target.value }))} placeholder="np. Dzień Formacji Wspólnoty" />
         </Field>
-        <Field label="Opis (pokazywany na stronie zapisów)">
+        <Field label={`Opis (pokazywany na stronie zapisów)${activeLocales.length > 1 ? ` — ${LANG_LABEL[editLang]}` : ''}`}>
           <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
+            value={descMap[editLang] ?? ''}
+            onChange={(e) => setDescMap((m) => ({ ...m, [editLang]: e.target.value }))}
             rows={4}
             placeholder="Krótki opis wydarzenia — np. zaproszenie, program, miejsce…"
             className={inputCls}
@@ -499,8 +550,8 @@ export default function EventEditForm({
             <option value="ICPE Mission Warszawa">ICPE Mission Warszawa</option>
           </select>
         </Field>
-        <Field label="Nadtytuł (nad nazwą eventu)">
-          <Input value={supertitle} onChange={(e) => setSupertitle(e.target.value)} placeholder="np. Wyjazd formacyjny" />
+        <Field label={`Nadtytuł (nad nazwą eventu)${activeLocales.length > 1 ? ` — ${LANG_LABEL[editLang]}` : ''}`}>
+          <Input value={superMap[editLang] ?? ''} onChange={(e) => setSuperMap((m) => ({ ...m, [editLang]: e.target.value }))} placeholder="np. Wyjazd formacyjny" />
         </Field>
         <Field label="Kolor główny">
           <div className="flex items-center gap-2">
@@ -547,18 +598,21 @@ export default function EventEditForm({
       </Section>
 
       <Section title="Program i gość specjalny">
-        <Field label="Program (godzina + punkt)">
+        <Field label={`Program (godzina + punkt)${activeLocales.length > 1 ? ` — treść: ${LANG_LABEL[editLang]}` : ''}`}>
           <div className="flex flex-col gap-2">
             {program.map((row) => (
               <div key={row.id} className="flex items-center gap-2">
-                <input value={row.time} onChange={(e) => updateProgramRow(row.id, { time: e.target.value })} placeholder="18:00" className={inputCls} style={{ ...inputStyle, width: 90 }} />
-                <input value={row.item} onChange={(e) => updateProgramRow(row.id, { item: e.target.value })} placeholder="Punkt programu" className={inputCls} style={{ ...inputStyle, flex: 1 }} />
+                <input value={row.time} onChange={(e) => setProgramTime(row.id, e.target.value)} placeholder="18:00" className={inputCls} style={{ ...inputStyle, width: 90 }} />
+                <input value={row.item[editLang] ?? ''} onChange={(e) => setProgramItem(row.id, e.target.value)} placeholder="Punkt programu" className={inputCls} style={{ ...inputStyle, flex: 1 }} />
                 <button onClick={() => removeProgramRow(row.id)} className="p-2 rounded-[8px]" style={{ color: 'var(--err)' }}><Trash2 size={15} /></button>
               </div>
             ))}
             <Button size="sm" variant="outline" onClick={addProgramRow}><Plus size={14} /> Dodaj punkt</Button>
           </div>
         </Field>
+        <p className="text-xs" style={{ color: 'var(--faint)' }}>
+          Godzina jest wspólna dla wszystkich języków; tłumaczysz tylko opis punktu.
+        </p>
         <Field label="Gość specjalny (imię i portret)">
           <div className="flex items-center gap-3">
             {specialGuestPhoto ? (

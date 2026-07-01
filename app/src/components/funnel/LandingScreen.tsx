@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Calendar, MapPin, Clock, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { EventInstanceDto, PricingConfig } from '@icpe/shared'
-import type { EventContent } from '../../lib/api'
+import { pickLang, type EventContent } from '../../lib/api'
 
 interface Props {
   event: EventInstanceDto
@@ -57,7 +57,8 @@ function MetaRow({
 }
 
 export default function LandingScreen({ event, onRegister, pricingConfig, content }: Props) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const lng = i18n.language
   const [showProgram, setShowProgram] = useState(false)
 
   const isOpen = event.status === 'OPEN'
@@ -155,12 +156,7 @@ export default function LandingScreen({ event, onRegister, pricingConfig, conten
 
       {/* Description — opis eventu z bazy (gdy ustawiony) */}
       {(() => {
-        const desc =
-          typeof event.description === 'string'
-            ? event.description
-            : event.description
-              ? (event.description.pl ?? event.description.en ?? event.description.it ?? '')
-              : ''
+        const desc = pickLang(event.description as string | Record<string, string> | undefined, lng)
         return desc ? (
           <p className="text-sm leading-relaxed whitespace-pre-line" style={{ color: 'var(--muted)' }}>
             {desc}
@@ -258,7 +254,7 @@ export default function LandingScreen({ event, onRegister, pricingConfig, conten
               {program.map((p, i) => (
                 <div key={i} className="flex gap-3 text-sm">
                   <span className="font-mono font-semibold shrink-0" style={{ color: 'var(--brand)', minWidth: 52 }}>{p.time}</span>
-                  <span style={{ color: 'var(--ink)' }}>{p.item}</span>
+                  <span style={{ color: 'var(--ink)' }}>{pickLang(p.item, lng)}</span>
                 </div>
               ))}
             </div>

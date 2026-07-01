@@ -1,7 +1,9 @@
-import type { EventContent } from '../../lib/api'
+import { useTranslation } from 'react-i18next'
+import { pickLang, type EventContent } from '../../lib/api'
 
 /** Renderuje program wydarzenia i gościa specjalnego (jeśli ustawione). */
 export default function EventContentBlocks({ content }: { content?: EventContent | null }) {
+  const { i18n } = useTranslation()
   const program = content?.program ?? []
   const guest = content?.specialGuest
 
@@ -32,7 +34,7 @@ export default function EventContentBlocks({ content }: { content?: EventContent
           {program.map((p, i) => (
             <div key={i} className="flex gap-3 text-sm">
               <span className="font-mono font-semibold shrink-0" style={{ color: 'var(--brand)', minWidth: 52 }}>{p.time}</span>
-              <span style={{ color: 'var(--ink)' }}>{p.item}</span>
+              <span style={{ color: 'var(--ink)' }}>{pickLang(p.item, i18n.language)}</span>
             </div>
           ))}
         </div>

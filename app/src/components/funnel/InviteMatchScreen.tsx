@@ -1,15 +1,10 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Calendar, MapPin, Check } from 'lucide-react'
 import type { EventInstanceDto } from '@icpe/shared'
 import { Input } from '../ui/Input'
-import { matchInvite, type EventContent } from '../../lib/api'
+import { matchInvite, pickLang, type EventContent } from '../../lib/api'
 import EventContentBlocks from './EventContentBlocks'
-
-function resolveDesc(d: EventInstanceDto['description']): string {
-  if (!d) return ''
-  if (typeof d === 'string') return d
-  return d.pl ?? d.en ?? d.it ?? ''
-}
 
 function dateRange(s: string, e: string): string {
   try {
@@ -24,6 +19,7 @@ function dateRange(s: string, e: string): string {
 }
 
 export default function InviteMatchScreen({ event, slug, content }: { event: EventInstanceDto; slug: string; content?: EventContent | null }) {
+  const { i18n } = useTranslation()
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
@@ -49,7 +45,7 @@ export default function InviteMatchScreen({ event, slug, content }: { event: Eve
     }
   }
 
-  const desc = resolveDesc(event.description)
+  const desc = pickLang(event.description as string | Record<string, string> | undefined, i18n.language)
 
   if (confirmedName) {
     return (

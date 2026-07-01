@@ -394,8 +394,8 @@ export interface EventTheme {
   heroImageUrl?: string
   /** Tag/kategoria (pigułka u góry hero), np. „ICPE Mission Polska" lub „Rekolekcje". */
   badge?: string
-  /** Nadtytuł nad nazwą eventu, np. „Wyjazd formacyjny". */
-  supertitle?: string
+  /** Nadtytuł nad nazwą eventu, np. „Wyjazd formacyjny" (string lub mapa językowa). */
+  supertitle?: LangText
 }
 
 export interface EventConfig {
@@ -534,8 +534,18 @@ export async function deleteInvitation(invId: string, token?: string): Promise<v
   await apiFetch(`/admin/invitations/${invId}`, { method: 'DELETE', headers: authHeaders(token) })
 }
 
+/** Tekst wielojęzyczny: albo zwykły string (legacy), albo mapa { pl, en, it }. */
+export type LangText = string | Record<string, string>
+
+/** Wybiera wersję językową z LangText; fallback: pl → en → it → pierwsza dostępna. */
+export function pickLang(value: LangText | undefined | null, lng: string): string {
+  if (value == null) return ''
+  if (typeof value === 'string') return value
+  return value[lng] ?? value.pl ?? value.en ?? value.it ?? Object.values(value)[0] ?? ''
+}
+
 export interface EventContent {
-  program?: { time: string; item: string }[]
+  program?: { time: string; item: LangText }[]
   specialGuest?: { name?: string; photoUrl?: string } | null
 }
 
@@ -727,7 +737,7 @@ export interface EventEditConfig {
   pricingConfig: PricingConfig
   enabledFields?: Record<string, boolean>
   locales: string[]
-  theme?: { primaryColor?: string; heroImageUrl?: string; titleColor?: string; badge?: string; supertitle?: string }
+  theme?: { primaryColor?: string; heroImageUrl?: string; titleColor?: string; badge?: string; supertitle?: LangText }
   paymentInfo?: { recipient?: string; account?: string } | null
   customFields?: EventContent | null
 }

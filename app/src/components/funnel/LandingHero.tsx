@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import type { EventTheme } from '@/lib/api'
+import { pickLang, type EventTheme } from '@/lib/api'
 
 interface Props {
   isOpen: boolean
@@ -8,8 +8,9 @@ interface Props {
 }
 
 export default function LandingHero({ isOpen, theme, title }: Props) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
 
+  const supertitle = pickLang(theme?.supertitle, i18n.language)
   const heroImageUrl = theme?.heroImageUrl
   const titleColor = theme?.titleColor
 
@@ -105,7 +106,7 @@ export default function LandingHero({ isOpen, theme, title }: Props) {
         {/* Bottom text */}
         <div className="flex flex-col gap-1">
           <p className="text-xs font-medium" style={{ color: 'rgba(255,255,255,0.85)' }}>
-            {theme?.supertitle || t('landing.supertitle')}
+            {supertitle || t('landing.supertitle')}
           </p>
           <h1
             className="font-serif leading-tight"

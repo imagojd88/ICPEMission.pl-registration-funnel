@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useParams } from 'react-router-dom'
 import type { EventInstanceDto, CreateRegistrationDto, RegistrationStatus, PaymentMethod } from '@icpe/shared'
 import { computePrice, DEFAULT_PRICING } from '@icpe/shared'
 import type { PricingConfig } from '@icpe/shared'
-import { getEventBySlug, getEventConfig, createRegistration, registerGuest, type EventConfig } from '../lib/api'
+import { getEventBySlug, getEventConfig, createRegistration, registerGuest, pickLang, type EventConfig } from '../lib/api'
 
 /** Rozdziela „Imię Nazwisko" na pola DTO. */
 function splitName(full: string): { firstName: string; lastName?: string } {
@@ -231,14 +232,15 @@ function StepperView({
 
 // ─── Main container ───────────────────────────────────────────────────────────
 
-/** Odczytuje lokalny string z tytułu eventu (Localized lub string). */
-function getEventTitle(title: EventInstanceDto['title']): string {
-  if (typeof title === 'string') return title
-  return title.pl ?? title.en ?? title.it ?? ''
+/** Odczytuje tytuł eventu w aktywnym języku (Localized lub string). */
+function getEventTitle(title: EventInstanceDto['title'], lng = 'pl'): string {
+  return pickLang(title as string | Record<string, string>, lng)
 }
 
 export default function PublicFunnel() {
   const { slug } = useParams<{ slug: string }>()
+  const { i18n } = useTranslation()
+  const lng = i18n.language
   const [screen, setScreen] = useState<PublicScreen>('landing')
   const [stepper, setStepper] = useState<StepperState>(buildInitialStepper())
   const [event, setEvent] = useState<EventInstanceDto | null>(null)
@@ -439,7 +441,7 @@ export default function PublicFunnel() {
         <LandingHero
           isOpen={event.status === 'OPEN'}
           theme={eventConfig?.theme}
-          title={getEventTitle(event.title)}
+          title={getEventTitle(event.title, lng)}
         />
         <InviteMatchScreen event={event} slug={slug ?? ''} content={eventConfig?.customFields} />
       </div>
@@ -458,7 +460,7 @@ export default function PublicFunnel() {
           <LandingHero
             isOpen={event.status === 'OPEN'}
             theme={eventConfig?.theme}
-            title={getEventTitle(event.title)}
+            title={getEventTitle(event.title, lng)}
           />
           <LandingScreen event={event} onRegister={handleStartRegister} pricingConfig={pricingConfig} content={eventConfig?.customFields} />
         </>
