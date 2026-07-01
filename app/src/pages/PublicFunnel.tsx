@@ -456,7 +456,7 @@ export default function PublicFunnel() {
             theme={eventConfig?.theme}
             title={getEventTitle(event.title)}
           />
-          <LandingScreen event={event} onRegister={handleStartRegister} pricingConfig={pricingConfig} />
+          <LandingScreen event={event} onRegister={handleStartRegister} pricingConfig={pricingConfig} content={eventConfig?.customFields} />
         </>
       )}
 

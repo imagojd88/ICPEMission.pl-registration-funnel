@@ -1,12 +1,14 @@
-import { Calendar, MapPin } from 'lucide-react'
+import { useState } from 'react'
+import { Calendar, MapPin, Clock, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { computePrice } from '@icpe/shared'
 import type { EventInstanceDto, PricingConfig } from '@icpe/shared'
+import type { EventContent } from '../../lib/api'
 
 interface Props {
   event: EventInstanceDto
   onRegister: () => void
   pricingConfig?: PricingConfig
+  content?: EventContent | null
 }
 
 function fmtDateRange(startIso?: string, endIso?: string): string {
@@ -54,8 +56,9 @@ function MetaRow({
   )
 }
 
-export default function LandingScreen({ event, onRegister, pricingConfig }: Props) {
+export default function LandingScreen({ event, onRegister, pricingConfig, content }: Props) {
   const { t } = useTranslation()
+  const [showProgram, setShowProgram] = useState(false)
 
   const isOpen = event.status === 'OPEN'
   const capacity = event.capacity ?? 0
@@ -64,18 +67,7 @@ export default function LandingScreen({ event, onRegister, pricingConfig }: Prop
   const filledPct = capacity > 0 ? Math.min(100, Math.round(((event.registeredCount ?? 0) / capacity) * 100)) : 0
 
   const nights = pricingConfig?.nights ?? 1
-  const cheapest = (pricingConfig?.rooms ?? []).slice().sort((a, b) => a.perPerson - b.perPerson)[0]
-  let fromPrice = 0
-  if (pricingConfig && cheapest) {
-    try {
-      fromPrice = computePrice(
-        { rooms: [{ roomId: cheapest.id, participants: [{ type: 'adult', age: 30 }] }] },
-        pricingConfig,
-      ).total
-    } catch {
-      fromPrice = 0
-    }
-  }
+  const program = content?.program ?? []
 
   if (!isOpen) {
     return (
@@ -176,44 +168,32 @@ export default function LandingScreen({ event, onRegister, pricingConfig }: Prop
         ) : null
       })()}
 
-      {/* Price + spots row */}
-      <div className="flex items-end justify-between">
-        {pricingConfig?.free ? (
-          <div className="flex flex-col gap-0.5">
-            <span className="font-serif font-bold" style={{ fontSize: 26, color: 'var(--brand)' }}>
-              Wstęp wolny
-            </span>
-            <span className="text-xs" style={{ color: 'var(--muted)' }}>wydarzenie bezpłatne</span>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-0.5">
-            <span className="text-xs" style={{ color: 'var(--muted)' }}>
-              {t('landing.price_from')}
-            </span>
-            <div className="flex items-baseline gap-1">
-              <span
-                className="font-serif font-bold"
-                style={{ fontSize: 30, color: 'var(--brand)' }}
-              >
-                {fromPrice > 0 ? `${fromPrice} zł` : '—'}
-              </span>
-              <span className="text-sm" style={{ color: 'var(--muted)' }}>
-                {t('landing.per_person')}
-              </span>
+      {/* Program (popup) + miejsca */}
+      {(program.length > 0 || hasCapacity) && (
+        <div className="flex items-center justify-between gap-3">
+          {program.length > 0 ? (
+            <button
+              onClick={() => setShowProgram(true)}
+              className="flex items-center gap-1.5 text-sm font-semibold px-3.5 py-2 rounded-[12px] transition-colors hover:bg-[var(--brand-soft)]"
+              style={{ border: '1.5px solid var(--brand)', color: 'var(--brand)', background: 'transparent', cursor: 'pointer' }}
+            >
+              <Clock size={15} /> Zobacz program
+            </button>
+          ) : (
+            <span />
+          )}
+          {hasCapacity && (
+            <div className="text-right">
+              <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+                {free} {t('landing.spots_free')}
+              </p>
+              <p className="text-xs" style={{ color: 'var(--muted)' }}>
+                {t('landing.spots_of', { total: capacity })}
+              </p>
             </div>
-          </div>
-        )}
-        {hasCapacity && (
-          <div className="text-right">
-            <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-              {free} {t('landing.spots_free')}
-            </p>
-            <p className="text-xs" style={{ color: 'var(--muted)' }}>
-              {t('landing.spots_of', { total: capacity })}
-            </p>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
 
       {/* Spots bar — tylko gdy ustawiono limit miejsc */}
       {hasCapacity && (
@@ -251,6 +231,40 @@ export default function LandingScreen({ event, onRegister, pricingConfig }: Prop
       <p className="text-center" style={{ fontSize: 12, color: 'var(--faint)' }}>
         {t('landing.cta_hint')}
       </p>
+
+      {/* Popup: program godzinowy */}
+      {showProgram && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.5)' }}
+          onClick={() => setShowProgram(false)}
+        >
+          <div
+            className="w-full rounded-[18px] overflow-hidden"
+            style={{ maxWidth: 380, background: 'var(--surface)', border: '1px solid var(--border)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-3" style={{ borderBottom: '1px solid var(--border)' }}>
+              <p className="font-bold text-sm" style={{ color: 'var(--ink)' }}>Program</p>
+              <button
+                onClick={() => setShowProgram(false)}
+                className="p-1.5 rounded-[8px]"
+                style={{ color: 'var(--faint)', background: 'none', border: 'none', cursor: 'pointer' }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="p-5 flex flex-col gap-2.5" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+              {program.map((p, i) => (
+                <div key={i} className="flex gap-3 text-sm">
+                  <span className="font-mono font-semibold shrink-0" style={{ color: 'var(--brand)', minWidth: 52 }}>{p.time}</span>
+                  <span style={{ color: 'var(--ink)' }}>{p.item}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
