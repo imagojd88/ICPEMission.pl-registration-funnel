@@ -46,13 +46,13 @@ export class InvitationsController {
 
   @Post('invite/:token/confirm')
   @ApiOperation({ summary: 'Publiczne: potwierdź udział po linku' })
-  confirm(@Param('token') token: string) {
-    return this.invites.confirmByToken(token);
+  confirm(@Param('token') token: string, @Body() dto?: { dietaryNotes?: string }) {
+    return this.invites.confirmByToken(token, dto?.dietaryNotes);
   }
 
   @Post('r/:slug/invite-match')
   @ApiOperation({ summary: 'Publiczne: dopasuj dane do zaproszenia (bez linku) i potwierdź' })
-  match(@Param('slug') slug: string, @Body() dto: Invitee) {
+  match(@Param('slug') slug: string, @Body() dto: Invitee & { dietaryNotes?: string }) {
     return this.invites.matchBySlug(slug, dto);
   }
 }

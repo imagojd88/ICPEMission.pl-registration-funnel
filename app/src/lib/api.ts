@@ -404,6 +404,7 @@ export interface EventConfig {
   locales: string[]
   theme?: EventTheme
   paymentInfo?: { recipient?: string; account?: string }
+  customFields?: EventContent
 }
 
 export async function getEventConfig(slug: string, locale = 'pl'): Promise<EventConfig> {
@@ -417,6 +418,7 @@ export async function getEventConfig(slug: string, locale = 'pl'): Promise<Event
       locales: (raw.locales as string[]) ?? ['pl'],
       theme: raw.theme as EventTheme | undefined,
       paymentInfo: raw.paymentInfo as { recipient?: string; account?: string } | undefined,
+      customFields: raw.customFields as EventContent | undefined,
     }
   } catch {
     return {
@@ -532,6 +534,11 @@ export async function deleteInvitation(invId: string, token?: string): Promise<v
   await apiFetch(`/admin/invitations/${invId}`, { method: 'DELETE', headers: authHeaders(token) })
 }
 
+export interface EventContent {
+  program?: { time: string; item: string }[]
+  specialGuest?: { name?: string; photoUrl?: string } | null
+}
+
 export interface InvitationView {
   firstName: string
   lastName: string
@@ -544,6 +551,7 @@ export interface InvitationView {
     endsAt: string
     location: string | null
     theme: EventTheme | null
+    customFields: EventContent | null
     slug: string | null
   }
 }
@@ -553,15 +561,21 @@ export async function getInvitation(inviteToken: string): Promise<InvitationView
   return apiFetch<InvitationView>(`/invite/${inviteToken}`)
 }
 
-/** Publiczne: potwierdź udział po linku. */
-export async function confirmInvitation(inviteToken: string): Promise<{ ok: boolean }> {
-  return apiFetch(`/invite/${inviteToken}/confirm`, { method: 'POST' })
+/** Publiczne: potwierdź udział po linku (opcjonalnie z alergiami/dietą). */
+export async function confirmInvitation(
+  inviteToken: string,
+  dietaryNotes?: string,
+): Promise<{ ok: boolean }> {
+  return apiFetch(`/invite/${inviteToken}/confirm`, {
+    method: 'POST',
+    body: JSON.stringify({ dietaryNotes: dietaryNotes ?? '' }),
+  })
 }
 
 /** Publiczne: dopasuj dane do zaproszenia (bez linku) i potwierdź. Rzuca, gdy brak dopasowania. */
 export async function matchInvite(
   slug: string,
-  data: Invitee,
+  data: Invitee & { dietaryNotes?: string },
 ): Promise<{ ok: boolean; token: string; firstName: string }> {
   return apiFetch(`/r/${slug}/invite-match`, { method: 'POST', body: JSON.stringify(data) })
 }

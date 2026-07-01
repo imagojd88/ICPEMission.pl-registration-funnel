@@ -4,6 +4,7 @@ import { Calendar, MapPin, Check } from 'lucide-react'
 import { getInvitation, confirmInvitation, type InvitationView } from '../lib/api'
 import Spinner from '../components/ui/Spinner'
 import ThemeToggle from '../components/ui/ThemeToggle'
+import EventContentBlocks from '../components/funnel/EventContentBlocks'
 
 function resolveTitle(t: unknown): string {
   if (typeof t === 'string') return t
@@ -41,6 +42,7 @@ export default function InviteConfirm() {
   const [error, setError] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [confirmed, setConfirmed] = useState(false)
+  const [dietary, setDietary] = useState('')
 
   useEffect(() => {
     if (!token) return
@@ -57,7 +59,7 @@ export default function InviteConfirm() {
     if (!token) return
     setConfirming(true)
     try {
-      await confirmInvitation(token)
+      await confirmInvitation(token, dietary)
       setConfirmed(true)
     } catch {
       setError(true)
@@ -127,6 +129,8 @@ export default function InviteConfirm() {
 
         {desc && <p className="text-sm leading-relaxed whitespace-pre-line" style={{ color: 'var(--muted)' }}>{desc}</p>}
 
+        <EventContentBlocks content={inv.event.customFields} />
+
         {confirmed ? (
           <div className="rounded-[15px] px-4 py-4 text-center flex flex-col items-center gap-2" style={{ border: '1px solid var(--ok)', background: 'var(--ok-soft)' }}>
             <div className="flex items-center justify-center rounded-full" style={{ width: 44, height: 44, background: 'var(--ok)' }}>
@@ -136,14 +140,29 @@ export default function InviteConfirm() {
             <p className="text-xs" style={{ color: 'var(--muted)' }}>Dziękujemy, {inv.firstName}! Do zobaczenia.</p>
           </div>
         ) : (
-          <button
-            onClick={() => { void handleConfirm() }}
-            disabled={confirming}
-            className="w-full text-white text-base font-semibold rounded-[16px] py-4 transition-all duration-150 active:scale-[0.98] hover:opacity-90"
-            style={{ background: 'var(--accent)', border: 'none', cursor: 'pointer', boxShadow: '0 6px 18px rgba(197,106,58,0.32)' }}
-          >
-            {confirming ? 'Potwierdzam…' : 'Potwierdzam udział →'}
-          </button>
+          <>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
+                Alergie / wymagania żywieniowe (opcjonalnie)
+              </label>
+              <textarea
+                value={dietary}
+                onChange={(e) => setDietary(e.target.value)}
+                rows={2}
+                placeholder="np. wegetariańska, bez glutenu"
+                className="w-full rounded-[12px] px-3 py-[11px] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                style={{ border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--ink)', resize: 'vertical' }}
+              />
+            </div>
+            <button
+              onClick={() => { void handleConfirm() }}
+              disabled={confirming}
+              className="w-full text-white text-base font-semibold rounded-[16px] py-4 transition-all duration-150 active:scale-[0.98] hover:opacity-90"
+              style={{ background: 'var(--accent)', border: 'none', cursor: 'pointer', boxShadow: '0 6px 18px rgba(197,106,58,0.32)' }}
+            >
+              {confirming ? 'Potwierdzam…' : 'Potwierdzam udział →'}
+            </button>
+          </>
         )}
       </div>
     </div>

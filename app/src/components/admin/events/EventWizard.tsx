@@ -107,6 +107,13 @@ interface WizardState {
   langIT: boolean
   // typ „na zaproszenie" — lista zaproszonych (surowy tekst, 1 osoba/wiersz)
   invitees: string
+  // spotkanie bez noclegu (kilka godzin) → pomijamy Pokoje i Cennik, ukrywamy noclegi
+  noAccommodation: boolean
+  // program wydarzenia: godzina + punkt
+  program: { id: string; time: string; item: string }[]
+  // gość specjalny + portret (URL)
+  specialGuestName: string
+  specialGuestPhoto: string
 }
 
 // ── Color config ──────────────────────────────────────────────────────────────
@@ -527,6 +534,27 @@ function Step1Details({ state, update }: { state: WizardState; update: (p: Parti
       /* ignoruj błąd zapisu miejsca */
     }
   }
+
+  const [uploadingGuest, setUploadingGuest] = useState(false)
+  async function handleGuestPhoto(e: ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0]
+    if (!f) return
+    setUploadingGuest(true)
+    try {
+      const url = await uploadImage(f)
+      update({ specialGuestPhoto: url })
+    } catch {
+      /* ignoruj błąd uploadu */
+    } finally {
+      setUploadingGuest(false)
+    }
+  }
+  const addProgramRow = () =>
+    update({ program: [...state.program, { id: `pg-${Date.now()}`, time: '', item: '' }] })
+  const updateProgramRow = (id: string, patch: Partial<{ time: string; item: string }>) =>
+    update({ program: state.program.map((r) => (r.id === id ? { ...r, ...patch } : r)) })
+  const removeProgramRow = (id: string) => update({ program: state.program.filter((r) => r.id !== id) })
+
   return (
     <div className="flex flex-col gap-4">
       <Input
@@ -569,14 +597,27 @@ function Step1Details({ state, update }: { state: WizardState; update: (p: Parti
           onChange={(e) => update({ dateEnd: e.target.value })}
         />
       </div>
-      <Input
-        label="Liczba nocy"
-        type="number"
-        min={0}
-        value={state.nights}
-        onChange={(e) => update({ nights: e.target.value })}
-        placeholder="1"
-      />
+      <div className="flex flex-col gap-2">
+        <label className="flex items-center gap-2 text-sm font-medium" style={{ color: 'var(--ink)' }}>
+          <input
+            type="checkbox"
+            checked={state.noAccommodation}
+            onChange={(e) => update({ noAccommodation: e.target.checked })}
+            className="accent-[var(--brand)] w-4 h-4"
+          />
+          Bez noclegu (spotkanie kilkugodzinne — pomija Pokoje i Cennik)
+        </label>
+        {!state.noAccommodation && (
+          <Input
+            label="Liczba nocy"
+            type="number"
+            min={0}
+            value={state.nights}
+            onChange={(e) => update({ nights: e.target.value })}
+            placeholder="1"
+          />
+        )}
+      </div>
       <Input
         label="Miejsce"
         value={state.location}
@@ -608,6 +649,59 @@ function Step1Details({ state, update }: { state: WizardState; update: (p: Parti
         onChange={(e) => update({ capacity: e.target.value })}
         placeholder="80"
       />
+
+      {/* Program wydarzenia */}
+      <div className="flex flex-col gap-2">
+        <label className="text-sm font-medium" style={{ color: 'var(--ink)' }}>Program (godzina + punkt)</label>
+        {state.program.map((row) => (
+          <div key={row.id} className="flex items-center gap-2">
+            <input
+              value={row.time}
+              onChange={(e) => updateProgramRow(row.id, { time: e.target.value })}
+              placeholder="18:00"
+              className="rounded-[10px] px-3 py-2 text-sm"
+              style={{ border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--ink)', width: 90 }}
+            />
+            <input
+              value={row.item}
+              onChange={(e) => updateProgramRow(row.id, { item: e.target.value })}
+              placeholder="Punkt programu"
+              className="flex-1 rounded-[10px] px-3 py-2 text-sm"
+              style={{ border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--ink)' }}
+            />
+            <button onClick={() => removeProgramRow(row.id)} className="p-2 rounded-[8px]" style={{ color: 'var(--err)', background: 'none', border: 'none', cursor: 'pointer' }}>
+              <X size={15} />
+            </button>
+          </div>
+        ))}
+        <Button size="sm" variant="outline" onClick={addProgramRow}>
+          <Plus size={14} /> Dodaj punkt programu
+        </Button>
+      </div>
+
+      {/* Gość specjalny */}
+      <div className="flex flex-col gap-2">
+        <label className="text-sm font-medium" style={{ color: 'var(--ink)' }}>Gość specjalny (opcjonalnie)</label>
+        <div className="flex items-center gap-3">
+          {state.specialGuestPhoto ? (
+            <img src={state.specialGuestPhoto} alt="" className="rounded-full object-cover shrink-0" style={{ width: 48, height: 48 }} />
+          ) : (
+            <div className="rounded-full shrink-0" style={{ width: 48, height: 48, background: 'var(--surface-2)', border: '1px solid var(--border)' }} />
+          )}
+          <input
+            value={state.specialGuestName}
+            onChange={(e) => update({ specialGuestName: e.target.value })}
+            placeholder="Imię i nazwisko gościa"
+            className="flex-1 rounded-[10px] px-3 py-2 text-sm"
+            style={{ border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--ink)' }}
+          />
+          <label className="flex items-center gap-1 px-3 py-2 rounded-[10px] text-sm cursor-pointer shrink-0" style={{ background: 'var(--surface-2)', color: 'var(--muted)', border: '1px solid var(--border)' }}>
+            {uploadingGuest ? '…' : 'Portret'}
+            <input type="file" accept="image/*" className="hidden" onChange={handleGuestPhoto} />
+          </label>
+        </div>
+      </div>
+
       <div>
         <p className="text-sm font-medium mb-2" style={{ color: 'var(--ink)' }}>
           Metody płatności
@@ -1288,6 +1382,10 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
     langEN: false,
     langIT: false,
     invitees: '',
+    noAccommodation: false,
+    program: [],
+    specialGuestName: '',
+    specialGuestPhoto: '',
   })
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -1319,7 +1417,12 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
     setState((prev) => ({ ...prev, ...partial }))
   }
 
-  const isLast = step === STEP_LABELS.length - 1
+  // „Bez noclegu" → pomijamy Pokoje (2) i Cennik (3).
+  const activeSteps = state.noAccommodation ? [0, 1, 4] : [0, 1, 2, 3, 4]
+  const curIdx = Math.max(0, activeSteps.indexOf(step))
+  const isLast = curIdx === activeSteps.length - 1
+  const goNext = () => setStep(activeSteps[Math.min(activeSteps.length - 1, curIdx + 1)])
+  const goPrev = () => (curIdx === 0 ? onCancel() : setStep(activeSteps[curIdx - 1]))
 
   async function handlePublish() {
     if (!state.name) { setSubmitError('Podaj nazwę eventu.'); return }
@@ -1330,7 +1433,7 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
     setSubmitError(null)
 
     try {
-      const nights = parseInt(state.nights) || 0
+      const nights = state.noAccommodation ? 0 : parseInt(state.nights) || 0
       const paymentMethods: string[] = []
       if (state.payOnline) paymentMethods.push('ONLINE')
       if (state.payTransfer) paymentMethods.push('BANK_TRANSFER')
@@ -1356,6 +1459,16 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
       }
       if (state.heroImageUrl) theme.heroImageUrl = state.heroImageUrl
       if (state.titleColor) theme.titleColor = state.titleColor
+
+      const customFields = {
+        program: state.program
+          .filter((r) => r.time.trim() || r.item.trim())
+          .map((r) => ({ time: r.time.trim(), item: r.item.trim() })),
+        specialGuest:
+          state.specialGuestName.trim() || state.specialGuestPhoto
+            ? { name: state.specialGuestName.trim(), photoUrl: state.specialGuestPhoto }
+            : null,
+      }
 
       // Tryb edycji — aktualizujemy istniejący event i kończymy.
       if (editTarget) {
@@ -1416,6 +1529,7 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
       await configureSeriesPage(seriesId, {
         slug: state.slug,
         theme,
+        customFields,
         enabledFields: { phone: true, address: true, dietary: true, children: true },
         locales,
         isEvergreen: state.eventType === 'evergreen',
@@ -1481,44 +1595,44 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
           className="flex items-center gap-0 px-6 pt-6 pb-5"
           style={{ borderBottom: '1px solid var(--border)' }}
         >
-          {STEP_LABELS.map((label, i) => (
-            <div key={label} className="flex items-center">
-              <button
-                onClick={() => i < step && setStep(i)}
-                className={cn(
-                  'flex items-center gap-2 text-sm font-medium transition-colors',
-                  i === step
-                    ? 'text-[var(--brand)]'
-                    : i < step
-                    ? 'text-[var(--ok)] cursor-pointer'
-                    : 'text-[var(--faint)] cursor-default',
-                )}
-              >
-                <span
-                  className="inline-flex items-center justify-center rounded-full text-xs font-bold"
-                  style={{
-                    width: 22,
-                    height: 22,
-                    background:
-                      i === step
-                        ? 'var(--brand)'
-                        : i < step
-                        ? 'var(--ok)'
-                        : 'var(--surface-3)',
-                    color: i <= step ? '#fff' : 'var(--faint)',
-                  }}
+          {activeSteps.map((si, i) => {
+            const label = STEP_LABELS[si]
+            const done = i < curIdx
+            const active = si === step
+            return (
+              <div key={label} className="flex items-center">
+                <button
+                  onClick={() => done && setStep(si)}
+                  className={cn(
+                    'flex items-center gap-2 text-sm font-medium transition-colors',
+                    active
+                      ? 'text-[var(--brand)]'
+                      : done
+                      ? 'text-[var(--ok)] cursor-pointer'
+                      : 'text-[var(--faint)] cursor-default',
+                  )}
                 >
-                  {i + 1}
-                </span>
-                <span className="hidden sm:block">{label}</span>
-              </button>
-              {i < STEP_LABELS.length - 1 && (
-                <span className="mx-2 text-xs" style={{ color: 'var(--border)' }}>
-                  /
-                </span>
-              )}
-            </div>
-          ))}
+                  <span
+                    className="inline-flex items-center justify-center rounded-full text-xs font-bold"
+                    style={{
+                      width: 22,
+                      height: 22,
+                      background: active ? 'var(--brand)' : done ? 'var(--ok)' : 'var(--surface-3)',
+                      color: active || done ? '#fff' : 'var(--faint)',
+                    }}
+                  >
+                    {i + 1}
+                  </span>
+                  <span className="hidden sm:block">{label}</span>
+                </button>
+                {i < activeSteps.length - 1 && (
+                  <span className="mx-2 text-xs" style={{ color: 'var(--border)' }}>
+                    /
+                  </span>
+                )}
+              </div>
+            )
+          })}
         </div>
 
         {/* Step content */}
@@ -1548,10 +1662,10 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => (step === 0 ? onCancel() : setStep(step - 1))}
+            onClick={goPrev}
             disabled={submitting}
           >
-            {step === 0 ? 'Anuluj' : 'Wstecz'}
+            {curIdx === 0 ? 'Anuluj' : 'Wstecz'}
           </Button>
           <Button
             variant={isLast ? 'cta' : 'default'}
@@ -1560,7 +1674,7 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
               if (isLast) {
                 void handlePublish()
               } else {
-                setStep(step + 1)
+                goNext()
               }
             }}
             disabled={submitting}

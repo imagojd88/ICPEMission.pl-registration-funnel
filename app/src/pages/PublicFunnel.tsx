@@ -438,7 +438,7 @@ export default function PublicFunnel() {
           theme={eventConfig?.theme}
           title={getEventTitle(event.title)}
         />
-        <InviteMatchScreen event={event} slug={slug ?? ''} />
+        <InviteMatchScreen event={event} slug={slug ?? ''} content={eventConfig?.customFields} />
       </div>
     )
   }

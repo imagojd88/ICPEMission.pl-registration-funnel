@@ -74,22 +74,27 @@ export class InvitationsService {
         endsAt: inst.endsAt.toISOString(),
         location: inst.location,
         theme: page?.theme ?? null,
+        customFields: page?.customFields ?? null,
         slug: page?.slug ?? null,
       },
     };
   }
 
-  async confirmByToken(token: string) {
+  async confirmByToken(token: string, dietaryNotes?: string) {
     const inv = await this.prisma.invitation.findUnique({ where: { token } });
     if (!inv) throw new NotFoundException('Invitation not found');
-    if (!inv.confirmedAt) {
-      await this.prisma.invitation.update({ where: { token }, data: { confirmedAt: new Date() } });
-    }
+    await this.prisma.invitation.update({
+      where: { token },
+      data: {
+        confirmedAt: inv.confirmedAt ?? new Date(),
+        ...(dietaryNotes !== undefined ? { dietaryNotes: dietaryNotes?.trim() || null } : {}),
+      },
+    });
     return { ok: true };
   }
 
   /** Bez linku: dopasowanie po imieniu + nazwisku + e-mailu w ramach eventu (slug), potem potwierdzenie. */
-  async matchBySlug(slug: string, data: Invitee) {
+  async matchBySlug(slug: string, data: Invitee & { dietaryNotes?: string }) {
     const page = await this.prisma.registrationPage.findUnique({
       where: { slug },
       include: { series: { include: { instances: { where: { status: 'OPEN' }, orderBy: { startsAt: 'asc' }, take: 1 } } } },
@@ -106,9 +111,13 @@ export class InvitationsService {
         norm(x.email) === norm(data.email),
     );
     if (!found) throw new NotFoundException('Nie znaleziono zaproszenia na podane dane');
-    if (!found.confirmedAt) {
-      await this.prisma.invitation.update({ where: { id: found.id }, data: { confirmedAt: new Date() } });
-    }
+    await this.prisma.invitation.update({
+      where: { id: found.id },
+      data: {
+        confirmedAt: found.confirmedAt ?? new Date(),
+        ...(data.dietaryNotes ? { dietaryNotes: data.dietaryNotes.trim() } : {}),
+      },
+    });
     return { ok: true, token: found.token, firstName: found.firstName };
   }
 }

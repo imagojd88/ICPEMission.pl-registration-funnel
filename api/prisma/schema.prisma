@@ -387,6 +387,7 @@ model Invitation {
   email       String
   token       String    @unique @default(cuid())
   confirmedAt DateTime?
+  dietaryNotes String?
   createdAt   DateTime  @default(now())
 
   @@index([instanceId])

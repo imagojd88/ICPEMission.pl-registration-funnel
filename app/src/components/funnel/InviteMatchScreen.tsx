@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { Calendar, MapPin, Check } from 'lucide-react'
 import type { EventInstanceDto } from '@icpe/shared'
 import { Input } from '../ui/Input'
-import { matchInvite } from '../../lib/api'
+import { matchInvite, type EventContent } from '../../lib/api'
+import EventContentBlocks from './EventContentBlocks'
 
 function resolveDesc(d: EventInstanceDto['description']): string {
   if (!d) return ''
@@ -22,10 +23,11 @@ function dateRange(s: string, e: string): string {
   }
 }
 
-export default function InviteMatchScreen({ event, slug }: { event: EventInstanceDto; slug: string }) {
+export default function InviteMatchScreen({ event, slug, content }: { event: EventInstanceDto; slug: string; content?: EventContent | null }) {
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
+  const [dietary, setDietary] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [confirmedName, setConfirmedName] = useState<string | null>(null)
@@ -38,7 +40,7 @@ export default function InviteMatchScreen({ event, slug }: { event: EventInstanc
     setBusy(true)
     setError(null)
     try {
-      const res = await matchInvite(slug, { firstName, lastName, email })
+      const res = await matchInvite(slug, { firstName, lastName, email, dietaryNotes: dietary })
       setConfirmedName(res.firstName)
     } catch {
       setError('Nie znaleźliśmy zaproszenia na podane dane. Sprawdź pisownię lub użyj linku z zaproszenia.')
@@ -76,6 +78,8 @@ export default function InviteMatchScreen({ event, slug }: { event: EventInstanc
 
       {desc && <p className="text-sm leading-relaxed whitespace-pre-line" style={{ color: 'var(--muted)' }}>{desc}</p>}
 
+      <EventContentBlocks content={content} />
+
       <div className="rounded-[15px] p-4 flex flex-col gap-3" style={{ border: '1px solid var(--border)', background: 'var(--surface)' }}>
         <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>Potwierdź udział</p>
         <p className="text-xs" style={{ color: 'var(--muted)' }}>
@@ -86,6 +90,17 @@ export default function InviteMatchScreen({ event, slug }: { event: EventInstanc
           <Input label="Nazwisko" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Kowalski" />
         </div>
         <Input label="E-mail" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="jan@example.com" />
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium" style={{ color: 'var(--ink)' }}>Alergie / wymagania żywieniowe (opcjonalnie)</label>
+          <textarea
+            value={dietary}
+            onChange={(e) => setDietary(e.target.value)}
+            rows={2}
+            placeholder="np. wegetariańska, bez glutenu"
+            className="w-full rounded-[12px] px-3 py-[11px] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+            style={{ border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--ink)', resize: 'vertical' }}
+          />
+        </div>
         {error && <p className="text-xs font-medium" style={{ color: 'var(--err)' }}>{error}</p>}
         <button
           onClick={() => { void handleSubmit() }}
