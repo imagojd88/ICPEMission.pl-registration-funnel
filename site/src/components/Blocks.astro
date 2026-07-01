@@ -1,0 +1,144 @@
+---
+import { REGISTRATION_BASE, type Block } from '../lib/api';
+
+interface Props {
+  blocks: Block[];
+}
+
+const { blocks } = Astro.props;
+const list = Array.isArray(blocks) ? blocks : [];
+
+const str = (v: unknown): string => (typeof v === 'string' ? v : '');
+---
+
+<div class="blocks prose">
+  {list.map((b) => {
+    switch (b.type) {
+      case 'heading':
+        return b.level === 3 ? <h3 class="b-h">{str(b.text)}</h3> : <h2 class="b-h">{str(b.text)}</h2>;
+      case 'paragraph':
+        return <div class="b-p" set:html={str(b.html)} />;
+      case 'image':
+        return (
+          <figure class="b-fig">
+            <img src={str(b.url)} alt={str(b.alt)} loading="lazy" />
+            {b.caption && <figcaption class="muted">{str(b.caption)}</figcaption>}
+          </figure>
+        );
+      case 'gallery':
+        return (
+          <div class="b-gallery">
+            {(Array.isArray(b.images) ? b.images : []).map((img: any) => (
+              <img src={str(img?.url)} alt={str(img?.alt)} loading="lazy" />
+            ))}
+          </div>
+        );
+      case 'quote':
+        return (
+          <blockquote class="b-quote">
+            <p>{str(b.text)}</p>
+            {b.author && <cite class="muted">— {str(b.author)}</cite>}
+          </blockquote>
+        );
+      case 'button':
+        return (
+          <p class="b-btn">
+            <a class="btn btn-accent" href={str(b.href)}>{str(b.label) || 'Więcej'}</a>
+          </p>
+        );
+      case 'eventCta':
+        return (
+          <p class="b-btn">
+            <a class="btn btn-accent" href={`${REGISTRATION_BASE}/r/${str(b.eventSlug)}`}>Zapisz się →</a>
+          </p>
+        );
+      case 'video':
+        return b.provider === 'youtube' ? (
+          <div class="b-video">
+            <iframe
+              src={`https://www.youtube-nocookie.com/embed/${str(b.id)}`}
+              title="video"
+              loading="lazy"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowfullscreen
+            ></iframe>
+          </div>
+        ) : null;
+      case 'divider':
+        return <hr class="b-hr" />;
+      default:
+        return null;
+    }
+  })}
+</div>
+
+<style>
+  .blocks {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .b-h {
+    margin: 12px 0 0;
+    color: var(--ink);
+  }
+  .b-p {
+    margin: 0;
+    color: var(--ink);
+  }
+  .b-fig {
+    margin: 8px 0;
+  }
+  .b-fig img {
+    border-radius: 14px;
+  }
+  .b-fig figcaption {
+    font-size: 13px;
+    margin-top: 6px;
+    text-align: center;
+  }
+  .b-gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 10px;
+  }
+  .b-gallery img {
+    border-radius: 12px;
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+    width: 100%;
+  }
+  .b-quote {
+    margin: 8px 0;
+    padding: 6px 0 6px 20px;
+    border-left: 3px solid var(--brand);
+  }
+  .b-quote p {
+    font-family: 'Newsreader', serif;
+    font-size: 20px;
+    font-style: italic;
+    margin: 0 0 6px;
+  }
+  .b-btn {
+    margin: 6px 0;
+  }
+  .b-video {
+    position: relative;
+    padding-bottom: 56.25%;
+    height: 0;
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .b-video iframe {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+  }
+  .b-hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 8px 0;
+  }
+</style>

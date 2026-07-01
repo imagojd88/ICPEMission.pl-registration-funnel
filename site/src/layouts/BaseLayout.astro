@@ -1,0 +1,57 @@
+---
+import '../styles/global.css';
+import Nav from '../components/Nav.astro';
+import Footer from '../components/Footer.astro';
+import { getSettings, getMenu } from '../lib/api';
+
+interface Props {
+  title?: string;
+  description?: string;
+  ogImage?: string | null;
+}
+
+const { title, description, ogImage } = Astro.props;
+
+const settings = await getSettings();
+const menu = await getMenu();
+
+const siteName = settings.siteName || 'ICPE Mission Polska';
+const pageTitle = title ? `${title} — ${siteName}` : siteName;
+const desc = description || settings.footerText || 'ICPE Mission Polska';
+const og = ogImage || settings.defaultOgImageUrl || null;
+const canonical = new URL(Astro.url.pathname, Astro.site).toString();
+---
+
+<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <title>{pageTitle}</title>
+    <meta name="description" content={desc} />
+    <link rel="canonical" href={canonical} />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={desc} />
+    <meta property="og:url" content={canonical} />
+    {og && <meta property="og:image" content={og} />}
+    <meta name="twitter:card" content={og ? 'summary_large_image' : 'summary'} />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,400;0,500;0,600;1,400&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <!-- Umami (Faza 4): wklej snippet trackera tutaj, gdy będzie gotowy. -->
+  </head>
+  <body>
+    <Nav siteName={siteName} logoUrl={settings.logoUrl} menu={menu} />
+    <main>
+      <slot />
+    </main>
+    <Footer settings={settings} menu={menu} />
+  </body>
+</html>

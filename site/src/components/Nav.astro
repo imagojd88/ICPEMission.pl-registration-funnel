@@ -1,0 +1,87 @@
+---
+import type { MenuItem } from '../lib/api';
+
+interface Props {
+  siteName: string;
+  logoUrl?: string | null;
+  menu: MenuItem[];
+}
+
+const { siteName, logoUrl, menu } = Astro.props;
+const items = menu.filter((m) => m.location === 'header');
+const current = Astro.url.pathname;
+---
+
+<header class="nav">
+  <div class="container nav-inner">
+    <a href="/" class="brand">
+      {logoUrl ? <img src={logoUrl} alt={siteName} class="logo" /> : <span class="brand-text">{siteName}</span>}
+    </a>
+    {items.length > 0 && (
+      <nav class="links">
+        {items.map((it) => (
+          <a href={it.href} class={current === it.href ? 'active' : ''}>{it.label}</a>
+        ))}
+      </nav>
+    )}
+  </div>
+</header>
+
+<style>
+  .nav {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border);
+  }
+  .nav-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 64px;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+  }
+  .brand:hover {
+    text-decoration: none;
+  }
+  .brand-text {
+    font-family: 'Newsreader', serif;
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .logo {
+    height: 34px;
+    width: auto;
+  }
+  .links {
+    display: flex;
+    align-items: center;
+    gap: 22px;
+  }
+  .links a {
+    color: var(--muted);
+    font-size: 15px;
+    font-weight: 500;
+  }
+  .links a:hover,
+  .links a.active {
+    color: var(--brand);
+    text-decoration: none;
+  }
+  @media (max-width: 640px) {
+    .links {
+      gap: 14px;
+    }
+    .links a {
+      font-size: 14px;
+    }
+  }
+</style>

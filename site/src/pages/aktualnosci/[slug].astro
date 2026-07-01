@@ -1,0 +1,82 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Blocks from '../../components/Blocks.astro';
+import { getArticles, getArticle, formatDateRange, type ArticleFull } from '../../lib/api';
+
+export async function getStaticPaths() {
+  const articles = await getArticles();
+  const results = await Promise.all(
+    articles.map(async (a) => {
+      const full = await getArticle(a.slug);
+      return full ? { params: { slug: a.slug }, props: { article: full } } : null;
+    }),
+  );
+  return results.filter((r): r is { params: { slug: string }; props: { article: ArticleFull } } => r !== null);
+}
+
+const { article } = Astro.props;
+---
+
+<BaseLayout
+  title={article.seoTitle || article.title}
+  description={article.seoDesc || article.excerpt || undefined}
+  ogImage={article.coverUrl}
+>
+  <article class="container post">
+    <header class="post-head">
+      <a href="/aktualnosci" class="back">← Aktualności</a>
+      {article.category && <span class="tag">{article.category}</span>}
+      <h1>{article.title}</h1>
+      <p class="muted meta">
+        {article.publishedAt && formatDateRange(article.publishedAt)}
+        {article.author ? ` · ${article.author}` : ''}
+      </p>
+    </header>
+
+    {article.coverUrl && <img class="cover" src={article.coverUrl} alt={article.title} />}
+
+    <Blocks blocks={article.blocks} />
+  </article>
+</BaseLayout>
+
+<style>
+  .post {
+    padding: 40px 20px 24px;
+  }
+  .post-head {
+    max-width: 720px;
+    margin: 0 auto 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .back {
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .tag {
+    align-self: flex-start;
+    background: var(--brand-soft);
+    color: var(--brand);
+    font-size: 12px;
+    font-weight: 600;
+    padding: 2px 10px;
+    border-radius: 99px;
+  }
+  .post-head h1 {
+    font-size: clamp(30px, 5vw, 46px);
+    margin: 0;
+  }
+  .meta {
+    font-size: 14px;
+    margin: 0;
+  }
+  .cover {
+    max-width: 900px;
+    width: 100%;
+    margin: 0 auto 28px;
+    border-radius: 16px;
+    max-height: 460px;
+    object-fit: cover;
+  }
+</style>

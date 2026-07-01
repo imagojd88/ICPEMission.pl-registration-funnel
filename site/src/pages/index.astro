@@ -1,0 +1,150 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Blocks from '../components/Blocks.astro';
+import EventCard from '../components/EventCard.astro';
+import { getPage, getUpcoming, getArticles, formatDateRange } from '../lib/api';
+
+// Strona główna: opcjonalna treść z Page o slug „home" + najbliższe wydarzenia + aktualności.
+const home = await getPage('home');
+const upcoming = await getUpcoming();
+const articles = await getArticles(3);
+---
+
+<BaseLayout title={home?.seoTitle || undefined} description={home?.seoDesc || undefined} ogImage={home?.ogImageUrl}>
+  <!-- Hero -->
+  <section class="hero">
+    <div class="container hero-inner">
+      <p class="supertitle">ICPE Mission Polska</p>
+      <h1 class="hero-title">{home?.title || 'Formacja, wspólnota, misja'}</h1>
+      {upcoming.length > 0 && (
+        <a class="btn btn-accent hero-cta" href="#wydarzenia">Zobacz najbliższe wydarzenia</a>
+      )}
+    </div>
+  </section>
+
+  <!-- Treść strony głównej (bloki), jeśli ustawiona -->
+  {home && home.blocks.length > 0 && (
+    <section class="container section">
+      <Blocks blocks={home.blocks} />
+    </section>
+  )}
+
+  <!-- Najbliższe wydarzenia -->
+  {upcoming.length > 0 && (
+    <section id="wydarzenia" class="container section">
+      <h2 class="section-title">Najbliższe wydarzenia</h2>
+      <div class="grid">
+        {upcoming.map((ev) => <EventCard event={ev} />)}
+      </div>
+    </section>
+  )}
+
+  <!-- Ostatnie aktualności -->
+  {articles.length > 0 && (
+    <section class="container section">
+      <div class="section-head">
+        <h2 class="section-title">Aktualności</h2>
+        <a href="/aktualnosci" class="more">Wszystkie →</a>
+      </div>
+      <div class="grid">
+        {articles.map((a) => (
+          <a class="card article" href={`/aktualnosci/${a.slug}`}>
+            {a.coverUrl && <div class="cover" style={`background-image:url(${a.coverUrl})`}></div>}
+            <div class="body">
+              {a.publishedAt && <p class="muted small">{formatDateRange(a.publishedAt)}</p>}
+              <h3 class="a-title">{a.title}</h3>
+              {a.excerpt && <p class="muted excerpt">{a.excerpt}</p>}
+            </div>
+          </a>
+        ))}
+      </div>
+    </section>
+  )}
+</BaseLayout>
+
+<style>
+  .hero {
+    background: linear-gradient(160deg, var(--hero-1), var(--hero-2));
+    color: var(--hero-title);
+  }
+  .hero-inner {
+    padding: 84px 20px 92px;
+    text-align: center;
+  }
+  .supertitle {
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    font-size: 13px;
+    opacity: 0.85;
+    margin: 0 0 12px;
+  }
+  .hero-title {
+    font-size: clamp(34px, 6vw, 56px);
+    margin: 0 auto;
+    max-width: 720px;
+    color: var(--hero-title);
+  }
+  .hero-cta {
+    margin-top: 28px;
+  }
+  .section {
+    padding: 48px 20px;
+  }
+  .section-title {
+    font-size: 28px;
+    margin: 0 0 24px;
+  }
+  .section-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 24px;
+  }
+  .section-head .section-title {
+    margin: 0;
+  }
+  .more {
+    font-weight: 600;
+    font-size: 15px;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 22px;
+  }
+  .article {
+    display: flex;
+    flex-direction: column;
+    text-decoration: none;
+    color: inherit;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .article:hover {
+    text-decoration: none;
+    transform: translateY(-2px);
+    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.08);
+  }
+  .cover {
+    height: 160px;
+    background-size: cover;
+    background-position: center;
+  }
+  .body {
+    padding: 16px 18px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .small {
+    font-size: 13px;
+  }
+  .a-title {
+    font-size: 19px;
+    margin: 0;
+    color: var(--ink);
+  }
+  .excerpt {
+    font-size: 14px;
+    margin: 0;
+  }
+</style>

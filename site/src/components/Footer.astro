@@ -1,0 +1,89 @@
+---
+import type { MenuItem, SiteSettings } from '../lib/api';
+
+interface Props {
+  settings: SiteSettings;
+  menu: MenuItem[];
+}
+
+const { settings, menu } = Astro.props;
+const footerLinks = menu.filter((m) => m.location === 'footer');
+const socials = settings.socials || {};
+const year = new Date().getFullYear();
+---
+
+<footer class="footer">
+  <div class="container footer-inner">
+    <div class="col">
+      <p class="name">{settings.siteName || 'ICPE Mission Polska'}</p>
+      {settings.footerText && <p class="muted small">{settings.footerText}</p>}
+    </div>
+
+    {footerLinks.length > 0 && (
+      <nav class="col links">
+        {footerLinks.map((it) => <a href={it.href}>{it.label}</a>)}
+      </nav>
+    )}
+
+    <div class="col contact">
+      {settings.contactEmail && <a href={`mailto:${settings.contactEmail}`}>{settings.contactEmail}</a>}
+      {settings.contactPhone && <span class="muted small">{settings.contactPhone}</span>}
+      {Object.keys(socials).length > 0 && (
+        <div class="socials">
+          {Object.entries(socials).map(([k, url]) => (
+            <a href={url} target="_blank" rel="noopener noreferrer">{k}</a>
+          ))}
+        </div>
+      )}
+    </div>
+  </div>
+  <div class="container copyright">
+    <span class="muted small">© {year} {settings.siteName || 'ICPE Mission Polska'}</span>
+  </div>
+</footer>
+
+<style>
+  .footer {
+    margin-top: 64px;
+    border-top: 1px solid var(--border);
+    background: var(--surface-2);
+    padding: 40px 0 24px;
+  }
+  .footer-inner {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 32px;
+    justify-content: space-between;
+  }
+  .col {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 180px;
+  }
+  .name {
+    font-family: 'Newsreader', serif;
+    font-size: 18px;
+    margin: 0;
+  }
+  .small {
+    font-size: 13px;
+  }
+  .links {
+    gap: 6px;
+  }
+  .links a,
+  .contact a {
+    color: var(--muted);
+    font-size: 14px;
+  }
+  .socials {
+    display: flex;
+    gap: 12px;
+    margin-top: 4px;
+    text-transform: capitalize;
+  }
+  .copyright {
+    margin-top: 28px;
+  }
+</style>

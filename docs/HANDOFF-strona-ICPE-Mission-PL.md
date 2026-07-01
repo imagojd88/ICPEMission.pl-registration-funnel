@@ -1,6 +1,6 @@
 # Handoff: Strona ICPE Mission PL — headless CMS na własnym API + Astro
 
-**Status:** **Faza 1 (backend `content`) ZREALIZOWANA** — API dla Personal OS działa. Kolejne: Faza 2 (Astro), 3 (UI w Personal OS), 4 (Umami), 5 (SEO+domena).
+**Status:** **Faza 1 (backend `content`) + Faza 2 (szkielet Astro) ZREALIZOWANE.** Kolejne: Faza 3 (UI w Personal OS), 4 (Umami), 5 (SEO+domena).
 **Kontekst:** rozszerzamy istniejący backend rejestracji (`icpe-api`, NestJS + Prisma + Postgres na Render). Personal OS pozostaje jedynym panelem zarządzania — steruje rejestracjami *i* treścią strony przez ten sam wzorzec `/admin/*` + token.
 
 ---
@@ -23,6 +23,19 @@ Dobudowany moduł `api/src/content/` w `icpe-api`. Po deployu na Render (`prisma
 **Autoryzacja Personal OS:** ten sam Bearer token (`SERVICE_TOKEN`) co dla `/admin/*` rejestracji.
 
 **Uwaga dot. sandboxa (dev):** nie dało się zregenerować klienta Prisma lokalnie (silnik 403) — typy Prismy weryfikuje dopiero build na Render (`prisma generate && nest build`); dynamiczne wejścia do `data` są rzutowane defensywnie.
+
+### Faza 2 — szkielet Astro (gotowe)
+
+Nowy projekt **`site/`** (Astro, SSG). Buduje się z `/site/*` i weryfikuje czysto (`astro build` + `astro check`: 0 błędów).
+
+- `site/src/lib/api.ts` — fetch `/site/*` (defensywny: pusta treść zamiast wywalonego builda), helpery `pickLang`, `formatDateRange`.
+- `site/src/layouts/BaseLayout.astro` — head, SEO/OG, fonty (Newsreader + Plus Jakarta Sans), Nav + Footer; placeholder na tracker Umami.
+- `site/src/components/` — `Nav`, `Footer`, `Blocks` (dispatcher bloków: heading/paragraph/image/gallery/quote/button/eventCta/video/divider), `EventCard`.
+- `site/src/pages/` — `index.astro` (home = Page „home" + najbliższe wydarzenia + aktualności), `[slug].astro` (strony statyczne z `getStaticPaths`), `aktualnosci/index.astro` + `[slug].astro`.
+- `site/src/styles/global.css` — tokeny brandu ICPE (spójne z aplikacją).
+- Deploy: Render **Static Site**, Root `site`, Build `npm install && npm run build`, Publish `site/dist`, ENV `PUBLIC_API_URL`/`PUBLIC_REGISTRATION_URL`/`SITE_URL`. Po utworzeniu skopiuj **Deploy Hook** do `icpe-api` jako `SITE_DEPLOY_HOOK_URL`. Szczegóły: `site/README.md`.
+
+**Home:** treść strony głównej pochodzi z rekordu `Page` o `slug = "home"` (opcjonalny — bez niego pokazuje się domyślny hero + wydarzenia).
 
 ---
 
@@ -236,7 +249,7 @@ site/
 | Faza | Zakres | Rezultat |
 |---|---|---|
 | **1. Backend treści** ✅ **ZROBIONE** | Modele Prisma, moduł `content`, endpointy `/admin/content/*` i `/site/*`, Deploy Hook + debounce | API gotowe; Personal OS ma kontrakt (patrz §0) |
-| **2. Szkielet Astro** | Layout, brand, i18n, render bloków, `getStaticPaths`, home + strona + lista/artykuł, SEO | Publiczna strona buduje się z treści z API |
+| **2. Szkielet Astro** ✅ **ZROBIONE** | Layout, brand, render bloków, `getStaticPaths`, home + strona + lista/artykuł, SEO/OG | Publiczna strona buduje się z treści z API (patrz §0 + `site/README.md`) |
 | **3. Personal OS — moduł treści** | Lista stron/artykułów, edytor blokowy, publikacja/cofnięcie, podgląd, menu, ustawienia | Pełne zarządzanie z Personal OS |
 | **4. Statystyki** | Umami (service + baza) na Render, tracker w Astro, widok w Personal OS | Pomiar ruchu i konwersji |
 | **5. SEO + domena** | sitemap, robots, OG, podpięcie domeny (np. `icpemission.pl` lub subdomena), przekierowania | Strona produkcyjna, indeksowalna |

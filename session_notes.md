@@ -42,6 +42,15 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — strona ICPE Mission PL (CMS)
 
+### Faza 2: szkielet publicznej strony (Astro, SSG)
+- Nowy projekt `site/` (Astro 4, output static). Buduje się z `/site/*` i weryfikuje czysto: `astro build` OK + `astro check` = 0 błędów (walidacja w /tmp, bo w mount npm install pada na FUSE).
+- `site/src/lib/api.ts` — fetch `/site/*` (defensywny: pusta treść zamiast wywalonego builda, gdy API down), helpery `pickLang`, `formatDateRange`. ENV: `PUBLIC_API_URL`, `PUBLIC_REGISTRATION_URL`, `SITE_URL`.
+- `BaseLayout.astro` (head/SEO/OG, fonty Newsreader+Plus Jakarta Sans, Nav+Footer, placeholder Umami), `Nav`, `Footer`, `Blocks` (dispatcher: heading/paragraph/image/gallery/quote/button/eventCta/video/divider), `EventCard`.
+- Strony: `index.astro` (home = Page slug „home" + najbliższe wydarzenia z `/site/events/upcoming` + 3 aktualności), `[slug].astro` (getStaticPaths z `/site/pages`, bez „home"), `aktualnosci/index.astro` + `[slug].astro`.
+- `global.css` — tokeny brandu ICPE (light) spójne z aplikacją.
+- Deploy (do zrobienia przez usera): Render Static Site, Root `site`, Build `npm install && npm run build`, Publish `site/dist`, ENV jw. Po utworzeniu skopiować Deploy Hook do `icpe-api` jako `SITE_DEPLOY_HOOK_URL`. Instrukcja: `site/README.md`.
+- Handoff zaktualizowany: §0 + Faza 2 ✅. Następne: Faza 3 (UI treści w Personal OS), 4 (Umami).
+
 ### Faza 1: moduł `content` w icpe-api (backend CMS)
 - Cel: API dla Personal OS do zarządzania treścią publicznej strony (patrz `docs/HANDOFF-strona-ICPE-Mission-PL.md`).
 - Prisma (`api/prisma/schema.prisma`): enum `ContentStatus {DRAFT,PUBLISHED}` + modele `Page`, `Article`, `MenuItem`, `SiteSettings` (singleton id="singleton"). Nowe tabele → wejdą przez `prisma db push` na starcie Render.

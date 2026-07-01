@@ -1,0 +1,89 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getArticles, formatDateRange } from '../../lib/api';
+
+const articles = await getArticles();
+---
+
+<BaseLayout title="Aktualności" description="Aktualności ICPE Mission Polska">
+  <section class="container list">
+    <h1 class="page-title">Aktualności</h1>
+
+    {articles.length === 0 ? (
+      <p class="muted">Brak opublikowanych wpisów.</p>
+    ) : (
+      <div class="grid">
+        {articles.map((a) => (
+          <a class="card article" href={`/aktualnosci/${a.slug}`}>
+            {a.coverUrl && <div class="cover" style={`background-image:url(${a.coverUrl})`}></div>}
+            <div class="body">
+              {a.publishedAt && <p class="muted small">{formatDateRange(a.publishedAt)}</p>}
+              {a.category && <span class="tag">{a.category}</span>}
+              <h2 class="a-title">{a.title}</h2>
+              {a.excerpt && <p class="muted excerpt">{a.excerpt}</p>}
+            </div>
+          </a>
+        ))}
+      </div>
+    )}
+  </section>
+</BaseLayout>
+
+<style>
+  .list {
+    padding: 48px 20px;
+  }
+  .page-title {
+    font-size: clamp(30px, 5vw, 44px);
+    margin: 0 0 28px;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 22px;
+  }
+  .article {
+    display: flex;
+    flex-direction: column;
+    text-decoration: none;
+    color: inherit;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .article:hover {
+    text-decoration: none;
+    transform: translateY(-2px);
+    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.08);
+  }
+  .cover {
+    height: 170px;
+    background-size: cover;
+    background-position: center;
+  }
+  .body {
+    padding: 16px 18px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .small {
+    font-size: 13px;
+  }
+  .tag {
+    align-self: flex-start;
+    background: var(--brand-soft);
+    color: var(--brand);
+    font-size: 12px;
+    font-weight: 600;
+    padding: 2px 10px;
+    border-radius: 99px;
+  }
+  .a-title {
+    font-size: 20px;
+    margin: 0;
+    color: var(--ink);
+  }
+  .excerpt {
+    font-size: 14px;
+    margin: 0;
+  }
+</style>

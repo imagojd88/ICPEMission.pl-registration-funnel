@@ -1,0 +1,115 @@
+/* ── Tokeny brandu ICPE (spójne z aplikacją rejestracji) ─────────────── */
+:root {
+  --bg: #f6f1e9;
+  --surface: #ffffff;
+  --surface-2: #fbf7f0;
+  --surface-3: #f1eade;
+  --ink: #22262e;
+  --muted: #6e6a62;
+  --faint: #9c968b;
+  --border: #e6decf;
+  --brand: #1c5d99;
+  --brand-2: #174d80;
+  --brand-soft: #e8f0f8;
+  --accent: #c56a3a;
+  --accent-2: #ad592e;
+  --accent-soft: #f7eae0;
+  --hero-1: #1c5d99;
+  --hero-2: #164a78;
+  --hero-title: #ffffff;
+  --maxw: 1080px;
+  --radius: 16px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.6;
+}
+
+h1, h2, h3, .serif {
+  font-family: 'Newsreader', Georgia, serif;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+a {
+  color: var(--brand);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+.container {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.prose {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+/* Przyciski */
+.btn {
+  display: inline-block;
+  padding: 14px 26px;
+  border-radius: 14px;
+  font-weight: 600;
+  font-size: 15px;
+  cursor: pointer;
+  border: none;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.btn:hover {
+  text-decoration: none;
+  opacity: 0.92;
+}
+
+.btn:active {
+  transform: scale(0.98);
+}
+
+.btn-accent {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 6px 18px rgba(197, 106, 58, 0.28);
+}
+
+.btn-outline {
+  background: transparent;
+  color: var(--brand);
+  border: 1.5px solid var(--brand);
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.muted {
+  color: var(--muted);
+}

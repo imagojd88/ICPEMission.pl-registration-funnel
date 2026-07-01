@@ -1,0 +1,64 @@
+---
+import { REGISTRATION_BASE, pickLang, formatDateRange, type UpcomingEvent } from '../lib/api';
+
+interface Props {
+  event: UpcomingEvent;
+}
+
+const { event } = Astro.props;
+const href = `${REGISTRATION_BASE}/r/${event.slug}`;
+const title = pickLang(event.title);
+const dates = formatDateRange(event.startsAt, event.endsAt);
+---
+
+<a class="event card" href={href}>
+  {event.heroImageUrl && (
+    <div class="cover" style={`background-image:url(${event.heroImageUrl})`}></div>
+  )}
+  <div class="body">
+    <h3 class="title">{title}</h3>
+    <p class="meta muted">{dates}{event.location ? ` · ${event.location}` : ''}</p>
+    <span class="cta">Zapisz się →</span>
+  </div>
+</a>
+
+<style>
+  .event {
+    display: flex;
+    flex-direction: column;
+    text-decoration: none;
+    color: inherit;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .event:hover {
+    text-decoration: none;
+    transform: translateY(-2px);
+    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.08);
+  }
+  .cover {
+    height: 170px;
+    background-size: cover;
+    background-position: center;
+  }
+  .body {
+    padding: 18px 18px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .title {
+    font-size: 20px;
+    margin: 0;
+    color: var(--ink);
+  }
+  .meta {
+    font-size: 14px;
+    margin: 0;
+  }
+  .cta {
+    margin-top: 8px;
+    color: var(--accent);
+    font-weight: 600;
+    font-size: 15px;
+  }
+</style>
