@@ -19,6 +19,7 @@ function toPaymentMethod(m: 'online' | 'transfer' | 'cash' | null): PaymentMetho
 }
 import { Skeleton } from '../components/ui/Skeleton'
 import ThemeToggle from '../components/ui/ThemeToggle'
+import LanguageSwitch from '../components/ui/LanguageSwitch'
 
 // Screen components
 import RsvpScreen from '../components/funnel/RsvpScreen'
@@ -423,6 +424,7 @@ export default function PublicFunnel() {
     return (
       <div className="min-h-screen mx-auto relative" style={{ maxWidth: 452, background: 'var(--bg)' }}>
         <ThemeToggle />
+        <LanguageSwitch locales={eventConfig?.locales} />
         <RsvpScreen event={event} onBack={() => window.history.back()} />
       </div>
     )
@@ -433,6 +435,7 @@ export default function PublicFunnel() {
     return (
       <div className="min-h-screen mx-auto relative" style={{ maxWidth: 452, background: 'var(--bg)' }}>
         <ThemeToggle />
+        <LanguageSwitch locales={eventConfig?.locales} />
         <LandingHero
           isOpen={event.status === 'OPEN'}
           theme={eventConfig?.theme}
@@ -449,6 +452,7 @@ export default function PublicFunnel() {
       style={{ maxWidth: 452, background: 'var(--bg)' }}
     >
       <ThemeToggle />
+      <LanguageSwitch locales={eventConfig?.locales} />
       {screen === 'landing' && (
         <>
           <LandingHero
