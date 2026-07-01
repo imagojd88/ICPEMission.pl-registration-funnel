@@ -42,6 +42,12 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — moduł rejestracji
 
+### Fix: wyścig przy przełączaniu języka (część stringów zostawała po PL do 2. kliknięcia)
+- Objaw: pierwsze kliknięcie EN zmieniało datę i opis (używają wprost `i18n.language`), ale stringi z `t()` („1 noc", „Zapisz się", „Rejestracja otwarta") zostawały po PL; drugie kliknięcie je poprawiało.
+- Przyczyna: `i18n.ts` ładował `en.json`/`it.json` leniwie (async) dopiero po `languageChanged`; komponenty renderowały się zanim bundle dojechał → fallback pl, a react-i18next domyślnie nie przerysowuje na zdarzenie „dodano zasób" (bindI18nStore).
+- Fix: `app/src/i18n.ts` importuje wszystkie 3 locale statycznie i rejestruje w `resources` przy init (pliki małe) — brak async, każdy `t()` zmienia się natychmiast. Usunięty backend/loadPath i `loadLocale`. Bundle frontu +~6 kB gzip (akceptowalne).
+- Stan: typecheck + build OK.
+
 ### i18n dat/„noc" + waluta eventu (PLN/EUR/USD)
 - Problem 1: na publicznych ekranach nazwy miesięcy i słowo „noc" były zakodowane po polsku (`toLocaleDateString('pl-PL')`, `noc/nocy`).
 - `app/src/lib/utils.ts`: dodane `bcp47(lng)` (pl→pl-PL, en→en-GB, it→it-IT) oraz `formatDateRange(start,end,lng)`. Podpięte w: `LandingScreen`, `InviteMatchScreen`, `RsvpScreen`, `SummaryScreen`, `PublicHome`, `InviteConfirm` (wszystkie usunęły własne pl-PL formatery, tytuł/opis też przez `pickLang(..., i18n.language)`).

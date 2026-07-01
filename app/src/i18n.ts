@@ -1,6 +1,11 @@
 import i18n from 'i18next'
 import { initReactI18next } from 'react-i18next'
+import pl from './locales/pl.json'
+import en from './locales/en.json'
+import it from './locales/it.json'
 
+// Wszystkie języki ładowane od razu (małe pliki) → brak wyścigu przy przełączaniu,
+// dzięki czemu każdy string z t() zmienia się natychmiast po zmianie języka.
 i18n
   .use(initReactI18next)
   .init({
@@ -12,25 +17,11 @@ i18n
     interpolation: {
       escapeValue: false,
     },
-    backend: {
-      loadPath: '/locales/{{lng}}.json',
+    resources: {
+      pl: { translation: pl },
+      en: { translation: en },
+      it: { translation: it },
     },
-    resources: {},
   })
-
-// Lazy-load locale files
-const loadLocale = async (lng: string) => {
-  if (i18n.hasResourceBundle(lng, 'translation')) return
-  try {
-    const module = await import(`./locales/${lng}.json`)
-    i18n.addResourceBundle(lng, 'translation', module.default ?? module, true, true)
-  } catch {
-    console.warn(`[i18n] Could not load locale: ${lng}`)
-  }
-}
-
-// Eagerly load default language, lazy-load others on demand
-loadLocale('pl')
-i18n.on('languageChanged', (lng) => loadLocale(lng))
 
 export default i18n
