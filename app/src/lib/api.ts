@@ -729,6 +729,7 @@ export interface EventEditConfig {
   locales: string[]
   theme?: { primaryColor?: string; heroImageUrl?: string; titleColor?: string; badge?: string; supertitle?: string }
   paymentInfo?: { recipient?: string; account?: string } | null
+  customFields?: EventContent | null
 }
 
 /** Surowe dane eventu do edycji (bez fallbacku do mocka — błędy mają wyjść na wierzch). */

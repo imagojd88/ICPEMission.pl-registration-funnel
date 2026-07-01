@@ -108,7 +108,29 @@ export default function EventEditForm({
   const [bankAccount, setBankAccount] = useState('')
   const [badge, setBadge] = useState('')
   const [supertitle, setSupertitle] = useState('')
+  const [program, setProgram] = useState<{ id: string; time: string; item: string }[]>([])
+  const [specialGuestName, setSpecialGuestName] = useState('')
+  const [specialGuestPhoto, setSpecialGuestPhoto] = useState('')
+  const [uploadingGuest, setUploadingGuest] = useState(false)
   const [places, setPlaces] = useState<Place[]>([])
+
+  async function handleGuestPhoto(e: ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0]
+    if (!f) return
+    setUploadingGuest(true)
+    try {
+      const url = await uploadImage(f)
+      setSpecialGuestPhoto(url)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setUploadingGuest(false)
+    }
+  }
+  const addProgramRow = () => setProgram((p) => [...p, { id: `pg-${Date.now()}`, time: '', item: '' }])
+  const updateProgramRow = (id: string, patch: Partial<{ time: string; item: string }>) =>
+    setProgram((p) => p.map((r) => (r.id === id ? { ...r, ...patch } : r)))
+  const removeProgramRow = (id: string) => setProgram((p) => p.filter((r) => r.id !== id))
 
   useEffect(() => {
     listPlaces().then(setPlaces).catch(() => {})
@@ -187,6 +209,9 @@ export default function EventEditForm({
         setBankAccount(cfg.paymentInfo?.account ?? '')
         setBadge(cfg.theme?.badge || 'ICPE Mission Polska')
         setSupertitle(cfg.theme?.supertitle ?? '')
+        setProgram((cfg.customFields?.program ?? []).map((p, i) => ({ id: `pg-${i}`, time: p.time, item: p.item })))
+        setSpecialGuestName(cfg.customFields?.specialGuest?.name ?? '')
+        setSpecialGuestPhoto(cfg.customFields?.specialGuest?.photoUrl ?? '')
         const loc = cfg.locales ?? ['pl']
         setLangPL(loc.includes('pl'))
         setLangEN(loc.includes('en'))
@@ -284,6 +309,15 @@ export default function EventEditForm({
         theme,
         enabledFields: { phone: true, address: true, dietary: true, children: true },
         paymentInfo: { recipient: bankRecipient.trim(), account: bankAccount.trim() },
+        customFields: {
+          program: program
+            .filter((r) => r.time.trim() || r.item.trim())
+            .map((r) => ({ time: r.time.trim(), item: r.item.trim() })),
+          specialGuest:
+            specialGuestName.trim() || specialGuestPhoto
+              ? { name: specialGuestName.trim(), photoUrl: specialGuestPhoto }
+              : null,
+        },
         locales,
         isEvergreen: false,
       })
@@ -508,6 +542,35 @@ export default function EventEditForm({
             <label className="flex items-center gap-1.5"><input type="checkbox" checked={langPL} onChange={(e) => setLangPL(e.target.checked)} className="accent-[var(--brand)] w-4 h-4" /> PL</label>
             <label className="flex items-center gap-1.5"><input type="checkbox" checked={langEN} onChange={(e) => setLangEN(e.target.checked)} className="accent-[var(--brand)] w-4 h-4" /> EN</label>
             <label className="flex items-center gap-1.5"><input type="checkbox" checked={langIT} onChange={(e) => setLangIT(e.target.checked)} className="accent-[var(--brand)] w-4 h-4" /> IT</label>
+          </div>
+        </Field>
+      </Section>
+
+      <Section title="Program i gość specjalny">
+        <Field label="Program (godzina + punkt)">
+          <div className="flex flex-col gap-2">
+            {program.map((row) => (
+              <div key={row.id} className="flex items-center gap-2">
+                <input value={row.time} onChange={(e) => updateProgramRow(row.id, { time: e.target.value })} placeholder="18:00" className={inputCls} style={{ ...inputStyle, width: 90 }} />
+                <input value={row.item} onChange={(e) => updateProgramRow(row.id, { item: e.target.value })} placeholder="Punkt programu" className={inputCls} style={{ ...inputStyle, flex: 1 }} />
+                <button onClick={() => removeProgramRow(row.id)} className="p-2 rounded-[8px]" style={{ color: 'var(--err)' }}><Trash2 size={15} /></button>
+              </div>
+            ))}
+            <Button size="sm" variant="outline" onClick={addProgramRow}><Plus size={14} /> Dodaj punkt</Button>
+          </div>
+        </Field>
+        <Field label="Gość specjalny (imię i portret)">
+          <div className="flex items-center gap-3">
+            {specialGuestPhoto ? (
+              <img src={specialGuestPhoto} alt="" className="rounded-full object-cover shrink-0" style={{ width: 44, height: 44 }} />
+            ) : (
+              <div className="rounded-full shrink-0" style={{ width: 44, height: 44, background: 'var(--surface-2)', border: '1px solid var(--border)' }} />
+            )}
+            <Input value={specialGuestName} onChange={(e) => setSpecialGuestName(e.target.value)} placeholder="Imię i nazwisko" />
+            <label className="flex items-center gap-1 px-3 py-2 rounded-[10px] text-sm cursor-pointer shrink-0" style={{ background: 'var(--surface-2)', color: 'var(--muted)', border: '1px solid var(--border)' }}>
+              {uploadingGuest ? '…' : 'Portret'}
+              <input type="file" accept="image/*" className="hidden" onChange={handleGuestPhoto} />
+            </label>
           </div>
         </Field>
       </Section>
