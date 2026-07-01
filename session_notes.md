@@ -40,6 +40,18 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ---
 
+## Dziennik prac — strona ICPE Mission PL (CMS)
+
+### Faza 1: moduł `content` w icpe-api (backend CMS)
+- Cel: API dla Personal OS do zarządzania treścią publicznej strony (patrz `docs/HANDOFF-strona-ICPE-Mission-PL.md`).
+- Prisma (`api/prisma/schema.prisma`): enum `ContentStatus {DRAFT,PUBLISHED}` + modele `Page`, `Article`, `MenuItem`, `SiteSettings` (singleton id="singleton"). Nowe tabele → wejdą przez `prisma db push` na starcie Render.
+- Nowy moduł `api/src/content/`: `content.service.ts` (CRUD Page/Article, publish/unpublish z triggerem rebuildu, preview, zapytania publiczne tylko PUBLISHED, menu putMenu = replace-all, settings upsert singleton), `content.admin.controller.ts` (`/admin/content/*`, `JwtAuthGuard`), `content.public.controller.ts` (`/site/*`, publiczne; `/site/events/upcoming` reużywa `EventsService.listPublicActive()`), `deploy-hook.service.ts` (Render Deploy Hook z debounce 15 s, ENV `SITE_DEPLOY_HOOK_URL`), `content.module.ts` (importuje AuthModule + EventsModule). Wpięty w `app.module.ts`.
+- `render.yaml`: dodany `SITE_DEPLOY_HOOK_URL` (`sync:false`) — do skopiowania z panelu Static Site Astro (Faza 2); gdy pusty, publikacja tylko loguje.
+- Sandbox: nie dało się zregenerować klienta Prisma (silnik 403), więc lokalny tsc leci na stubie `PrismaClient: any` — Prisma waliduje dopiero build Render (`prisma generate && nest build`). Dynamiczne wejścia do `data` rzutowane `as any` defensywnie (jak w events.service dla JSON). Reszta TS czysta.
+- **Po pushu: Manual Deploy `icpe-api`** (nowe tabele + moduł). Test: `GET /site/pages`→`[]`, `GET /admin/content/pages` z tokenem→`[]`. Autoryzacja: ten sam `SERVICE_TOKEN`.
+- Handoff zaktualizowany: sekcja §0 „Stan wdrożenia" + Faza 1 oznaczona ✅.
+- Następne: Faza 2 (Astro static-site + Deploy Hook), Faza 3 (UI treści w Personal OS).
+
 ## Dziennik prac — moduł rejestracji
 
 ### Wielojęzyczne nazwy pokoi

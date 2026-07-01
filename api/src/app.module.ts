@@ -15,6 +15,7 @@ import { RsvpModule } from './rsvp/rsvp.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { PlacesModule } from './places/places.module';
 import { InvitationsModule } from './invitations/invitations.module';
+import { ContentModule } from './content/content.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { InvitationsModule } from './invitations/invitations.module';
     UploadsModule,
     PlacesModule,
     InvitationsModule,
+    ContentModule,
   ],
 })
 export class AppModule {}

@@ -392,3 +392,78 @@ model Invitation {
 
   @@index([instanceId])
 }
+
+// ─────────────────────────────────────────────────────────────
+// CMS strony ICPE Mission PL (Faza 1) — treść zarządzana z Personal OS,
+// konsumowana przez statyczną stronę Astro (endpointy /site/*).
+// ─────────────────────────────────────────────────────────────
+
+enum ContentStatus {
+  DRAFT
+  PUBLISHED
+}
+
+// Strona statyczna (o-nas, kontakt, "/" dla home). Treść jako bloki (JSON).
+model Page {
+  id          String        @id @default(cuid())
+  slug        String        @unique
+  title       String
+  locale      String        @default("pl")
+  blocks      Json          @default("[]")
+  seoTitle    String?
+  seoDesc     String?
+  ogImageUrl  String?
+  status      ContentStatus @default(DRAFT)
+  publishedAt DateTime?
+  navOrder    Int?
+  showInNav   Boolean       @default(false)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+// Aktualność / wpis (news, świadectwa). Treść jako bloki (JSON).
+model Article {
+  id          String        @id @default(cuid())
+  slug        String        @unique
+  title       String
+  locale      String        @default("pl")
+  excerpt     String?
+  coverUrl    String?
+  blocks      Json          @default("[]")
+  category    String?
+  author      String?
+  seoTitle    String?
+  seoDesc     String?
+  status      ContentStatus @default(DRAFT)
+  publishedAt DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([status, publishedAt])
+}
+
+// Element nawigacji (header/footer) — edytowalne z Personal OS.
+model MenuItem {
+  id        String   @id @default(cuid())
+  label     String
+  href      String
+  location  String   @default("header") // header | footer
+  order     Int      @default(0)
+  parentId  String?
+  createdAt DateTime @default(now())
+
+  @@index([location, order])
+}
+
+// Ustawienia globalne strony (jeden rekord, id="singleton").
+model SiteSettings {
+  id                String   @id @default("singleton")
+  siteName          String   @default("ICPE Mission Polska")
+  logoUrl           String?
+  contactEmail      String?
+  contactPhone      String?
+  socials           Json?    // { facebook, instagram, youtube, ... }
+  footerText        String?
+  defaultOgImageUrl String?
+  updatedAt         DateTime @updatedAt
+}

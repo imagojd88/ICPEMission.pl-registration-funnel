@@ -52,3 +52,8 @@ services:
         sync: false
       - key: SMTP_PASS          # hasło skrzynki
         sync: false
+      # CMS strony ICPE Mission PL — Deploy Hook static-site'u Astro.
+      # Skopiuj z panelu Render (Static Site ▸ Settings ▸ Deploy Hook). Gdy pusty,
+      # publikacja treści tylko loguje zdarzenie (bez rebuildu). Blueprint nie nadpisuje.
+      - key: SITE_DEPLOY_HOOK_URL
+        sync: false

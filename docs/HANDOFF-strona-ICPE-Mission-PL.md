@@ -1,7 +1,28 @@
 # Handoff: Strona ICPE Mission PL — headless CMS na własnym API + Astro
 
-**Status:** propozycja architektury zatwierdzona (Astro + moduł treści w `icpe-api`, statystyki: Umami self-host)
+**Status:** **Faza 1 (backend `content`) ZREALIZOWANA** — API dla Personal OS działa. Kolejne: Faza 2 (Astro), 3 (UI w Personal OS), 4 (Umami), 5 (SEO+domena).
 **Kontekst:** rozszerzamy istniejący backend rejestracji (`icpe-api`, NestJS + Prisma + Postgres na Render). Personal OS pozostaje jedynym panelem zarządzania — steruje rejestracjami *i* treścią strony przez ten sam wzorzec `/admin/*` + token.
+
+---
+
+## 0. Stan wdrożenia (Faza 1 — gotowe)
+
+Dobudowany moduł `api/src/content/` w `icpe-api`. Po deployu na Render (`prisma db push` doda tabele; `prisma generate` jest w buildzie) Personal OS ma działające API.
+
+**Nowe pliki:**
+- `api/prisma/schema.prisma` — enum `ContentStatus` + modele `Page`, `Article`, `MenuItem`, `SiteSettings`.
+- `api/src/content/content.service.ts` — logika CRUD + publikacja + podgląd + zapytania publiczne.
+- `api/src/content/content.admin.controller.ts` — `/admin/content/*` (token-auth `JwtAuthGuard`).
+- `api/src/content/content.public.controller.ts` — `/site/*` (publiczne, tylko `PUBLISHED`).
+- `api/src/content/deploy-hook.service.ts` — Render Deploy Hook z debounce (15 s).
+- `api/src/content/content.module.ts` — rejestracja (importuje `AuthModule` + `EventsModule`); wpięty w `app.module.ts`.
+- `render.yaml` — `SITE_DEPLOY_HOOK_URL` (`sync:false`).
+
+**Po deployu:** URL API bez zmian (`https://icpe-api.onrender.com`). Uwaga: backend nie ma auto-deploy → **Manual Deploy** `icpe-api` (nowe tabele, nowy moduł). Test szybki: `GET /site/pages` → `[]`, `GET /admin/content/pages` z tokenem → `[]`.
+
+**Autoryzacja Personal OS:** ten sam Bearer token (`SERVICE_TOKEN`) co dla `/admin/*` rejestracji.
+
+**Uwaga dot. sandboxa (dev):** nie dało się zregenerować klienta Prisma lokalnie (silnik 403) — typy Prismy weryfikuje dopiero build na Render (`prisma generate && nest build`); dynamiczne wejścia do `data` są rzutowane defensywnie.
 
 ---
 
@@ -214,7 +235,7 @@ site/
 
 | Faza | Zakres | Rezultat |
 |---|---|---|
-| **1. Backend treści** | Modele Prisma, moduł `content`, endpointy `/admin/content/*` i `/site/*`, Deploy Hook + debounce | API gotowe; Personal OS ma kontrakt |
+| **1. Backend treści** ✅ **ZROBIONE** | Modele Prisma, moduł `content`, endpointy `/admin/content/*` i `/site/*`, Deploy Hook + debounce | API gotowe; Personal OS ma kontrakt (patrz §0) |
 | **2. Szkielet Astro** | Layout, brand, i18n, render bloków, `getStaticPaths`, home + strona + lista/artykuł, SEO | Publiczna strona buduje się z treści z API |
 | **3. Personal OS — moduł treści** | Lista stron/artykułów, edytor blokowy, publikacja/cofnięcie, podgląd, menu, ustawienia | Pełne zarządzanie z Personal OS |
 | **4. Statystyki** | Umami (service + baza) na Render, tracker w Astro, widok w Personal OS | Pomiar ruchu i konwersji |
