@@ -181,7 +181,15 @@ export class RegistrationsService {
     const roomNames = new Map<string, string>();
     const pcRooms =
       ((instance?.pricingConfig as { rooms?: Array<{ id: unknown; name: unknown }> })?.rooms) ?? [];
-    for (const r of pcRooms) roomNames.set(String(r.id), String(r.name));
+    // Nazwa pokoju może być stringiem (legacy) lub mapą { pl, en, it } → dla Personal OS bierzemy PL.
+    const resolveName = (n: unknown): string => {
+      if (n && typeof n === 'object') {
+        const m = n as Record<string, string>;
+        return m.pl ?? m.en ?? m.it ?? Object.values(m)[0] ?? '';
+      }
+      return String(n ?? '');
+    };
+    for (const r of pcRooms) roomNames.set(String(r.id), resolveName(r.name));
 
     const regs = await this.prisma.registration.findMany({
       where: {

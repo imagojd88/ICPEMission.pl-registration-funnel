@@ -42,6 +42,15 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — moduł rejestracji
 
+### Wielojęzyczne nazwy pokoi
+- Problem: nazwy pokoi to był pojedynczy string w `pricingConfig.rooms[].name`, więc zakładka języka w edytorze ich nie rozdzielała — zmiana na EN zmieniała też PL.
+- `RoomTypeDef.name` → `string | Record<string,string>` w `shared/src/pricing.ts` i `api/src/_shared/pricing.ts` (lustro). Nowy helper `roomLabel(name, lng)` (fallback pl→en→it) eksportowany z shared. `validateRoomCapacity` używa `roomLabel(name)` w komunikatach.
+- Backend `registrations.service.ts`: mapa `roomNames` resolvuje nazwę do PL (Personal OS), gdy name jest mapą.
+- Edytor `EventEditForm`: `RoomRow.name` → mapa, input nazwy pokoju związany z `editLang` (placeholder pokazuje aktywny język), load: string→{pl}, zapis: `cleanMap(r.name)`, „Dodaj pokój" startuje `name: {}`.
+- Publiczne wyświetlanie: `Step3Room` (opcje wyboru pokoju) i `SummaryScreen` przez `roomLabel(name, i18n.language)`. Dopasowanie błędów pojemności też przez `roomLabel(name)` (bo `validateRoomCapacity` buduje komunikaty z nazwą PL).
+- Kreator `EventWizard`: nazwy pokoi pozostają jednojęzyczne (PL) — `mapEditConfigToState` resolvuje mapę→PL przy wczytaniu, create zapisuje `{ pl: name }`. Uwaga: edycja wielojęzycznego eventu przez kreator spłaszczyłaby nazwy pokoi do PL — właściwa ścieżka edycji to EventEditForm.
+- Stan: typecheck app+api + build OK. Zmiana w `shared` + `_shared` (typ name rozszerzony, opcjonalny) → dla frontu wystarczy auto-deploy; backend Manual Deploy nie jest wymagany (zmiana tylko czyta name defensywnie).
+
 ### Fix: wyścig przy przełączaniu języka (część stringów zostawała po PL do 2. kliknięcia)
 - Objaw: pierwsze kliknięcie EN zmieniało datę i opis (używają wprost `i18n.language`), ale stringi z `t()` („1 noc", „Zapisz się", „Rejestracja otwarta") zostawały po PL; drugie kliknięcie je poprawiało.
 - Przyczyna: `i18n.ts` ładował `en.json`/`it.json` leniwie (async) dopiero po `languageChanged`; komponenty renderowały się zanim bundle dojechał → fallback pl, a react-i18next domyślnie nie przerysowuje na zdarzenie „dodano zasób" (bindI18nStore).

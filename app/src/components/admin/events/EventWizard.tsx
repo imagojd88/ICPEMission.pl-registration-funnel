@@ -185,7 +185,7 @@ function mapEditConfigToState(prev: WizardState, cfg: EventEditConfig, slug: str
   const pc = cfg.pricingConfig
   const rooms: RoomRow[] = (pc?.rooms ?? []).map((r, i) => ({
     id: `edit-room-${i}`,
-    name: r.name,
+    name: typeof r.name === 'string' ? r.name : (r.name?.pl ?? Object.values(r.name ?? {})[0] ?? ''),
     model: (r.model as PricingModel) || 'os/noc',
     capacity: String(r.cap ?? 1),
     price: String(r.perPerson ?? 0),

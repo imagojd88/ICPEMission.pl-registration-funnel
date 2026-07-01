@@ -23,7 +23,8 @@ export interface PricedParticipant {
 
 export interface RoomTypeDef {
   id: string;
-  name: string;
+  /** nazwa pokoju — string (legacy) lub mapa językowa { pl, en, it } */
+  name: string | Record<string, string>;
   desc?: string;
   /** maksymalna liczba osób w pokoju */
   cap: number;
@@ -213,16 +214,23 @@ export function validateRoomCapacity(input: PriceInput, config: PricingConfig = 
       continue;
     }
     if (booking.participants.length === 0) {
-      errors.push(`Pokój „${room.name}" nie ma przypisanych osób.`);
+      errors.push(`Pokój „${roomLabel(room.name)}" nie ma przypisanych osób.`);
     }
     if (booking.participants.length > room.cap) {
-      errors.push(`Pokój „${room.name}" mieści maks. ${room.cap} os., przypisano ${booking.participants.length}.`);
+      errors.push(`Pokój „${roomLabel(room.name)}" mieści maks. ${room.cap} os., przypisano ${booking.participants.length}.`);
     }
   }
   return { ok: errors.length === 0, errors };
 }
 
 /** Formatowanie waluty: Intl pl-PL + " zł". */
+export function roomLabel(name: string | Record<string, string> | undefined | null, lng = 'pl'): string {
+  if (!name) return '';
+  if (typeof name === 'string') return name;
+  const l = (lng || 'pl').slice(0, 2);
+  return name[l] ?? name.pl ?? name.en ?? name.it ?? Object.values(name)[0] ?? '';
+}
+
 export function formatZl(n: number): string {
   return new Intl.NumberFormat('pl-PL').format(Math.round(n)) + ' zł';
 }

@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { validateRoomCapacity, formatMoney } from '@icpe/shared'
+import { validateRoomCapacity, formatMoney, roomLabel } from '@icpe/shared'
 import type { PricingConfig, PriceInput } from '@icpe/shared'
 import type { Participant, RoomEntry } from '../../../pages/PublicFunnel'
 import { X, Plus } from 'lucide-react'
@@ -100,7 +100,7 @@ export default function Step3Room({ rooms, participants, pricingConfig, onChange
       {rooms.map((room, roomIdx) => {
         const selectedType = roomTypes.find((rt) => rt.id === room.roomId) ?? roomTypes[0]
         // Błędy pojemności dotyczące tego pokoju
-        const roomCapError = capErrors.find((e) => selectedType && e.includes(selectedType.name))
+        const roomCapError = capErrors.find((e) => selectedType && e.includes(roomLabel(selectedType.name)))
 
         return (
           <div
@@ -143,7 +143,7 @@ export default function Step3Room({ rooms, participants, pricingConfig, onChange
               >
                 {roomTypes.map((rt) => (
                   <option key={rt.id} value={rt.id}>
-                    {rt.name} — {money(rt.perPerson)}/os/noc · maks. {rt.cap} os.
+                    {roomLabel(rt.name, i18n.language)} — {money(rt.perPerson)}/os/noc · maks. {rt.cap} os.
                   </option>
                 ))}
               </select>
@@ -271,7 +271,7 @@ export default function Step3Room({ rooms, participants, pricingConfig, onChange
               (e) =>
                 !rooms.some((r) => {
                   const rt = pricingConfig.rooms.find((t) => t.id === r.roomId)
-                  return rt && e.includes(rt.name)
+                  return rt && e.includes(roomLabel(rt.name))
                 }),
             )
             .map((e, i) => (

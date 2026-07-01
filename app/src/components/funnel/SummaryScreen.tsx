@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { computePrice, formatMoney, buildIcs, googleCalendarUrl } from '@icpe/shared'
+import { computePrice, formatMoney, roomLabel, buildIcs, googleCalendarUrl } from '@icpe/shared'
 import type { EventInstanceDto, PricingConfig, PriceLine } from '@icpe/shared'
 import type { StepperState } from '../../pages/PublicFunnel'
 import { bcp47 } from '../../lib/utils'
@@ -239,7 +239,7 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
-                      Pokój {ri + 1}: {roomType?.name ?? room.roomId}
+                      Pokój {ri + 1}: {roomType ? roomLabel(roomType.name, i18n.language) : room.roomId}
                     </span>
                     <span className="text-sm font-semibold" style={{ color: 'var(--muted)' }}>
                       {roomType ? `${money(roomType.perPerson)}/os/noc` : ''}

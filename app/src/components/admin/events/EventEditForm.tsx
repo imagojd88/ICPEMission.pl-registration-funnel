@@ -26,7 +26,7 @@ type PricingModel = 'os/noc' | 'za pokój' | 'za osobę' | 'dopłata 1-os'
 
 interface RoomRow {
   id: string
-  name: string
+  name: Record<string, string>
   model: PricingModel
   capacity: string
   price: string
@@ -196,7 +196,7 @@ export default function EventEditForm({
         setRooms(
           (pc?.rooms ?? []).map((r, i) => ({
             id: `r-${i}`,
-            name: r.name,
+            name: typeof r.name === 'string' ? (r.name ? { pl: r.name } : {}) : (r.name ?? {}),
             model: (r.model as PricingModel) || 'os/noc',
             capacity: String(r.cap ?? 1),
             price: String(r.perPerson ?? 0),
@@ -273,7 +273,7 @@ export default function EventEditForm({
         .sort((a, b) => a.ltAge - b.ltAge),
       rooms: rooms.map((r, i) => ({
         id: String(i + 1),
-        name: r.name,
+        name: cleanMap(r.name),
         cap: parseInt(r.capacity) || 1,
         perPerson: parseFloat(r.price) || 0,
         model: r.model,
@@ -504,13 +504,13 @@ export default function EventEditForm({
           <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--faint)' }}>Pokoje</span>
           {rooms.map((r) => (
             <div key={r.id} className="flex items-center gap-2">
-              <Input value={r.name} onChange={(e) => setRooms((p) => p.map((x) => x.id === r.id ? { ...x, name: e.target.value } : x))} placeholder="Nazwa" />
+              <Input value={r.name[editLang] ?? ''} onChange={(e) => setRooms((p) => p.map((x) => x.id === r.id ? { ...x, name: { ...x.name, [editLang]: e.target.value } } : x))} placeholder={activeLocales.length > 1 ? `Nazwa (${LANG_LABEL[editLang]})` : 'Nazwa'} />
               <input value={r.capacity} onChange={(e) => setRooms((p) => p.map((x) => x.id === r.id ? { ...x, capacity: e.target.value } : x))} placeholder="os." inputMode="numeric" className={inputCls} style={{ ...inputStyle, width: 70 }} />
               <input value={r.price} onChange={(e) => setRooms((p) => p.map((x) => x.id === r.id ? { ...x, price: e.target.value } : x))} placeholder="zł/os" inputMode="numeric" className={inputCls} style={{ ...inputStyle, width: 90 }} />
               <button onClick={() => setRooms((p) => p.filter((x) => x.id !== r.id))} className="p-2 rounded-[8px]" style={{ color: 'var(--err)' }}><Trash2 size={15} /></button>
             </div>
           ))}
-          <Button size="sm" variant="outline" onClick={() => setRooms((p) => [...p, { id: `r-new-${Date.now()}`, name: '', model: 'os/noc', capacity: '2', price: '80', tag: '' }])}>
+          <Button size="sm" variant="outline" onClick={() => setRooms((p) => [...p, { id: `r-new-${Date.now()}`, name: {}, model: 'os/noc', capacity: '2', price: '80', tag: '' }])}>
             <Plus size={14} /> Dodaj pokój
           </Button>
         </div>
