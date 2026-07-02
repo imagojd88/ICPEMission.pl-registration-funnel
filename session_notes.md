@@ -81,6 +81,13 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 - Przyczyna: Astro scopuje style komponentu (atrybut `data-astro-cid-*` na elementach z szablonu), a piny/kropki/pierścienie/etykiety/chipy tworzę dynamicznie w JS — te elementy nie mają atrybutu scope, więc reguły `.wm-pin{position:absolute}` itd. do nich nie trafiały → bez `position:absolute` `left/top%` ignorowane → flow u góry.
 - Fix: w `WorldMap.astro` `<style>` selektory elementów tworzonych w JS zmienione na `:global(.wm-pin/.wm-ring/.wm-dot/.wm-label/.wm-chip)`. Zweryfikowane w zbudowanym HTML: reguły globalne (0 wystąpień ze scope).
 
+### Mapa: overlay CMS tylko dla opisu + poprawki etykiet
+- Zmiana architektury: `applyOverlay` w WorldMap nakłada z CMS TYLKO `note` (n_pl/n_en). Nazwa/kraj/tag/współrzędne = stałe w kodzie strony. Powód: tagi zasiane w CMS starymi wartościami nadpisywały baked → wcześniejsze zmiany tagów nie były widoczne. Teraz tagi/kraje są kod-kontrolowane, opisy nadal z CMS.
+- Warszawa tag: „Europa" → „To my · Polska" / „This is us · Polska".
+- Malta kraj: „Malta · dom macierzysty" → „Malta · kolebka Instytutu Ewangelizacji Świata - ICPE Mission" (+ EN „cradle of…").
+- Etykieta listy chipów: „Wszystkie oddziały" → „Tam jest ICPE" / „Where ICPE is".
+- Handoff 07 zaktualizowany: z CMS edytowalny jest tylko OPIS wspólnoty (name/cc/tag read-only na stronie).
+
 ### Opisy wspólnot: obsługa linków <a href> (sanityzacja)
 - `WorldMap.astro`: opis (`.wm-note`) renderowany przez `sanitizeNote()` zamiast `textContent`. Dozwolone tagi: `a[href]`, `b/strong/i/em/br`; reszta rozpakowywana do tekstu. Linki tylko `http(s)`, wymuszone `target="_blank" rel="noopener noreferrer nofollow"` + styl terakota/underline. Bezpieczne (brak script/js: URL). Treść z CMS (trusted admin), więc innerHTML akceptowalny po sanityzacji.
 

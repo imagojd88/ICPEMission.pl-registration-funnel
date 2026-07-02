@@ -107,10 +107,10 @@ const communities = await getCommunities();
   ];
 
   const DATA = [
-    { id:0, name:'Warszawa', cc_pl:'Polska', cc_en:'Poland', lat:52.23, lng:21.01, g:'hub', tag_pl:'Europa', tag_en:'Europe', n_pl:'Wspólnota warszawska ICPE Mission — ludzie świeccy, którzy pośród pracy i codzienności żyją wiarą razem. Spotykamy się na modlitwie, formacji i otwartych wieczorach uwielbienia. To z perspektywy Warszawy powstała ta strona.', n_en:'The Warsaw ICPE Mission community — lay people who live their faith together in the middle of work and everyday life. We gather for prayer, formation and open worship evenings. This site is told from Warsaw.' },
+    { id:0, name:'Warszawa', cc_pl:'Polska', cc_en:'Poland', lat:52.23, lng:21.01, g:'hub', tag_pl:'To my · Polska', tag_en:'This is us · Polska', n_pl:'Wspólnota warszawska ICPE Mission — ludzie świeccy, którzy pośród pracy i codzienności żyją wiarą razem. Spotykamy się na modlitwie, formacji i otwartych wieczorach uwielbienia. To z perspektywy Warszawy powstała ta strona.', n_en:'The Warsaw ICPE Mission community — lay people who live their faith together in the middle of work and everyday life. We gather for prayer, formation and open worship evenings. This site is told from Warsaw.' },
     { id:1, name:'Kraków', cc_pl:'Polska', cc_en:'Poland', lat:50.06, lng:19.94, g:'pl', tag_pl:'Europa', tag_en:'Europe', n_pl:'Krakowska wspólnota ICPE Mission. Grupa świeckich zaangażowanych w ewangelizację, wspólną modlitwę i codzienne życie wiarą w sercu Małopolski.', n_en:'The Kraków ICPE Mission community. Lay people engaged in evangelisation, shared prayer and everyday life of faith in the heart of Lesser Poland.' },
     { id:2, name:'Lublin', cc_pl:'Polska · 2 wspólnoty', cc_en:'Poland · 2 communities', lat:51.25, lng:22.57, g:'pl', tag_pl:'Europa', tag_en:'Europe', n_pl:'Dwie wspólnoty ICPE Mission w Lublinie — dwa domy jednej rodziny. Żyją modlitwą, formacją i posługą, dzieląc się wiarą we wschodniej Polsce.', n_en:'Two ICPE Mission communities in Lublin — two homes of one family. They live by prayer, formation and service, sharing faith in eastern Poland.' },
-    { id:3, name:'Malta', cc_pl:'Malta · dom macierzysty', cc_en:'Malta · motherhouse', lat:35.90, lng:14.51, g:'hq', tag_pl:'Europa', tag_en:'Europe', n_pl:'Dom macierzysty wspólnoty. To tutaj w 1985 roku Mario i Anna Cappello wraz z grupą świeckich założyli Instytut Ewangelizacji Świata. Malta pozostaje sercem międzynarodowej rodziny ICPE.', n_en:'The motherhouse of the community. Here, in 1985, Mario and Anna Cappello together with a group of lay people founded the Institute for World Evangelisation. Malta remains the heart of the international ICPE family.' },
+    { id:3, name:'Malta', cc_pl:'Malta · kolebka Instytutu Ewangelizacji Świata - ICPE Mission', cc_en:'Malta · cradle of the Institute for World Evangelisation - ICPE Mission', lat:35.90, lng:14.51, g:'hq', tag_pl:'Europa', tag_en:'Europe', n_pl:'Dom macierzysty wspólnoty. To tutaj w 1985 roku Mario i Anna Cappello wraz z grupą świeckich założyli Instytut Ewangelizacji Świata. Malta pozostaje sercem międzynarodowej rodziny ICPE.', n_en:'The motherhouse of the community. Here, in 1985, Mario and Anna Cappello together with a group of lay people founded the Institute for World Evangelisation. Malta remains the heart of the international ICPE family.' },
     { id:4, name:'Fraternia kapłanów', cc_pl:'Malta', cc_en:'Malta', lat:35.88, lng:14.62, g:'hq', tag_pl:'Europa', tag_en:'Europe', n_pl:'Fraternia kapłanów ICPE Mission z siedzibą na Malcie. Kapłani, którzy towarzyszą świeckim wspólnotom na całym świecie — w formacji, sakramentach i wspólnej misji.', n_en:'The Fraternity of ICPE Mission priests, based in Malta. Priests who accompany the lay communities around the world — in formation, the sacraments and a shared mission.' },
     { id:5, name:'Oregon', cc_pl:'USA', cc_en:'USA', lat:44.9, lng:-122.8, g:'world', tag_pl:'Ameryka Płn.', tag_en:'North America', n_pl:'Szkoła Świadectwa (School of Witness) w Oregonie. Miesięczna, w pełni stacjonarna szkoła formacji: modlitwa, życie we wspólnocie, studium i ewangelizacja, prowadząca do stania się świadkiem wiary.', n_en:'The School of Witness in Oregon. A month-long, fully residential school of formation: prayer, community life, study and outreach, leading participants to become witnesses of the faith.' },
     { id:6, name:'Seul', cc_pl:'Korea Płd.', cc_en:'South Korea', lat:37.57, lng:126.98, g:'world', tag_pl:'Azja', tag_en:'Asia', n_pl:'Wspólnota ICPE Mission w Korei Południowej. Świeccy misjonarze niosący Ewangelię w dynamicznym, wielkomiejskim kontekście azjatyckim.', n_en:'The ICPE Mission community in South Korea. Lay missionaries bringing the Gospel into a fast-moving, urban Asian context.' },
@@ -139,14 +139,10 @@ const communities = await getCommunities();
     if (!Array.isArray(cms) || !cms.length) return;
     const byKey = {};
     cms.forEach((c) => { if (c && c.key) byKey[c.key] = c; });
+    // Z CMS nakładamy TYLKO opis (note). Nazwa/kraj/tag/współrzędne są stałe (kod strony).
     DATA.forEach((d) => {
       const o = byKey[d.key];
       if (!o) return;
-      if (o.name) d.name = o.name;
-      if (o.ccPl != null) d.cc_pl = o.ccPl;
-      if (o.ccEn != null) d.cc_en = o.ccEn;
-      if (o.tagPl != null) d.tag_pl = o.tagPl;
-      if (o.tagEn != null) d.tag_en = o.tagEn;
       if (o.notePl != null) d.n_pl = o.notePl;
       if (o.noteEn != null) d.n_en = o.noteEn;
     });
@@ -304,7 +300,7 @@ const communities = await getCommunities();
       root.querySelector('.wm-note').innerHTML = sanitizeNote(L(cur.n_pl, cur.n_en));
       root.querySelector('.wm-hint').textContent = L('najedź kursorem na pinezkę lub kraj', 'hover a pin or a country');
       root.querySelector('.wm-count').textContent = L('23 wspólnoty · 6 kontynentów', '23 communities · 6 continents');
-      root.querySelector('.wm-list-label').textContent = L('Wszystkie oddziały', 'All branches');
+      root.querySelector('.wm-list-label').textContent = L('Tam jest ICPE', 'Where ICPE is');
     }
 
     function renderChips() {

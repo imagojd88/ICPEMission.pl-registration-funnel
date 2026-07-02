@@ -136,9 +136,9 @@ GET   /admin/content/communities        → Community[]   (seeduje 19 przy pierw
 PATCH /admin/content/communities/:id     → Community     (edycja) + rebuild
 ```
 Model `Community`: `{ id, key, name, ccPl, ccEn, tagPl, tagEn, notePl, noteEn, lat, lng, grp, order }`.
-Pola **edytowalne** (PATCH): `name, ccPl, ccEn, tagPl, tagEn, notePl, noteEn`
-(nazwa, kraj PL/EN, tag PL/EN, opis PL/EN). `key/lat/lng/grp/order` są strukturalne — **nie edytuj** (mapa łączy dane po `key`).
-UI: lista 19 wspólnot (po `order`), formularz edycji z polami PL/EN (opis = textarea).
+**WAŻNE — strona wyświetla z CMS TYLKO opis** (`notePl` / `noteEn`). Nazwa, kraj i tag (`name/ccPl/ccEn/tagPl/tagEn`) oraz `key/lat/lng/grp/order` są stałe po stronie kodu strony (design) — mapa ich **nie** bierze z CMS. Dlatego w UI wystarczy edycja **opisu PL/EN**; edycja pozostałych pól nic nie zmieni na stronie (możesz je pokazać jako read-only).
+Opis obsługuje proste HTML: `<a href="https://…">tekst</a>`, `<b>/<i>/<strong>/<em>/<br>` (reszta jest usuwana; linki otwierają się w nowej karcie).
+UI: lista 19 wspólnot (po `order`), edycja pola opis PL/EN (textarea).
 Zmiana zapisuje się od razu i wyzwala rebuild strony. Publiczny odczyt: `GET /site/communities`.
 
 ## 6. Schemat bloków treści (pole `blocks`)
