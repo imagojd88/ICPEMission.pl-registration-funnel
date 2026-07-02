@@ -58,10 +58,12 @@ import WorldMap from '../components/WorldMap.astro';
         </aside>
       </header>
 
-      <!-- HERO IMAGE -->
+      <!-- HERO IMAGE — rotacja 2 zdjęć z powolnym crossfade.
+           Powrót do jednego zdjęcia: usuń drugi <img class="hero-slide"> poniżej. -->
       <div style="padding:0 72px 20px;">
-        <div style="height:420px; border-radius:16px; border:1px solid #E2D8C8; overflow:hidden;">
-          <img src="/uploads/photo-1507692049790-de58290a4334.avif" alt="Wspólnota podczas wieczoru uwielbienia" style="width:100%; height:100%; object-fit:cover; object-position:center 40%; display:block;" />
+        <div class="hero-slides" data-hero-slides style="position:relative; height:420px; border-radius:16px; border:1px solid #E2D8C8; overflow:hidden;">
+          <img class="hero-slide is-on" src="/uploads/photo-1507692049790-de58290a4334.avif" alt="Wspólnota podczas wieczoru uwielbienia" style="object-position:center 40%;" />
+          <img class="hero-slide" src="/uploads/hero_john.jpg" alt="John Paul podczas wieczoru uwielbienia" style="object-position:center 30%;" />
         </div>
       </div>
 
@@ -102,14 +104,15 @@ import WorldMap from '../components/WorldMap.astro';
                 <img src="/uploads/ks-pawlowski.jpg" alt="ks. Sławomir Pawłowski SAC" style="width:76px; height:76px; border-radius:50%; object-fit:cover; object-position:center 25%; border:2px solid #E2D8C8; flex:0 0 auto;" />
                 <div>
                   <div style="font-size:17px; font-weight:700; letter-spacing:-.01em;"><span data-pl>ks. Sławomir Pawłowski SAC</span><span data-en>fr. Sławomir Pawłowski SAC</span></div>
+                  <div style="font-family:'Space Mono',monospace; font-size:12px; letter-spacing:.04em; text-transform:uppercase; color:#A0724F; margin-top:3px;"><span data-pl>Doradca ICPE Mission Polska</span><span data-en>Spiritual advisor to the ICPE Mission Poland</span></div>
                 </div>
               </div>
             </figure>
 
             <figure class="quote" style="margin:0;">
               <p style="margin:0; font-family:'Instrument Serif',serif; font-style:italic; font-weight:400; font-size:27px; line-height:1.36; color:#3A3028;">
-                <span data-pl>„Pod wieloma względami ICPE ugruntowało moją drogę z Bogiem. Tutaj uczę się, jak stawać się człowiekiem według Bożego serca i uczę się tego do dziś. Naszym mottem zawsze było: »Poznać Go i pomóc poznać Go innym«. Musiałem nauczyć się całkowicie Mu oddać i pozwolić Mu napełnić mnie swoim uzdrowieniem i miłością, a On nauczył mnie Mu ufać. ICPE stworzyło dla mnie tę przestrzeń, poprzez nauczanie, uwielbienie i opiekę duszpasterską. To przygotowało mnie do kochania i służenia Jego ludowi w Polsce już przez ponad 16 lat."</span>
-                <span data-en>“In many ways the ICPE grounded me in my walk with God. Here, I learn how to become a man after God's heart and I am still learning till today. ICPE taught me how to fall in love with Jesus. As our motto was »To know him and to make him known«. I had to learn to surrender all to him and allow him to fill me with his healing and love, and he taught me to trust him. For me ICPE created that space, through the teachings, worship and pastoral care and structures, that helped me grow to be a man after God's heart. This prepared me to love and serve his people in Poland for more than 16 years.”</span>
+                <span data-pl>„Pod wieloma względami ICPE ugruntowało moją drogę z Bogiem. Tutaj uczę się, jak stawać się człowiekiem według Bożego serca i uczę się tego do dziś. ICPE stworzyło dla mnie tę przestrzeń poprzez formację, uwielbienie i opiekę duszpasterską. To przygotowało mnie do kochania i służenia Jego ludowi w Polsce już przez ponad 16 lat."</span>
+                <span data-en>“In many ways the ICPE grounded me in my walk with God. Here, I learn how to become a man after God's heart and I am still learning till today. For me ICPE created that space, through the teachings, worship and pastoral care and structures, that helped me grow to be a man after God's heart. This prepared me to love and serve his people in Poland for more than 16 years.”</span>
               </p>
               <div style="display:flex; align-items:center; gap:16px; margin-top:28px;">
                 <img src="/uploads/john-paul.jpg" alt="John Paul" style="width:76px; height:76px; border-radius:50%; object-fit:cover; object-position:48% 27%; border:2px solid #E2D8C8; flex:0 0 auto;" />
@@ -234,6 +237,10 @@ import WorldMap from '../components/WorldMap.astro';
 </LandingLayout>
 
 <style>
+  /* Hero — crossfade dwóch zdjęć (powolny fade) */
+  .hero-slide { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; opacity: 0; transition: opacity 1.8s ease-in-out; }
+  .hero-slide.is-on { opacity: 1; }
+
   /* Rotator cytatów w sekcji „Kim jesteśmy" */
   .quotes { position: relative; }
   .quote { display: none; }
@@ -276,6 +283,18 @@ import WorldMap from '../components/WorldMap.astro';
       el.setAttribute('href', 'mailto:' + email + (subj ? '?subject=' + encodeURIComponent(subj) : ''));
       if (el.hasAttribute('data-showtext') && !el.textContent.trim()) el.textContent = email;
     } catch (e) { /* ignore */ }
+  });
+
+  // Hero: powolny crossfade między zdjęciami co 7s.
+  document.querySelectorAll('[data-hero-slides]').forEach((box) => {
+    const slides = Array.from(box.querySelectorAll('.hero-slide'));
+    if (slides.length <= 1) return;
+    let i = 0;
+    setInterval(() => {
+      slides[i].classList.remove('is-on');
+      i = (i + 1) % slides.length;
+      slides[i].classList.add('is-on');
+    }, 7000);
   });
 
   // Rotator cytatów: pierwszy slajd (założyciele) startowy; auto-rotacja co 8s (gdy >1 cytat),

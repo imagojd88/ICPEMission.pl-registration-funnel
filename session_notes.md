@@ -73,6 +73,9 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 - Przyczyna: Astro scopuje style komponentu (atrybut `data-astro-cid-*` na elementach z szablonu), a piny/kropki/pierścienie/etykiety/chipy tworzę dynamicznie w JS — te elementy nie mają atrybutu scope, więc reguły `.wm-pin{position:absolute}` itd. do nich nie trafiały → bez `position:absolute` `left/top%` ignorowane → flow u góry.
 - Fix: w `WorldMap.astro` `<style>` selektory elementów tworzonych w JS zmienione na `:global(.wm-pin/.wm-ring/.wm-dot/.wm-label/.wm-chip)`. Zweryfikowane w zbudowanym HTML: reguły globalne (0 wystąpień ze scope).
 
+### Opisy wspólnot: obsługa linków <a href> (sanityzacja)
+- `WorldMap.astro`: opis (`.wm-note`) renderowany przez `sanitizeNote()` zamiast `textContent`. Dozwolone tagi: `a[href]`, `b/strong/i/em/br`; reszta rozpakowywana do tekstu. Linki tylko `http(s)`, wymuszone `target="_blank" rel="noopener noreferrer nofollow"` + styl terakota/underline. Bezpieczne (brak script/js: URL). Treść z CMS (trusted admin), więc innerHTML akceptowalny po sanityzacji.
+
 ### Edytowalne opisy wspólnot mapy (z Personal OS)
 - Wymóg usera: opisy pod mapą (hover/klik) edytowalne z CRM. Struktura mapy (współrzędne/piny) zostaje w kodzie; teksty z CMS.
 - Backend: Prisma model `Community` (key unikalny, name, ccPl/En, tagPl/En, notePl/En @Text, lat, lng, grp, order). Seed 19 (`api/src/content/community-seed.ts`) auto-upsert przy pierwszym GET (gdy tabela pusta). ContentService: `listCommunities`, `updateCommunity` (PATCH pól tekstowych + trigger rebuild), `publicCommunities`. Endpointy: `/admin/content/communities` (GET, PATCH :id) + `/site/communities`. Rejestracja: bez zmian (w ContentModule).

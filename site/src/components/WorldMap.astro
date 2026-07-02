@@ -159,6 +159,36 @@ const communities = await getCommunities();
   const xPct = (lng) => ((lng + 180) / 360) * 100;
   const yPct = (lat) => ((LATT - lat) / SPAN) * 100;
 
+  // Bezpieczny render opisu wspólnoty: dozwolone tylko proste formatowanie + linki.
+  // Reszta tagów jest rozpakowywana do tekstu; linki tylko http(s), otwierane w nowej karcie.
+  const NOTE_TAGS = { A: ['href'], B: [], STRONG: [], I: [], EM: [], BR: [] };
+  function sanitizeNote(html) {
+    const tpl = document.createElement('template');
+    tpl.innerHTML = String(html == null ? '' : html);
+    const walk = (parent) => {
+      Array.from(parent.childNodes).forEach((node) => {
+        if (node.nodeType !== 1) return; // tekst zostaje
+        const tag = node.tagName;
+        const allowedAttrs = NOTE_TAGS[tag];
+        const unwrap = () => parent.replaceChild(document.createTextNode(node.textContent || ''), node);
+        if (!allowedAttrs) { unwrap(); return; }
+        Array.from(node.attributes).forEach((a) => {
+          if (!allowedAttrs.includes(a.name.toLowerCase())) node.removeAttribute(a.name);
+        });
+        if (tag === 'A') {
+          const href = node.getAttribute('href') || '';
+          if (!/^https?:\/\//i.test(href)) { unwrap(); return; }
+          node.setAttribute('target', '_blank');
+          node.setAttribute('rel', 'noopener noreferrer nofollow');
+          node.setAttribute('style', 'color:#C0603C; text-decoration:underline;');
+        }
+        walk(node);
+      });
+    };
+    walk(tpl.content);
+    return tpl.innerHTML;
+  }
+
   function initWorldMap(root) {
     applyOverlay(root);
     const canvas = root.querySelector('.wm-canvas');
@@ -271,7 +301,7 @@ const communities = await getCommunities();
         `${Math.abs(cur.lat).toFixed(2)}° ${cur.lat >= 0 ? 'N' : 'S'}   ${Math.abs(cur.lng).toFixed(2)}° ${cur.lng >= 0 ? 'E' : 'W'}`;
       root.querySelector('.wm-name').textContent = cur.name;
       root.querySelector('.wm-country').textContent = L(cur.cc_pl, cur.cc_en);
-      root.querySelector('.wm-note').textContent = L(cur.n_pl, cur.n_en);
+      root.querySelector('.wm-note').innerHTML = sanitizeNote(L(cur.n_pl, cur.n_en));
       root.querySelector('.wm-hint').textContent = L('najedź kursorem na pinezkę lub kraj', 'hover a pin or a country');
       root.querySelector('.wm-count').textContent = L('23 wspólnoty · 6 kontynentów', '23 communities · 6 continents');
       root.querySelector('.wm-list-label').textContent = L('Wszystkie oddziały', 'All branches');
