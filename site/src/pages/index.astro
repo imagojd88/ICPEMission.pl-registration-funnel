@@ -241,12 +241,11 @@ import WorldMap from '../components/WorldMap.astro';
   .hero-slide { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; opacity: 0; transition: opacity 1.8s ease-in-out; }
   .hero-slide.is-on { opacity: 1; }
 
-  /* Rotator cytatów w sekcji „Kim jesteśmy" */
-  .quotes { position: relative; }
-  .quote { display: none; }
-  .quote.is-active { display: block; animation: quoteFade .5s ease; }
-  @keyframes quoteFade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-  .quote-dots { display: flex; gap: 8px; margin-top: 26px; }
+  /* Rotator cytatów — płynny crossfade (nakładanie slajdów w gridzie, bez skoków wysokości) */
+  .quotes { display: grid; grid-template-columns: 1fr; }
+  .quote { grid-column: 1; grid-row: 1; opacity: 0; transition: opacity 1s ease-in-out; pointer-events: none; }
+  .quote.is-active { opacity: 1; pointer-events: auto; }
+  .quote-dots { grid-column: 1; grid-row: 2; display: flex; gap: 8px; margin-top: 26px; }
   .quote-dots button { width: 8px; height: 8px; border-radius: 50%; border: none; padding: 0; cursor: pointer; background: #c9bca9; transition: background .15s, transform .15s; }
   .quote-dots button.is-on { background: #c0603c; transform: scale(1.25); }
 
