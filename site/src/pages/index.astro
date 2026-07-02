@@ -1,6 +1,26 @@
 ---
 import LandingLayout from '../layouts/LandingLayout.astro';
 import WorldMap from '../components/WorldMap.astro';
+import { getSettings, type HeroImage } from '../lib/api';
+
+// Hero: konfiguracja z ustawień (Personal OS). Fallback = obecne 5 zdjęć, gdy API puste.
+const FALLBACK_HERO_IMAGES: HeroImage[] = [
+  { url: '/uploads/photo-1507692049790-de58290a4334.avif', position: 'center 40%', alt: 'Wieczór uwielbienia' },
+  { url: '/uploads/hero_john.jpg', position: 'center 30%', alt: 'John Paul' },
+  { url: '/uploads/hero_3.jpg', position: 'center 38%', alt: 'Wspólnota ICPE Mission' },
+  { url: '/uploads/hero_4.jpg', position: 'center 45%', alt: 'Uwielbienie' },
+  { url: '/uploads/hero_5.jpg', position: 'center 33%', alt: 'Modlitwa' },
+];
+const settings = await getSettings();
+const heroCfg = settings.hero && Array.isArray(settings.hero.images) && settings.hero.images.length
+  ? settings.hero
+  : { rotate: true, defaultUrl: null, images: FALLBACK_HERO_IMAGES };
+const heroRotate = heroCfg.rotate !== false;
+let heroImages: HeroImage[] = heroCfg.images;
+if (!heroRotate) {
+  const def = heroImages.find((i) => i.url === heroCfg.defaultUrl) || heroImages[0];
+  heroImages = def ? [def] : heroImages.slice(0, 1);
+}
 ---
 
 <LandingLayout>
@@ -58,12 +78,17 @@ import WorldMap from '../components/WorldMap.astro';
         </aside>
       </header>
 
-      <!-- HERO IMAGE — rotacja 2 zdjęć z powolnym crossfade.
-           Powrót do jednego zdjęcia: usuń drugi <img class="hero-slide"> poniżej. -->
+      <!-- HERO IMAGE — zdjęcia i rotacja sterowane z ustawień (Personal OS). -->
       <div style="padding:0 72px 20px;">
         <div class="hero-slides" data-hero-slides style="position:relative; height:420px; border-radius:16px; border:1px solid #E2D8C8; overflow:hidden;">
-          <img class="hero-slide is-on" src="/uploads/photo-1507692049790-de58290a4334.avif" alt="Wspólnota podczas wieczoru uwielbienia" style="object-position:center 40%;" />
-          <img class="hero-slide" src="/uploads/hero_john.jpg" alt="John Paul podczas wieczoru uwielbienia" style="object-position:center 30%;" />
+          {heroImages.map((img, i) => (
+            <img
+              class={`hero-slide${i === 0 ? ' is-on' : ''}`}
+              src={img.url}
+              alt={img.alt || 'ICPE Mission'}
+              style={`object-position:${img.position || 'center'};`}
+            />
+          ))}
         </div>
       </div>
 

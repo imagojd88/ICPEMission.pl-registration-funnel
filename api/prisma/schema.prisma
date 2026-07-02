@@ -484,5 +484,6 @@ model SiteSettings {
   socials           Json?    // { facebook, instagram, youtube, ... }
   footerText        String?
   defaultOgImageUrl String?
+  hero              Json?    // { rotate: bool, defaultUrl: string|null, images: [{url, position?, alt?}] }
   updatedAt         DateTime @updatedAt
 }

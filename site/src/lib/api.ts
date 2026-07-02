@@ -59,6 +59,16 @@ export interface MenuItem {
   order: number;
 }
 
+export interface HeroImage {
+  url: string;
+  position?: string; // CSS object-position, np. "center 40%"
+  alt?: string;
+}
+export interface HeroConfig {
+  rotate: boolean;
+  defaultUrl?: string | null;
+  images: HeroImage[];
+}
 export interface SiteSettings {
   siteName: string;
   logoUrl?: string | null;
@@ -67,6 +77,7 @@ export interface SiteSettings {
   socials?: Record<string, string> | null;
   footerText?: string | null;
   defaultOgImageUrl?: string | null;
+  hero?: HeroConfig | null;
 }
 
 export interface UpcomingEvent {

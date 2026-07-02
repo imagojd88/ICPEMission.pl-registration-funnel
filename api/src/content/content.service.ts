@@ -10,6 +10,19 @@ const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : und
 const strOrNull = (v: unknown): string | null | undefined =>
   v === null ? null : typeof v === 'string' ? v : undefined;
 
+// Domyślna konfiguracja hero (obecne 5 zdjęć landingu) — seed przy pierwszym odczycie.
+const DEFAULT_HERO = {
+  rotate: true,
+  defaultUrl: '/uploads/photo-1507692049790-de58290a4334.avif',
+  images: [
+    { url: '/uploads/photo-1507692049790-de58290a4334.avif', position: 'center 40%', alt: 'Wieczór uwielbienia' },
+    { url: '/uploads/hero_john.jpg', position: 'center 30%', alt: 'John Paul' },
+    { url: '/uploads/hero_3.jpg', position: 'center 38%', alt: 'Wspólnota ICPE Mission' },
+    { url: '/uploads/hero_4.jpg', position: 'center 45%', alt: 'Uwielbienie' },
+    { url: '/uploads/hero_5.jpg', position: 'center 33%', alt: 'Modlitwa' },
+  ],
+};
+
 @Injectable()
 export class ContentService {
   constructor(
@@ -164,11 +177,20 @@ export class ContentService {
 
   // ── SETTINGS (singleton) ─────────────────────────────────────────
   async getSettings() {
-    return this.prisma.siteSettings.upsert({
+    const s = await this.prisma.siteSettings.upsert({
       where: { id: 'singleton' },
       update: {},
       create: { id: 'singleton' },
     });
+    // Seed domyślnego hero przy pierwszym odczycie (gdy brak).
+    if ((s as { hero?: unknown }).hero == null) {
+      return this.prisma.siteSettings.update({
+        where: { id: 'singleton' },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        data: { hero: DEFAULT_HERO as any },
+      });
+    }
+    return s;
   }
 
   async putSettings(body: AnyBody) {
@@ -180,6 +202,7 @@ export class ContentService {
     if (body.socials !== undefined) d.socials = body.socials ?? null;
     if (strOrNull(body.footerText) !== undefined) d.footerText = strOrNull(body.footerText);
     if (strOrNull(body.defaultOgImageUrl) !== undefined) d.defaultOgImageUrl = strOrNull(body.defaultOgImageUrl);
+    if (body.hero !== undefined) d.hero = body.hero ?? null;
     const s = await this.prisma.siteSettings.upsert({
       where: { id: 'singleton' },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

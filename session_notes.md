@@ -49,6 +49,14 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 - Weryfikacja: astro build + check = 0 błędów, api tsc OK.
 - „Napisz do nas" → **mailto** `warszawa@icpemission.pl` (wybór usera). Antyspam: adres jako base64 w `data-mail`, `mailto:` (z tematem „Kontakt — ICPE Mission Warszawa") składany w JS przy załadowaniu → w źródle HTML brak wzorca „x@y" (zweryfikowane: 0 wystąpień plaintextu). Podpięte: przycisk w nawigacji, przycisk w banerze CTA, oraz zakodowany link w stopce (JS pokazuje adres jako tekst). Fallback bez JS: `href="#kontakt"` (scroll do stopki). Klasa `.js-mail` + skrypt w index.astro.
 
+### Hero: 3 dodatkowe zdjęcia + sterowanie z CMS (SiteSettings.hero)
+- Dodane hero_3/4/5.jpg do rotacji (razem 5 slajdów; object-position dobrane pod kadr 420px).
+- Hero przeniesione z hardcode na CMS: `SiteSettings.hero` Json `{ rotate, defaultUrl, images:[{url,position?,alt?}] }`. Backend: schema + `getSettings` zasiewa DEFAULT_HERO (5 obecnych zdjęć) przy pierwszym odczycie; `putSettings` przyjmuje `hero`. `content.service.ts`.
+- Astro `index.astro`: `getSettings()` przy buildzie → render hero z `hero.images`; `rotate=false` → tylko domyślne (defaultUrl lub pierwsze). Fallback do 5 wbudowanych, gdy API puste/down. Crossfade CSS/JS bez zmian.
+- URL zdjęć: zasiane = względne `/uploads/*` (statyki strony); nowe z Personal OS = PEŁNY URL `${API_BASE}/uploads/:id` (strona i API to różne domeny!).
+- Handoff dla Personal OS: `docs/09-prompt-personal-os-hero.md` (sekcja Hero w Ustawieniach: toggle rotacji, dodaj/usuń zdjęcie, oznacz domyślne).
+- Po pushu: Manual Deploy `icpe-api` (nowa kolumna `hero` + seed). Do tego czasu strona i tak pokazuje 5 zdjęć (fallback).
+
 ### „Kim jesteśmy" — rotator cytatów
 - Blok cytatu (dot. założycieli) zamieniony na rotator: `.quotes[data-quotes]` z `<figure class="quote">` (każdy = cytat PL/EN + podpis: zdjęcie opcjonalne + nazwa + rola PL/EN). Pierwszy = założyciele (`is-active`), zawsze na starcie.
 - CSS: `.quote{display:none}`, `.quote.is-active{display:block; @keyframes quoteFade}`, `.quote-dots button(.is-on)`.
