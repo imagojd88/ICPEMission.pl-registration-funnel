@@ -54,6 +54,8 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 - CSS: `.quote{display:none}`, `.quote.is-active{display:block; @keyframes quoteFade}`, `.quote-dots button(.is-on)`.
 - JS (is:inline w index.astro): auto-rotacja co 8s tylko gdy >1 cytat, pauza na hover, kropki budowane dynamicznie; przy 1 cytacie kropki ukryte i brak rotacji. Język przez CSS (data-pl/data-en).
 - DO DODANIA: kolejne cytaty od usera — wstawiać `<figure class="quote">…</figure>` przed `<div class="quote-dots">`. Format cytatu: tekst PL + EN, nazwa autora, rola PL + EN, opcjonalnie zdjęcie (URL w /uploads).
+- Cytat #2: ks. Sławomir Pawłowski SAC (PL/EN, bez roli). Zdjęcie: `site/public/uploads/ks-pawlowski.jpg` (user zapisuje sam — plik niedostępny z sesji).
+- Cytat #3: John Paul, ICPE Mission Warszawa/Warsaw (name + rola). Zdjęcie: `site/public/uploads/john-paul.jpg` (user zapisuje; to szeroka fotka ze sceny → mocny zoom w okrągłym kadrze, object-position 48% 27%). Drobne poprawki gramatyczne w EN (helped me grow / to make him known / przecinki) — do rewertu jeśli user chce verbatim. Rotacja: 3 slajdy, założyciele zawsze pierwsi.
 
 ### Stopka — linki zewnętrzne + social
 - Przebudowa stopki na 4 kolumny (marka+e-mail, Nawigacja, „ICPE w sieci", „Social"); na mobile 1 kolumna.
