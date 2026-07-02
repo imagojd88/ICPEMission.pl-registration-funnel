@@ -76,16 +76,24 @@ import WorldMap from '../components/WorldMap.astro';
       <section id="wspolnota" class="ethos" style="padding:80px 72px; display:grid; grid-template-columns:1.15fr 1fr; gap:72px;">
         <div>
           <div style="font-family:'Space Mono',monospace; font-size:13px; letter-spacing:.14em; text-transform:uppercase; color:#A0724F; margin-bottom:24px;"><span data-pl>Kim jesteśmy</span><span data-en>Who we are</span></div>
-          <p style="margin:0; font-family:'Instrument Serif',serif; font-style:italic; font-weight:400; font-size:27px; line-height:1.36; color:#3A3028;">
-            <span data-pl>„Wspólnota ICPE urodziła się z ziarenka Bożej obietnicy na małej wyspie na Morzu Śródziemnym. Kiedy zebrali się ludzie gotowi żyć tą obietnicą, zobaczyliśmy otwierające się drzwi — i dzięki łasce z wysoka dzisiaj docieramy do ludzi w potrzebie na całym świecie. Przyjdź i dołącz do nas!"</span>
-            <span data-en>“The ICPE Community was born from the seed of God's promise on a small island in the Mediterranean. When people gathered, ready to live that promise, we saw doors open, and by grace from on high, today we reach people in need around the world. Come and join us!”</span>
-          </p>
-          <div style="display:flex; align-items:center; gap:16px; margin-top:28px;">
-            <img src="/uploads/462623044_7856737674427104_2359881754499323139_n.jpg" alt="Anna i Mario Cappello" style="width:76px; height:76px; border-radius:50%; object-fit:cover; object-position:center 30%; border:2px solid #E2D8C8; flex:0 0 auto;" />
-            <div>
-              <div style="font-size:17px; font-weight:700; letter-spacing:-.01em;">Anna &amp; Mario Cappello</div>
-              <div style="font-family:'Space Mono',monospace; font-size:12px; letter-spacing:.04em; text-transform:uppercase; color:#A0724F; margin-top:3px;"><span data-pl>Założyciele · Malta</span><span data-en>Founders · Malta</span></div>
-            </div>
+          <!-- Rotator cytatów. Pierwszy (założyciele) zawsze na starcie. Kolejne cytaty:
+               dodaj następne <figure class="quote"> … </figure> przed <div class="quote-dots">. -->
+          <div class="quotes" data-quotes>
+            <figure class="quote is-active" style="margin:0;">
+              <p style="margin:0; font-family:'Instrument Serif',serif; font-style:italic; font-weight:400; font-size:27px; line-height:1.36; color:#3A3028;">
+                <span data-pl>„Wspólnota ICPE urodziła się z ziarenka Bożej obietnicy na małej wyspie na Morzu Śródziemnym. Kiedy zebrali się ludzie gotowi żyć tą obietnicą, zobaczyliśmy otwierające się drzwi — i dzięki łasce z wysoka dzisiaj docieramy do ludzi w potrzebie na całym świecie. Przyjdź i dołącz do nas!"</span>
+                <span data-en>“The ICPE Community was born from the seed of God's promise on a small island in the Mediterranean. When people gathered, ready to live that promise, we saw doors open, and by grace from on high, today we reach people in need around the world. Come and join us!”</span>
+              </p>
+              <div style="display:flex; align-items:center; gap:16px; margin-top:28px;">
+                <img src="/uploads/462623044_7856737674427104_2359881754499323139_n.jpg" alt="Anna i Mario Cappello" style="width:76px; height:76px; border-radius:50%; object-fit:cover; object-position:center 30%; border:2px solid #E2D8C8; flex:0 0 auto;" />
+                <div>
+                  <div style="font-size:17px; font-weight:700; letter-spacing:-.01em;">Anna &amp; Mario Cappello</div>
+                  <div style="font-family:'Space Mono',monospace; font-size:12px; letter-spacing:.04em; text-transform:uppercase; color:#A0724F; margin-top:3px;"><span data-pl>Założyciele · Malta</span><span data-en>Founders · Malta</span></div>
+                </div>
+              </div>
+            </figure>
+
+            <div class="quote-dots" role="tablist" aria-label="Cytaty"></div>
           </div>
         </div>
         <div style="padding-top:8px;">
@@ -199,6 +207,15 @@ import WorldMap from '../components/WorldMap.astro';
 </LandingLayout>
 
 <style>
+  /* Rotator cytatów w sekcji „Kim jesteśmy" */
+  .quotes { position: relative; }
+  .quote { display: none; }
+  .quote.is-active { display: block; animation: quoteFade .5s ease; }
+  @keyframes quoteFade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .quote-dots { display: flex; gap: 8px; margin-top: 26px; }
+  .quote-dots button { width: 8px; height: 8px; border-radius: 50%; border: none; padding: 0; cursor: pointer; background: #c9bca9; transition: background .15s, transform .15s; }
+  .quote-dots button.is-on { background: #c0603c; transform: scale(1.25); }
+
   /* Responsywność — składanie gridów do 1 kolumny na mobile */
   @media (max-width: 900px) {
     .hero { grid-template-columns: 1fr !important; }
@@ -232,6 +249,33 @@ import WorldMap from '../components/WorldMap.astro';
       el.setAttribute('href', 'mailto:' + email + (subj ? '?subject=' + encodeURIComponent(subj) : ''));
       if (el.hasAttribute('data-showtext') && !el.textContent.trim()) el.textContent = email;
     } catch (e) { /* ignore */ }
+  });
+
+  // Rotator cytatów: pierwszy slajd (założyciele) startowy; auto-rotacja co 8s (gdy >1 cytat),
+  // pauza na hover, kropki do ręcznego przełączania. Język działa przez CSS (data-pl/data-en).
+  document.querySelectorAll('[data-quotes]').forEach((box) => {
+    const slides = Array.from(box.querySelectorAll('.quote'));
+    const dotsWrap = box.querySelector('.quote-dots');
+    if (slides.length <= 1) { if (dotsWrap) dotsWrap.style.display = 'none'; return; }
+    let idx = 0, timer;
+    const dots = slides.map((_, i) => {
+      const b = document.createElement('button');
+      b.setAttribute('aria-label', 'Cytat ' + (i + 1));
+      if (i === 0) b.classList.add('is-on');
+      b.addEventListener('click', () => { show(i); restart(); });
+      dotsWrap.appendChild(b);
+      return b;
+    });
+    function show(i) {
+      slides[idx].classList.remove('is-active'); dots[idx].classList.remove('is-on');
+      idx = i;
+      slides[idx].classList.add('is-active'); dots[idx].classList.add('is-on');
+    }
+    function next() { show((idx + 1) % slides.length); }
+    function restart() { clearInterval(timer); timer = setInterval(next, 8000); }
+    restart();
+    box.addEventListener('mouseenter', () => clearInterval(timer));
+    box.addEventListener('mouseleave', restart);
   });
 
   // Przełącznik języka PL/EN — ustawia data-lang na kontenerze (CSS steruje widocznością).
