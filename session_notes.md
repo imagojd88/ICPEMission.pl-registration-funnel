@@ -49,6 +49,12 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 - Weryfikacja: astro build + check = 0 błędów, api tsc OK.
 - „Napisz do nas" → **mailto** `warszawa@icpemission.pl` (wybór usera). Antyspam: adres jako base64 w `data-mail`, `mailto:` (z tematem „Kontakt — ICPE Mission Warszawa") składany w JS przy załadowaniu → w źródle HTML brak wzorca „x@y" (zweryfikowane: 0 wystąpień plaintextu). Podpięte: przycisk w nawigacji, przycisk w banerze CTA, oraz zakodowany link w stopce (JS pokazuje adres jako tekst). Fallback bez JS: `href="#kontakt"` (scroll do stopki). Klasa `.js-mail` + skrypt w index.astro.
 
+### Stopka — linki zewnętrzne + social
+- Przebudowa stopki na 4 kolumny (marka+e-mail, Nawigacja, „ICPE w sieci", „Social"); na mobile 1 kolumna.
+- ICPE w sieci: ICPE International (icpe.org), ICPE Book (icpebook.org), HopeXchange (hopexchangemedicalcenter.org).
+- Social: Instagram (icpemission360), FB ICPE Warszawa (id=61583565058942), FB Seminary (ICPEMissionSeminary), FB ICPE 360 (id=100068380218392). Wszystkie `target="_blank" rel="noopener noreferrer"`.
+- E-mail (mailto base64) przeniesiony do kolumny marki.
+
 ### Domena icpemission.pl podpięta (ZROBIONE przez usera)
 - DNS (nameservery aderlo.cloud): apex `icpemission.pl` A → 216.24.57.1 (Render), `www` CNAME → icpe-site.onrender.com. Uwaga: na apexie NIE dawać CNAME (kolizja z MX/NS/TXT) — użyto rekordu A wg alternatywy Rendera. Rekordy Brevo/poczty (MX, SPF, DKIM brevo1._domainkey + x._domainkey, _dmarc, @ TXT brevo-code, mail/smtp/pop) nietknięte. `rejestracja` CNAME → icpe-frontend.onrender.com bez zmian.
 - Zweryfikowane z zewnątrz: `https://icpemission.pl` serwuje landing po HTTPS, canonical/OG = https://icpemission.pl/, SSL OK. Strona produkcyjna.
