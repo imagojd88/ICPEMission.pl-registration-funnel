@@ -172,6 +172,7 @@ export class RegistrationsService {
     ]);
 
     const updated = await this.prisma.registration.findUnique({ where: { id }, include: { participants: true } });
+    if (!updated) throw new NotFoundException('Registration not found');
     return { registration: this.mapToDto(updated), summary: priceResult };
   }
 
