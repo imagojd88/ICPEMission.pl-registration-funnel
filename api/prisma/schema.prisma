@@ -259,6 +259,8 @@ model Registration {
   contact             Json
   preferredRoomTypeId String?
   roomsJson           Json?
+  optionsJson         Json?      // opcje wyceny: { transport, bedding } — do edycji/przeliczenia
+  discountCode        String?
   dietaryNotes        String?
   totalPrice          Decimal            @db.Decimal(10, 2)
   currency            String             @default("PLN")

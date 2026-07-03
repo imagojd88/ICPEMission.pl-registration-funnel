@@ -1,5 +1,5 @@
 import {
-  Controller, Get, Post, Put, Param, Query, Body, Res, UseGuards,
+  Controller, Get, Post, Put, Patch, Param, Query, Body, Res, UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { RegistrationsService } from './registrations.service';
@@ -51,6 +51,15 @@ export class RegistrationsController {
   }
 
   // ── Admin endpoints ────────────────────────────────────────────────────────
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Patch('admin/registrations/:id')
+  @ApiOperation({ summary: 'Edytuj zgłoszenie (admin) — pełny skład + ponowne przeliczenie ceny' })
+  adminUpdate(@Param('id') id: string, @Body() dto: Record<string, unknown>) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return this.regs.adminUpdate(id, dto as any);
+  }
 
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()

@@ -7,8 +7,11 @@ import {
   getAdminRegistrations,
   markRegistrationPaid,
   patchRegistrationStatus,
+  getEventEditConfig,
 } from '@/lib/api'
-import type { RegistrationDto, EventInstanceDto } from '@icpe/shared'
+import type { RegistrationDto, EventInstanceDto, PricingConfig } from '@icpe/shared'
+import { DEFAULT_PRICING } from '@icpe/shared'
+import RegistrationEditForm from './RegistrationEditForm'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -45,11 +48,13 @@ function RegistrationDrawer({
   onClose,
   onMarkPaid,
   onStatusChange,
+  onEdit,
 }: {
   registration: RegistrationDto
   onClose: () => void
   onMarkPaid: (id: string) => Promise<void>
   onStatusChange: (id: string, status: string) => Promise<void>
+  onEdit: (r: RegistrationDto) => void
 }) {
   const r = registration
   const fullName = `${r.contact.firstName} ${r.contact.lastName}`
@@ -249,6 +254,9 @@ function RegistrationDrawer({
           className="px-6 py-4 flex flex-col gap-2 sticky bottom-0"
           style={{ background: 'var(--surface)', borderTop: '1px solid var(--border)' }}
         >
+          <Button size="sm" variant="outline" onClick={() => onEdit(r)}>
+            Edytuj zgłoszenie
+          </Button>
           <div className="grid grid-cols-2 gap-2">
             <Button
               size="sm"
@@ -296,6 +304,8 @@ export default function RegistrationsScreen() {
   const [statusFilter, setStatusFilter] = useState<PayStatus>('all')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [openDrawer, setOpenDrawer] = useState<RegistrationDto | null>(null)
+  const [editing, setEditing] = useState<RegistrationDto | null>(null)
+  const [pricingConfig, setPricingConfig] = useState<PricingConfig>(DEFAULT_PRICING)
 
   const [instances, setInstances] = useState<EventInstanceDto[]>([])
   const [selectedInstanceId, setSelectedInstanceId] = useState<string>('')
@@ -333,6 +343,16 @@ export default function RegistrationsScreen() {
   useEffect(() => {
     if (selectedInstanceId) loadRegs(selectedInstanceId)
   }, [selectedInstanceId, loadRegs])
+
+  // Konfiguracja cennika instancji (do edycji zgłoszeń — typy pokoi, opcje, przeliczenie).
+  useEffect(() => {
+    const inst = instances.find((i) => i.id === selectedInstanceId)
+    const slug = (inst as { slug?: string } | undefined)?.slug
+    if (!slug) return
+    getEventEditConfig(slug)
+      .then((cfg) => setPricingConfig(cfg.pricingConfig ?? DEFAULT_PRICING))
+      .catch(() => setPricingConfig(DEFAULT_PRICING))
+  }, [selectedInstanceId, instances])
 
   async function handleMarkPaid(id: string) {
     await markRegistrationPaid(id)
@@ -598,6 +618,17 @@ export default function RegistrationsScreen() {
           onClose={() => setOpenDrawer(null)}
           onMarkPaid={handleMarkPaid}
           onStatusChange={handleStatusChange}
+          onEdit={(r) => { setOpenDrawer(null); setEditing(r) }}
+        />
+      )}
+
+      {/* Edycja zgłoszenia */}
+      {editing && (
+        <RegistrationEditForm
+          registration={editing}
+          pricingConfig={pricingConfig}
+          onClose={() => setEditing(null)}
+          onSaved={() => { setEditing(null); loadRegs(selectedInstanceId) }}
         />
       )}
     </div>

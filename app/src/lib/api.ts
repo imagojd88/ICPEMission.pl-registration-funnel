@@ -666,6 +666,28 @@ export async function getAdminRegistrations(
   )
 }
 
+/** Admin: pełna edycja zgłoszenia (kontakt, uczestnicy, pokoje, opcje) z przeliczeniem ceny. */
+export interface AdminEditRegistrationDto {
+  contact?: { firstName: string; lastName: string; email: string; phone?: string }
+  participants: Array<{ type: 'adult' | 'child'; firstName: string; lastName?: string; age?: number; gender?: string; dietary?: string }>
+  rooms: Array<{ roomId: string; participantIndexes: number[] }>
+  options?: { transport?: boolean; bedding?: boolean }
+  discountCode?: string
+  dietaryNotes?: string | null
+  locale?: string
+}
+export async function adminUpdateRegistration(
+  id: string,
+  dto: AdminEditRegistrationDto,
+  token?: string,
+): Promise<{ registration: RegistrationDto; summary: unknown }> {
+  return apiFetch(`/admin/registrations/${id}`, {
+    method: 'PATCH',
+    headers: authHeaders(token),
+    body: JSON.stringify(dto),
+  })
+}
+
 export async function markRegistrationPaid(id: string, token?: string): Promise<void> {
   await apiFetch(`/admin/registrations/${id}/mark-paid`, {
     method: 'POST',

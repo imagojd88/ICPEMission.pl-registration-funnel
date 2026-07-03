@@ -90,6 +90,10 @@ export interface RegistrationDto {
   roomLabel?: string | null;
   roomNote?: string | null;
   createdAt: string;
+  /** Do edycji przez admina: pełny skład pokoi + opcje + kod rabatowy. */
+  rooms?: Array<{ roomId: string; participantIndexes: number[] }>;
+  options?: { transport?: boolean; bedding?: boolean };
+  discountCode?: string;
 }
 
 /** Jeden pokój w komponowanym zgłoszeniu: typ pokoju + indeksy osób z `participants`. */

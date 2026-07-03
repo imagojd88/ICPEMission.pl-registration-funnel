@@ -135,6 +135,13 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — moduł rejestracji
 
+### Edycja zgłoszeń przez admina (oba: app + Personal OS, pełna edycja z przeliczeniem)
+- Backend: `PATCH /admin/registrations/:id` (registrations.controller + `adminUpdate` w service). Przyjmuje pełny skład (kontakt, uczestnicy, pokoje, opcje), PONOWNIE przelicza cenę (silnik), podmienia uczestników (transakcja: kasuje roomAssignment+participant, tworzy nowych), aktualizuje roomsJson/optionsJson/totalPrice/currency + kwotę płatności PENDING. Nie rusza statusu/metody płatności.
+- Prisma: `Registration.optionsJson` + `discountCode` (nowe kolumny) — zapisywane przy create i edycji. DTO admina (`toContractRegistration`) wystawia teraz `rooms/options/discountCode/dietaryNotes` do wczytania w formularzu. `RegistrationDto` (shared) rozszerzone.
+- App UI: `RegistrationEditForm.tsx` (modal) — kontakt, uczestnicy (dodaj/usuń, przypisania po ID uczestnika→indeksy przy zapisie), pokoje (typ + przypisanie osób), opcje, uwagi, żywa kwota (computePrice), walidacja (wszyscy przypisani, pojemność). Wpięte w RegistrationsScreen (przycisk „Edytuj zgłoszenie" w drawerze; pobiera pricingConfig instancji przez getEventEditConfig). api: `adminUpdateRegistration`.
+- Handoff dla Personal OS: `docs/10-prompt-personal-os-edycja-zgloszen.md`.
+- Weryfikacja: app+api tsc + vite build OK. Po pushu: **Manual Deploy icpe-api** (nowe kolumny optionsJson/discountCode).
+
 ### Fix funnela: blokada bez wyboru pokoju + czytelne błędy
 - Bug: „API 400: ." przy submit, bo krok pokoju (step 3) przepuszczał dalej bez przypisania osób do pokoi (DTO `rooms` @ArrayNotEmpty).
 - `api.ts apiFetch`: przy !res.ok czyta treść z body (NestJS `{message}`) i rzuca czytelny komunikat zamiast „API 400: {statusText pusty}".

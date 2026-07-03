@@ -57,6 +57,8 @@ export class RegistrationsService {
         contact: dto.contact as object,
         // roomsJson — skład pokoi (nowy model kompozycji); pole dodane do schematu Prisma
         ...(({ roomsJson: dto.rooms as unknown }) as { roomsJson: unknown }),
+        optionsJson: dto.options as unknown,
+        discountCode: dto.discountCode,
         dietaryNotes: dto.dietaryNotes,
         totalPrice: priceResult.total,
         currency: priceResult.currency,
@@ -101,6 +103,76 @@ export class RegistrationsService {
             ? { method: 'CASH', note: 'Płatność gotówką na miejscu' }
             : { method: 'ONLINE', registrationId: registration.id },
     };
+  }
+
+  /**
+   * Edycja zgłoszenia przez admina (Personal OS / panel). Przyjmuje pełny nowy skład
+   * (kontakt, uczestnicy, pokoje, opcje) i PONOWNIE przelicza cenę. Podmienia uczestników,
+   * aktualizuje roomsJson, totalPrice i ewentualną płatność PENDING. Nie zmienia statusu ani
+   * metody płatności.
+   */
+  async adminUpdate(id: string, dto: {
+    contact?: Record<string, unknown>;
+    participants: Array<{ type: 'adult' | 'child'; firstName: string; lastName?: string; age?: number; gender?: string; dietary?: string }>;
+    rooms: Array<{ roomId: string; participantIndexes: number[] }>;
+    options?: { transport?: boolean; bedding?: boolean };
+    discountCode?: string;
+    dietaryNotes?: string | null;
+    locale?: string;
+  }) {
+    const reg = await this.prisma.registration.findUnique({ where: { id } });
+    if (!reg) throw new NotFoundException('Registration not found');
+
+    const priceInput: PriceInput = {
+      rooms: dto.rooms.map((entry) => ({
+        roomId: entry.roomId,
+        participants: entry.participantIndexes.map((i) => ({
+          type: dto.participants[i].type,
+          age: dto.participants[i].age ?? 0,
+        })),
+      })),
+      options: { transport: !!dto.options?.transport, bedding: !!dto.options?.bedding },
+      discountCode: dto.discountCode,
+    };
+    const priceResult = await this.pricing.quote(priceInput, reg.instanceId);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const p: any = this.prisma;
+    await this.prisma.$transaction([
+      // Fizyczne przydziały pokoi i uczestnicy są tworzeni od nowa.
+      p.roomAssignment.deleteMany({ where: { registrationId: id } }),
+      p.participant.deleteMany({ where: { registrationId: id } }),
+      p.payment.updateMany({
+        where: { registrationId: id, status: 'PENDING' },
+        data: { amount: priceResult.total, currency: priceResult.currency },
+      }),
+      p.registration.update({
+        where: { id },
+        data: {
+          ...(dto.contact ? { contact: dto.contact as object } : {}),
+          ...(dto.locale ? { locale: dto.locale } : {}),
+          roomsJson: dto.rooms as unknown,
+          optionsJson: (dto.options ?? {}) as unknown,
+          discountCode: dto.discountCode ?? null,
+          dietaryNotes: dto.dietaryNotes ?? null,
+          totalPrice: priceResult.total,
+          currency: priceResult.currency,
+          participants: {
+            create: dto.participants.map((pp) => ({
+              type: (pp.type === 'adult' ? 'ADULT' : 'CHILD') as 'ADULT' | 'CHILD',
+              firstName: pp.firstName,
+              lastName: pp.lastName ?? '',
+              age: pp.age,
+              gender: (pp.gender === 'F' ? 'FEMALE' : pp.gender === 'M' ? 'MALE' : 'OTHER') as 'MALE' | 'FEMALE' | 'OTHER',
+              dietary: pp.dietary,
+            })),
+          },
+        },
+      }),
+    ]);
+
+    const updated = await this.prisma.registration.findUnique({ where: { id }, include: { participants: true } });
+    return { registration: this.mapToDto(updated), summary: priceResult };
   }
 
   async findById(id: string, token?: string) {
@@ -220,6 +292,9 @@ export class RegistrationsService {
       participants: Array<{ type: string; firstName: string; lastName: string; age: number | null; gender: string | null; dietary: string | null }>;
       preferredRoomTypeId?: string | null;
       roomsJson?: unknown;
+      optionsJson?: unknown;
+      discountCode?: string | null;
+      dietaryNotes?: string | null;
       totalPrice: { toString(): string }; currency: string; paymentMethod?: string | null;
       checkedInAt?: Date | null;
       roomLabel?: string | null;
@@ -267,6 +342,11 @@ export class RegistrationsService {
       roomLabel: reg.roomLabel ?? null,
       roomNote: reg.roomNote ?? null,
       createdAt: iso(reg.createdAt),
+      // Do edycji przez admina: pełny skład pokoi + opcje + notatki.
+      rooms: (Array.isArray(reg.roomsJson) ? reg.roomsJson : []) as Array<{ roomId: string; participantIndexes: number[] }>,
+      options: (reg.optionsJson ?? {}) as { transport?: boolean; bedding?: boolean },
+      discountCode: reg.discountCode ?? undefined,
+      dietaryNotes: reg.dietaryNotes ?? undefined,
     };
   }
 
