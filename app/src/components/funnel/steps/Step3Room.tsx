@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { validateRoomCapacity, formatMoney, roomLabel } from '@icpe/shared'
 import type { PricingConfig, PriceInput } from '@icpe/shared'
@@ -21,6 +22,14 @@ export default function Step3Room({ rooms, participants, pricingConfig, onChange
   const money = (n: number) => formatMoney(n, pricingConfig.currency, i18n.language)
 
   const roomTypes = pricingConfig.rooms
+
+  // Auto-dodaj pierwszy pokój, gdy jeszcze żadnego nie ma (czytelny start doboru pokoju).
+  useEffect(() => {
+    if (rooms.length === 0 && roomTypes.length > 0) {
+      onChange([{ uid: newRoomUid(), roomId: roomTypes[0].id, participantIndexes: [] }])
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Które indeksy uczestników są już przypisane do jakiegokolwiek pokoju
   const assignedIndexes = new Set(rooms.flatMap((r) => r.participantIndexes))
@@ -74,6 +83,9 @@ export default function Step3Room({ rooms, participants, pricingConfig, onChange
       <h2 className="text-base font-semibold" style={{ color: 'var(--ink)' }}>
         {t('room.title')}
       </h2>
+      <p className="text-sm -mt-2" style={{ color: 'var(--muted)' }}>
+        Zaznacz, kto śpi w którym pokoju. Każda osoba musi być przypisana do pokoju — dopiero wtedy przejdziesz dalej.
+      </p>
 
       {/* Nieprzypisane osoby */}
       {unassignedIndexes.length > 0 && (

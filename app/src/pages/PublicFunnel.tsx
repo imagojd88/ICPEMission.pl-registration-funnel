@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams } from 'react-router-dom'
 import type { EventInstanceDto, CreateRegistrationDto, RegistrationStatus, PaymentMethod } from '@icpe/shared'
-import { computePrice, DEFAULT_PRICING } from '@icpe/shared'
+import { computePrice, DEFAULT_PRICING, validateRoomCapacity } from '@icpe/shared'
 import type { PricingConfig } from '@icpe/shared'
 import { getEventBySlug, getEventConfig, createRegistration, registerGuest, pickLang, type EventConfig } from '../lib/api'
 
@@ -157,6 +157,7 @@ function StepperView({
   onChange,
   onBack,
   onNext,
+  error,
 }: {
   state: StepperState
   event: EventInstanceDto
@@ -164,6 +165,7 @@ function StepperView({
   onChange: (patch: Partial<StepperState>) => void
   onBack: () => void
   onNext: () => void
+  error?: string | null
 }) {
   const renderStep = () => {
     switch (state.step) {
@@ -224,7 +226,16 @@ function StepperView({
   return (
     <div className="flex flex-col min-h-screen" style={{ background: 'var(--bg)' }}>
       <StepperHeader step={state.step} totalSteps={STEPS} onBack={onBack} />
-      <div style={{ paddingBottom: 80 }}>{renderStep()}</div>
+      <div style={{ paddingBottom: error ? 8 : 80 }}>{renderStep()}</div>
+      {error && (
+        <div
+          className="mx-[22px] mb-2 px-4 py-3 rounded-[12px] text-sm font-medium"
+          style={{ background: 'var(--err-soft)', color: 'var(--err)', border: '1px solid var(--err)' }}
+          role="alert"
+        >
+          {error}
+        </div>
+      )}
       <StickyPriceBar state={state} pricingConfig={pricingConfig} onNext={onNext} />
     </div>
   )
@@ -250,6 +261,7 @@ export default function PublicFunnel() {
   const [error, setError] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [stepError, setStepError] = useState<string | null>(null)
   const [result, setResult] = useState<{ regId: string; status: RegistrationStatus; total: number } | null>(null)
 
   const loadEvent = () => {
@@ -291,6 +303,7 @@ export default function PublicFunnel() {
   }
 
   const handleStepperBack = () => {
+    setStepError(null)
     if (stepper.step === 0) {
       setScreen('landing')
     } else {
@@ -298,7 +311,47 @@ export default function PublicFunnel() {
     }
   }
 
+  /** Walidacja kroku „Pokój" (3): każdy uczestnik przypisany, pojemność OK. */
+  const validateRoomStep = (): string | null => {
+    if (!pricingConfig.rooms || pricingConfig.rooms.length === 0) return null // event bez pokoi
+    const n = stepper.participants.length
+    if (n === 0) return null
+    if (stepper.rooms.length === 0) return 'Dodaj pokój i przypisz do niego uczestników, zanim przejdziesz dalej.'
+    const assigned = new Set<number>()
+    stepper.rooms.forEach((r) =>
+      r.participantIndexes.forEach((i) => {
+        if (i >= 0 && i < n) assigned.add(i)
+      }),
+    )
+    if (assigned.size < n) {
+      const missing = n - assigned.size
+      return `Przypisz wszystkich uczestników do pokoi — brakuje ${missing} ${missing === 1 ? 'osoby' : 'osób'}.`
+    }
+    const { ok, errors } = validateRoomCapacity(
+      {
+        rooms: stepper.rooms.map((r) => ({
+          roomId: r.roomId,
+          participants: r.participantIndexes
+            .filter((i) => i >= 0 && i < n)
+            .map((i) => ({ type: stepper.participants[i].type, age: stepper.participants[i].age })),
+        })),
+      },
+      pricingConfig,
+    )
+    if (!ok) return errors[0] ?? 'Sprawdź przypisanie osób do pokoi.'
+    return null
+  }
+
   const handleStepperNext = () => {
+    setStepError(null)
+    // Krok „Pokój" (3): nie przepuszczamy dalej bez poprawnego wyboru pokoju.
+    if (stepper.step === 3) {
+      const err = validateRoomStep()
+      if (err) {
+        setStepError(err)
+        return
+      }
+    }
     if (stepper.step < STEPS - 1) {
       patchStepper({ step: stepper.step + 1 })
     } else if (pricingConfig.free) {
@@ -367,7 +420,8 @@ export default function PublicFunnel() {
       })
       setScreen('success')
     } catch (e: unknown) {
-      setSubmitError(e instanceof Error ? e.message : String(e))
+      const detail = e instanceof Error ? e.message : String(e)
+      setSubmitError(`Nie udało się zapisać zgłoszenia. ${detail} Sprawdź dane i spróbuj ponownie.`)
     } finally {
       setSubmitting(false)
     }
@@ -474,6 +528,7 @@ export default function PublicFunnel() {
           onChange={patchStepper}
           onBack={handleStepperBack}
           onNext={handleStepperNext}
+          error={stepError}
         />
       )}
 

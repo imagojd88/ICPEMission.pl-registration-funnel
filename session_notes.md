@@ -135,6 +135,14 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — moduł rejestracji
 
+### Fix funnela: blokada bez wyboru pokoju + czytelne błędy
+- Bug: „API 400: ." przy submit, bo krok pokoju (step 3) przepuszczał dalej bez przypisania osób do pokoi (DTO `rooms` @ArrayNotEmpty).
+- `api.ts apiFetch`: przy !res.ok czyta treść z body (NestJS `{message}`) i rzuca czytelny komunikat zamiast „API 400: {statusText pusty}".
+- `PublicFunnel`: `validateRoomStep()` + `stepError` — na kroku 3 „Dalej" blokuje, gdy: brak pokoju / nieprzypisane osoby (podaje ile brakuje) / przekroczona pojemność (komunikat z `validateRoomCapacity`). Banner błędu nad paskiem ceny. Submit error z przyjaznym prefiksem „Nie udało się zapisać zgłoszenia…".
+- `Step3Room`: auto-dodanie pierwszego pokoju (czytelny start) + instrukcja „Zaznacz, kto śpi w którym pokoju…".
+- Weryfikacja: app tsc + vite build OK. Tylko frontend (app) → auto-deploy icpe-frontend.
+
+
 ### Wielojęzyczne nazwy pokoi
 - Problem: nazwy pokoi to był pojedynczy string w `pricingConfig.rooms[].name`, więc zakładka języka w edytorze ich nie rozdzielała — zmiana na EN zmieniała też PL.
 - `RoomTypeDef.name` → `string | Record<string,string>` w `shared/src/pricing.ts` i `api/src/_shared/pricing.ts` (lustro). Nowy helper `roomLabel(name, lng)` (fallback pl→en→it) eksportowany z shared. `validateRoomCapacity` używa `roomLabel(name)` w komunikatach.

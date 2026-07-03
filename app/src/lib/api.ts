@@ -96,7 +96,19 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
     setAuthToken(null)
     throw new Error(`API 401: Unauthorized`)
   }
-  if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`)
+  if (!res.ok) {
+    // Wyciągnij czytelny komunikat z ciała odpowiedzi (NestJS: { message: string | string[] }).
+    let detail = ''
+    try {
+      const body = (await res.json()) as { message?: unknown; error?: unknown }
+      const m = body?.message ?? body?.error
+      if (Array.isArray(m)) detail = m.filter((x) => typeof x === 'string').join(' ')
+      else if (typeof m === 'string') detail = m
+    } catch {
+      /* brak JSON w odpowiedzi */
+    }
+    throw new Error(detail || `Błąd serwera (${res.status})`)
+  }
   return res.json() as Promise<T>
 }
 
