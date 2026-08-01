@@ -4,7 +4,9 @@ databases:
   - name: icpe-db
     databaseName: icpe
     user: icpe
-    plan: free          # uwaga: darmowa baza Render wygasa po ~30 dniach — później zmień na płatną
+    plan: basic-256mb   # baza podniesiona z 'free' na płatną w panelu Render (2026-08).
+                        # NIE wpisuj tu z powrotem 'free' — Render nie pozwala degradować planu
+                        # i cały sync Blueprintu wywala się błędem "cannot downgrade database".
 
 services:
   - type: web

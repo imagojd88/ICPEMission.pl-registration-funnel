@@ -8,6 +8,7 @@
 
 - **Monorepo** npm workspaces: `app/` (React 18 + Vite + TS + Tailwind), `api/` (NestJS 10 + Prisma + PostgreSQL), `shared/` (kontrakt + silnik wyceny).
 - **Vendored shared:** `api/` importuje z `'../shared'` = `api/src/_shared/` — musi być lustrem `shared/src/` (silnik pricingu).
+- **Baza:** Render Postgres `icpe-db` na planie **basic-256mb** (podniesiona z free w sierpniu 2026). W `render.yaml` musi być `plan: basic-256mb` — wpisanie `free` psuje CAŁY sync Blueprintu (`cannot downgrade database from Basic-256mb to Free`) przy każdym pushu.
 - **Backend:** Render Web Service `icpe-api` (Blueprint/`render.yaml`). **Auto-Deploy domyślnie WYŁĄCZONY** → po zmianach w backendzie trzeba **Manual Deploy** (zalecane włączyć Auto-Deploy). API URL: `https://icpe-api.onrender.com`.
 - **Frontend:** Render Static Site `icpe-frontend` — auto-deploy po pushu.
 - **Prisma:** zmiany schematu wchodzą przez `prisma db push` przy starcie Render (nowe nullable pola/tabele dodają się same).
