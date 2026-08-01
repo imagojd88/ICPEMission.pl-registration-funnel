@@ -42,6 +42,16 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — strona ICPE Mission PL (CMS)
 
+### Poprawki treści landingu — 7 zmian PL/EN (2026-08-01)
+- **Bogotá → Medellín** wszędzie: ticker (`index.astro`), pinezka mapy (`WorldMap.astro`: nazwa + współrzędne 6.24/-75.58), seed (`community-seed.ts`). **Klucz `bogota` celowo bez zmian** (łączy z istniejącym rekordem opisu w CMS; seed i tak działa tylko na pustej bazie). Nazwa w panelu CMS w bazie nadal „Bogotá" — mapa bierze nazwę z kodu, więc bez wpływu na stronę; ewentualnie poprawić ręcznie w Personal OS.
+- **Ticker dwujęzyczny**: rozbity na `data-pl`/`data-en`; EN: „Seoul · Singapore". Pinezki mapy: `name` → „Seoul", „Singapore" (jedno pole dla obu języków — decyzja usera; `ccPl` „Singapur" jako kraj zostaje).
+- **Kim jesteśmy**: EN dodane „founded in Malta by Mario and Anna Cappello with a small group of courageous companions in 1985"; PL analogicznie („przez Mario i Annę Cappello wraz z niewielką grupą odważnych towarzyszy").
+- **Nad mapą**: „One community · one world" → „Our locations around the globe" (poprawiona literówka usera „our the globe" — potwierdzone); PL → „Nasze wspólnoty na całym świecie". H2 „From Malta to Wellington." → „Institute For World Evangelisation"; PL → „Instytut Ewangelizacji Świata".
+- **Stopka**: „Part of the Institute…" → „Institute for World Evangelisation – ICPE Mission."; PL bez „Część".
+- **CTA**: „Write to the Warsaw community…" → „Drop us a line or visit us at one of our events."; PL → „Napisz do nas lub odwiedź nas…".
+- Weryfikacja: astro build + check = 0 błędów (build z kopii w /tmp — `npm install` na FUSE zawodzi), grep w dist/index.html potwierdza wszystkie nowe teksty i brak starych; api `tsc --noEmit` OK.
+- Wdrożenie: push → auto-deploy static-site strony; zmiana w `community-seed.ts` czysto kosmetyczna dla istniejącej bazy (Manual Deploy `icpe-api` niekonieczny).
+
 ### Poprawki treści landingu (tagi mapy, zdania)
 - Tagi wspólnot na mapie: usunięte „Oddział · …", „Ten dom · hub", „Serce wspólnoty", „Fraternia", „Oddział · od 1996" → zostaje sam kontynent (Europa/Azja/Afryka/Oceania/Ameryka Płn./Ameryka Płd. + EN). Zmienione w DWÓCH miejscach: `WorldMap.astro` (dane bazowe/fallback) i `api/src/content/community-seed.ts` (seed CMS) — żeby po wdrożeniu Community CMS nie nadpisał nowych wartości starymi.
 - Zdanie nad mapą → „ICPE Warszawa to jedna z 23 wspólnot Instytutu Ewangelizacji Świata – ICPE Mission na świecie. Zobacz, gdzie jeszcze jesteśmy obecni." (+ EN).
