@@ -14,6 +14,7 @@ import {
   createPlace,
   createInvitations,
 } from '@/lib/api'
+import { SUPERTITLE_PRESETS, isPresetSupertitle } from '@/lib/supertitles'
 import { DEFAULT_PRICING } from '@icpe/shared'
 import type { PricingConfig, AgeBracket } from '@icpe/shared'
 import type { EventEditConfig, Place, InvitationItem, Invitee } from '@/lib/api'
@@ -106,6 +107,8 @@ interface WizardState {
   color: ColorSwatch
   heroImageUrl: string
   titleColor: string
+  /** Mały tekst nad nazwą eventu w hero (kreator: jednojęzycznie, PL). */
+  supertitle: string
   langPL: boolean
   langEN: boolean
   langIT: boolean
@@ -234,6 +237,11 @@ function mapEditConfigToState(prev: WizardState, cfg: EventEditConfig, slug: str
     color: colorFromHex(cfg.theme?.primaryColor),
     heroImageUrl: cfg.theme?.heroImageUrl ?? '',
     titleColor: cfg.theme?.titleColor ?? '#FFFFFF',
+    // Nadtytuł bywa mapą {pl,en,it} (edytor) — kreator jest jednojęzyczny, bierzemy PL.
+    supertitle:
+      typeof cfg.theme?.supertitle === 'string'
+        ? cfg.theme.supertitle
+        : (cfg.theme?.supertitle as Record<string, string> | undefined)?.pl ?? '',
     langPL: (cfg.locales ?? ['pl']).includes('pl'),
     langEN: (cfg.locales ?? []).includes('en'),
     langIT: (cfg.locales ?? []).includes('it'),
@@ -1167,6 +1175,8 @@ function Step3Pricing({ state, update }: { state: WizardState; update: (p: Parti
 }
 
 function Step4Page({ state, update }: { state: WizardState; update: (p: Partial<WizardState>) => void }) {
+  // Wybrana opcja „Inny…" — trzyma otwarte pole tekstowe, dopóki jest puste.
+  const [superCustom, setSuperCustom] = useState(false)
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-1.5">
@@ -1220,6 +1230,39 @@ function Step4Page({ state, update }: { state: WizardState; update: (p: Partial<
             </button>
           ))}
         </div>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <label className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
+          Nadtytuł (mały tekst nad nazwą eventu)
+        </label>
+        <select
+          value={
+            isPresetSupertitle(state.supertitle) ? state.supertitle : state.supertitle ? '__custom' : ''
+          }
+          onChange={(e) => {
+            const v = e.target.value
+            update({ supertitle: v === '__custom' ? '' : v })
+            setSuperCustom(v === '__custom')
+          }}
+          className="w-full h-[46px] px-3 text-sm rounded-[12px] border"
+          style={{ borderColor: 'var(--border)', background: 'var(--surface)', color: 'var(--ink)', outline: 'none' }}
+        >
+          <option value="">— brak (bez nadtytułu) —</option>
+          {SUPERTITLE_PRESETS.map((s) => (
+            <option key={s} value={s}>{s}</option>
+          ))}
+          <option value="__custom">Inny — wpisz własny…</option>
+        </select>
+        {(superCustom || (state.supertitle && !isPresetSupertitle(state.supertitle))) && (
+          <input
+            value={state.supertitle}
+            onChange={(e) => update({ supertitle: e.target.value })}
+            placeholder="np. Świętowanie daru wspólnoty"
+            className="w-full h-[46px] px-3 text-sm rounded-[12px] border"
+            style={{ borderColor: 'var(--border)', background: 'var(--surface)', color: 'var(--ink)', outline: 'none' }}
+          />
+        )}
       </div>
 
       <div className="flex flex-col gap-1.5">
@@ -1440,6 +1483,7 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
     color: 'blue',
     heroImageUrl: '',
     titleColor: '#FFFFFF',
+    supertitle: '',
     langPL: true,
     langEN: false,
     langIT: false,
@@ -1523,6 +1567,7 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
       }
       if (state.heroImageUrl) theme.heroImageUrl = state.heroImageUrl
       if (state.titleColor) theme.titleColor = state.titleColor
+      if (state.supertitle.trim()) theme.supertitle = state.supertitle.trim()
 
       const customFields = {
         program: state.program

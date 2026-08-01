@@ -14,6 +14,7 @@ import {
   type EventEditConfig,
   type Place,
 } from '@/lib/api'
+import { SUPERTITLE_PRESETS, isPresetSupertitle } from '@/lib/supertitles'
 import { DEFAULT_PRICING } from '@icpe/shared'
 import type { PricingConfig } from '@icpe/shared'
 
@@ -111,6 +112,8 @@ export default function EventEditForm({
   const [bankAccount, setBankAccount] = useState('')
   const [badge, setBadge] = useState('')
   const [superMap, setSuperMap] = useState<Record<string, string>>({})
+  // Ręcznie wybrana opcja „Inny…" — trzyma otwarte pole tekstowe, gdy jest jeszcze puste.
+  const [superCustom, setSuperCustom] = useState(false)
   const [program, setProgram] = useState<{ id: string; time: string; item: Record<string, string> }[]>([])
   const [specialGuestName, setSpecialGuestName] = useState('')
   const [specialGuestPhoto, setSpecialGuestPhoto] = useState('')
@@ -170,6 +173,11 @@ export default function EventEditForm({
     if (activeLocales.length > 0 && !activeLocales.includes(editLang)) setEditLang(activeLocales[0])
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [langPL, langEN, langIT])
+
+  /** Nadtytuł w aktualnie edytowanym języku. */
+  const superTitle = superMap[editLang] ?? ''
+  // Przełączenie języka zaczyna wybór od nowa (druga wersja może być z listy).
+  useEffect(() => { setSuperCustom(false) }, [editLang])
 
   const LANG_LABEL: Record<string, string> = { pl: 'PL', en: 'EN', it: 'IT' }
   const cleanMap = (m: Record<string, string>): Record<string, string> =>
@@ -576,7 +584,33 @@ export default function EventEditForm({
           </select>
         </Field>
         <Field label={`Nadtytuł (nad nazwą eventu)${activeLocales.length > 1 ? ` — ${LANG_LABEL[editLang]}` : ''}`}>
-          <Input value={superMap[editLang] ?? ''} onChange={(e) => setSuperMap((m) => ({ ...m, [editLang]: e.target.value }))} placeholder="np. Wyjazd formacyjny" />
+          <div className="flex flex-col gap-2">
+            <select
+              value={isPresetSupertitle(superTitle) ? superTitle : superTitle ? '__custom' : ''}
+              onChange={(e) => {
+                const v = e.target.value
+                // „__custom" nie jest treścią — czyścimy pole i czekamy, aż user wpisze swoje.
+                setSuperMap((m) => ({ ...m, [editLang]: v === '__custom' ? '' : v }))
+                setSuperCustom(v === '__custom')
+              }}
+              className={inputCls}
+              style={inputStyle}
+            >
+              <option value="">— brak (bez nadtytułu) —</option>
+              {SUPERTITLE_PRESETS.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+              <option value="__custom">Inny — wpisz własny…</option>
+            </select>
+            {(superCustom || (superTitle && !isPresetSupertitle(superTitle))) && (
+              <Input
+                value={superTitle}
+                onChange={(e) => setSuperMap((m) => ({ ...m, [editLang]: e.target.value }))}
+                placeholder="np. Świętowanie daru wspólnoty"
+                autoFocus
+              />
+            )}
+          </div>
         </Field>
         <Field label="Kolor główny">
           <div className="flex items-center gap-2">

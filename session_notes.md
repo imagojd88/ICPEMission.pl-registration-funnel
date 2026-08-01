@@ -149,6 +149,12 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — moduł rejestracji
 
+### Nadtytuł eventu: lista wyboru + koniec z fallbackiem
+- Przyczyna „randomowego" nadtytułu: kreator eventu **w ogóle nie zapisywał** `theme.supertitle`, a `LandingHero` przy pustej wartości podstawiał `t('landing.supertitle')` = „Wyjazd formacyjny". Każdy nowy event dostawał więc tę etykietę niezależnie od charakteru.
+- `LandingHero`: brak nadtytułu → nic się nie renderuje (fallback usunięty).
+- `app/src/lib/supertitles.ts` — wspólna lista 10 presetów (Spotkanie wspólnoty, Rekolekcje, Obóz wakacyjny, Weekend formacyjny, Wyjazd formacyjny, Kids Ministry, Youth Ministry, Spotkanie otwarte, Fellowship, Świętowanie daru wspólnoty) + `isPresetSupertitle`.
+- Select z presetami + opcja „Inny — wpisz własny…" w `EventEditForm` (per język, `editLang`) i w kreatorze `Step4Page` (jednojęzycznie, PL; `mapEditConfigToState` spłaszcza mapę do PL).
+
 ### Goście specjalni: liczba mnoga + krótki opis
 - `customFields.specialGuest` rozszerzone o `plural` (bool) i `bio` (mapa językowa). Checkbox „To więcej niż jedna osoba (np. małżeństwo)" + pole „Kim są — 1–2 zdania" w `EventEditForm` (bio podpięte pod `editLang`, więc tłumaczalne) oraz w `EventWizard` (jednojęzycznie, PL — jak reszta kreatora).
 - `EventContentBlocks`: etykieta z `plural`, bio pod nazwiskiem, layout przełącza się na `items-start` gdy jest opis. Przy okazji etykiety „Gość specjalny"/„Program" przeszły z hardcode'u PL na i18n (nowa sekcja `content.*` w pl/en/it) — wcześniej po przełączeniu na EN zostawały polskie.

@@ -120,9 +120,13 @@ export default function LandingHero({ isOpen, theme, title, inviteOnly }: Props)
 
         {/* Bottom text */}
         <div className="flex flex-col gap-1">
-          <p className="text-xs font-medium" style={{ color: 'rgba(255,255,255,0.85)' }}>
-            {supertitle || t('landing.supertitle')}
-          </p>
+          {/* Bez fallbacku: pusty nadtytuł ma zniknąć, a nie podstawiać domyślne
+              „Wyjazd formacyjny" — to wprowadzało w błąd na eventach innego typu. */}
+          {supertitle && (
+            <p className="text-xs font-medium" style={{ color: 'rgba(255,255,255,0.85)' }}>
+              {supertitle}
+            </p>
+          )}
           <h1
             className="font-serif leading-tight"
             style={{
