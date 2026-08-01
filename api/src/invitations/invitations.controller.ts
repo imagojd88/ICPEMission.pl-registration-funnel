@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Param, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { InvitationsService } from './invitations.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -7,6 +7,7 @@ interface Invitee {
   firstName: string;
   lastName: string;
   email: string;
+  phone?: string;
 }
 
 @ApiTags('invitations')
@@ -17,9 +18,33 @@ export class InvitationsController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @Post('admin/instances/:id/invitations')
-  @ApiOperation({ summary: 'Dodaj zaproszonych do eventu' })
-  create(@Param('id') id: string, @Body() dto: { invitees: Invitee[] }) {
-    return this.invites.createMany(id, dto?.invitees ?? []);
+  @ApiOperation({ summary: 'Dodaj zaproszonych do eventu (domyślnie wysyła maile z linkami)' })
+  create(@Param('id') id: string, @Body() dto: { invitees: Invitee[]; sendEmails?: boolean }) {
+    return this.invites.createMany(id, dto?.invitees ?? [], dto?.sendEmails !== false);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Patch('admin/invitations/:invId')
+  @ApiOperation({ summary: 'Edytuj zaproszonego (np. dopisz telefon)' })
+  update(@Param('invId') invId: string, @Body() dto: Partial<Invitee>) {
+    return this.invites.update(invId, dto ?? {});
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Post('admin/invitations/:invId/send')
+  @ApiOperation({ summary: 'Wyślij (ponownie) zaproszenie mailem' })
+  resend(@Param('invId') invId: string) {
+    return this.invites.resend(invId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Post('admin/instances/:id/invitations/send')
+  @ApiOperation({ summary: 'Wyślij zaproszenia zbiorczo (domyślnie tylko niewysłane)' })
+  resendAll(@Param('id') id: string, @Body() dto?: { onlyUnsent?: boolean }) {
+    return this.invites.resendAll(id, dto?.onlyUnsent !== false);
   }
 
   @UseGuards(JwtAuthGuard)

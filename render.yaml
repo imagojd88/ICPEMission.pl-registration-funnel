@@ -34,6 +34,10 @@ services:
         sync: false
       - key: CORS_ORIGIN
         value: https://rejestracja.icpemission.pl
+      # Bazowy adres publicznego frontu — z niego budowane są linki /i/:token
+      # w mailach z zaproszeniem. Gdy pusty, fallback: CORS_ORIGIN.
+      - key: PUBLIC_APP_URL
+        value: https://rejestracja.icpemission.pl
       - key: PAYMENTS_MODE
         value: mock
       # Mail: ustaw w panelu Render (Blueprint nie nadpisuje — sync:false).

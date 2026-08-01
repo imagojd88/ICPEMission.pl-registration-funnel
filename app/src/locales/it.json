@@ -1,5 +1,8 @@
 {
-  "nav": { "back": "← Indietro", "step": "Passo {{n}} di {{total}}" },
+  "nav": {
+    "back": "← Indietro",
+    "step": "Passo {{n}} di {{total}}"
+  },
   "landing": {
     "pill": "ICPE Mission Polonia",
     "badge_open": "Iscrizioni aperte",
@@ -21,6 +24,23 @@
     "next_date_title": "Prossima data",
     "notify_me": "Avvisami quando si aprono le iscrizioni",
     "closed_desc": "Le iscrizioni per questa edizione sono già chiuse. Iscriviti alla lista di notifiche per non perdere la prossima."
+  },
+  "invite": {
+    "only_badge": "Questo evento è riservato agli ospiti invitati",
+    "only_note": "Confermi la partecipazione con il link personale dell'invito. Se non ce l'hai, inserisci i tuoi dati qui sotto — verificheremo se sei nella lista degli ospiti.",
+    "confirm_title": "Conferma la partecipazione",
+    "confirm_hint": "Inserisci i dati esattamente come li hai comunicati all'organizzatore.",
+    "first_name": "Nome",
+    "last_name": "Cognome",
+    "email": "E-mail",
+    "dietary": "Allergie / esigenze alimentari (facoltativo)",
+    "dietary_ph": "es. vegetariana, senza glutine",
+    "required": "Inserisci nome, cognome ed e-mail.",
+    "not_found": "Non abbiamo trovato un invito con questi dati. Controlla l'ortografia o usa il link dell'invito.",
+    "checking": "Verifico…",
+    "submit": "Confermo la partecipazione →",
+    "confirmed_title": "Partecipazione confermata",
+    "confirmed_sub": "Grazie, {{name}}! A presto."
   },
   "stepper": {
     "step0": "Dati del richiedente",
@@ -57,7 +77,14 @@
   },
   "prefs": {
     "title": "Preferenze e allergie",
-    "diets": ["Vegetariana", "Vegana", "Senza glutine", "Senza lattosio", "Senza frutta secca", "Kosher"],
+    "diets": [
+      "Vegetariana",
+      "Vegana",
+      "Senza glutine",
+      "Senza lattosio",
+      "Senza frutta secca",
+      "Kosher"
+    ],
     "allergies_label": "Allergie e intolleranze (dettagliato)",
     "allergies_placeholder": "Descrivi dettagliatamente eventuali allergie e intolleranze alimentari...",
     "notes_label": "Note aggiuntive",

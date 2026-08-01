@@ -3,6 +3,7 @@ import { Plus, Trash2, Upload, Images } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import ImageGalleryPicker from '@/components/admin/ImageGalleryPicker'
+import InvitedGuestsSection from '@/components/admin/events/InvitedGuestsSection'
 import {
   getEventEditConfig,
   updateEventInstance,
@@ -115,6 +116,8 @@ export default function EventEditForm({
   const [specialGuestPhoto, setSpecialGuestPhoto] = useState('')
   const [uploadingGuest, setUploadingGuest] = useState(false)
   const [places, setPlaces] = useState<Place[]>([])
+  // Typ eventu z serii — decyduje, czy pokazać sekcję zaproszonych gości.
+  const [eventType, setEventType] = useState<string>('')
 
   async function handleGuestPhoto(e: ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]
@@ -176,6 +179,7 @@ export default function EventEditForm({
       .then((cfg: EventEditConfig) => {
         if (cancelled) return
         const pc = cfg.pricingConfig
+        setEventType(cfg.type ?? '')
         setNameMap((cfg.title as Record<string, string>) ?? {})
         setDescMap((cfg.description as Record<string, string>) ?? {})
         setDateStart(cfg.startsAt ? cfg.startsAt.slice(0, 10) : '')
@@ -606,6 +610,15 @@ export default function EventEditForm({
           </div>
         </Field>
       </Section>
+
+      {eventType === 'INVITE' && (
+        <Section title="Zaproszeni goście">
+          <InvitedGuestsSection
+            instanceId={editTarget.instanceId}
+            eventTitle={nameMap.pl || nameMap.en || nameMap.it || 'wydarzenie'}
+          />
+        </Section>
+      )}
 
       <Section title="Program i gość specjalny">
         <Field label={`Program (godzina + punkt)${activeLocales.length > 1 ? ` — treść: ${LANG_LABEL[editLang]}` : ''}`}>

@@ -387,8 +387,12 @@ model Invitation {
   firstName   String
   lastName    String
   email       String
+  // Telefon (opcjonalny) — używany do przycisku „Wyślij przez WhatsApp" w panelu.
+  phone       String?
   token       String    @unique @default(cuid())
   confirmedAt DateTime?
+  // Kiedy ostatnio poszedł mail z zaproszeniem (null = jeszcze nie wysłano).
+  sentAt      DateTime?
   dietaryNotes String?
   createdAt   DateTime  @default(now())
 

@@ -411,6 +411,8 @@ export interface EventTheme {
 }
 
 export interface EventConfig {
+  /** Typ eventu z serii — źródło zapasowe, gdy `/r/:slug` nie zwróci `type` na instancji. */
+  type?: 'ONE_TIME' | 'EVERGREEN' | 'STANDALONE' | 'INVITE'
   roomTypes: RoomTypeDto[]
   pricing: PricingConfig
   locales: string[]
@@ -425,6 +427,7 @@ export async function getEventConfig(slug: string, locale = 'pl'): Promise<Event
     // undefined i krok „Pokój" się wywala (pusta strona).
     const raw = await apiFetch<Record<string, unknown>>(`/r/${slug}/config?locale=${locale}`)
     return {
+      type: raw.type as EventConfig['type'],
       roomTypes: (raw.roomTypes as EventConfig['roomTypes']) ?? MOCK_ROOM_TYPES,
       pricing: (raw.pricingConfig as PricingConfig) ?? (raw.pricing as PricingConfig) ?? MOCK_PRICING,
       locales: (raw.locales as string[]) ?? ['pl'],
@@ -516,23 +519,31 @@ export interface Invitee {
   firstName: string
   lastName: string
   email: string
+  /** Opcjonalny telefon — pozwala wysłać zaproszenie wprost przez WhatsApp. */
+  phone?: string
 }
 
-export interface InvitationItem extends Invitee {
+export interface InvitationItem extends Omit<Invitee, 'phone'> {
   id: string
   token: string
+  /** Gotowy link /i/:token złożony po stronie API (bazuje na PUBLIC_APP_URL). */
+  link?: string
+  phone?: string | null
   confirmedAt: string | null
+  /** Kiedy poszedł mail z zaproszeniem (null = jeszcze nie wysłano). */
+  sentAt?: string | null
 }
 
 export async function createInvitations(
   instanceId: string,
   invitees: Invitee[],
   token?: string,
+  sendEmails = true,
 ): Promise<InvitationItem[]> {
   return apiFetch<InvitationItem[]>(`/admin/instances/${instanceId}/invitations`, {
     method: 'POST',
     headers: authHeaders(token),
-    body: JSON.stringify({ invitees }),
+    body: JSON.stringify({ invitees, sendEmails }),
   })
 }
 
@@ -542,8 +553,41 @@ export async function listInvitations(instanceId: string, token?: string): Promi
   })
 }
 
+export async function updateInvitation(
+  invId: string,
+  patch: Partial<Invitee>,
+  token?: string,
+): Promise<InvitationItem> {
+  return apiFetch<InvitationItem>(`/admin/invitations/${invId}`, {
+    method: 'PATCH',
+    headers: authHeaders(token),
+    body: JSON.stringify(patch),
+  })
+}
+
 export async function deleteInvitation(invId: string, token?: string): Promise<void> {
   await apiFetch(`/admin/invitations/${invId}`, { method: 'DELETE', headers: authHeaders(token) })
+}
+
+/** Wysyła (lub ponawia) mail z zaproszeniem do jednej osoby. */
+export async function sendInvitation(
+  invId: string,
+  token?: string,
+): Promise<{ ok: boolean; status: 'SENT' | 'FAILED' | 'LOGGED' | 'NO_EMAIL' }> {
+  return apiFetch(`/admin/invitations/${invId}/send`, { method: 'POST', headers: authHeaders(token) })
+}
+
+/** Wysyłka zbiorcza; domyślnie tylko do tych, którzy jeszcze nie dostali maila. */
+export async function sendAllInvitations(
+  instanceId: string,
+  onlyUnsent = true,
+  token?: string,
+): Promise<{ sent: number; failed: number; skipped: number; logged: number }> {
+  return apiFetch(`/admin/instances/${instanceId}/invitations/send`, {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: JSON.stringify({ onlyUnsent }),
+  })
 }
 
 /** Tekst wielojęzyczny: albo zwykły string (legacy), albo mapa { pl, en, it }. */
@@ -598,7 +642,7 @@ export async function confirmInvitation(
 export async function matchInvite(
   slug: string,
   data: Invitee & { dietaryNotes?: string },
-): Promise<{ ok: boolean; token: string; firstName: string }> {
+): Promise<{ ok: boolean; firstName: string }> {
   return apiFetch(`/r/${slug}/invite-match`, { method: 'POST', body: JSON.stringify(data) })
 }
 

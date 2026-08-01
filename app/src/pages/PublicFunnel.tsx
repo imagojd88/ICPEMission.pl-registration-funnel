@@ -475,8 +475,12 @@ export default function PublicFunnel() {
     return <FunnelError onRetry={loadEvent} />
   }
 
+  // Typ eventu: pierwotnie tylko z `/r/:slug`, ale ten endpoint długo nie zwracał `type`
+  // (siedzi na serii) — dlatego fallback do `/r/:slug/config`, który zwraca go od zawsze.
+  const eventType = event.type ?? eventConfig?.type
+
   // Event typu STANDALONE (bez noclegu, bezpłatny) → prosty ekran RSVP zamiast lejka.
-  if (event.type === 'STANDALONE') {
+  if (eventType === 'STANDALONE') {
     return (
       <div className="min-h-screen mx-auto relative" style={{ maxWidth: 452, background: 'var(--bg)' }}>
         <ThemeToggle />
@@ -487,7 +491,7 @@ export default function PublicFunnel() {
   }
 
   // Event „na zaproszenie" — bez linku: formularz dopasowania danych do zaproszenia.
-  if (event.type === 'INVITE') {
+  if (eventType === 'INVITE') {
     return (
       <div className="min-h-screen mx-auto relative" style={{ maxWidth: 452, background: 'var(--bg)' }}>
         <ThemeToggle />

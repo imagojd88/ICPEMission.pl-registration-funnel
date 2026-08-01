@@ -1,5 +1,8 @@
 {
-  "nav": { "back": "← Back", "step": "Step {{n}} of {{total}}" },
+  "nav": {
+    "back": "← Back",
+    "step": "Step {{n}} of {{total}}"
+  },
   "landing": {
     "pill": "ICPE Mission Poland",
     "badge_open": "Registration open",
@@ -21,6 +24,23 @@
     "next_date_title": "Next date",
     "notify_me": "Notify me when registration opens",
     "closed_desc": "Registration for this edition is now closed. Sign up for the notification list so you don't miss the next one."
+  },
+  "invite": {
+    "only_badge": "This event is for invited guests only",
+    "only_note": "You confirm your attendance with the personal link from your invitation. If you don't have it, enter your details below — we'll check whether you're on the guest list.",
+    "confirm_title": "Confirm your attendance",
+    "confirm_hint": "Enter your details exactly as you gave them to the organiser.",
+    "first_name": "First name",
+    "last_name": "Last name",
+    "email": "E-mail",
+    "dietary": "Allergies / dietary requirements (optional)",
+    "dietary_ph": "e.g. vegetarian, gluten-free",
+    "required": "Please provide your first name, last name and e-mail.",
+    "not_found": "We couldn't find an invitation matching these details. Check the spelling or use the link from your invitation.",
+    "checking": "Checking…",
+    "submit": "Confirm attendance →",
+    "confirmed_title": "Attendance confirmed",
+    "confirmed_sub": "Thank you, {{name}}! See you there."
   },
   "stepper": {
     "step0": "Contact details",
@@ -57,7 +77,14 @@
   },
   "prefs": {
     "title": "Preferences and allergies",
-    "diets": ["Vegetarian", "Vegan", "Gluten-free", "Lactose-free", "Nut-free", "Kosher"],
+    "diets": [
+      "Vegetarian",
+      "Vegan",
+      "Gluten-free",
+      "Lactose-free",
+      "Nut-free",
+      "Kosher"
+    ],
     "allergies_label": "Allergies and intolerances (detailed)",
     "allergies_placeholder": "Describe any food allergies and intolerances in detail...",
     "notes_label": "Additional notes",

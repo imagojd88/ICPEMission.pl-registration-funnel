@@ -79,8 +79,16 @@ export class EventsService {
       },
     });
     if (!page) throw new NotFoundException('Page not found');
-    const instance = page.series.instances[0];
-    if (!instance) throw new NotFoundException('No open instance');
+    const raw = page.series.instances[0];
+    if (!raw) throw new NotFoundException('No open instance');
+    // WAŻNE: typ eventu (ONE_TIME/STANDALONE/INVITE) siedzi na serii, a publiczny front
+    // czyta go z instancji (`event.type`). Bez tego gałęzie STANDALONE/INVITE nigdy się
+    // nie uruchamiały i event „na zaproszenie" pokazywał zwykły lejek rejestracji.
+    const instance = {
+      ...raw,
+      type: (page.series as { type?: string }).type ?? 'ONE_TIME',
+      slug: page.slug,
+    };
     return { page, instance };
   }
 
@@ -188,12 +196,16 @@ export class EventsService {
     const instances = await this.prisma.eventInstance.findMany({
       where: { status: 'OPEN' },
       orderBy: { startsAt: 'asc' },
+      include: { series: { select: { type: true } } },
     });
     const out: Array<{
       slug: string; title: unknown; startsAt: string; endsAt: string;
       location: string; heroImageUrl: string | null; primaryColor: string | null;
     }> = [];
     for (const inst of instances) {
+      // Eventy „na zaproszenie" są prywatne — nie reklamujemy ich kafelkiem na stronie
+      // głównej. Zaproszony i tak wchodzi swoim linkiem /i/:token albo bezpośrednio /r/:slug.
+      if ((inst.series as { type?: string } | null)?.type === 'INVITE') continue;
       const page = await this.prisma.registrationPage.findUnique({
         where: { seriesId: inst.seriesId },
         select: { slug: true, theme: true },

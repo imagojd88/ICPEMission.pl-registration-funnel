@@ -32,6 +32,16 @@ export class RegistrationsService {
     });
     if (!instance) throw new NotFoundException('Event instance not found');
 
+    // Event „na zaproszenie": udział potwierdza się wyłącznie zaproszeniem (link /i/:token
+    // albo dopasowanie danych do listy gości). Zwykła rejestracja jest zabroniona także
+    // na poziomie API — samo ukrycie formularza w UI to nie jest zabezpieczenie.
+    const seriesType = (instance.series as { type?: string })?.type;
+    if (seriesType === 'INVITE') {
+      throw new ForbiddenException(
+        'To jest wydarzenie tylko dla zaproszonych gości — rejestracja odbywa się przez osobisty link z zaproszenia.',
+      );
+    }
+
     // Buduj PriceInput z nowego modelu kompozycji pokoi
     const priceInput: PriceInput = {
       rooms: dto.rooms.map(entry => ({

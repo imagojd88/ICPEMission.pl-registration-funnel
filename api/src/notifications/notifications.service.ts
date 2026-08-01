@@ -2,6 +2,14 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 
+/** Escapowanie treści wstawianej do HTML-a maila (tytuły eventów bywają z `&`, `<`). */
+const esc = (s: unknown) =>
+  String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+
 export interface MailPayload {
   to: string;
   type: string;
@@ -79,6 +87,41 @@ export class NotificationsService {
       return { subject, text, html };
     }
 
+    if (payload.type === 'INVITATION') {
+      const title = String(d.eventTitle ?? 'wydarzenie');
+      const link = String(d.link ?? '');
+      const name = String(d.firstName ?? '').trim();
+      const when = String(d.when ?? '');
+      const where = String(d.location ?? '');
+      const subject = `Zaproszenie — ${title}`;
+      // Treść tekstowa (z linkiem inline) i HTML (z przyciskiem) budowane osobno —
+      // wcześniej HTML powstawał przez filtrowanie linii po wartości linku, co jest kruche.
+      const intro = [
+        name ? `${name},` : 'Dzień dobry,',
+        '',
+        `zapraszamy Cię na: ${title}.`,
+        when ? `Termin: ${when}.` : '',
+        where ? `Miejsce: ${where}.` : '',
+        '',
+        'To wydarzenie tylko dla zaproszonych gości. Udział potwierdzisz swoim osobistym linkiem:',
+      ];
+      const outro = [
+        'Prosimy nie przekazywać linku dalej — jest przypisany do Ciebie.',
+        '',
+        'Szczęść Boże,',
+        'ICPE Mission Polska',
+      ];
+      const text = [...intro, link, '', ...outro].join('\n');
+      const p = (l: string) => (l === '' ? '<br/>' : `<p style="margin:0 0 6px">${esc(l)}</p>`);
+      const html = `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.6;color:#1f2937">
+        ${intro.map(p).join('')}
+        <p style="margin:18px 0"><a href="${esc(link)}" style="display:inline-block;background:#C0603C;color:#fff;text-decoration:none;padding:12px 22px;border-radius:12px;font-weight:600">Potwierdzam udział</a></p>
+        <p style="margin:0 0 14px;font-size:12px;color:#6b7280">Gdyby przycisk nie działał, skopiuj link: ${esc(link)}</p>
+        ${outro.map(p).join('')}
+      </div>`;
+      return { subject, text, html };
+    }
+
     if (payload.type === 'PAYMENT_REMINDER') {
       const subject = `Przypomnienie o płatności — ${String(d.transferTitle ?? '')}`;
       const text = `Dzień dobry,\n\nPrzypominamy o płatności na kwotę ${money(d.amount, 'PLN')} (tytuł: ${String(
@@ -91,7 +134,12 @@ export class NotificationsService {
     return { subject, text: JSON.stringify(d), html: `<pre>${JSON.stringify(d, null, 2)}</pre>` };
   }
 
-  async sendMail(payload: MailPayload): Promise<void> {
+  /**
+   * Wysyła (albo tylko loguje) maila. Zwraca końcowy status, żeby wołający mógł pokazać
+   * adminowi, czy mail faktycznie wyszedł — błąd SMTP jest łapany tutaj.
+   * `LOGGED` = MAIL_MODE≠smtp, czyli mail NIE poszedł do nikogo (tylko wpis w logach).
+   */
+  async sendMail(payload: MailPayload): Promise<'SENT' | 'FAILED' | 'LOGGED'> {
     const notification = await this.prisma.notification.create({
       data: {
         type: payload.type,
@@ -111,16 +159,18 @@ export class NotificationsService {
         const from = this.config.get<string>('MAIL_FROM', 'ICPE Mission <no-reply@icpemission.pl>');
         await transporter.sendMail({ from, to: payload.to, subject, text, html });
         await this.prisma.notification.update({ where: { id: notification.id }, data: { status: 'SENT' } });
+        return 'SENT';
       } catch (e) {
         this.logger.error(`SMTP send failed: ${(e as Error).message}`);
         await this.prisma.notification.update({ where: { id: notification.id }, data: { status: 'FAILED' } });
+        return 'FAILED';
       }
-      return;
     }
 
-    // Domyślnie: tryb log (maile tylko w logach Render).
+    // Domyślnie: tryb log (maile tylko w logach Render — NIC nie wychodzi na zewnątrz).
     this.logger.log(`[log] ${payload.type} → ${payload.to}`);
-    await this.prisma.notification.update({ where: { id: notification.id }, data: { status: 'SENT' } });
+    await this.prisma.notification.update({ where: { id: notification.id }, data: { status: 'LOGGED' } });
+    return 'LOGGED';
   }
 
   async sendConfirmation(opts: {

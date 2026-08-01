@@ -1,5 +1,8 @@
 {
-  "nav": { "back": "← Wstecz", "step": "Krok {{n}} z {{total}}" },
+  "nav": {
+    "back": "← Wstecz",
+    "step": "Krok {{n}} z {{total}}"
+  },
   "landing": {
     "pill": "ICPE Mission Polska",
     "badge_open": "Rejestracja otwarta",
@@ -23,6 +26,23 @@
     "next_date_title": "Najbliższy termin",
     "notify_me": "Powiadom mnie o zapisach",
     "closed_desc": "Rejestracja na tę edycję jest już zamknięta. Zapisz się na listę powiadomień, by nie przegapić kolejnej."
+  },
+  "invite": {
+    "only_badge": "To jest wydarzenie tylko dla zaproszonych gości",
+    "only_note": "Udział potwierdzasz osobistym linkiem z zaproszenia. Jeśli go nie masz, wpisz dane poniżej — sprawdzimy, czy jesteś na liście gości.",
+    "confirm_title": "Potwierdź udział",
+    "confirm_hint": "Podaj dane dokładnie takie, jak przekazałeś organizatorowi.",
+    "first_name": "Imię",
+    "last_name": "Nazwisko",
+    "email": "E-mail",
+    "dietary": "Alergie / wymagania żywieniowe (opcjonalnie)",
+    "dietary_ph": "np. wegetariańska, bez glutenu",
+    "required": "Podaj imię, nazwisko i e-mail.",
+    "not_found": "Nie znaleźliśmy zaproszenia na podane dane. Sprawdź pisownię lub użyj linku z zaproszenia.",
+    "checking": "Sprawdzam…",
+    "submit": "Potwierdzam udział →",
+    "confirmed_title": "Udział potwierdzony",
+    "confirmed_sub": "Dziękujemy, {{name}}! Do zobaczenia."
   },
   "stepper": {
     "step0": "Dane zgłaszającego",
@@ -59,7 +79,14 @@
   },
   "prefs": {
     "title": "Preferencje i alergie",
-    "diets": ["Wegetariańska", "Wegańska", "Bezglutenowa", "Bez laktozy", "Bez orzechów", "Koszerna"],
+    "diets": [
+      "Wegetariańska",
+      "Wegańska",
+      "Bezglutenowa",
+      "Bez laktozy",
+      "Bez orzechów",
+      "Koszerna"
+    ],
     "allergies_label": "Alergie i nietolerancje (szczegółowo)",
     "allergies_placeholder": "Opisz szczegółowo wszelkie alergie i nietolerancje pokarmowe...",
     "notes_label": "Dodatkowe uwagi",

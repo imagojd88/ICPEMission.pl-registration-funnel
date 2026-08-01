@@ -18,22 +18,25 @@ import { DEFAULT_PRICING } from '@icpe/shared'
 import type { PricingConfig, AgeBracket } from '@icpe/shared'
 import type { EventEditConfig, Place, InvitationItem, Invitee } from '@/lib/api'
 
-/** Parsuje listę zaproszonych: 1 wiersz = „Imię Nazwisko, email". */
+/** Parsuje listę zaproszonych: 1 wiersz = „Imię Nazwisko, email, telefon" (telefon opcjonalny). */
 function parseInvitees(raw: string): Invitee[] {
   return raw
     .split('\n')
     .map((l) => l.trim())
     .filter(Boolean)
     .map((line) => {
-      const [namePart, emailPart] = line.split(',')
+      const [namePart, emailPart, phonePart] = line.split(',')
       const names = (namePart ?? '').trim().split(/\s+/).filter(Boolean)
       return {
         firstName: names[0] ?? '',
         lastName: names.slice(1).join(' '),
         email: (emailPart ?? '').trim(),
+        phone: (phonePart ?? '').trim() || undefined,
       }
     })
-    .filter((i) => i.firstName && i.email)
+    // Wystarczy imię + nazwisko — gość bez maila też ma sens (link przekazujemy
+    // ręcznie/WhatsAppem), tak samo jak w panelu edycji eventu.
+    .filter((i) => i.firstName && i.lastName)
 }
 
 const PUBLIC_BASE = 'https://rejestracja.icpemission.pl'
@@ -467,13 +470,15 @@ function Step0Type({ state, update }: { state: WizardState; update: (p: Partial<
         >
           <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>Zaproszeni goście</p>
           <p className="text-xs" style={{ color: 'var(--muted)' }}>
-            Jedna osoba na wiersz: <b>Imię Nazwisko, email</b>. Po zapisaniu eventu każdy dostanie unikalny link do potwierdzenia.
+            Jedna osoba na wiersz: <b>Imię Nazwisko, email, telefon</b> (telefon opcjonalny — pozwala wysłać
+            zaproszenie przez WhatsApp). Po zapisaniu eventu każdy dostanie mailem swój unikalny link do
+            potwierdzenia; listę gości edytujesz później w „Edytuj event".
           </p>
           <textarea
             value={state.invitees}
             onChange={(e) => update({ invitees: e.target.value })}
             rows={6}
-            placeholder={'Jan Kowalski, jan@example.com\nAnna Nowak, anna@example.com'}
+            placeholder={'Jan Kowalski, jan@example.com, +48600100200\nAnna Nowak, anna@example.com'}
             className="w-full rounded-[12px] px-3 py-[11px] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
             style={{ border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--ink)', resize: 'vertical' }}
           />
@@ -1315,10 +1320,16 @@ function SuccessScreen({ slug, onClose, invites }: { slug: string; onClose: () =
           <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
             Linki dla zaproszonych ({invites!.length})
           </p>
-          <p className="text-xs" style={{ color: 'var(--muted)' }}>Wyślij każdemu jego indywidualny link:</p>
+          <p className="text-xs" style={{ color: 'var(--muted)' }}>
+            Zaproszenia poszły mailem. Możesz też przekazać link bezpośrednio:
+          </p>
           <div className="flex flex-col gap-2 max-h-72 overflow-y-auto">
             {invites!.map((inv) => {
-              const link = `${PUBLIC_BASE}/i/${inv.token}`
+              const link = inv.link || `${PUBLIC_BASE}/i/${inv.token}`
+              const waText = encodeURIComponent(
+                `${inv.firstName}, zapraszamy Cię na wydarzenie. Udział potwierdzisz swoim osobistym linkiem:\n${link}`,
+              )
+              const waHref = `https://wa.me/${(inv.phone ?? '').replace(/\D/g, '')}?text=${waText}`
               return (
                 <div
                   key={inv.id}
@@ -1331,13 +1342,24 @@ function SuccessScreen({ slug, onClose, invites }: { slug: string; onClose: () =
                     </p>
                     <p className="text-xs font-mono truncate" style={{ color: 'var(--faint)' }}>{link}</p>
                   </div>
-                  <button
-                    onClick={() => { void navigator.clipboard.writeText(link) }}
-                    className="text-xs font-medium px-2.5 py-1 rounded-[8px] shrink-0"
-                    style={{ background: 'var(--surface)', color: 'var(--brand)', border: '1px solid var(--border)', cursor: 'pointer' }}
-                  >
-                    Kopiuj
-                  </button>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      onClick={() => { void navigator.clipboard.writeText(link) }}
+                      className="text-xs font-medium px-2.5 py-1 rounded-[8px]"
+                      style={{ background: 'var(--surface)', color: 'var(--brand)', border: '1px solid var(--border)', cursor: 'pointer' }}
+                    >
+                      Kopiuj
+                    </button>
+                    <a
+                      href={waHref}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs font-medium px-2.5 py-1 rounded-[8px] no-underline"
+                      style={{ background: '#25D36618', color: '#128C7E', border: '1px solid #25D36655' }}
+                    >
+                      WhatsApp
+                    </a>
+                  </div>
                 </div>
               )
             })}
