@@ -368,7 +368,7 @@ if (!heroRotate) {
       slides[idx].classList.add('is-active'); dots[idx].classList.add('is-on');
     }
     function next() { show((idx + 1) % slides.length); }
-    function restart() { clearInterval(timer); timer = setInterval(next, 8000); }
+    function restart() { clearInterval(timer); timer = setInterval(next, 16000); }
     restart();
     box.addEventListener('mouseenter', () => clearInterval(timer));
     box.addEventListener('mouseleave', restart);

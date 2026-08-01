@@ -43,6 +43,9 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — strona ICPE Mission PL (CMS)
 
+### Rotacja cytatów „Kim jesteśmy" zwolniona (2026-08-01)
+- Interwał rotatora cytatów w `index.astro`: 8000 → 16000 ms (user: trudno nadążyć z czytaniem). Hover nadal pauzuje. Build OK.
+
 ### Poprawki treści landingu — 7 zmian PL/EN (2026-08-01)
 - **Bogotá → Medellín** wszędzie: ticker (`index.astro`), pinezka mapy (`WorldMap.astro`: nazwa + współrzędne 6.24/-75.58), seed (`community-seed.ts`). **Klucz `bogota` celowo bez zmian** (łączy z istniejącym rekordem opisu w CMS; seed i tak działa tylko na pustej bazie). Nazwa w panelu CMS w bazie nadal „Bogotá" — mapa bierze nazwę z kodu, więc bez wpływu na stronę; ewentualnie poprawić ręcznie w Personal OS.
 - **Ticker dwujęzyczny**: rozbity na `data-pl`/`data-en`; EN: „Seoul · Singapore". Pinezki mapy: `name` → „Seoul", „Singapore" (jedno pole dla obu języków — decyzja usera; `ccPl` „Singapur" jako kraj zostaje).
