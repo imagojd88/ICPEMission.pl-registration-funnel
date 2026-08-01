@@ -42,7 +42,13 @@
     "checking": "Sprawdzam…",
     "submit": "Potwierdzam udział →",
     "confirmed_title": "Udział potwierdzony",
-    "confirmed_sub": "Dziękujemy, {{name}}! Do zobaczenia."
+    "confirmed_sub": "Dziękujemy, {{name}}! Do zobaczenia.",
+    "badge": "Tylko dla zaproszonych"
+  },
+  "content": {
+    "special_guest": "Gość specjalny",
+    "special_guests": "Goście specjalni",
+    "program": "Program"
   },
   "stepper": {
     "step0": "Dane zgłaszającego",

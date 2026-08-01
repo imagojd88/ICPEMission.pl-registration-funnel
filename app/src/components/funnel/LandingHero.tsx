@@ -1,13 +1,16 @@
 import { useTranslation } from 'react-i18next'
+import { Lock } from 'lucide-react'
 import { pickLang, type EventTheme } from '@/lib/api'
 
 interface Props {
   isOpen: boolean
   theme?: EventTheme
   title?: string
+  /** Event „na zaproszenie" → badge mówi o zamkniętym gronie, nie o otwartej rejestracji. */
+  inviteOnly?: boolean
 }
 
-export default function LandingHero({ isOpen, theme, title }: Props) {
+export default function LandingHero({ isOpen, theme, title, inviteOnly }: Props) {
   const { t, i18n } = useTranslation()
 
   const supertitle = pickLang(theme?.supertitle, i18n.language)
@@ -82,7 +85,19 @@ export default function LandingHero({ isOpen, theme, title }: Props) {
           </span>
 
           {/* Status badge */}
-          {isOpen ? (
+          {inviteOnly ? (
+            <span
+              className="inline-flex items-center gap-1 text-white text-xs font-semibold px-3 py-1.5 backdrop-blur-sm"
+              style={{
+                background: 'rgba(0,0,0,0.35)',
+                border: '1px solid rgba(255,255,255,0.35)',
+                borderRadius: 99,
+              }}
+            >
+              <Lock size={11} strokeWidth={2.5} />
+              {t('invite.badge')}
+            </span>
+          ) : isOpen ? (
             <span
               className="text-white text-xs font-semibold px-3 py-1.5"
               style={{ background: 'var(--accent)', borderRadius: 99 }}

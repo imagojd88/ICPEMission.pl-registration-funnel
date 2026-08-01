@@ -602,7 +602,14 @@ export function pickLang(value: LangText | undefined | null, lng: string): strin
 
 export interface EventContent {
   program?: { time: string; item: LangText }[]
-  specialGuest?: { name?: string; photoUrl?: string } | null
+  specialGuest?: {
+    name?: string
+    photoUrl?: string
+    /** true → etykieta „Goście specjalni" (np. małżeństwo, duet prowadzących). */
+    plural?: boolean
+    /** Krótkie 1–2 zdania: kim są. Wielojęzyczne jak program. */
+    bio?: LangText
+  } | null
 }
 
 export interface InvitationView {

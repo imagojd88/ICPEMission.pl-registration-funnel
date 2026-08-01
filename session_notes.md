@@ -33,7 +33,7 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 - `EventSeries.type` — typ eventu: `ONE_TIME` | `STANDALONE` | `INVITE`.
 - `RegistrationPage.theme` (JSON): `primaryColor, heroImageUrl, titleColor, badge, supertitle`.
 - `RegistrationPage.paymentInfo` (JSON): `{ recipient, account }` — dane przelewu per event.
-- `RegistrationPage.customFields` (JSON): `{ program: [{time,item}], specialGuest: {name, photoUrl} }`.
+- `RegistrationPage.customFields` (JSON): `{ program: [{time,item}], specialGuest: {name, photoUrl, plural?, bio?} }` — `plural` przełącza etykietę „Gość specjalny"/„Goście specjalni", `bio` to mapa językowa (1–2 zdania o gościach).
 - `pricingConfig` (JSON): dodane `free?: boolean` (event bezpłatny).
 - `Registration`: `checkedInAt`, `roomLabel`, `roomNote`, `roomsJson`.
 - `Invitation` (model): `token @unique`, `confirmedAt`, `dietaryNotes`.
@@ -148,6 +148,11 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 - Następne: Faza 2 (Astro static-site + Deploy Hook), Faza 3 (UI treści w Personal OS).
 
 ## Dziennik prac — moduł rejestracji
+
+### Goście specjalni: liczba mnoga + krótki opis
+- `customFields.specialGuest` rozszerzone o `plural` (bool) i `bio` (mapa językowa). Checkbox „To więcej niż jedna osoba (np. małżeństwo)" + pole „Kim są — 1–2 zdania" w `EventEditForm` (bio podpięte pod `editLang`, więc tłumaczalne) oraz w `EventWizard` (jednojęzycznie, PL — jak reszta kreatora).
+- `EventContentBlocks`: etykieta z `plural`, bio pod nazwiskiem, layout przełącza się na `items-start` gdy jest opis. Przy okazji etykiety „Gość specjalny"/„Program" przeszły z hardcode'u PL na i18n (nowa sekcja `content.*` w pl/en/it) — wcześniej po przełączeniu na EN zostawały polskie.
+- Backend bez zmian (customFields to wolny JSON), więc wystarczy auto-deploy frontu.
 
 ### Eventy „na zaproszenie": fix typu, blokada rejestracji, maile, panel gości
 - **Bug krytyczny (potwierdzony na produkcji):** `GET /r/:slug` zwracał `{page, instance}`, gdzie `instance` to surowy rekord Prismy **bez pola `type`** (typ siedzi na `EventSeries`). Front czyta `event.type`, więc gałęzie `STANDALONE` i `INVITE` w `PublicFunnel` **nigdy się nie uruchamiały** — event na zaproszenie (`/r/covenant-day-2026`, `series.type: "INVITE"`) pokazywał zwykły lejek rejestracji. Fix: `findBySlug` dokleja `type` (z serii) i `slug` do zwracanej instancji. Dodatkowo front ma fallback `event.type ?? eventConfig?.type` (endpoint `/r/:slug/config` zwracał `type` od zawsze). **UWAGA:** po wdrożeniu eventy STANDALONE też zaczną wreszcie pokazywać ekran RSVP zamiast lejka — to zamierzone, ale warto sprawdzić istniejące standalone'y.

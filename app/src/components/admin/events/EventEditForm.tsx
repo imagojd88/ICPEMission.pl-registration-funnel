@@ -114,6 +114,9 @@ export default function EventEditForm({
   const [program, setProgram] = useState<{ id: string; time: string; item: Record<string, string> }[]>([])
   const [specialGuestName, setSpecialGuestName] = useState('')
   const [specialGuestPhoto, setSpecialGuestPhoto] = useState('')
+  // Kilka osób (np. małżeństwo) → etykieta „Goście specjalni" zamiast „Gość specjalny".
+  const [specialGuestPlural, setSpecialGuestPlural] = useState(false)
+  const [guestBioMap, setGuestBioMap] = useState<Record<string, string>>({})
   const [uploadingGuest, setUploadingGuest] = useState(false)
   const [places, setPlaces] = useState<Place[]>([])
   // Typ eventu z serii — decyduje, czy pokazać sekcję zaproszonych gości.
@@ -239,6 +242,9 @@ export default function EventEditForm({
         )
         setSpecialGuestName(cfg.customFields?.specialGuest?.name ?? '')
         setSpecialGuestPhoto(cfg.customFields?.specialGuest?.photoUrl ?? '')
+        setSpecialGuestPlural(!!cfg.customFields?.specialGuest?.plural)
+        const gb = cfg.customFields?.specialGuest?.bio
+        setGuestBioMap(typeof gb === 'string' ? (gb ? { pl: gb } : {}) : (gb ?? {}))
         const loc = cfg.locales ?? ['pl']
         setLangPL(loc.includes('pl'))
         setLangEN(loc.includes('en'))
@@ -345,7 +351,12 @@ export default function EventEditForm({
             .map((r) => ({ time: r.time.trim(), item: cleanMap(r.item) })),
           specialGuest:
             specialGuestName.trim() || specialGuestPhoto
-              ? { name: specialGuestName.trim(), photoUrl: specialGuestPhoto }
+              ? {
+                  name: specialGuestName.trim(),
+                  photoUrl: specialGuestPhoto,
+                  plural: specialGuestPlural,
+                  bio: cleanMap(guestBioMap),
+                }
               : null,
         },
         locales,
@@ -636,19 +647,42 @@ export default function EventEditForm({
         <p className="text-xs" style={{ color: 'var(--faint)' }}>
           Godzina jest wspólna dla wszystkich języków; tłumaczysz tylko opis punktu.
         </p>
-        <Field label="Gość specjalny (imię i portret)">
+        <Field label={`${specialGuestPlural ? 'Goście specjalni' : 'Gość specjalny'} (imiona i portret)`}>
           <div className="flex items-center gap-3">
             {specialGuestPhoto ? (
               <img src={specialGuestPhoto} alt="" className="rounded-full object-cover shrink-0" style={{ width: 44, height: 44 }} />
             ) : (
               <div className="rounded-full shrink-0" style={{ width: 44, height: 44, background: 'var(--surface-2)', border: '1px solid var(--border)' }} />
             )}
-            <Input value={specialGuestName} onChange={(e) => setSpecialGuestName(e.target.value)} placeholder="Imię i nazwisko" />
+            <Input
+              value={specialGuestName}
+              onChange={(e) => setSpecialGuestName(e.target.value)}
+              placeholder={specialGuestPlural ? 'np. Anna i Mario Cappello' : 'Imię i nazwisko'}
+            />
             <label className="flex items-center gap-1 px-3 py-2 rounded-[10px] text-sm cursor-pointer shrink-0" style={{ background: 'var(--surface-2)', color: 'var(--muted)', border: '1px solid var(--border)' }}>
               {uploadingGuest ? '…' : 'Portret'}
               <input type="file" accept="image/*" className="hidden" onChange={handleGuestPhoto} />
             </label>
           </div>
+        </Field>
+        <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: 'var(--ink)' }}>
+          <input
+            type="checkbox"
+            checked={specialGuestPlural}
+            onChange={(e) => setSpecialGuestPlural(e.target.checked)}
+            className="accent-[var(--brand)] w-4 h-4"
+          />
+          To więcej niż jedna osoba (np. małżeństwo) — pokaż „Goście specjalni"
+        </label>
+        <Field label={`Kim są — 1–2 zdania${activeLocales.length > 1 ? ` — treść: ${LANG_LABEL[editLang]}` : ''}`}>
+          <textarea
+            value={guestBioMap[editLang] ?? ''}
+            onChange={(e) => setGuestBioMap((m) => ({ ...m, [editLang]: e.target.value }))}
+            rows={3}
+            placeholder="np. Anna i Mario prowadzą wspólnotę ICPE Mission na Malcie i od 20 lat głoszą rekolekcje w całej Europie."
+            className={inputCls}
+            style={{ ...inputStyle, resize: 'vertical' }}
+          />
         </Field>
       </Section>
 

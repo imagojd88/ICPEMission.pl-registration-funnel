@@ -118,6 +118,8 @@ interface WizardState {
   // gość specjalny + portret (URL)
   specialGuestName: string
   specialGuestPhoto: string
+  specialGuestPlural: boolean
+  specialGuestBio: string
 }
 
 // ── Color config ──────────────────────────────────────────────────────────────
@@ -689,7 +691,9 @@ function Step1Details({ state, update }: { state: WizardState; update: (p: Parti
 
       {/* Gość specjalny */}
       <div className="flex flex-col gap-2">
-        <label className="text-sm font-medium" style={{ color: 'var(--ink)' }}>Gość specjalny (opcjonalnie)</label>
+        <label className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
+          {state.specialGuestPlural ? 'Goście specjalni' : 'Gość specjalny'} (opcjonalnie)
+        </label>
         <div className="flex items-center gap-3">
           {state.specialGuestPhoto ? (
             <img src={state.specialGuestPhoto} alt="" className="rounded-full object-cover shrink-0" style={{ width: 48, height: 48 }} />
@@ -699,7 +703,7 @@ function Step1Details({ state, update }: { state: WizardState; update: (p: Parti
           <input
             value={state.specialGuestName}
             onChange={(e) => update({ specialGuestName: e.target.value })}
-            placeholder="Imię i nazwisko gościa"
+            placeholder={state.specialGuestPlural ? 'np. Anna i Mario Cappello' : 'Imię i nazwisko gościa'}
             className="flex-1 rounded-[10px] px-3 py-2 text-sm"
             style={{ border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--ink)' }}
           />
@@ -708,6 +712,23 @@ function Step1Details({ state, update }: { state: WizardState; update: (p: Parti
             <input type="file" accept="image/*" className="hidden" onChange={handleGuestPhoto} />
           </label>
         </div>
+        <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: 'var(--ink)' }}>
+          <input
+            type="checkbox"
+            checked={state.specialGuestPlural}
+            onChange={(e) => update({ specialGuestPlural: e.target.checked })}
+            className="accent-[var(--brand)] w-4 h-4"
+          />
+          To więcej niż jedna osoba (np. małżeństwo) — pokaż „Goście specjalni"
+        </label>
+        <textarea
+          value={state.specialGuestBio}
+          onChange={(e) => update({ specialGuestBio: e.target.value })}
+          rows={3}
+          placeholder="Kim są — 1–2 zdania, np. Anna i Mario prowadzą wspólnotę ICPE Mission na Malcie."
+          className="w-full rounded-[10px] px-3 py-2 text-sm"
+          style={{ border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--ink)', resize: 'vertical' }}
+        />
       </div>
 
       <div>
@@ -1427,6 +1448,8 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
     program: [],
     specialGuestName: '',
     specialGuestPhoto: '',
+    specialGuestPlural: false,
+    specialGuestBio: '',
   })
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -1507,7 +1530,13 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
           .map((r) => ({ time: r.time.trim(), item: r.item.trim() })),
         specialGuest:
           state.specialGuestName.trim() || state.specialGuestPhoto
-            ? { name: state.specialGuestName.trim(), photoUrl: state.specialGuestPhoto }
+            ? {
+                name: state.specialGuestName.trim(),
+                photoUrl: state.specialGuestPhoto,
+                plural: state.specialGuestPlural,
+                // Kreator jest jednojęzyczny (PL); tłumaczenia dodaje się w edycji eventu.
+                bio: state.specialGuestBio.trim() ? { pl: state.specialGuestBio.trim() } : {},
+              }
             : null,
       }
 

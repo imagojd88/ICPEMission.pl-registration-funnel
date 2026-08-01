@@ -500,6 +500,7 @@ export default function PublicFunnel() {
           isOpen={event.status === 'OPEN'}
           theme={eventConfig?.theme}
           title={getEventTitle(event.title, lng)}
+          inviteOnly
         />
         <InviteMatchScreen event={event} slug={slug ?? ''} content={eventConfig?.customFields} />
       </div>

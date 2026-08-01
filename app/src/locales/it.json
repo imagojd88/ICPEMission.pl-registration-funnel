@@ -40,7 +40,13 @@
     "checking": "Verifico…",
     "submit": "Confermo la partecipazione →",
     "confirmed_title": "Partecipazione confermata",
-    "confirmed_sub": "Grazie, {{name}}! A presto."
+    "confirmed_sub": "Grazie, {{name}}! A presto.",
+    "badge": "Solo su invito"
+  },
+  "content": {
+    "special_guest": "Ospite speciale",
+    "special_guests": "Ospiti speciali",
+    "program": "Programma"
   },
   "stepper": {
     "step0": "Dati del richiedente",

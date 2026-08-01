@@ -40,7 +40,13 @@
     "checking": "Checking…",
     "submit": "Confirm attendance →",
     "confirmed_title": "Attendance confirmed",
-    "confirmed_sub": "Thank you, {{name}}! See you there."
+    "confirmed_sub": "Thank you, {{name}}! See you there.",
+    "badge": "Invited guests only"
+  },
+  "content": {
+    "special_guest": "Special guest",
+    "special_guests": "Special guests",
+    "program": "Programme"
   },
   "stepper": {
     "step0": "Contact details",
