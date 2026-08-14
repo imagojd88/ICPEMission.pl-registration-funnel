@@ -5,6 +5,7 @@ import type { EventInstanceDto, CreateRegistrationDto, RegistrationStatus, Payme
 import { computePrice, DEFAULT_PRICING, validateRoomCapacity } from '@icpe/shared'
 import type { PricingConfig } from '@icpe/shared'
 import { getEventBySlug, getEventConfig, createRegistration, registerGuest, pickLang, type EventConfig } from '../lib/api'
+import { clearDraft, loadDraft, pruneExpiredDrafts, saveDraft, type ResumableScreen } from '../lib/funnelDraft'
 
 /** Rozdziela „Imię Nazwisko" na pola DTO. */
 function splitName(full: string): { firstName: string; lastName?: string } {
@@ -108,6 +109,33 @@ function buildInitialStepper(): StepperState {
 }
 
 const STEPS = 5
+
+/**
+ * Odtwarza StepperState z danych w localStorage. Wszystko jest scalane z domyślnym
+ * stanem i sprawdzane pod kątem typu, bo draft mógł powstać na starszej wersji kodu
+ * (albo zostać ręcznie zmieniony) — brakujące pole = wysypka renderu i biała strona.
+ */
+function normalizeStepper(raw: unknown): StepperState | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+  const base = buildInitialStepper()
+  const r = raw as Partial<StepperState>
+  const obj = <T,>(v: unknown, fallback: T): T =>
+    v && typeof v === 'object' && !Array.isArray(v) ? { ...fallback, ...(v as T) } : fallback
+  const participants =
+    Array.isArray(r.participants) && r.participants.length > 0 ? r.participants : base.participants
+  const step = typeof r.step === 'number' ? Math.min(Math.max(Math.trunc(r.step), 0), STEPS - 1) : 0
+  return {
+    ...base,
+    ...r,
+    step,
+    applicant: obj(r.applicant, base.applicant),
+    participants,
+    dietaryTags: Array.isArray(r.dietaryTags) ? r.dietaryTags : base.dietaryTags,
+    rooms: Array.isArray(r.rooms) ? r.rooms : base.rooms,
+    options: obj(r.options, base.options),
+    consents: obj(r.consents, base.consents),
+  }
+}
 
 // ─── Loading skeleton ────────────────────────────────────────────────────────
 
@@ -241,6 +269,59 @@ function StepperView({
   )
 }
 
+// ─── Niedokończone zgłoszenie ────────────────────────────────────────────────
+
+/** Propozycja powrotu do przerwanego wypełniania (dane z localStorage). */
+function DraftBanner({
+  step,
+  totalSteps,
+  name,
+  onResume,
+  onDiscard,
+}: {
+  step: number
+  totalSteps: number
+  name?: string
+  onResume: () => void
+  onDiscard: () => void
+}) {
+  const { t } = useTranslation()
+  return (
+    <div
+      className="mx-[22px] mt-5 rounded-[15px] px-4 py-3.5 flex flex-col gap-2.5"
+      style={{ background: 'var(--brand-soft)', border: '1px solid var(--brand)' }}
+      role="status"
+    >
+      <div className="flex flex-col gap-1">
+        <p className="text-sm font-semibold" style={{ color: 'var(--brand)' }}>
+          {name ? t('draft.title_named', { name }) : t('draft.title')}
+        </p>
+        <p className="text-xs" style={{ color: 'var(--muted)' }}>
+          {t('draft.subtitle', { step: Math.min(step + 1, totalSteps), total: totalSteps })}
+        </p>
+      </div>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onResume}
+          className="text-sm font-semibold px-4 py-2 rounded-[12px] text-white"
+          style={{ background: 'var(--accent)', border: 'none', cursor: 'pointer' }}
+        >
+          {t('draft.resume')}
+        </button>
+        <button
+          type="button"
+          onClick={onDiscard}
+          className="text-sm font-medium px-3 py-2 rounded-[12px]"
+          style={{ background: 'transparent', color: 'var(--muted)', border: '1px solid var(--border)', cursor: 'pointer' }}
+        >
+          {t('draft.discard')}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ─── Main container ───────────────────────────────────────────────────────────
 
 /** Odczytuje tytuł eventu w aktywnym języku (Localized lub string). */
@@ -263,6 +344,45 @@ export default function PublicFunnel() {
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [stepError, setStepError] = useState<string | null>(null)
   const [result, setResult] = useState<{ regId: string; status: RegistrationStatus; total: number } | null>(null)
+  // Niedokończone zgłoszenie z poprzedniej wizyty (localStorage) — pokazujemy je jako
+  // propozycję na ekranie startowym, nie wskakujemy w lejek bez pytania.
+  const [draft, setDraft] = useState<{ screen: ResumableScreen; stepper: StepperState } | null>(null)
+
+  const draftSlug = slug ?? ''
+
+  // Draft odczytujemy przy każdym powrocie na ekran startowy — inaczej trzymalibyśmy
+  // nieaktualny snapshot i po wysłaniu zgłoszenia baner proponowałby wysłać je ponownie.
+  useEffect(() => {
+    if (screen !== 'landing') return
+    const raw = loadDraft(draftSlug)
+    const stepper = raw ? normalizeStepper(raw.stepper) : null
+    if (raw && !stepper) clearDraft(draftSlug) // niezgodny kształt → wyrzucamy
+    setDraft(raw && stepper ? { screen: raw.screen, stepper } : null)
+  }, [draftSlug, screen])
+
+  useEffect(() => {
+    pruneExpiredDrafts()
+  }, [])
+
+  // Autozapis na każdą zmianę kroku/danych — poza ekranem startowym i sukcesem.
+  useEffect(() => {
+    if (!draftSlug) return
+    if (screen === 'landing') return
+    if (screen === 'success') {
+      clearDraft(draftSlug)
+      return
+    }
+    // Pusty formularz nie jest wart proponowania przy następnej wizycie.
+    const a = stepper.applicant
+    const started =
+      stepper.step > 0 ||
+      !!(a.firstName.trim() || a.lastName.trim() || a.email.trim() || a.phone.trim() || a.address.trim()) ||
+      stepper.participants.some((p) => p.name.trim())
+    if (!started) return
+    // Debounce: bez tego każdy wpisany znak to JSON.stringify + zapis do storage.
+    const id = window.setTimeout(() => saveDraft(draftSlug, screen, stepper), 400)
+    return () => window.clearTimeout(id)
+  }, [draftSlug, screen, stepper])
 
   const loadEvent = () => {
     setLoading(true)
@@ -300,6 +420,19 @@ export default function PublicFunnel() {
   const handleStartRegister = () => {
     setStepper(buildInitialStepper())
     setScreen('stepper')
+  }
+
+  /** Powrót do niedokończonego zgłoszenia — na ten sam krok, z tymi samymi danymi. */
+  const handleResumeDraft = () => {
+    if (!draft) return
+    setStepper(draft.stepper)
+    setScreen(draft.screen)
+    setDraft(null)
+  }
+
+  const handleDiscardDraft = () => {
+    clearDraft(draftSlug)
+    setDraft(null)
   }
 
   const handleStepperBack = () => {
@@ -521,6 +654,15 @@ export default function PublicFunnel() {
             theme={eventConfig?.theme}
             title={getEventTitle(event.title, lng)}
           />
+          {draft && (
+            <DraftBanner
+              step={draft.stepper.step}
+              totalSteps={STEPS}
+              name={draft.stepper.applicant.firstName.trim()}
+              onResume={handleResumeDraft}
+              onDiscard={handleDiscardDraft}
+            />
+          )}
           <LandingScreen event={event} onRegister={handleStartRegister} pricingConfig={pricingConfig} content={eventConfig?.customFields} />
         </>
       )}

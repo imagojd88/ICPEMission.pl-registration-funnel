@@ -190,5 +190,12 @@
     "next": "Avanti",
     "publish": "Pubblica pagina ✓",
     "published": "✓ Pubblicato"
+  },
+  "draft": {
+    "title": "Hai un'iscrizione non completata",
+    "title_named": "{{name}}, hai un'iscrizione non completata",
+    "subtitle": "Ti sei fermato al passo {{step}} di {{total}}. I tuoi dati sono salvati — puoi continuare invece di ricominciare.",
+    "resume": "Completa l'iscrizione →",
+    "discard": "Ricomincia"
   }
 }

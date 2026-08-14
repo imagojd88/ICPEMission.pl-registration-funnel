@@ -149,6 +149,13 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — moduł rejestracji
 
+### Lejek: zapamiętywanie niedokończonego zgłoszenia
+- Powód: zgłoszenie leci na serwer dopiero po kliknięciu „Wyślij zgłoszenie" na podsumowaniu — odświeżenie strony albo zamknięcie karty kasowało cały postęp bez śladu w bazie. Zgłoszenie usera: osoba wypełniała formularz dwukrotnie i nie ma jej na liście (potwierdzone: najnowsza rejestracja na `5september` z 3 lipca, czyli nic nie doszło do API).
+- `app/src/lib/funnelDraft.ts` — draft w `localStorage`, klucz `icpe:funnel:<slug>`, `VERSION` + TTL 3 dni + `pruneExpiredDrafts()` (sprząta drafty wszystkich slugów, żeby dane osobowe nie leżały bezterminowo). `loadDraft` zwraca `stepper` jako `unknown` i whitelistuje ekran powrotu (`stepper|payment_method|summary`).
+- `PublicFunnel`: autozapis z debounce 400 ms (pomija pusty formularz), `normalizeStepper()` scala draft z `buildInitialStepper()` i sprawdza typy pól (draft ze starszej wersji kodu nie wywala renderu — nie ma ErrorBoundary w projekcie), baner `DraftBanner` na ekranie startowym z „Dokończ zgłoszenie" / „Zacznij od nowa" (i18n `draft.*` w pl/en/it).
+- **Pułapka złapana w review własnego kodu:** stan `draft` czytany tylko przy montowaniu powodował, że po wysłaniu zgłoszenia i powrocie na landing baner nadal się pokazywał (storage już pusty) i pozwalał **wysłać to samo zgłoszenie drugi raz** — API nie ma dedupu `createRegistration`. Fix: draft przeładowywany przy każdym wejściu na ekran startowy (`useEffect` z zależnością od `screen`).
+- Do rozważenia: wzmianka w klauzuli RODO, że dane wpisane w formularzu zapisują się lokalnie w przeglądarce na 3 dni.
+
 ### Nadtytuł eventu: lista wyboru + koniec z fallbackiem
 - Przyczyna „randomowego" nadtytułu: kreator eventu **w ogóle nie zapisywał** `theme.supertitle`, a `LandingHero` przy pustej wartości podstawiał `t('landing.supertitle')` = „Wyjazd formacyjny". Każdy nowy event dostawał więc tę etykietę niezależnie od charakteru.
 - `LandingHero`: brak nadtytułu → nic się nie renderuje (fallback usunięty).

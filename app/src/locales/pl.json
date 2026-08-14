@@ -192,5 +192,12 @@
     "next": "Dalej",
     "publish": "Publikuj stronę ✓",
     "published": "✓ Opublikowano"
+  },
+  "draft": {
+    "title": "Masz niedokończone zgłoszenie",
+    "title_named": "{{name}}, masz niedokończone zgłoszenie",
+    "subtitle": "Zatrzymałeś się na kroku {{step}} z {{total}}. Twoje dane czekają — możesz dokończyć zamiast wypełniać wszystko od nowa.",
+    "resume": "Dokończ zgłoszenie →",
+    "discard": "Zacznij od nowa"
   }
 }

@@ -190,5 +190,12 @@
     "next": "Next",
     "publish": "Publish page ✓",
     "published": "✓ Published"
+  },
+  "draft": {
+    "title": "You have an unfinished registration",
+    "title_named": "{{name}}, you have an unfinished registration",
+    "subtitle": "You stopped at step {{step}} of {{total}}. Your details are saved — you can carry on instead of starting over.",
+    "resume": "Finish registration →",
+    "discard": "Start over"
   }
 }
