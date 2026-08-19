@@ -23,6 +23,9 @@ function formatUpdatedAt(d: Date): string {
 type PayStatus = 'all' | 'PAID' | 'AWAITING_TRANSFER' | 'PENDING' | 'CANCELLED'
 
 function payBadge(r: RegistrationDto) {
+  // Zgłoszenia bezpłatne (m.in. potwierdzenia z eventów „na zaproszenie", totalPrice 0)
+  // nie mają płatności — czerwone „Oczekuje" byłoby fałszywym alarmem.
+  if (r.status === 'CONFIRMED' && Number(r.totalPrice) === 0) return <Badge variant="ok">Bezpłatne</Badge>
   if (r.paymentStatus === 'PAID') return <Badge variant="ok">Opłacone</Badge>
   if (r.paymentStatus === 'AWAITING_TRANSFER') return <Badge variant="warn">Oczekuje</Badge>
   if (r.status === 'WAITLIST') return <Badge variant="muted">Lista oczekujących</Badge>

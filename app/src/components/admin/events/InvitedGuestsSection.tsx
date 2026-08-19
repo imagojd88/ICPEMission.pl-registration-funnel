@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Check, Clock, Copy, Mail, MessageCircle, Plus, RefreshCw, Send, Trash2, Users } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
+import { useAutoRefresh } from '@/hooks/useAutoRefresh'
 import {
   createInvitations,
   deleteInvitation,
@@ -56,21 +57,29 @@ export default function InvitedGuestsSection({
   const [adding, setAdding] = useState(false)
   const [draft, setDraft] = useState({ firstName: '', lastName: '', email: '', phone: '' })
 
-  const load = useCallback(async () => {
-    setLoading(true)
+  const load = useCallback(async (silent = false) => {
+    // `silent` — odświeżanie w tle (polling): bez spinnera, żeby lista nie mrugała.
+    if (!silent) setLoading(true)
     try {
       setItems(await listInvitations(instanceId))
       setError(null)
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [instanceId])
 
   useEffect(() => {
     void load()
   }, [load])
+
+  // Potwierdzenia spływają w tle — admin ma je widzieć bez F5. Pauza w trakcie
+  // akcji na wierszu (wysyłka, usuwanie, synchronizacja), żeby nie podmienić danych pod ręką.
+  const { lastUpdatedAt, refreshing, refreshNow } = useAutoRefresh(() => load(true), {
+    intervalMs: 20000,
+    enabled: !busyId && !adding,
+  })
 
   async function handleAdd() {
     if (!draft.firstName.trim() || !draft.lastName.trim()) {
@@ -226,13 +235,19 @@ export default function InvitedGuestsSection({
           {unsent > 0 && ` · bez wysłanego maila: ${unsent}`}
         </p>
         <div className="flex items-center gap-2">
+          {lastUpdatedAt && (
+            <span className="text-xs" style={{ color: 'var(--muted)' }}>
+              Zaktualizowano{' '}
+              {lastUpdatedAt.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          )}
           <button
             type="button"
-            onClick={() => { void load() }}
+            onClick={() => { void refreshNow() }}
             className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-[8px]"
             style={{ background: 'var(--surface-2)', color: 'var(--muted)', border: '1px solid var(--border)', cursor: 'pointer' }}
           >
-            <RefreshCw size={13} /> Odśwież
+            <RefreshCw size={13} className={refreshing ? 'animate-spin' : undefined} /> Odśwież
           </button>
           <button
             type="button"
