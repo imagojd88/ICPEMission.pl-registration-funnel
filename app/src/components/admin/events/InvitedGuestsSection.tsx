@@ -174,11 +174,33 @@ export default function InvitedGuestsSection({
     }
   }
 
-  const confirmed = items.filter((i) => i.confirmedAt).length
+  const confirmedItems = items.filter((i) => i.confirmedAt)
+  const confirmed = confirmedItems.length
   const unsent = items.filter((i) => i.email && !i.sentAt).length
+  const notConfirmed = items.length - confirmed
+
+  // Najważniejsza liczba dla organizatora: ile posiłków zamówić u cateringu.
+  const spouseCount = confirmedItems.filter((i) => i.spouseAttending).length
+  const childrenCount = confirmedItems.reduce((sum, i) => sum + (i.children?.length ?? 0), 0)
+  const adultsCount = confirmed + spouseCount
+  const mealsCount = adultsCount + childrenCount
 
   return (
     <div className="flex flex-col gap-4">
+      <div
+        className="flex items-center justify-between gap-3 flex-wrap px-3 py-2.5 rounded-[10px]"
+        style={{ background: 'var(--brand-soft)', border: '1px solid var(--brand)' }}
+      >
+        <p className="text-sm font-semibold" style={{ color: 'var(--brand)' }}>
+          Potwierdzeni: {adultsCount} dorosłych + {childrenCount} dzieci = {mealsCount} posiłków
+        </p>
+        {notConfirmed > 0 && (
+          <p className="text-xs" style={{ color: 'var(--muted)' }}>
+            Jeszcze niepotwierdzeni: {notConfirmed}
+          </p>
+        )}
+      </div>
+
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <p className="text-sm" style={{ color: 'var(--muted)' }}>
           Potwierdziło <strong style={{ color: 'var(--ink)' }}>{confirmed}</strong> z {items.length}
@@ -256,6 +278,27 @@ export default function InvitedGuestsSection({
                     {isConfirmed ? 'Potwierdził' : 'Czeka'}
                   </span>
                 </div>
+
+                {isConfirmed && (inv.spouseAttending || (inv.children?.length ?? 0) > 0 || inv.dietaryNotes || inv.spouseDietaryNotes) && (
+                  <div className="flex flex-col gap-0.5">
+                    {inv.spouseAttending && (
+                      <p className="text-xs" style={{ color: 'var(--muted)' }}>
+                        + małżonek: {[inv.spouseFirstName, inv.spouseLastName].filter(Boolean).join(' ') || '—'}
+                      </p>
+                    )}
+                    {(inv.children?.length ?? 0) > 0 && (
+                      <p className="text-xs" style={{ color: 'var(--muted)' }}>
+                        dzieci: {inv.children.length} ({inv.children.map((c) => `${c.firstName ? `${c.firstName} ` : ''}${c.age}`).join(', ')} lat)
+                      </p>
+                    )}
+                    {inv.dietaryNotes && (
+                      <p className="text-xs" style={{ color: 'var(--muted)' }}>dieta: {inv.dietaryNotes}</p>
+                    )}
+                    {inv.spouseDietaryNotes && (
+                      <p className="text-xs" style={{ color: 'var(--muted)' }}>dieta małżonka: {inv.spouseDietaryNotes}</p>
+                    )}
+                  </div>
+                )}
 
                 <p className="text-[11px] font-mono truncate" style={{ color: 'var(--faint)' }}>{inviteLink(inv)}</p>
 

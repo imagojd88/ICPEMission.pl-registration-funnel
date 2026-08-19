@@ -1,11 +1,23 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Calendar, MapPin, Check, Lock } from 'lucide-react'
+import { Calendar, MapPin, Check, Lock, Trash2 } from 'lucide-react'
 import type { EventInstanceDto } from '@icpe/shared'
 import { Input } from '../ui/Input'
-import { matchInvite, pickLang, type EventContent } from '../../lib/api'
+import { matchInvite, pickLang, type EventContent, type ChildEntry } from '../../lib/api'
 import { formatDateRange } from '../../lib/utils'
 import EventContentBlocks from './EventContentBlocks'
+
+/** Wiersz dziecka w formularzu — `age` jako string, żeby pole mogło być puste w trakcie edycji. */
+interface ChildRow {
+  key: string
+  age: string
+  firstName: string
+}
+
+let childKeyCounter = 0
+function newChildRow(): ChildRow {
+  return { key: `c-${++childKeyCounter}`, age: '', firstName: '' }
+}
 
 export default function InviteMatchScreen({ event, slug, content }: { event: EventInstanceDto; slug: string; content?: EventContent | null }) {
   const { t, i18n } = useTranslation()
@@ -13,19 +25,55 @@ export default function InviteMatchScreen({ event, slug, content }: { event: Eve
   const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
   const [dietary, setDietary] = useState('')
+  const [spouseChoice, setSpouseChoice] = useState<'alone' | 'with' | null>(null)
+  const [spouseFirstName, setSpouseFirstName] = useState('')
+  const [spouseLastName, setSpouseLastName] = useState('')
+  const [spouseDietary, setSpouseDietary] = useState('')
+  const [children, setChildren] = useState<ChildRow[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [confirmedName, setConfirmedName] = useState<string | null>(null)
+
+  function addChild() {
+    setChildren((prev) => [...prev, newChildRow()])
+  }
+  function updateChild(key: string, patch: Partial<ChildRow>) {
+    setChildren((prev) => prev.map((c) => (c.key === key ? { ...c, ...patch } : c)))
+  }
+  function removeChild(key: string) {
+    setChildren((prev) => prev.filter((c) => c.key !== key))
+  }
 
   async function handleSubmit() {
     if (!firstName.trim() || !lastName.trim() || !email.trim()) {
       setError(t('invite.required'))
       return
     }
+    if (!spouseChoice) {
+      setError(t('invite.attendance_required'))
+      return
+    }
+    if (spouseChoice === 'with' && (!spouseFirstName.trim() || !spouseLastName.trim())) {
+      setError(t('invite.spouse_required'))
+      return
+    }
+    const childrenPayload: ChildEntry[] = children
+      .filter((c) => c.age.trim() !== '')
+      .map((c) => ({ age: Number(c.age), ...(c.firstName.trim() ? { firstName: c.firstName.trim() } : {}) }))
     setBusy(true)
     setError(null)
     try {
-      const res = await matchInvite(slug, { firstName, lastName, email, dietaryNotes: dietary })
+      const res = await matchInvite(slug, {
+        firstName,
+        lastName,
+        email,
+        dietaryNotes: dietary,
+        spouseAttending: spouseChoice === 'with',
+        spouseFirstName: spouseChoice === 'with' ? spouseFirstName : undefined,
+        spouseLastName: spouseChoice === 'with' ? spouseLastName : undefined,
+        spouseDietaryNotes: spouseChoice === 'with' ? spouseDietary : undefined,
+        children: childrenPayload,
+      })
       setConfirmedName(res.firstName)
     } catch {
       setError(t('invite.not_found'))
@@ -87,6 +135,92 @@ export default function InviteMatchScreen({ event, slug, content }: { event: Eve
           <Input label={t('invite.last_name')} value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Kowalski" />
         </div>
         <Input label={t('invite.email')} value={email} onChange={(e) => setEmail(e.target.value)} placeholder="jan@example.com" />
+
+        {/* Sam/z małżonkiem — kluczowe dla liczby posiłków, dlatego bez domyślnego zaznaczenia. */}
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-medium" style={{ color: 'var(--ink)' }}>{t('invite.spouse_question')}</label>
+          <div className="flex rounded-[10px] overflow-hidden p-0.5" style={{ background: 'var(--surface-2)' }}>
+            {(['alone', 'with'] as const).map((choice) => (
+              <button
+                key={choice}
+                type="button"
+                onClick={() => setSpouseChoice(choice)}
+                className="flex-1 px-3 py-2 text-xs font-semibold rounded-[8px] transition-all duration-150"
+                style={{
+                  background: spouseChoice === choice ? 'var(--surface)' : 'transparent',
+                  color: spouseChoice === choice ? 'var(--ink)' : 'var(--muted)',
+                  boxShadow: spouseChoice === choice ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                {choice === 'alone' ? t('invite.spouse_alone') : t('invite.spouse_with')}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {spouseChoice === 'with' && (
+          <div className="flex flex-col gap-2 rounded-[12px] p-3" style={{ background: 'var(--surface-2)' }}>
+            <div className="grid grid-cols-2 gap-2">
+              <Input label={t('invite.spouse_first_name')} value={spouseFirstName} onChange={(e) => setSpouseFirstName(e.target.value)} placeholder="Anna" />
+              <Input label={t('invite.spouse_last_name')} value={spouseLastName} onChange={(e) => setSpouseLastName(e.target.value)} placeholder="Kowalska" />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium" style={{ color: 'var(--ink)' }}>{t('invite.spouse_dietary')}</label>
+              <textarea
+                value={spouseDietary}
+                onChange={(e) => setSpouseDietary(e.target.value)}
+                rows={2}
+                placeholder={t('invite.dietary_ph')}
+                className="w-full rounded-[12px] px-3 py-[11px] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                style={{ border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--ink)', resize: 'vertical' }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Dzieci — opcjonalne, bez wierszy sekcja to sam przycisk. */}
+        <div className="flex flex-col gap-2">
+          <label className="text-sm font-medium" style={{ color: 'var(--ink)' }}>{t('invite.children')}</label>
+          {children.map((c) => (
+            <div key={c.key} className="flex items-center gap-2">
+              <input
+                inputMode="numeric"
+                value={c.age}
+                onChange={(e) => updateChild(c.key, { age: e.target.value.replace(/[^0-9]/g, '') })}
+                placeholder={t('invite.child_age')}
+                className="rounded-[12px] px-3 py-[11px] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                style={{ width: 76, border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--ink)' }}
+              />
+              <input
+                value={c.firstName}
+                onChange={(e) => updateChild(c.key, { firstName: e.target.value })}
+                placeholder={t('invite.child_name')}
+                className="flex-1 rounded-[12px] px-3 py-[11px] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                style={{ border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--ink)' }}
+              />
+              <button
+                type="button"
+                onClick={() => removeChild(c.key)}
+                aria-label={t('invite.child_add')}
+                className="p-2 rounded-[8px] transition-colors duration-150 hover:bg-[var(--err-soft)]"
+                style={{ color: 'var(--muted)', border: 'none', background: 'none', cursor: 'pointer' }}
+              >
+                <Trash2 size={15} />
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={addChild}
+            className="self-start text-xs font-semibold"
+            style={{ color: 'var(--brand)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+          >
+            {t('invite.child_add')}
+          </button>
+        </div>
+
         <div className="flex flex-col gap-1">
           <label className="text-sm font-medium" style={{ color: 'var(--ink)' }}>{t('invite.dietary')}</label>
           <textarea

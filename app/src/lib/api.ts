@@ -523,6 +523,22 @@ export interface Invitee {
   phone?: string
 }
 
+/** Wpis dziecka w deklaracji gościa. */
+export interface ChildEntry {
+  firstName?: string
+  age: number
+}
+
+/** Payload deklaracji przy potwierdzeniu udziału (link imienny lub dopasowanie po danych). */
+export interface ConfirmPayload {
+  dietaryNotes?: string
+  spouseAttending?: boolean
+  spouseFirstName?: string
+  spouseLastName?: string
+  spouseDietaryNotes?: string
+  children?: ChildEntry[]
+}
+
 export interface InvitationItem extends Omit<Invitee, 'phone'> {
   id: string
   token: string
@@ -532,6 +548,12 @@ export interface InvitationItem extends Omit<Invitee, 'phone'> {
   confirmedAt: string | null
   /** Kiedy poszedł mail z zaproszeniem (null = jeszcze nie wysłano). */
   sentAt?: string | null
+  dietaryNotes: string | null
+  spouseAttending: boolean | null
+  spouseFirstName: string | null
+  spouseLastName: string | null
+  spouseDietaryNotes: string | null
+  children: ChildEntry[]
 }
 
 export async function createInvitations(
@@ -617,6 +639,12 @@ export interface InvitationView {
   lastName: string
   email: string
   confirmedAt: string | null
+  dietaryNotes: string | null
+  spouseAttending: boolean | null
+  spouseFirstName: string | null
+  spouseLastName: string | null
+  spouseDietaryNotes: string | null
+  children: ChildEntry[]
   event: {
     title: unknown
     description: unknown
@@ -634,21 +662,21 @@ export async function getInvitation(inviteToken: string): Promise<InvitationView
   return apiFetch<InvitationView>(`/invite/${inviteToken}`)
 }
 
-/** Publiczne: potwierdź udział po linku (opcjonalnie z alergiami/dietą). */
+/** Publiczne: potwierdź (lub zmień) udział po linku — deklaracja małżonka/dzieci/diety. */
 export async function confirmInvitation(
   inviteToken: string,
-  dietaryNotes?: string,
+  payload: ConfirmPayload,
 ): Promise<{ ok: boolean }> {
   return apiFetch(`/invite/${inviteToken}/confirm`, {
     method: 'POST',
-    body: JSON.stringify({ dietaryNotes: dietaryNotes ?? '' }),
+    body: JSON.stringify(payload),
   })
 }
 
 /** Publiczne: dopasuj dane do zaproszenia (bez linku) i potwierdź. Rzuca, gdy brak dopasowania. */
 export async function matchInvite(
   slug: string,
-  data: Invitee & { dietaryNotes?: string },
+  data: Invitee & ConfirmPayload,
 ): Promise<{ ok: boolean; firstName: string }> {
   return apiFetch(`/r/${slug}/invite-match`, { method: 'POST', body: JSON.stringify(data) })
 }

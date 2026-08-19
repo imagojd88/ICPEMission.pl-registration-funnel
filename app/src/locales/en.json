@@ -41,7 +41,20 @@
     "submit": "Confirm attendance →",
     "confirmed_title": "Attendance confirmed",
     "confirmed_sub": "Thank you, {{name}}! See you there.",
-    "badge": "Invited guests only"
+    "badge": "Invited guests only",
+    "attendance_required": "Please select whether you're coming alone or with your spouse.",
+    "spouse_question": "How are you coming?",
+    "spouse_alone": "I'm coming alone",
+    "spouse_with": "I'm coming with my spouse",
+    "spouse_first_name": "Spouse's first name",
+    "spouse_last_name": "Spouse's last name",
+    "spouse_dietary": "Spouse's allergies / dietary requirements (optional)",
+    "spouse_required": "Please provide your spouse's first and last name.",
+    "children": "Children (optional)",
+    "child_add": "+ Add child",
+    "child_age": "Age",
+    "child_name": "Name (optional)",
+    "change_answer": "Change your answer"
   },
   "content": {
     "special_guest": "Special guest",

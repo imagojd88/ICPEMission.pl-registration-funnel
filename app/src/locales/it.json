@@ -41,7 +41,20 @@
     "submit": "Confermo la partecipazione →",
     "confirmed_title": "Partecipazione confermata",
     "confirmed_sub": "Grazie, {{name}}! A presto.",
-    "badge": "Solo su invito"
+    "badge": "Solo su invito",
+    "attendance_required": "Seleziona se vieni da solo/a oppure con il coniuge.",
+    "spouse_question": "Come arrivi?",
+    "spouse_alone": "Vengo da solo/a",
+    "spouse_with": "Vengo con il coniuge",
+    "spouse_first_name": "Nome del coniuge",
+    "spouse_last_name": "Cognome del coniuge",
+    "spouse_dietary": "Allergie / esigenze alimentari del coniuge (facoltativo)",
+    "spouse_required": "Inserisci nome e cognome del coniuge.",
+    "children": "Bambini (facoltativo)",
+    "child_add": "+ Aggiungi bambino",
+    "child_age": "Età",
+    "child_name": "Nome (facoltativo)",
+    "change_answer": "Modifica la risposta"
   },
   "content": {
     "special_guest": "Ospite speciale",

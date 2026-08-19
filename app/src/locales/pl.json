@@ -43,7 +43,20 @@
     "submit": "Potwierdzam udział →",
     "confirmed_title": "Udział potwierdzony",
     "confirmed_sub": "Dziękujemy, {{name}}! Do zobaczenia.",
-    "badge": "Tylko dla zaproszonych"
+    "badge": "Tylko dla zaproszonych",
+    "attendance_required": "Wybierz, czy przyjeżdżasz sam/sama, czy z małżonkiem.",
+    "spouse_question": "Jak przyjeżdżasz?",
+    "spouse_alone": "Przyjadę sam/sama",
+    "spouse_with": "Przyjadę z małżonkiem",
+    "spouse_first_name": "Imię małżonka",
+    "spouse_last_name": "Nazwisko małżonka",
+    "spouse_dietary": "Alergie / wymagania żywieniowe małżonka (opcjonalnie)",
+    "spouse_required": "Podaj imię i nazwisko małżonka.",
+    "children": "Dzieci (opcjonalnie)",
+    "child_add": "+ Dodaj dziecko",
+    "child_age": "Wiek",
+    "child_name": "Imię (opcjonalnie)",
+    "change_answer": "Zmień odpowiedź"
   },
   "content": {
     "special_guest": "Gość specjalny",

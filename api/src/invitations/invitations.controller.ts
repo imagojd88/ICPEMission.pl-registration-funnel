@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
-import { InvitationsService } from './invitations.service';
+import { InvitationsService, type ConfirmPayload } from './invitations.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 interface Invitee {
@@ -70,14 +70,14 @@ export class InvitationsController {
   }
 
   @Post('invite/:token/confirm')
-  @ApiOperation({ summary: 'Publiczne: potwierdź udział po linku' })
-  confirm(@Param('token') token: string, @Body() dto?: { dietaryNotes?: string }) {
-    return this.invites.confirmByToken(token, dto?.dietaryNotes);
+  @ApiOperation({ summary: 'Publiczne: potwierdź (lub zmień) udział po linku' })
+  confirm(@Param('token') token: string, @Body() dto?: ConfirmPayload) {
+    return this.invites.confirmByToken(token, dto ?? {});
   }
 
   @Post('r/:slug/invite-match')
   @ApiOperation({ summary: 'Publiczne: dopasuj dane do zaproszenia (bez linku) i potwierdź' })
-  match(@Param('slug') slug: string, @Body() dto: Invitee & { dietaryNotes?: string }) {
+  match(@Param('slug') slug: string, @Body() dto: Invitee & ConfirmPayload) {
     return this.invites.matchBySlug(slug, dto);
   }
 }

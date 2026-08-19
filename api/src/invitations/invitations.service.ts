@@ -10,6 +10,22 @@ interface Invitee {
   phone?: string;
 }
 
+/** Wpis dziecka w deklaracji gościa. */
+export interface ChildEntry {
+  firstName?: string;
+  age: number;
+}
+
+/** Payload deklaracji przy potwierdzeniu udziału (link imienny lub dopasowanie po danych). */
+export interface ConfirmPayload {
+  dietaryNotes?: string;
+  spouseAttending?: boolean;
+  spouseFirstName?: string;
+  spouseLastName?: string;
+  spouseDietaryNotes?: string;
+  children?: ChildEntry[];
+}
+
 /** Wiersz zaproszenia w kształcie, jaki dostaje panel admina / Personal OS. */
 export interface InvitationRow {
   id: string;
@@ -21,6 +37,12 @@ export interface InvitationRow {
   link: string;
   confirmedAt: string | null;
   sentAt: string | null;
+  dietaryNotes: string | null;
+  spouseAttending: boolean | null;
+  spouseFirstName: string | null;
+  spouseLastName: string | null;
+  spouseDietaryNotes: string | null;
+  children: ChildEntry[];
 }
 
 type InvitationRecord = {
@@ -32,9 +54,55 @@ type InvitationRecord = {
   token: string;
   confirmedAt: Date | null;
   sentAt: Date | null;
+  dietaryNotes: string | null;
+  spouseAttending: boolean | null;
+  spouseFirstName: string | null;
+  spouseLastName: string | null;
+  spouseDietaryNotes: string | null;
+  childrenJson: unknown;
 };
 
 const norm = (s: string) => (s ?? '').trim().toLowerCase();
+
+/** Waliduje/przycina listę dzieci z payloadu — patrz specyfikacja: max 12, wiek 0–25, imię max 60 znaków. */
+function sanitizeChildren(children: ChildEntry[] | undefined): ChildEntry[] {
+  if (!Array.isArray(children)) return [];
+  const out: ChildEntry[] = [];
+  for (const c of children) {
+    if (out.length >= 12) break;
+    const ageNum = Number(c?.age);
+    if (!Number.isFinite(ageNum)) continue;
+    const age = Math.min(25, Math.max(0, Math.round(ageNum)));
+    const firstNameRaw = (c?.firstName ?? '').trim().slice(0, 60);
+    out.push({ age, ...(firstNameRaw ? { firstName: firstNameRaw } : {}) });
+  }
+  return out;
+}
+
+/** Zwraca dane do zapisu w Prisma dla deklaracji małżonka/dzieci — wspólne dla obu ścieżek potwierdzenia. */
+function declarationData(payload: ConfirmPayload): Record<string, unknown> {
+  const data: Record<string, unknown> = {};
+  if (payload.dietaryNotes !== undefined) data.dietaryNotes = payload.dietaryNotes.trim() || null;
+  if (payload.spouseAttending !== undefined) {
+    data.spouseAttending = payload.spouseAttending;
+    if (payload.spouseAttending === true) {
+      data.spouseFirstName = (payload.spouseFirstName ?? '').trim() || null;
+      data.spouseLastName = (payload.spouseLastName ?? '').trim() || null;
+      data.spouseDietaryNotes = (payload.spouseDietaryNotes ?? '').trim() || null;
+    } else {
+      // Zmiana deklaracji na „sam/sama" — nie zostawiamy w panelu danych po niedoszłym małżonku.
+      data.spouseFirstName = null;
+      data.spouseLastName = null;
+      data.spouseDietaryNotes = null;
+    }
+  }
+  if (payload.children !== undefined) data.childrenJson = sanitizeChildren(payload.children);
+  return data;
+}
+
+function childrenOf(r: { childrenJson: unknown }): ChildEntry[] {
+  return Array.isArray(r.childrenJson) ? (r.childrenJson as ChildEntry[]) : [];
+}
 
 @Injectable()
 export class InvitationsService {
@@ -65,6 +133,12 @@ export class InvitationsService {
       link: `${this.baseUrl()}/i/${r.token}`,
       confirmedAt: r.confirmedAt ? r.confirmedAt.toISOString() : null,
       sentAt: r.sentAt ? r.sentAt.toISOString() : null,
+      dietaryNotes: r.dietaryNotes ?? null,
+      spouseAttending: r.spouseAttending ?? null,
+      spouseFirstName: r.spouseFirstName ?? null,
+      spouseLastName: r.spouseLastName ?? null,
+      spouseDietaryNotes: r.spouseDietaryNotes ?? null,
+      children: childrenOf(r),
     };
   }
 
@@ -219,6 +293,7 @@ export class InvitationsService {
       include: { instance: { include: { series: { include: { page: true } } } } },
     });
     if (!inv) throw new NotFoundException('Invitation not found');
+    const rec = inv as unknown as InvitationRecord;
     const inst = inv.instance;
     const page = inst.series.page;
     return {
@@ -226,6 +301,12 @@ export class InvitationsService {
       lastName: inv.lastName,
       email: inv.email,
       confirmedAt: inv.confirmedAt ? inv.confirmedAt.toISOString() : null,
+      dietaryNotes: rec.dietaryNotes ?? null,
+      spouseAttending: rec.spouseAttending ?? null,
+      spouseFirstName: rec.spouseFirstName ?? null,
+      spouseLastName: rec.spouseLastName ?? null,
+      spouseDietaryNotes: rec.spouseDietaryNotes ?? null,
+      children: childrenOf(rec),
       event: {
         title: inst.title,
         description: inst.description,
@@ -239,21 +320,22 @@ export class InvitationsService {
     };
   }
 
-  async confirmByToken(token: string, dietaryNotes?: string) {
+  /** Publiczne: potwierdź (lub zmień) udział po tokenie z osobistego linku. */
+  async confirmByToken(token: string, payload: ConfirmPayload) {
     const inv = await this.prisma.invitation.findUnique({ where: { token } });
     if (!inv) throw new NotFoundException('Invitation not found');
     await this.prisma.invitation.update({
       where: { token },
       data: {
         confirmedAt: inv.confirmedAt ?? new Date(),
-        ...(dietaryNotes !== undefined ? { dietaryNotes: dietaryNotes?.trim() || null } : {}),
-      },
+        ...declarationData(payload),
+      } as never,
     });
     return { ok: true };
   }
 
   /** Bez linku: dopasowanie po imieniu + nazwisku + e-mailu w ramach eventu (slug), potem potwierdzenie. */
-  async matchBySlug(slug: string, data: Invitee & { dietaryNotes?: string }) {
+  async matchBySlug(slug: string, data: Invitee & ConfirmPayload) {
     const page = await this.prisma.registrationPage.findUnique({
       where: { slug },
       include: { series: { include: { instances: { where: { status: 'OPEN' }, orderBy: { startsAt: 'asc' }, take: 1 } } } },
@@ -277,8 +359,8 @@ export class InvitationsService {
       where: { id: found.id },
       data: {
         confirmedAt: found.confirmedAt ?? new Date(),
-        ...(data.dietaryNotes ? { dietaryNotes: data.dietaryNotes.trim() } : {}),
-      },
+        ...declarationData(data),
+      } as never,
     });
     // Nie zwracamy `token` — publiczny endpoint nie powinien wydawać osobistego linku
     // komuś, kto zgadł dane. Potwierdzenie już zostało zapisane, front potrzebuje tylko imienia.

@@ -395,6 +395,13 @@ model Invitation {
   sentAt      DateTime?
   dietaryNotes String?
   createdAt   DateTime  @default(now())
+  // Deklaracja przy potwierdzeniu: null = jeszcze nie odpowiedział.
+  spouseAttending    Boolean?
+  spouseFirstName    String?
+  spouseLastName     String?
+  spouseDietaryNotes String?
+  // Lista dzieci: [{ firstName?: string, age: number }]
+  childrenJson       Json?
 
   @@index([instanceId])
 }
