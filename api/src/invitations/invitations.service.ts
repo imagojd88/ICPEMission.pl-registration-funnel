@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -43,10 +43,13 @@ export interface InvitationRow {
   spouseLastName: string | null;
   spouseDietaryNotes: string | null;
   children: ChildEntry[];
+  // Zgłoszenie (Registration) powiązane przy potwierdzeniu — null, gdy panel jeszcze nie zsynchronizowany.
+  registrationId: string | null;
 }
 
 type InvitationRecord = {
   id: string;
+  instanceId: string;
   firstName: string;
   lastName: string;
   email: string;
@@ -60,6 +63,7 @@ type InvitationRecord = {
   spouseLastName: string | null;
   spouseDietaryNotes: string | null;
   childrenJson: unknown;
+  registrationId: string | null;
 };
 
 const norm = (s: string) => (s ?? '').trim().toLowerCase();
@@ -106,6 +110,8 @@ function childrenOf(r: { childrenJson: unknown }): ChildEntry[] {
 
 @Injectable()
 export class InvitationsService {
+  private readonly logger = new Logger(InvitationsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
@@ -139,6 +145,7 @@ export class InvitationsService {
       spouseLastName: r.spouseLastName ?? null,
       spouseDietaryNotes: r.spouseDietaryNotes ?? null,
       children: childrenOf(r),
+      registrationId: r.registrationId ?? null,
     };
   }
 
@@ -331,6 +338,14 @@ export class InvitationsService {
         ...declarationData(payload),
       } as never,
     });
+    // Gość ma zobaczyć „Udział potwierdzony" nawet gdy synchronizacja z panelem zawiedzie.
+    try {
+      await this.syncRegistration(inv.id);
+    } catch (e) {
+      this.logger.error(
+        `syncRegistration (confirmByToken) failed for invitation ${inv.id}: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
     return { ok: true };
   }
 
@@ -362,8 +377,198 @@ export class InvitationsService {
         ...declarationData(data),
       } as never,
     });
+    // Jak wyżej: błąd synchronizacji nie może zablokować potwierdzenia gościa.
+    try {
+      await this.syncRegistration(found.id);
+    } catch (e) {
+      this.logger.error(
+        `syncRegistration (matchBySlug) failed for invitation ${found.id}: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
     // Nie zwracamy `token` — publiczny endpoint nie powinien wydawać osobistego linku
     // komuś, kto zgadł dane. Potwierdzenie już zostało zapisane, front potrzebuje tylko imienia.
     return { ok: true, firstName: found.firstName };
+  }
+
+  /**
+   * Spina potwierdzone zaproszenie ze zgłoszeniem (`Registration`), z którego czytają
+   * WSZYSTKIE moduły panelu (Zgłoszenia, Obecność, Płatności, Zakwaterowanie, Dashboard).
+   * Idempotentne:
+   *  - jeśli `invitation.registrationId` już wskazuje zgłoszenie → aktualizuje je,
+   *  - inaczej, jeśli w tej instancji istnieje zgłoszenie z tym samym e-mailem w `contact`
+   *    → podpina się pod nie (bez duplikatu),
+   *  - inaczej tworzy nowe zgłoszenie.
+   * Uczestnicy są odtwarzani od zera przy każdym wywołaniu (gość + małżonek + dzieci),
+   * żeby zmiana deklaracji („Zmień odpowiedź") zawsze była w pełni odzwierciedlona.
+   */
+  private async syncRegistration(invitationId: string): Promise<string | null> {
+    const invRaw = await this.prisma.invitation.findUnique({ where: { id: invitationId } });
+    if (!invRaw) return null;
+    const rec = invRaw as unknown as InvitationRecord;
+
+    const instance = await this.prisma.eventInstance.findUnique({
+      where: { id: rec.instanceId },
+      select: { pricingConfig: true },
+    });
+    const currency = (instance?.pricingConfig as { currency?: string } | null)?.currency || 'PLN';
+
+    // Kontrakt `toContractRegistration` czyta contact.firstName/lastName/email/phone 1:1 —
+    // inny kształt = puste nazwisko w panelu.
+    const contact = {
+      firstName: rec.firstName,
+      lastName: rec.lastName,
+      email: rec.email,
+      phone: rec.phone ?? undefined,
+    };
+
+    const dietaryNotes = this.composeDietaryNotes(rec);
+
+    // `gender` jest wymagane przez schemat Participant, ale przy zaproszeniach nie zbieramy
+    // płci (formularz pyta tylko o dietę/dzieci/małżonka) — 'OTHER' jako neutralna wartość.
+    const gender = 'OTHER' as const;
+    const participantsData: Array<{
+      type: 'ADULT' | 'CHILD';
+      firstName: string;
+      lastName: string;
+      age?: number;
+      gender: 'OTHER';
+      dietary?: string | null;
+    }> = [
+      {
+        type: 'ADULT',
+        firstName: rec.firstName,
+        lastName: rec.lastName,
+        gender,
+        dietary: rec.dietaryNotes ?? undefined,
+      },
+    ];
+    if (rec.spouseAttending === true) {
+      participantsData.push({
+        type: 'ADULT',
+        firstName: (rec.spouseFirstName ?? '').trim() || 'Współmałżonek',
+        lastName: (rec.spouseLastName ?? '').trim() || rec.lastName,
+        gender,
+        dietary: rec.spouseDietaryNotes ?? undefined,
+      });
+    }
+    for (const child of childrenOf(rec)) {
+      participantsData.push({
+        type: 'CHILD',
+        firstName: (child.firstName ?? '').trim() || 'Dziecko',
+        lastName: rec.lastName,
+        age: child.age,
+        gender,
+      });
+    }
+
+    let registrationId: string | null = rec.registrationId ?? null;
+
+    // Idempotencja po e-mailu, gdy zaproszenie jeszcze nie ma podpiętego zgłoszenia
+    // (np. gość istniał już w Registration z wcześniejszej próby albo zwykłego lejka).
+    if (!registrationId && rec.email) {
+      const emailNorm = norm(rec.email);
+      const candidates = await this.prisma.registration.findMany({
+        where: { instanceId: rec.instanceId },
+        select: { id: true, contact: true },
+      });
+      const match = candidates.find((c: { id: string; contact: unknown }) => {
+        const cc = (c.contact ?? {}) as { email?: string };
+        return norm(cc.email ?? '') === emailNorm;
+      });
+      if (match) registrationId = match.id;
+    }
+
+    if (registrationId) {
+      // Uczestnicy są odtwarzani od zera — najpierw odczepiamy ewentualne przypisania
+      // pokoju per-osoba (RoomAssignment.participantId), żeby kasowanie Participant nie
+      // wywaliło się na FK. Sam przydział pokoju do RODZINY (registrationId) zostaje.
+      await this.prisma.$transaction([
+        this.prisma.roomAssignment.updateMany({
+          where: { registrationId, participantId: { not: null } },
+          data: { participantId: null },
+        }),
+        this.prisma.participant.deleteMany({ where: { registrationId } }),
+        this.prisma.registration.update({
+          where: { id: registrationId },
+          data: {
+            status: 'CONFIRMED',
+            locale: 'pl',
+            contact: contact as object,
+            totalPrice: 0,
+            currency,
+            dietaryNotes,
+            participants: { create: participantsData },
+          } as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+        }),
+      ]);
+    } else {
+      const created = await this.prisma.registration.create({
+        data: {
+          instanceId: rec.instanceId,
+          status: 'CONFIRMED',
+          locale: 'pl',
+          contact: contact as object,
+          totalPrice: 0,
+          currency,
+          dietaryNotes,
+          paymentMethod: null,
+          participants: { create: participantsData },
+        } as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+      });
+      registrationId = created.id;
+    }
+
+    if (registrationId !== rec.registrationId) {
+      await this.prisma.invitation.update({
+        where: { id: invitationId },
+        data: { registrationId } as never,
+      });
+    }
+
+    return registrationId;
+  }
+
+  /** Notatka o diecie do `Registration.dietaryNotes` — dopisuje wymagania małżonka, żeby nie zgubić informacji. */
+  private composeDietaryNotes(rec: InvitationRecord): string | null {
+    const guest = (rec.dietaryNotes ?? '').trim();
+    const spouseAttending = rec.spouseAttending === true;
+    const spouseDiet = spouseAttending ? (rec.spouseDietaryNotes ?? '').trim() : '';
+    const spouseLabel = (rec.spouseFirstName ?? '').trim() || 'Współmałżonek';
+    if (guest && spouseDiet) return `${rec.firstName}: ${guest} | ${spouseLabel}: ${spouseDiet}`;
+    if (guest) return guest;
+    if (spouseDiet) return `${spouseLabel}: ${spouseDiet}`;
+    return null;
+  }
+
+  /**
+   * Backfill: dla wszystkich już potwierdzonych zaproszeń danej instancji dogania
+   * zgłoszenia w panelu. Wołane ręcznie z panelu (przycisk „Synchronizuj z listą zgłoszeń")
+   * — obsługuje gości, którzy potwierdzili udział zanim ta synchronizacja istniała.
+   */
+  async syncAllRegistrations(instanceId: string): Promise<{ created: number; updated: number; failed: number }> {
+    const rows = (await this.prisma.invitation.findMany({
+      where: { instanceId, confirmedAt: { not: null } },
+    })) as InvitationRecord[];
+    let created = 0;
+    let updated = 0;
+    let failed = 0;
+    for (const row of rows) {
+      const hadRegistration = !!row.registrationId;
+      try {
+        const id = await this.syncRegistration(row.id);
+        if (!id) {
+          failed += 1;
+          continue;
+        }
+        if (hadRegistration) updated += 1;
+        else created += 1;
+      } catch (e) {
+        failed += 1;
+        this.logger.error(
+          `syncAllRegistrations: sync failed for invitation ${row.id}: ${e instanceof Error ? e.message : String(e)}`,
+        );
+      }
+    }
+    return { created, updated, failed };
   }
 }

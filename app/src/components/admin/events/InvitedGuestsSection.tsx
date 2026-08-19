@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Check, Clock, Copy, Mail, MessageCircle, Plus, RefreshCw, Send, Trash2 } from 'lucide-react'
+import { Check, Clock, Copy, Mail, MessageCircle, Plus, RefreshCw, Send, Trash2, Users } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import {
@@ -8,6 +8,7 @@ import {
   listInvitations,
   sendAllInvitations,
   sendInvitation,
+  syncInvitationRegistrations,
   type InvitationItem,
 } from '@/lib/api'
 
@@ -161,6 +162,21 @@ export default function InvitedGuestsSection({
     }
   }
 
+  async function handleSyncRegistrations() {
+    setBusyId('sync')
+    setError(null)
+    setInfo(null)
+    try {
+      const res = await syncInvitationRegistrations(instanceId)
+      setInfo(`Utworzono ${res.created}, zaktualizowano ${res.updated}${res.failed > 0 ? `, błędów: ${res.failed}` : ''}.`)
+      await load()
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   async function handleDelete(inv: InvitationItem) {
     if (!window.confirm(`Usunąć zaproszenie dla: ${inv.firstName} ${inv.lastName}?`)) return
     setBusyId(inv.id)
@@ -178,6 +194,9 @@ export default function InvitedGuestsSection({
   const confirmed = confirmedItems.length
   const unsent = items.filter((i) => i.email && !i.sentAt).length
   const notConfirmed = items.length - confirmed
+  // Potwierdzeni, których jeszcze nie widać w module Zgłoszenia/Obecność (backfill nie klikany
+  // albo synchronizacja przy potwierdzeniu akurat zawiodła).
+  const unsynced = confirmedItems.filter((i) => !i.registrationId).length
 
   // Najważniejsza liczba dla organizatora: ile posiłków zamówić u cateringu.
   const spouseCount = confirmedItems.filter((i) => i.spouseAttending).length
@@ -215,6 +234,16 @@ export default function InvitedGuestsSection({
           >
             <RefreshCw size={13} /> Odśwież
           </button>
+          <button
+            type="button"
+            onClick={() => { void handleSyncRegistrations() }}
+            disabled={busyId === 'sync'}
+            className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-[8px]"
+            style={{ background: 'var(--surface-2)', color: 'var(--muted)', border: '1px solid var(--border)', cursor: 'pointer' }}
+            title="Dogania zgłoszenia w module Zgłoszenia/Obecność dla już potwierdzonych gości"
+          >
+            <Users size={13} /> {busyId === 'sync' ? 'Synchronizuję…' : 'Synchronizuj z listą zgłoszeń'}
+          </button>
           {unsent > 0 && (
             <button
               type="button"
@@ -228,6 +257,13 @@ export default function InvitedGuestsSection({
           )}
         </div>
       </div>
+
+      {unsynced > 0 && (
+        <p className="text-xs px-3 py-2 rounded-[8px]" style={{ background: 'var(--surface-2)', color: 'var(--muted)', border: '1px solid var(--border)' }}>
+          {unsynced} {unsynced === 1 ? 'potwierdzenie' : 'potwierdzeń'} jeszcze nie widać w module Zgłoszenia/Obecność —
+          kliknij „Synchronizuj z listą zgłoszeń" powyżej.
+        </p>
+      )}
 
       {error && (
         <p className="text-xs font-medium px-3 py-2 rounded-[8px]" style={{ background: 'var(--err-soft)', color: 'var(--err)' }}>

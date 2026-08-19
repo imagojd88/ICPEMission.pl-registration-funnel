@@ -402,6 +402,8 @@ model Invitation {
   spouseDietaryNotes String?
   // Lista dzieci: [{ firstName?: string, age: number }]
   childrenJson       Json?
+  // Zgłoszenie utworzone przy potwierdzeniu udziału (spina zaproszenie z modułami panelu).
+  registrationId String?
 
   @@index([instanceId])
 }

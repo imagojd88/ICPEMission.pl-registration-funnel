@@ -57,6 +57,14 @@ export class InvitationsController {
 
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
+  @Post('admin/instances/:id/invitations/sync-registrations')
+  @ApiOperation({ summary: 'Backfill: dogoń zgłoszenia (moduł Zgłoszenia/Obecność) dla już potwierdzonych zaproszeń' })
+  syncRegistrations(@Param('id') id: string) {
+    return this.invites.syncAllRegistrations(id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @Delete('admin/invitations/:invId')
   @ApiOperation({ summary: 'Usuń zaproszenie' })
   remove(@Param('invId') invId: string) {

@@ -554,6 +554,8 @@ export interface InvitationItem extends Omit<Invitee, 'phone'> {
   spouseLastName: string | null
   spouseDietaryNotes: string | null
   children: ChildEntry[]
+  /** Zgłoszenie (moduł Zgłoszenia/Obecność) powiązane przy potwierdzeniu — null, gdy jeszcze niezsynchronizowane. */
+  registrationId: string | null
 }
 
 export async function createInvitations(
@@ -609,6 +611,17 @@ export async function sendAllInvitations(
     method: 'POST',
     headers: authHeaders(token),
     body: JSON.stringify({ onlyUnsent }),
+  })
+}
+
+/** Backfill: dogania zgłoszenia (Zgłoszenia/Obecność) dla już potwierdzonych zaproszeń tej instancji. */
+export async function syncInvitationRegistrations(
+  instanceId: string,
+  token?: string,
+): Promise<{ created: number; updated: number; failed: number }> {
+  return apiFetch(`/admin/instances/${instanceId}/invitations/sync-registrations`, {
+    method: 'POST',
+    headers: authHeaders(token),
   })
 }
 
