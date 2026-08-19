@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Search, X, ChevronRight, ChevronLeft } from 'lucide-react'
+import { Search, X, ChevronRight, ChevronLeft, RefreshCw } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import {
@@ -12,6 +12,11 @@ import {
 import type { RegistrationDto, EventInstanceDto, PricingConfig } from '@icpe/shared'
 import { DEFAULT_PRICING } from '@icpe/shared'
 import RegistrationEditForm from './RegistrationEditForm'
+import { useAutoRefresh } from '@/hooks/useAutoRefresh'
+
+function formatUpdatedAt(d: Date): string {
+  return d.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -326,23 +331,33 @@ export default function RegistrationsScreen() {
       .finally(() => setLoadingInstances(false))
   }, [])
 
-  // Load registrations when instance changes
-  const loadRegs = useCallback((instanceId: string) => {
-    if (!instanceId) return
-    setLoadingRegs(true)
+  // Load registrations when instance changes. `silent` (odświeżanie w tle) nie rusza
+  // `loadingRegs` — dane są podmieniane bez migotania spinnera/skeletonu.
+  const loadRegs = useCallback((instanceId: string, silent = false) => {
+    if (!instanceId) return Promise.resolve()
+    if (!silent) setLoadingRegs(true)
     setError(null)
-    getAdminRegistrations(instanceId)
+    return getAdminRegistrations(instanceId)
       .then(setRegs)
       .catch((e: unknown) => {
         setError(e instanceof Error ? e.message : String(e))
-        setRegs([])
+        if (!silent) setRegs([])
       })
-      .finally(() => setLoadingRegs(false))
+      .finally(() => {
+        if (!silent) setLoadingRegs(false)
+      })
   }, [])
 
   useEffect(() => {
-    if (selectedInstanceId) loadRegs(selectedInstanceId)
+    if (selectedInstanceId) void loadRegs(selectedInstanceId)
   }, [selectedInstanceId, loadRegs])
+
+  // Auto-odświeżanie w tle. Wstrzymane, gdy admin ma otwarty drawer zgłoszenia lub
+  // formularz edycji — nie chcemy podmieniać danych pod ręką kogoś, kto właśnie edytuje.
+  const { lastUpdatedAt, refreshing, refreshNow } = useAutoRefresh(
+    () => loadRegs(selectedInstanceId, true),
+    { intervalMs: 20000, enabled: !openDrawer && !editing },
+  )
 
   // Konfiguracja cennika instancji (do edycji zgłoszeń — typy pokoi, opcje, przeliczenie).
   useEffect(() => {
@@ -418,6 +433,23 @@ export default function RegistrationsScreen() {
             ))}
           </select>
         )}
+
+        {/* Wskaźnik odświeżania */}
+        <div className="flex items-center gap-2 ml-auto">
+          {lastUpdatedAt && (
+            <span className="text-xs" style={{ color: 'var(--faint)' }}>
+              Zaktualizowano {formatUpdatedAt(lastUpdatedAt)}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => { void refreshNow() }}
+            className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-[8px]"
+            style={{ background: 'var(--surface-2)', color: 'var(--muted)', border: '1px solid var(--border)', cursor: 'pointer' }}
+          >
+            <RefreshCw size={13} className={refreshing ? 'animate-spin' : undefined} /> Odśwież
+          </button>
+        </div>
       </div>
 
       {/* Error */}

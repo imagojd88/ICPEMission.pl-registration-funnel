@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   CalendarDays,
   UserPlus,
   TrendingUp,
   BedDouble,
+  RefreshCw,
 } from 'lucide-react'
 import {
   getAdminSummary,
@@ -11,6 +12,7 @@ import {
   getAdminRegistrations,
 } from '@/lib/api'
 import type { AdminSummaryDto, EventInstanceDto, RegistrationDto } from '@icpe/shared'
+import { useAutoRefresh } from '@/hooks/useAutoRefresh'
 
 // ── KPI Tile ─────────────────────────────────────────────────────────────────
 
@@ -382,6 +384,10 @@ function RecentRegistrations({
 
 // ── Dashboard Screen ──────────────────────────────────────────────────────────
 
+function formatUpdatedAt(d: Date): string {
+  return d.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })
+}
+
 export default function DashboardScreen() {
   const [summary, setSummary] = useState<AdminSummaryDto | null>(null)
   const [instances, setInstances] = useState<EventInstanceDto[]>([])
@@ -391,41 +397,71 @@ export default function DashboardScreen() {
   const [loadingRegs, setLoadingRegs] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    setLoadingSummary(true)
-    getAdminSummary()
-      .then(setSummary)
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
-      .finally(() => setLoadingSummary(false))
+  // `silent` (odświeżanie w tle) nie dotyka flag `loading*`, żeby żaden spinner/skeleton
+  // nie mrugał co interwał — podmieniane są wyłącznie dane.
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoadingSummary(true)
+    try {
+      const s = await getAdminSummary()
+      setSummary(s)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      if (!silent) setLoadingSummary(false)
+    }
 
-    setLoadingInstances(true)
-    getAdminInstances('OPEN')
-      .then(async (list) => {
-        setInstances(list)
-        setLoadingInstances(false)
-        if (list.length > 0) {
-          setLoadingRegs(true)
-          try {
-            const r = await getAdminRegistrations(list[0].id)
-            setRegs(r)
-          } catch {
-            setRegs([])
-          } finally {
-            setLoadingRegs(false)
-          }
+    if (!silent) setLoadingInstances(true)
+    try {
+      const list = await getAdminInstances('OPEN')
+      setInstances(list)
+      if (!silent) setLoadingInstances(false)
+      if (list.length > 0) {
+        if (!silent) setLoadingRegs(true)
+        try {
+          const r = await getAdminRegistrations(list[0].id)
+          setRegs(r)
+        } catch {
+          setRegs([])
+        } finally {
+          if (!silent) setLoadingRegs(false)
         }
-      })
-      .catch(() => {
-        setInstances([])
-        setLoadingInstances(false)
-      })
+      }
+    } catch {
+      setInstances([])
+      if (!silent) setLoadingInstances(false)
+    }
   }, [])
+
+  useEffect(() => {
+    void load(false)
+  }, [load])
+
+  const { lastUpdatedAt, refreshing, refreshNow } = useAutoRefresh(() => load(true), {
+    intervalMs: 30000,
+  })
 
   const s = summary ?? { openInstances: 0, registrationsToday: 0, revenue: 0, currency: 'PLN', occupancyPct: 0 }
   const firstInstanceTitle = instances.length > 0 ? resolveTitle(instances[0].title) : ''
 
   return (
     <div className="flex flex-col gap-6">
+      {/* Wskaźnik odświeżania */}
+      <div className="flex items-center justify-end gap-2 -mb-2">
+        {lastUpdatedAt && (
+          <span className="text-xs" style={{ color: 'var(--faint)' }}>
+            Zaktualizowano {formatUpdatedAt(lastUpdatedAt)}
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={() => { void refreshNow() }}
+          className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-[8px]"
+          style={{ background: 'var(--surface-2)', color: 'var(--muted)', border: '1px solid var(--border)', cursor: 'pointer' }}
+        >
+          <RefreshCw size={13} className={refreshing ? 'animate-spin' : undefined} /> Odśwież
+        </button>
+      </div>
+
       {error && (
         <div
           className="px-4 py-3 rounded-[12px] text-sm"
