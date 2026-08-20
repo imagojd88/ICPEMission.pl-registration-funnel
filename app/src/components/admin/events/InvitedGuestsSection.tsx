@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Check, Clock, Copy, Mail, MessageCircle, Plus, RefreshCw, Send, Trash2, Users } from 'lucide-react'
+import { Check, Clock, Copy, Mail, MessageCircle, MessageSquare, Plus, RefreshCw, Send, Trash2, Users } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import { useAutoRefresh } from '@/hooks/useAutoRefresh'
@@ -30,15 +30,35 @@ function waNumber(phone?: string | null): string {
   return (phone ?? '').replace(/\D/g, '')
 }
 
-function whatsappHref(inv: InvitationItem, eventTitle: string): string {
-  const text = [
+/** Treść zaproszenia wysyłanego komunikatorem — wspólna dla WhatsAppa i iMessage. */
+function inviteMessage(inv: InvitationItem, eventTitle: string): string {
+  return [
     `${inv.firstName}, zapraszamy Cię na: ${eventTitle}.`,
     '',
     'To wydarzenie tylko dla zaproszonych gości — udział potwierdzisz swoim osobistym linkiem:',
     inviteLink(inv),
   ].join('\n')
+}
+
+function whatsappHref(inv: InvitationItem, eventTitle: string): string {
   const num = waNumber(inv.phone)
-  return `https://wa.me/${num}?text=${encodeURIComponent(text)}`
+  return `https://wa.me/${num}?text=${encodeURIComponent(inviteMessage(inv, eventTitle))}`
+}
+
+/**
+ * Link otwierający macOS-owe Wiadomości (iMessage) z gotową treścią do ręcznego wysłania.
+ * Adresat: numer telefonu, a gdy go brak — e-mail (iMessage adresuje też po Apple ID).
+ * Bez żadnego z nich otwiera puste okno z samą treścią.
+ * Zapis `?&body=` to wersja działająca zarówno w macOS, jak i w iOS (różnie traktują separator).
+ */
+function imessageHref(inv: InvitationItem, eventTitle: string): string {
+  const raw = (inv.phone ?? '').trim()
+  const digits = waNumber(raw)
+  // Zachowujemy „+" tylko wtedy, gdy admin sam je wpisał — doklejanie go do numeru
+  // krajowego (np. „512 345 678") zrobiłoby z niego nieistniejący numer międzynarodowy.
+  const num = digits ? (raw.startsWith('+') ? `+${digits}` : digits) : ''
+  const recipient = num || (inv.email || '').trim()
+  return `sms:${recipient}?&body=${encodeURIComponent(inviteMessage(inv, eventTitle))}`
 }
 
 export default function InvitedGuestsSection({
@@ -124,6 +144,21 @@ export default function InvitedGuestsSection({
     } catch {
       // np. brak HTTPS albo odmowa uprawnień — pokazujemy link do ręcznego skopiowania
       setError(`Nie udało się skopiować automatycznie. Link: ${inviteLink(inv)}`)
+    }
+  }
+
+  /**
+   * Klik w „iMessage" otwiera Wiadomości przez schemat `sms:`. Niektóre wersje macOS
+   * ignorują parametr `body` i otwierają pustą rozmowę, więc treść ląduje też w schowku —
+   * wtedy wystarczy ⌘V. Sam link otwiera aplikację (domyślna akcja anchora), tu tylko schowek.
+   */
+  async function handleImessage(inv: InvitationItem) {
+    setError(null)
+    try {
+      await navigator.clipboard.writeText(inviteMessage(inv, eventTitle))
+      setInfo('Otwieram Wiadomości. Treść jest też w schowku — jeśli okno będzie puste, wklej ⌘V i wyślij ręcznie.')
+    } catch {
+      setInfo('Otwieram Wiadomości. Jeśli treść się nie wypełni, skopiuj link przyciskiem „Kopiuj link".')
     }
   }
 
@@ -371,6 +406,21 @@ export default function InvitedGuestsSection({
                     title={inv.phone ? `Wyślij na ${inv.phone}` : 'Otworzy WhatsApp — adresata wybierzesz w aplikacji'}
                   >
                     <MessageCircle size={12} /> WhatsApp
+                  </a>
+                  <a
+                    href={imessageHref(inv, eventTitle)}
+                    onClick={() => { void handleImessage(inv) }}
+                    className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-[8px] no-underline"
+                    style={{ background: '#007AFF18', color: '#0A6FD8', border: '1px solid #007AFF55' }}
+                    title={
+                      inv.phone
+                        ? `Otworzy Wiadomości (iMessage) do ${inv.phone} — wysyłasz ręcznie`
+                        : inv.email
+                          ? `Otworzy Wiadomości (iMessage) do ${inv.email} — wysyłasz ręcznie`
+                          : 'Otworzy Wiadomości — adresata wybierzesz w aplikacji'
+                    }
+                  >
+                    <MessageSquare size={12} /> iMessage
                   </a>
                   <button
                     type="button"
