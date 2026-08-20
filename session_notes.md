@@ -149,6 +149,14 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — moduł rejestracji
 
+### Zaproszeni goście: przycisk iMessage (2026-08-19)
+- W sekcji „Zaproszeni goście" (edycja eventu) między „WhatsApp" a „Wyślij mail" doszedł przycisk **iMessage** — otwiera macOS-owe Wiadomości z gotową treścią do ręcznego wysłania.
+- Treść wiadomości wyciągnięta do wspólnej funkcji `inviteMessage(inv, eventTitle)` — używają jej WhatsApp i iMessage, więc oba kanały mówią to samo.
+- Link: `sms:<adresat>?&body=<treść>` — zapis `?&` działa i na macOS, i na iOS (różnie traktują separator parametru). Adresat: numer telefonu, a gdy go brak — e-mail (iMessage adresuje też po Apple ID); bez obu otwiera się puste okno z samą treścią.
+- Numer: „+" doklejane TYLKO gdy admin sam je wpisał — automatyczne dodanie plusa do numeru krajowego („512 345 678") zrobiłoby z niego nieistniejący numer międzynarodowy.
+- Zabezpieczenie: część wersji macOS ignoruje `body` i otwiera pustą rozmowę, więc klik kopiuje treść także do schowka i pokazuje podpowiedź „wklej ⌘V". Bez tego admin zostawałby z pustym oknem i bez treści.
+- Commit `b354853`. `tsc --noEmit` czysty. NIEPRZETESTOWANE na żywym macOS — zachowanie `body` w Wiadomościach zależy od wersji systemu; do sprawdzenia przy pierwszym użyciu.
+
 ### Zaproszenia: deklaracja małżonka i dzieci + auto-odświeżanie panelu (2026-08-19)
 - **Powód:** przy evencie jednorazowym „na zaproszenie" (Celebracja Przymierza, 17.10.2026) organizator musi wiedzieć, ile zamówić posiłków — potrzebna deklaracja „sam / z małżonkiem" oraz opcjonalna lista dzieci z wiekiem.
 - **Decyzje usera (WIĄŻĄCE):** małżonek = wybór + imię/nazwisko + osobne pole na jego alergie; dzieci = lista wierszy „wiek + imię (opcjonalnie)"; oba pytania w OBU ścieżkach potwierdzenia (link imienny i formularz dopasowania bez linku); auto-odświeżanie w Dashboardzie, Zgłoszeniach i liście zaproszonych.
