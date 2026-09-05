@@ -43,6 +43,13 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — strona ICPE Mission PL (CMS)
 
+### Nowy cytat: ks. Jerome Barnabas (2026-09-05)
+- Piąty slajd rotatora „Kim jesteśmy" (dodany przed `div.quote-dots`, po slajdzie Jacka): PL „Zawsze zadawałem sobie pytanie: «Jaki jest mój prawdziwy cel w życiu?»…", EN „I always questioned myself: ‘What is my true purpose in life?’…". Redakcja: uporządkowane cudzysłowy zagnieżdżone («…»/‘…’), „ICPE MISSION" → „ICPE Mission", usunięta podwójna spacja. Podpis: ks./fr. Jerome Barnabas, podtytuł „ICPE Mission" (brak roli od usera — do ew. uzupełnienia). Zdjęcie od usera → `site/public/uploads/jerome-barnabas.jpg`. Build OK.
+
+### Nowy cytat założycieli (Cappello) w „Kim jesteśmy" (2026-09-05)
+- Slajd 1 (Anna & Mario Cappello): nowy cytat PL „Bóg otworzył drzwi przekraczające wszelkie wyobrażenia…", EN „God opened doors beyond imagination…". Poprawki redakcyjne względem tekstu usera: EN „will you to say" → „will you say", usunięta podwójna spacja; cudzysłowy zagnieżdżone «tak» / ‘yes’.
+- Ostatni slajd (Jacek Dudzic) zachowuje STARY tekst („Wspólnota ICPE urodziła się z ziarenka…") — ten sam cytat pod dwoma podpisami to stan zamierzony. Build OK: nowy 1×, stary 1× w dist.
+
 ### Rotacja cytatów „Kim jesteśmy" zwolniona (2026-08-01)
 - Interwał rotatora cytatów w `index.astro`: 8000 → 16000 ms (user: trudno nadążyć z czytaniem). Hover nadal pauzuje. Build OK.
 
