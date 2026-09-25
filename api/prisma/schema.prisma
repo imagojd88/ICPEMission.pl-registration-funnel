@@ -367,6 +367,11 @@ model Notification {
   locale         String
   status         String        @default("QUEUED")
   payload        Json
+  // Dostawca, przez który poszedł mail ('resend' | 'smtp' | 'log'), jego id wiadomości
+  // i treść błędu — do dziennika wysyłek w Ustawieniach panelu.
+  provider       String?
+  providerId     String?
+  error          String?
   registrationId String?
   registration   Registration? @relation(fields: [registrationId], references: [id])
   createdAt      DateTime      @default(now())
@@ -404,6 +409,13 @@ model Invitation {
   childrenJson       Json?
   // Zgłoszenie utworzone przy potwierdzeniu udziału (spina zaproszenie z modułami panelu).
   registrationId String?
+  // Ścieżka „uczestnik zaprasza gościa": kto dodał tę osobę. Oba id null = dodana przez admina.
+  // invitedByInvitationId — zapraszający to potwierdzony gość eventu INVITE,
+  // invitedByRegistrationId — zapraszający to uczestnik zwykłego eventu (zgłoszenie z lejka).
+  invitedByInvitationId   String?
+  invitedByRegistrationId String?
+  // Migawka „Imię Nazwisko" zapraszającego — do etykiety w panelu bez dodatkowych zapytań.
+  invitedByName           String?
 
   @@index([instanceId])
 }

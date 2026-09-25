@@ -118,6 +118,8 @@ export interface CreateRegistrationDto {
   discountCode?: string;
   paymentMethod: PaymentMethod;
   consents: { rodo: boolean; regulamin: boolean };
+  /** Token osobistego zaproszenia (link `/r/:slug?inv=`) — spina zaproszenie ze zgłoszeniem. */
+  invitationToken?: string;
 }
 
 /** Skrót KPI dla dashboardu / karty Personal OS. */

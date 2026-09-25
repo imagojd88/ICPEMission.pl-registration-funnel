@@ -3,6 +3,7 @@ import { Sun, Moon, LogOut, User, Server, Check } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import { getAdminEmail } from '@/lib/api'
 import { getTheme, setTheme as applyTheme } from '@/lib/theme'
+import MailSettings from './MailSettings'
 
 const API_URL =
   (import.meta as ImportMeta & { env: Record<string, string> }).env.VITE_API_URL ?? ''
@@ -123,12 +124,15 @@ export default function SettingsScreen({ onLogout }: { onLogout: () => void }) {
         </div>
       </Section>
 
+      {/* Poczta: dostawca, test, dziennik wysyłek */}
+      <MailSettings />
+
       {/* System */}
       <Section title="System">
         <Row icon={<Server size={18} />} label="Adres API" desc={API_URL || 'nie ustawiono'} />
         <p className="text-xs" style={{ color: 'var(--faint)' }}>
-          ICPE Mission — panel rejestracji. Zmiany w konfiguracji backendu (płatności, e-mail,
-          keep-alive) ustawiasz po stronie Render.
+          ICPE Mission — panel rejestracji. Zmiany w konfiguracji backendu (płatności, klucz
+          poczty, keep-alive) ustawiasz po stronie Render.
         </p>
       </Section>
     </div>

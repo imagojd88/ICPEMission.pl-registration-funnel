@@ -5,6 +5,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { buildIcs, googleCalendarUrl } from '../shared';
 import { CreateRegistrationDto } from './dto/create-registration.dto';
 import { v4 as uuid } from 'uuid';
+import { guestInviteConfig, guestInvitePageLink } from '../invitations/guest-invite-config';
 import { PriceInput } from '../shared';
 import {
   mapRegStatus,
@@ -89,6 +90,34 @@ export class RegistrationsService {
       include: { participants: true },
     });
 
+    // Rejestracja z osobistego zaproszenia (gość dodany przez uczestnika lub admina na zwykłym
+    // evencie): spinamy zaproszenie ze zgłoszeniem, żeby lista gości pokazała „zarejestrowany".
+    // Nieważny token nie blokuje zapisu — zgłoszenie jest ważne samo w sobie.
+    let isParticipantGuest = false;
+    if (dto.invitationToken) {
+      try {
+        const inv = await this.prisma.invitation.findUnique({ where: { token: dto.invitationToken } });
+        const rec = inv as unknown as {
+          id: string; instanceId: string; registrationId: string | null; confirmedAt: Date | null;
+          invitedByInvitationId?: string | null; invitedByRegistrationId?: string | null;
+        } | null;
+        if (rec && rec.instanceId === dto.instanceId && !rec.registrationId) {
+          await this.prisma.invitation.update({
+            where: { id: rec.id },
+            data: { registrationId: registration.id, confirmedAt: rec.confirmedAt ?? new Date() } as never,
+          });
+        }
+        isParticipantGuest = !!(rec && (rec.invitedByInvitationId || rec.invitedByRegistrationId));
+      } catch (e) {
+        console.error('Linking invitation to registration failed:', (e as Error).message);
+      }
+    }
+
+    // Link „Zaproś gościa" w mailu — gdy event ma włączoną tę ścieżkę, a zapisany sam nie jest
+    // gościem innego uczestnika (bez łańcucha zaproszeń).
+    const gi = guestInviteConfig(instance.series?.page?.customFields);
+    const guestInviteLink = gi.enabled && !isParticipantGuest ? guestInvitePageLink(editToken) : undefined;
+
     // Send confirmation mail (fire-and-forget)
     const title = (instance.title as Record<string, string>)[dto.locale] ?? (instance.title as Record<string, string>)['pl'] ?? 'Event';
     this.notifications.sendConfirmation({
@@ -101,11 +130,14 @@ export class RegistrationsService {
       currency: priceResult.currency,
       paymentMethod: dto.paymentMethod,
       editToken,
+      guestInviteLink,
     }).catch(console.error);
 
     return {
       registration: this.mapToDto(registration),
       summary: priceResult,
+      // Front pokazuje przycisk „Zaproś gościa" na ekranie sukcesu tylko, gdy to true.
+      canInviteGuests: !!guestInviteLink,
       payment:
         dto.paymentMethod === 'BANK_TRANSFER'
           ? { method: 'BANK_TRANSFER', transferTitle: `REG-${registration.id}` }

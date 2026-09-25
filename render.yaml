@@ -43,10 +43,15 @@ services:
       - key: PAYMENTS_MODE
         value: mock
       # Mail: ustaw w panelu Render (Blueprint nie nadpisuje — sync:false).
-      # MAIL_MODE=smtp + dane SMTP, żeby maile faktycznie wychodziły (domyślnie tylko log).
-      - key: MAIL_MODE          # 'log' (domyślnie) albo 'smtp'
+      # Zalecane: Resend — wklej RESEND_API_KEY, a MAIL_MODE ustaw na 'resend' (albo zostaw puste:
+      # sam klucz włącza Resend). Stan i mail testowy: panel ▸ Ustawienia ▸ E-mail.
+      - key: MAIL_MODE          # 'resend' | 'smtp' | 'log' (puste + RESEND_API_KEY = resend)
         sync: false
-      - key: MAIL_FROM          # np. "ICPE Mission <rejestracja@icpemission.pl>"
+      - key: RESEND_API_KEY     # re_… z Resend ▸ API Keys (Sending access); domena musi być zweryfikowana
+        sync: false
+      - key: MAIL_FROM          # np. "ICPE Mission <rejestracja@icpemission.pl>" — domena zweryfikowana w Resend
+        sync: false
+      - key: MAIL_REPLY_TO      # opcjonalnie: adres na odpowiedzi, np. warszawa@icpemission.pl
         sync: false
       - key: SMTP_HOST          # np. smtp.poczta-domeny.pl
         sync: false

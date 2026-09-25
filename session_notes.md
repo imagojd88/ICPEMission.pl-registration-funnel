@@ -156,6 +156,28 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — moduł rejestracji
 
+### Resend + sekcja „E-mail” w panelu; ścieżka „uczestnik zaprasza gościa” (2026-09-25)
+**Decyzje usera:** konfiguracja poczty w ENV na Render (nie w bazie) + podgląd/test w panelu; zapraszanie gości dla eventów INVITE **i** zwykłych (z rejestracją); limit per event (domyślnie 2, twardy sufit 10); gość od razu na liście, bez akceptacji admina, **bez łańcucha** (gość uczestnika nie zaprasza dalej).
+
+**Poczta (Resend):**
+- `notifications.service.ts`: dostawca `resend | smtp | log` — `MAIL_MODE` jawnie, a przy pustym `MAIL_MODE` sam `RESEND_API_KEY` włącza Resend; nieznana wartość MAIL_MODE jest ignorowana (nie wyłącza po cichu wysyłki). Resend przez HTTP API (`fetch`, bez SDK, timeout 15 s), `MAIL_FROM`, opcjonalny `MAIL_REPLY_TO`. `sendMailDetailed` zwraca treść błędu dostawcy.
+- Prisma `Notification`: nowe `provider`, `providerId`, `error` (nullable) — dziennik wysyłek.
+- Nowy `mail.controller.ts` (JWT): `GET /admin/mail/status`, `POST /admin/mail/test {to}`, `GET /admin/mail/log`.
+- Panel ▸ Ustawienia ▸ **E-mail** (`MailSettings.tsx`): aktywny dostawca + końcówka klucza, nadawca, „Wyślij test”, 20 ostatnich maili ze statusem i błędem, instrukcja podłączenia Resend.
+- Nowe szablony: `GUEST_INVITATION` („X zaprasza Cię…”, tryb CONFIRM/REGISTER), `INVITE_CONFIRMED` (potwierdzenie udziału + link „Zaproś gościa”), `TEST`; `CONFIRMATION` dostaje przycisk „Zaproś gościa”, gdy ścieżka włączona; `INVITATION` ma tryb REGISTER (zwykły event).
+- `render.yaml`/`.env.example`: `RESEND_API_KEY`, `MAIL_REPLY_TO` (sync:false).
+
+**Goście od uczestników:**
+- Konfiguracja: `RegistrationPage.customFields.guestInvites = { enabled, maxPerInviter }` (bez migracji) — checkbox + limit w edycji eventu (sekcja „Zaproszeni goście” / „Goście z zaproszeniem”, teraz widoczna dla wszystkich typów poza STANDALONE).
+- Prisma `Invitation`: `invitedByInvitationId`, `invitedByRegistrationId`, `invitedByName` (nullable). Gość = zwykły wiersz `Invitation` — ta sama lista co dodani przez admina, z etykietą „zaproszony przez X”.
+- Tożsamość zapraszającego = sekretny token: token zaproszenia (INVITE, musi być potwierdzony) albo `Registration.editToken` (zwykły event, status PENDING_PAYMENT/AWAITING_TRANSFER/CONFIRMED). Public API: `GET/POST /guest-invites/:token`, `DELETE /guest-invites/:token/guests/:id` (`guest-invites.service.ts`). Walidacja: imię, nazwisko, e-mail, telefon wymagane; dedup po e-mailu (lista zaproszeń + zgłoszenia + własny e-mail); limit; blokada po zamknięciu zapisów; wycofać można tylko niepotwierdzonego gościa.
+- Strona `/g/:token` (`GuestInvitePage.tsx`): formularz gościa, licznik limitu, lista „Twoi goście”. Wejścia: INVITE → przycisk na `/i/:token` po potwierdzeniu + mail `INVITE_CONFIRMED` (też dla ścieżki bez linku); zwykły event → przycisk na ekranie sukcesu lejka + link w mailu potwierdzenia.
+- Gość zwykłego eventu: link `/r/:slug?inv=token` → lejek z wpisanymi danymi (applicant + pierwszy uczestnik), `invitationToken` idzie w `POST /registrations` → zaproszenie dostaje `registrationId` + `confirmedAt` (panel: „Zarejestrowany”). `/i/:token` dla zwykłego eventu przekierowuje do lejka; `POST /invite/:token/confirm` dla zwykłego eventu = 403 (inaczej darmowe zgłoszenie z pominięciem płatności).
+- Weryfikacja: `tsc --noEmit` api+app czyste; `vite build` OK (zbudowany w kontenerze na świeżym `npm install`). `prisma generate` niemożliwy w sandboxie (403 na binarkach) — schemat zweryfikuje build Render.
+- **Po pushu:** Manual Deploy `icpe-api` (nowe kolumny). Render ▸ icpe-api ▸ Environment: `RESEND_API_KEY`, `MAIL_MODE=resend` (lub puste — UWAGA: jeśli stoi `smtp`, trzeba zmienić), `MAIL_FROM` z domeny zweryfikowanej w Resend. Potem Ustawienia ▸ E-mail ▸ „Wyślij test”. Ścieżkę gości włącza się per event checkboxem w edycji.
+- Nieprzetestowane end-to-end (brak dostępu do bazy/Resenda z sandboxa). Strona `/g/:token` i banery zaproszeń tylko po polsku.
+
+
 ### Zaproszeni goście: przycisk iMessage (2026-08-19)
 - W sekcji „Zaproszeni goście" (edycja eventu) między „WhatsApp" a „Wyślij mail" doszedł przycisk **iMessage** — otwiera macOS-owe Wiadomości z gotową treścią do ręcznego wysłania.
 - Treść wiadomości wyciągnięta do wspólnej funkcji `inviteMessage(inv, eventTitle)` — używają jej WhatsApp i iMessage, więc oba kanały mówią to samo.

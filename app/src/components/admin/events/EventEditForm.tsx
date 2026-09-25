@@ -124,6 +124,9 @@ export default function EventEditForm({
   const [places, setPlaces] = useState<Place[]>([])
   // Typ eventu z serii — decyduje, czy pokazać sekcję zaproszonych gości.
   const [eventType, setEventType] = useState<string>('')
+  // Ścieżka „uczestnik zaprasza gościa" (customFields.guestInvites).
+  const [guestInvitesEnabled, setGuestInvitesEnabled] = useState(false)
+  const [guestInvitesMax, setGuestInvitesMax] = useState('2')
 
   async function handleGuestPhoto(e: ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]
@@ -253,6 +256,8 @@ export default function EventEditForm({
         setSpecialGuestPlural(!!cfg.customFields?.specialGuest?.plural)
         const gb = cfg.customFields?.specialGuest?.bio
         setGuestBioMap(typeof gb === 'string' ? (gb ? { pl: gb } : {}) : (gb ?? {}))
+        setGuestInvitesEnabled(cfg.customFields?.guestInvites?.enabled === true)
+        setGuestInvitesMax(String(cfg.customFields?.guestInvites?.maxPerInviter ?? 2))
         const loc = cfg.locales ?? ['pl']
         setLangPL(loc.includes('pl'))
         setLangEN(loc.includes('en'))
@@ -366,6 +371,10 @@ export default function EventEditForm({
                   bio: cleanMap(guestBioMap),
                 }
               : null,
+          guestInvites: {
+            enabled: guestInvitesEnabled,
+            maxPerInviter: Math.min(10, Math.max(1, parseInt(guestInvitesMax, 10) || 2)),
+          },
         },
         locales,
         isEvergreen: false,
@@ -656,11 +665,44 @@ export default function EventEditForm({
         </Field>
       </Section>
 
-      {eventType === 'INVITE' && (
-        <Section title="Zaproszeni goście">
+      {eventType && eventType !== 'STANDALONE' && (
+        <Section title={eventType === 'INVITE' ? 'Zaproszeni goście' : 'Goście z zaproszeniem'}>
+          {/* Uczestnicy zapraszają gości sami — goście lądują na liście poniżej. */}
+          <div className="flex flex-col gap-2 px-3 py-3 rounded-[10px]" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
+            <label className="flex items-center gap-2 text-sm font-medium" style={{ color: 'var(--ink)' }}>
+              <input
+                type="checkbox"
+                checked={guestInvitesEnabled}
+                onChange={(e) => setGuestInvitesEnabled(e.target.checked)}
+                className="accent-[var(--brand)] w-4 h-4"
+              />
+              Uczestnicy mogą sami zapraszać gości
+            </label>
+            {guestInvitesEnabled && (
+              <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--ink)' }}>
+                <span>Maks. gości na uczestnika:</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={guestInvitesMax}
+                  onChange={(e) => setGuestInvitesMax(e.target.value)}
+                  className={inputCls}
+                  style={{ ...inputStyle, width: 80 }}
+                />
+              </div>
+            )}
+            <p className="text-xs" style={{ color: 'var(--faint)' }}>
+              {eventType === 'INVITE'
+                ? 'Po potwierdzeniu udziału gość dostaje link „Zaproś gościa". Zaproszona przez niego osoba dostaje imienne zaproszenie mailem i sama potwierdza udział. Goście uczestników nie mogą zapraszać dalej.'
+                : 'Po rejestracji uczestnik widzi przycisk „Zaproś gościa" (także w mailu z potwierdzeniem). Gość dostaje mailem osobisty link do rejestracji z wpisanymi danymi i przechodzi zwykły formularz z ceną. Goście uczestników nie mogą zapraszać dalej.'}
+              {' '}Zmiana działa po kliknięciu „Zapisz".
+            </p>
+          </div>
           <InvitedGuestsSection
             instanceId={editTarget.instanceId}
             eventTitle={nameMap.pl || nameMap.en || nameMap.it || 'wydarzenie'}
+            eventType={eventType}
           />
         </Section>
       )}

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Check, Clock, Copy, Mail, MessageCircle, MessageSquare, Plus, RefreshCw, Send, Trash2, Users } from 'lucide-react'
+import { Check, Clock, Copy, Mail, MessageCircle, MessageSquare, Plus, RefreshCw, Send, Trash2, UserPlus, Users } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import { useAutoRefresh } from '@/hooks/useAutoRefresh'
@@ -16,9 +16,9 @@ import {
 /** Fallback bazy linków — API zwraca gotowy `link`, to tylko awaryjnie. */
 const PUBLIC_BASE = typeof window !== 'undefined' ? window.location.origin : 'https://rejestracja.icpemission.pl'
 
-/** Serwer odpowiedział „zalogowano zamiast wysłać" → wyłączony SMTP na backendzie. */
+/** Serwer odpowiedział „zalogowano zamiast wysłać" → brak skonfigurowanego dostawcy poczty. */
 const MAIL_OFF_HINT =
-  'Mail NIE został wysłany — serwer ma wyłączoną wysyłkę (MAIL_MODE≠smtp). Ustaw MAIL_MODE=smtp w konfiguracji API albo przekaż link ręcznie.'
+  'Mail NIE został wysłany — serwer nie ma skonfigurowanej poczty. Podłącz Resend (Ustawienia ▸ E-mail) albo przekaż link ręcznie.'
 
 /** Link do potwierdzenia — API zwraca gotowy `link`, ale trzymamy fallback lokalny. */
 function inviteLink(inv: InvitationItem): string {
@@ -30,19 +30,24 @@ function waNumber(phone?: string | null): string {
   return (phone ?? '').replace(/\D/g, '')
 }
 
-/** Treść zaproszenia wysyłanego komunikatorem — wspólna dla WhatsAppa i iMessage. */
-function inviteMessage(inv: InvitationItem, eventTitle: string): string {
+/**
+ * Treść zaproszenia wysyłanego komunikatorem — wspólna dla WhatsAppa i iMessage.
+ * `register` = zwykły event: gość rejestruje się w lejku (link ma wypełnione dane).
+ */
+function inviteMessage(inv: InvitationItem, eventTitle: string, register = false): string {
   return [
     `${inv.firstName}, zapraszamy Cię na: ${eventTitle}.`,
     '',
-    'To wydarzenie tylko dla zaproszonych gości — udział potwierdzisz swoim osobistym linkiem:',
+    register
+      ? 'Zarejestrujesz się swoim osobistym linkiem — Twoje dane są już wpisane:'
+      : 'To wydarzenie tylko dla zaproszonych gości — udział potwierdzisz swoim osobistym linkiem:',
     inviteLink(inv),
   ].join('\n')
 }
 
-function whatsappHref(inv: InvitationItem, eventTitle: string): string {
+function whatsappHref(inv: InvitationItem, eventTitle: string, register = false): string {
   const num = waNumber(inv.phone)
-  return `https://wa.me/${num}?text=${encodeURIComponent(inviteMessage(inv, eventTitle))}`
+  return `https://wa.me/${num}?text=${encodeURIComponent(inviteMessage(inv, eventTitle, register))}`
 }
 
 /**
@@ -51,23 +56,28 @@ function whatsappHref(inv: InvitationItem, eventTitle: string): string {
  * Bez żadnego z nich otwiera puste okno z samą treścią.
  * Zapis `?&body=` to wersja działająca zarówno w macOS, jak i w iOS (różnie traktują separator).
  */
-function imessageHref(inv: InvitationItem, eventTitle: string): string {
+function imessageHref(inv: InvitationItem, eventTitle: string, register = false): string {
   const raw = (inv.phone ?? '').trim()
   const digits = waNumber(raw)
   // Zachowujemy „+" tylko wtedy, gdy admin sam je wpisał — doklejanie go do numeru
   // krajowego (np. „512 345 678") zrobiłoby z niego nieistniejący numer międzynarodowy.
   const num = digits ? (raw.startsWith('+') ? `+${digits}` : digits) : ''
   const recipient = num || (inv.email || '').trim()
-  return `sms:${recipient}?&body=${encodeURIComponent(inviteMessage(inv, eventTitle))}`
+  return `sms:${recipient}?&body=${encodeURIComponent(inviteMessage(inv, eventTitle, register))}`
 }
 
 export default function InvitedGuestsSection({
   instanceId,
   eventTitle,
+  eventType = 'INVITE',
 }: {
   instanceId: string
   eventTitle: string
+  /** INVITE = gość potwierdza udział; inne typy = gość rejestruje się w lejku (z płatnością). */
+  eventType?: string
 }) {
+  const isInvite = eventType === 'INVITE'
+  const register = !isInvite
   const [items, setItems] = useState<InvitationItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -155,7 +165,7 @@ export default function InvitedGuestsSection({
   async function handleImessage(inv: InvitationItem) {
     setError(null)
     try {
-      await navigator.clipboard.writeText(inviteMessage(inv, eventTitle))
+      await navigator.clipboard.writeText(inviteMessage(inv, eventTitle, register))
       setInfo('Otwieram Wiadomości. Treść jest też w schowku — jeśli okno będzie puste, wklej ⌘V i wyślij ręcznie.')
     } catch {
       setInfo('Otwieram Wiadomości. Jeśli treść się nie wypełni, skopiuj link przyciskiem „Kopiuj link".')
@@ -248,8 +258,17 @@ export default function InvitedGuestsSection({
   const adultsCount = confirmed + spouseCount
   const mealsCount = adultsCount + childrenCount
 
+  const fromParticipants = items.filter((i) => i.invitedByParticipant).length
+
   return (
     <div className="flex flex-col gap-4">
+      {!isInvite && (
+        <p className="text-xs px-3 py-2 rounded-[8px]" style={{ background: 'var(--surface-2)', color: 'var(--muted)', border: '1px solid var(--border)' }}>
+          Osoby z tej listy dostają osobisty link do rejestracji z wpisanymi danymi. Po rejestracji
+          pojawiają się w module Zgłoszenia jak każdy uczestnik (z ceną i płatnością).
+        </p>
+      )}
+      {isInvite && (
       <div
         className="flex items-center justify-between gap-3 flex-wrap px-3 py-2.5 rounded-[10px]"
         style={{ background: 'var(--brand-soft)', border: '1px solid var(--brand)' }}
@@ -263,11 +282,13 @@ export default function InvitedGuestsSection({
           </p>
         )}
       </div>
+      )}
 
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <p className="text-sm" style={{ color: 'var(--muted)' }}>
-          Potwierdziło <strong style={{ color: 'var(--ink)' }}>{confirmed}</strong> z {items.length}
+          {isInvite ? 'Potwierdziło' : 'Zarejestrowało się'} <strong style={{ color: 'var(--ink)' }}>{confirmed}</strong> z {items.length}
           {unsent > 0 && ` · bez wysłanego maila: ${unsent}`}
+          {fromParticipants > 0 && ` · od uczestników: ${fromParticipants}`}
         </p>
         <div className="flex items-center gap-2">
           {lastUpdatedAt && (
@@ -284,6 +305,7 @@ export default function InvitedGuestsSection({
           >
             <RefreshCw size={13} className={refreshing ? 'animate-spin' : undefined} /> Odśwież
           </button>
+          {isInvite && (
           <button
             type="button"
             onClick={() => { void handleSyncRegistrations() }}
@@ -294,6 +316,7 @@ export default function InvitedGuestsSection({
           >
             <Users size={13} /> {busyId === 'sync' ? 'Synchronizuję…' : 'Synchronizuj z listą zgłoszeń'}
           </button>
+          )}
           {unsent > 0 && (
             <button
               type="button"
@@ -308,7 +331,7 @@ export default function InvitedGuestsSection({
         </div>
       </div>
 
-      {unsynced > 0 && (
+      {isInvite && unsynced > 0 && (
         <p className="text-xs px-3 py-2 rounded-[8px]" style={{ background: 'var(--surface-2)', color: 'var(--muted)', border: '1px solid var(--border)' }}>
           {unsynced} {unsynced === 1 ? 'potwierdzenie' : 'potwierdzeń'} jeszcze nie widać w module Zgłoszenia/Obecność —
           kliknij „Synchronizuj z listą zgłoszeń" powyżej.
@@ -351,6 +374,11 @@ export default function InvitedGuestsSection({
                       {inv.email || 'bez e-maila'}
                       {inv.phone ? ` · ${inv.phone}` : ''}
                     </p>
+                    {inv.invitedByParticipant && (
+                      <p className="flex items-center gap-1 text-[11px] font-medium mt-0.5" style={{ color: 'var(--brand)' }}>
+                        <UserPlus size={11} /> zaproszony przez: {inv.invitedByName || 'uczestnika'}
+                      </p>
+                    )}
                   </div>
                   <span
                     className="flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-full shrink-0"
@@ -361,7 +389,7 @@ export default function InvitedGuestsSection({
                     }
                   >
                     {isConfirmed ? <Check size={12} /> : <Clock size={12} />}
-                    {isConfirmed ? 'Potwierdził' : 'Czeka'}
+                    {isConfirmed ? (isInvite ? 'Potwierdził' : 'Zarejestrowany') : 'Czeka'}
                   </span>
                 </div>
 
@@ -398,7 +426,7 @@ export default function InvitedGuestsSection({
                     <Copy size={12} /> {copiedId === inv.id ? 'Skopiowano!' : 'Kopiuj link'}
                   </button>
                   <a
-                    href={whatsappHref(inv, eventTitle)}
+                    href={whatsappHref(inv, eventTitle, register)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-[8px] no-underline"
@@ -408,7 +436,7 @@ export default function InvitedGuestsSection({
                     <MessageCircle size={12} /> WhatsApp
                   </a>
                   <a
-                    href={imessageHref(inv, eventTitle)}
+                    href={imessageHref(inv, eventTitle, register)}
                     onClick={() => { void handleImessage(inv) }}
                     className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-[8px] no-underline"
                     style={{ background: '#007AFF18', color: '#0A6FD8', border: '1px solid #007AFF55' }}
@@ -478,8 +506,8 @@ export default function InvitedGuestsSection({
           />
         </div>
         <p className="text-[11px]" style={{ color: 'var(--faint)' }}>
-          Po dodaniu zaproszenie z osobistym linkiem idzie automatycznie na e-mail. Telefon z numerem
-          kierunkowym pozwala wysłać je jednym kliknięciem przez WhatsApp.
+          Po dodaniu zaproszenie z osobistym linkiem{register ? ' do rejestracji' : ''} idzie automatycznie
+          na e-mail. Telefon z numerem kierunkowym pozwala wysłać je jednym kliknięciem przez WhatsApp.
         </p>
         <Button onClick={() => { void handleAdd() }} size="sm" disabled={adding}>
           <Plus size={14} /> {adding ? 'Dodaję…' : 'Dodaj i wyślij zaproszenie'}

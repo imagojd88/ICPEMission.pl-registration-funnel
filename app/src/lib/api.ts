@@ -462,7 +462,7 @@ export async function getQuote(input: PriceInput): Promise<PriceResult> {
 
 export async function createRegistration(
   data: CreateRegistrationDto,
-): Promise<{ registration: RegistrationDto; summary: PriceResult; payment: unknown }> {
+): Promise<{ registration: RegistrationDto; summary: PriceResult; payment: unknown; canInviteGuests?: boolean }> {
   return apiFetch('/registrations', { method: 'POST', body: JSON.stringify(data) })
 }
 
@@ -556,6 +556,9 @@ export interface InvitationItem extends Omit<Invitee, 'phone'> {
   children: ChildEntry[]
   /** Zgłoszenie (moduł Zgłoszenia/Obecność) powiązane przy potwierdzeniu — null, gdy jeszcze niezsynchronizowane. */
   registrationId: string | null
+  /** „Imię Nazwisko" uczestnika, który dodał tę osobę (null = dodana przez admina). */
+  invitedByName?: string | null
+  invitedByParticipant?: boolean
 }
 
 export async function createInvitations(
@@ -645,12 +648,20 @@ export interface EventContent {
     /** Krótkie 1–2 zdania: kim są. Wielojęzyczne jak program. */
     bio?: LangText
   } | null
+  /** Ścieżka „uczestnik zaprasza gościa" — włączana per event w edycji. */
+  guestInvites?: { enabled?: boolean; maxPerInviter?: number } | null
 }
 
 export interface InvitationView {
   firstName: string
   lastName: string
   email: string
+  phone?: string | null
+  /** Kto zaprosił (gość uczestnika) — null, gdy zaproszenie od organizatora. */
+  invitedByName?: string | null
+  /** Po potwierdzeniu pokazać „Zaproś gościa" (event INVITE z włączoną ścieżką, osoba nie jest gościem). */
+  guestInvitesEnabled?: boolean
+  maxGuests?: number
   confirmedAt: string | null
   dietaryNotes: string | null
   spouseAttending: boolean | null
@@ -667,6 +678,7 @@ export interface InvitationView {
     theme: EventTheme | null
     customFields: EventContent | null
     slug: string | null
+    type?: string | null
   }
 }
 
@@ -692,6 +704,58 @@ export async function matchInvite(
   data: Invitee & ConfirmPayload,
 ): Promise<{ ok: boolean; firstName: string }> {
   return apiFetch(`/r/${slug}/invite-match`, { method: 'POST', body: JSON.stringify(data) })
+}
+
+// ---------------------------------------------------------------------------
+// Ścieżka „uczestnik zaprasza gościa" (publiczna, token w URL-u /g/:token)
+// ---------------------------------------------------------------------------
+
+export type GuestBlockedReason = 'DISABLED' | 'NOT_CONFIRMED' | 'GUEST_CANNOT_INVITE' | 'CLOSED' | 'LIMIT' | null
+
+export interface GuestInviteView {
+  inviter: { firstName: string }
+  event: {
+    title: unknown
+    startsAt: string
+    endsAt: string
+    location: string | null
+    theme: EventTheme | null
+    slug: string | null
+    type: string | null
+  }
+  /** CONFIRM = gość potwierdza udział (event na zaproszenie), REGISTER = gość przechodzi rejestrację. */
+  guestFlow: 'CONFIRM' | 'REGISTER'
+  maxGuests: number
+  used: number
+  remaining: number
+  canInvite: boolean
+  blockedReason: GuestBlockedReason
+  guests: { id: string; firstName: string; lastName: string; email: string; status: 'CONFIRMED' | 'PENDING'; sentAt: string | null }[]
+  added?: { id: string; mailStatus: 'SENT' | 'FAILED' | 'LOGGED' | 'NO_EMAIL' }
+}
+
+export interface GuestInput {
+  firstName: string
+  lastName: string
+  email: string
+  phone: string
+}
+
+export async function getGuestInvites(token: string): Promise<GuestInviteView> {
+  return apiFetch<GuestInviteView>(`/guest-invites/${encodeURIComponent(token)}`)
+}
+
+export async function addGuestInvite(token: string, guest: GuestInput): Promise<GuestInviteView> {
+  return apiFetch<GuestInviteView>(`/guest-invites/${encodeURIComponent(token)}`, {
+    method: 'POST',
+    body: JSON.stringify(guest),
+  })
+}
+
+export async function removeGuestInvite(token: string, guestId: string): Promise<GuestInviteView> {
+  return apiFetch<GuestInviteView>(`/guest-invites/${encodeURIComponent(token)}/guests/${guestId}`, {
+    method: 'DELETE',
+  })
 }
 
 export async function getRegistration(id: string, token: string): Promise<RegistrationDto> {
@@ -726,6 +790,43 @@ export async function startCheckout(
 function authHeaders(token?: string): Record<string, string> {
   const tok = token ?? getAuthToken()
   return tok ? { Authorization: `Bearer ${tok}` } : {}
+}
+
+// ── Poczta (Ustawienia ▸ E-mail) ────────────────────────────────────────────
+
+export interface MailStatus {
+  provider: 'resend' | 'smtp' | 'log'
+  from: string
+  replyTo: string | null
+  resendKeySet: boolean
+  resendKeyHint: string | null
+  smtpHost: string | null
+  mailModeEnv: string | null
+}
+
+export interface MailLogItem {
+  id: string
+  type: string
+  to: string
+  status: string
+  provider: string | null
+  error: string | null
+  createdAt: string
+}
+
+export async function getMailStatus(token?: string): Promise<MailStatus> {
+  return apiFetch<MailStatus>('/admin/mail/status', { headers: authHeaders(token) })
+}
+
+export async function sendTestMail(
+  to: string,
+  token?: string,
+): Promise<{ status: 'SENT' | 'FAILED' | 'LOGGED'; error?: string; provider: string }> {
+  return apiFetch('/admin/mail/test', { method: 'POST', headers: authHeaders(token), body: JSON.stringify({ to }) })
+}
+
+export async function getMailLog(limit = 30, token?: string): Promise<MailLogItem[]> {
+  return apiFetch<MailLogItem[]>(`/admin/mail/log?limit=${limit}`, { headers: authHeaders(token) })
 }
 
 export async function getAdminSummary(token?: string): Promise<AdminSummaryDto> {

@@ -48,4 +48,6 @@ export class CreateRegistrationDto {
   @IsOptional() @IsString() discountCode?: string;
   @IsIn(['ONLINE', 'BANK_TRANSFER', 'CASH']) @ApiProperty() paymentMethod!: 'ONLINE' | 'BANK_TRANSFER' | 'CASH';
   @ValidateNested() @Type(() => ConsentsDto) @ApiProperty() consents!: ConsentsDto;
+  /** Token osobistego zaproszenia (link z maila `/r/:slug?inv=`) — spina zaproszenie ze zgłoszeniem. */
+  @IsOptional() @IsString() invitationToken?: string;
 }

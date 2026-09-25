@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useParams } from 'react-router-dom'
-import { Calendar, MapPin, Check, Trash2 } from 'lucide-react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Calendar, MapPin, Check, Trash2, UserPlus } from 'lucide-react'
 import { getInvitation, confirmInvitation, pickLang, type InvitationView, type ChildEntry } from '../lib/api'
 import { formatDateRange } from '../lib/utils'
 import Spinner from '../components/ui/Spinner'
@@ -23,6 +23,7 @@ function newChildRow(): ChildRow {
 export default function InviteConfirm() {
   const { t, i18n } = useTranslation()
   const { token } = useParams<{ token: string }>()
+  const navigate = useNavigate()
   const [inv, setInv] = useState<InvitationView | null>(null)
   const [error, setError] = useState(false)
   const [confirming, setConfirming] = useState(false)
@@ -42,6 +43,12 @@ export default function InviteConfirm() {
     if (!token) return
     getInvitation(token)
       .then((v) => {
+        // Zaproszenie na zwykły event realizuje się rejestracją w lejku (cena, pokój, płatność) —
+        // przekierowanie z tokenem, lejek wypełni dane gościa i zepnie zgłoszenie z zaproszeniem.
+        if (v.event.type && v.event.type !== 'INVITE' && v.event.slug) {
+          navigate(`/r/${v.event.slug}?inv=${encodeURIComponent(token)}`, { replace: true })
+          return
+        }
         setInv(v)
         if (v.confirmedAt) setConfirmed(true)
         setDietary(v.dietaryNotes ?? '')
@@ -158,6 +165,11 @@ export default function InviteConfirm() {
         <p className="text-base" style={{ color: 'var(--ink)' }}>
           Cześć <span className="font-semibold">{inv.firstName}</span>, serdecznie zapraszamy!
         </p>
+        {inv.invitedByName && (
+          <p className="text-sm -mt-3" style={{ color: 'var(--muted)' }}>
+            Zaprasza Cię: <span className="font-medium" style={{ color: 'var(--ink)' }}>{inv.invitedByName}</span>
+          </p>
+        )}
 
         <div className="flex flex-col gap-3">
           <div className="flex items-center gap-2.5 text-sm" style={{ color: 'var(--ink)' }}>
@@ -190,6 +202,15 @@ export default function InviteConfirm() {
             >
               {t('invite.change_answer')}
             </button>
+            {inv.guestInvitesEnabled && token && (
+              <Link
+                to={`/g/${token}`}
+                className="mt-2 flex items-center justify-center gap-2 w-full text-sm font-semibold rounded-[12px] py-2.5 no-underline"
+                style={{ background: 'var(--surface)', color: 'var(--brand)', border: '1px solid var(--brand)' }}
+              >
+                <UserPlus size={15} /> Zaproś gościa{inv.maxGuests ? ` (do ${inv.maxGuests})` : ''}
+              </Link>
+            )}
           </div>
         ) : (
           <>

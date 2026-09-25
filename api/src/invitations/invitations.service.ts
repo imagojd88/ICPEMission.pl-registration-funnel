@@ -1,7 +1,7 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { guestInviteConfig, guestInvitePageLink, personalInviteLink } from './guest-invite-config';
 
 interface Invitee {
   firstName: string;
@@ -45,9 +45,18 @@ export interface InvitationRow {
   children: ChildEntry[];
   // Zgłoszenie (Registration) powiązane przy potwierdzeniu — null, gdy panel jeszcze nie zsynchronizowany.
   registrationId: string | null;
+  // Ścieżka „uczestnik zaprasza gościa": kto dodał (null = admin).
+  invitedByName: string | null;
+  invitedByParticipant: boolean;
 }
 
-type InvitationRecord = {
+/** Kontekst eventu potrzebny do złożenia osobistego linku (zależy od typu eventu). */
+export interface InviteLinkCtx {
+  type?: string;
+  slug?: string | null;
+}
+
+export type InvitationRecord = {
   id: string;
   instanceId: string;
   firstName: string;
@@ -64,7 +73,18 @@ type InvitationRecord = {
   spouseDietaryNotes: string | null;
   childrenJson: unknown;
   registrationId: string | null;
+  invitedByInvitationId?: string | null;
+  invitedByRegistrationId?: string | null;
+  invitedByName?: string | null;
 };
+
+/** Czy zaproszenie powstało w ścieżce „uczestnik zaprasza gościa". */
+export function isParticipantGuest(r: {
+  invitedByInvitationId?: string | null;
+  invitedByRegistrationId?: string | null;
+}): boolean {
+  return !!(r.invitedByInvitationId || r.invitedByRegistrationId);
+}
 
 const norm = (s: string) => (s ?? '').trim().toLowerCase();
 
@@ -115,20 +135,22 @@ export class InvitationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
-    private readonly config: ConfigService,
   ) {}
 
-  /** Bazowy adres publicznego frontu — z niego składamy link /i/:token do maila. */
-  private baseUrl(): string {
-    // `||`, nie `??` — pusty ENV na Renderze dałby link względny („/i/token"), martwy w mailu.
-    const raw =
-      this.config.get<string>('PUBLIC_APP_URL') ||
-      this.config.get<string>('CORS_ORIGIN') ||
-      'https://rejestracja.icpemission.pl';
-    return raw.split(',')[0].trim().replace(/\/+$/, '');
+  /** Typ serii + slug strony dla instancji — do składania linków. */
+  async linkCtx(instanceId: string): Promise<InviteLinkCtx> {
+    const inst = await this.prisma.eventInstance.findUnique({
+      where: { id: instanceId },
+      include: { series: { include: { page: true } } },
+    });
+    return { type: (inst?.series as { type?: string } | undefined)?.type, slug: inst?.series?.page?.slug ?? null };
   }
 
-  private toRow(r: InvitationRecord): InvitationRow {
+  linkFor(token: string, ctx: InviteLinkCtx): string {
+    return personalInviteLink(token, ctx.type, ctx.slug);
+  }
+
+  private toRow(r: InvitationRecord, ctx: InviteLinkCtx = { type: 'INVITE' }): InvitationRow {
     return {
       id: r.id,
       firstName: r.firstName,
@@ -136,7 +158,7 @@ export class InvitationsService {
       email: r.email,
       phone: r.phone ?? null,
       token: r.token,
-      link: `${this.baseUrl()}/i/${r.token}`,
+      link: this.linkFor(r.token, ctx),
       confirmedAt: r.confirmedAt ? r.confirmedAt.toISOString() : null,
       sentAt: r.sentAt ? r.sentAt.toISOString() : null,
       dietaryNotes: r.dietaryNotes ?? null,
@@ -146,17 +168,19 @@ export class InvitationsService {
       spouseDietaryNotes: r.spouseDietaryNotes ?? null,
       children: childrenOf(r),
       registrationId: r.registrationId ?? null,
+      invitedByName: r.invitedByName ?? null,
+      invitedByParticipant: isParticipantGuest(r),
     };
   }
 
   /** Tytuł eventu po polsku (title bywa mapą {pl,en,it}). */
-  private titleOf(title: unknown): string {
+  titleOf(title: unknown): string {
     if (typeof title === 'string') return title;
     const m = (title ?? {}) as Record<string, string>;
     return m.pl ?? m.en ?? m.it ?? Object.values(m)[0] ?? 'wydarzenie';
   }
 
-  private whenOf(startsAt: Date, endsAt: Date): string {
+  whenOf(startsAt: Date, endsAt: Date): string {
     const f = (d: Date) =>
       d.toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' });
     const same = startsAt.toDateString() === endsAt.toDateString();
@@ -195,18 +219,18 @@ export class InvitationsService {
     }
     if (sendEmails) {
       for (const row of created) {
-        if (row.email) await this.sendInviteMail(row, inst);
+        if (row.email) await this.sendInviteMail(row);
       }
     }
     return this.list(instanceId);
   }
 
   async list(instanceId: string): Promise<InvitationRow[]> {
-    const rows = await this.prisma.invitation.findMany({
-      where: { instanceId },
-      orderBy: { createdAt: 'asc' },
-    });
-    return (rows as InvitationRecord[]).map((r) => this.toRow(r));
+    const [rows, ctx] = await Promise.all([
+      this.prisma.invitation.findMany({ where: { instanceId }, orderBy: { createdAt: 'asc' } }),
+      this.linkCtx(instanceId),
+    ]);
+    return (rows as InvitationRecord[]).map((r) => this.toRow(r, ctx));
   }
 
   async remove(id: string) {
@@ -221,29 +245,42 @@ export class InvitationsService {
     if (patch.lastName !== undefined) data.lastName = patch.lastName.trim();
     if (patch.email !== undefined) data.email = patch.email.trim();
     if (patch.phone !== undefined) data.phone = patch.phone.trim() || null;
-    const row = await this.prisma.invitation.update({ where: { id }, data: data as never });
-    return this.toRow(row as InvitationRecord);
+    const row = (await this.prisma.invitation.update({ where: { id }, data: data as never })) as InvitationRecord;
+    return this.toRow(row, await this.linkCtx(row.instanceId));
   }
 
-  /** Wysyłka maila z zaproszeniem — wspólna dla auto-wysyłki i „wyślij ponownie". */
-  private async sendInviteMail(
-    row: InvitationRecord,
-    inst: { title: unknown; startsAt: Date; endsAt: Date; location: string | null },
-  ): Promise<'SENT' | 'FAILED' | 'LOGGED' | 'NO_EMAIL'> {
+  /**
+   * Wysyłka maila z zaproszeniem — wspólna dla auto-wysyłki, „wyślij ponownie" i gości
+   * dodanych przez uczestników. Szablon i link zależą od typu eventu i od tego, kto zaprosił:
+   *  - gość uczestnika → GUEST_INVITATION („X zaprasza Cię…"),
+   *  - dodany przez admina → INVITATION,
+   *  - event na zaproszenie → potwierdzenie `/i/:token`, zwykły → lejek `/r/:slug?inv=`.
+   */
+  async sendInviteMail(row: InvitationRecord): Promise<'SENT' | 'FAILED' | 'LOGGED' | 'NO_EMAIL'> {
     if (!row.email) return 'NO_EMAIL';
+    const inst = await this.prisma.eventInstance.findUnique({
+      where: { id: row.instanceId },
+      include: { series: { include: { page: true } } },
+    });
+    if (!inst) throw new NotFoundException('Instance not found');
+    const type = (inst.series as { type?: string }).type;
+    const link = personalInviteLink(row.token, type, inst.series.page?.slug);
+    const guest = isParticipantGuest(row);
     const status = await this.notifications.sendMail({
       to: row.email,
-      type: 'INVITATION',
+      type: guest ? 'GUEST_INVITATION' : 'INVITATION',
       locale: 'pl',
       data: {
         firstName: row.firstName,
         eventTitle: this.titleOf(inst.title),
         when: this.whenOf(inst.startsAt, inst.endsAt),
         location: inst.location ?? '',
-        link: `${this.baseUrl()}/i/${row.token}`,
+        link,
+        mode: type === 'INVITE' ? 'CONFIRM' : 'REGISTER',
+        inviterName: row.invitedByName ?? '',
       },
     });
-    // `sentAt` stemplujemy WYŁĄCZNIE przy realnej wysyłce. Przy MAIL_MODE=log mail nigdzie
+    // `sentAt` stemplujemy WYŁĄCZNIE przy realnej wysyłce. Przy braku dostawcy mail nigdzie
     // nie poszedł, więc oznaczenie go jako wysłanego kłamałoby adminowi w panelu.
     if (status === 'SENT') {
       await this.prisma.invitation.update({
@@ -256,12 +293,9 @@ export class InvitationsService {
 
   /** Ponowna (lub pierwsza ręczna) wysyłka zaproszenia do jednej osoby. */
   async resend(id: string) {
-    const inv = await this.prisma.invitation.findUnique({
-      where: { id },
-      include: { instance: true },
-    });
+    const inv = await this.prisma.invitation.findUnique({ where: { id } });
     if (!inv) throw new NotFoundException('Invitation not found');
-    const status = await this.sendInviteMail(inv as unknown as InvitationRecord, inv.instance);
+    const status = await this.sendInviteMail(inv as unknown as InvitationRecord);
     return { ok: status === 'SENT', status };
   }
 
@@ -285,7 +319,7 @@ export class InvitationsService {
         skipped += 1;
         continue;
       }
-      const status = await this.sendInviteMail(row, inst);
+      const status = await this.sendInviteMail(row);
       if (status === 'SENT') sent += 1;
       else if (status === 'LOGGED') logged += 1;
       else failed += 1;
@@ -303,10 +337,18 @@ export class InvitationsService {
     const rec = inv as unknown as InvitationRecord;
     const inst = inv.instance;
     const page = inst.series.page;
+    const type = (inst.series as { type?: string }).type;
+    const gi = guestInviteConfig(page?.customFields);
     return {
       firstName: inv.firstName,
       lastName: inv.lastName,
       email: inv.email,
+      phone: rec.phone ?? null,
+      invitedByName: rec.invitedByName ?? null,
+      // Strona /i/:token pokazuje „Zaproś gościa" po potwierdzeniu — tylko gdy event ma włączoną
+      // ścieżkę gości, a ta osoba sama nie jest gościem uczestnika (bez łańcucha).
+      guestInvitesEnabled: type === 'INVITE' && gi.enabled && !isParticipantGuest(rec),
+      maxGuests: gi.maxPerInviter,
       confirmedAt: inv.confirmedAt ? inv.confirmedAt.toISOString() : null,
       dietaryNotes: rec.dietaryNotes ?? null,
       spouseAttending: rec.spouseAttending ?? null,
@@ -323,14 +365,23 @@ export class InvitationsService {
         theme: page?.theme ?? null,
         customFields: page?.customFields ?? null,
         slug: page?.slug ?? null,
+        type: type ?? null,
       },
     };
   }
 
   /** Publiczne: potwierdź (lub zmień) udział po tokenie z osobistego linku. */
   async confirmByToken(token: string, payload: ConfirmPayload) {
-    const inv = await this.prisma.invitation.findUnique({ where: { token } });
+    const inv = await this.prisma.invitation.findUnique({
+      where: { token },
+      include: { instance: { include: { series: true } } },
+    });
     if (!inv) throw new NotFoundException('Invitation not found');
+    // Na zwykłym evencie zaproszenie realizuje się rejestracją w lejku (z ceną, pokojem) —
+    // „potwierdzenie" stworzyłoby darmowe zgłoszenie z pominięciem płatności.
+    if ((inv.instance.series as { type?: string }).type !== 'INVITE') {
+      throw new ForbiddenException('To zaproszenie realizuje się przez formularz rejestracji.');
+    }
     await this.prisma.invitation.update({
       where: { token },
       data: {
@@ -346,6 +397,7 @@ export class InvitationsService {
         `syncRegistration (confirmByToken) failed for invitation ${inv.id}: ${e instanceof Error ? e.message : String(e)}`,
       );
     }
+    if (!inv.confirmedAt) await this.sendConfirmedMail(inv.id);
     return { ok: true };
   }
 
@@ -385,9 +437,45 @@ export class InvitationsService {
         `syncRegistration (matchBySlug) failed for invitation ${found.id}: ${e instanceof Error ? e.message : String(e)}`,
       );
     }
+    // Ścieżka bez linku: gość nie zna swojego tokenu, więc link do zapraszania (i do zmiany
+    // odpowiedzi) dostaje mailem — na adres z listy, nie ten wpisany w formularzu.
+    if (!found.confirmedAt) await this.sendConfirmedMail(found.id);
     // Nie zwracamy `token` — publiczny endpoint nie powinien wydawać osobistego linku
     // komuś, kto zgadł dane. Potwierdzenie już zostało zapisane, front potrzebuje tylko imienia.
     return { ok: true, firstName: found.firstName };
+  }
+
+  /**
+   * Mail „dziękujemy za potwierdzenie" z linkiem do zapraszania gości — tylko gdy event ma
+   * włączoną ścieżkę gości i potwierdzający sam nie jest gościem (bez łańcucha zaproszeń).
+   * Błąd wysyłki nie może zablokować potwierdzenia.
+   */
+  private async sendConfirmedMail(invitationId: string): Promise<void> {
+    try {
+      const inv = await this.prisma.invitation.findUnique({
+        where: { id: invitationId },
+        include: { instance: { include: { series: { include: { page: true } } } } },
+      });
+      if (!inv || !inv.email) return;
+      const rec = inv as unknown as InvitationRecord;
+      const gi = guestInviteConfig(inv.instance.series.page?.customFields);
+      if (!gi.enabled || isParticipantGuest(rec)) return;
+      await this.notifications.sendMail({
+        to: inv.email,
+        type: 'INVITE_CONFIRMED',
+        locale: 'pl',
+        data: {
+          firstName: inv.firstName,
+          eventTitle: this.titleOf(inv.instance.title),
+          when: this.whenOf(inv.instance.startsAt, inv.instance.endsAt),
+          link: personalInviteLink(inv.token, 'INVITE', null),
+          guestInviteLink: guestInvitePageLink(inv.token),
+          maxGuests: gi.maxPerInviter,
+        },
+      });
+    } catch (e) {
+      this.logger.error(`sendConfirmedMail failed for ${invitationId}: ${e instanceof Error ? e.message : String(e)}`);
+    }
   }
 
   /**

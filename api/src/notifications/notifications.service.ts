@@ -2,6 +2,24 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 
+/** Wspólny układ maila z przyciskiem: akapity (intro) → przycisk → link zapasowy → akapity (outro). */
+function buttonMail(intro: string[], button: { label: string; href: string } | null, outro: string[]): { text: string; html: string } {
+  const text = [...intro, ...(button ? [button.href, ''] : []), ...outro].join('\n');
+  const p = (l: string) => (l === '' ? '<br/>' : `<p style="margin:0 0 6px">${esc(l)}</p>`);
+  const btn = button
+    ? `<p style="margin:18px 0"><a href="${esc(button.href)}" style="display:inline-block;background:#C0603C;color:#fff;text-decoration:none;padding:12px 22px;border-radius:12px;font-weight:600">${esc(button.label)}</a></p>
+        <p style="margin:0 0 14px;font-size:12px;color:#6b7280">Gdyby przycisk nie działał, skopiuj link: ${esc(button.href)}</p>`
+    : '';
+  const html = `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.6;color:#1f2937">
+        ${intro.map(p).join('')}
+        ${btn}
+        ${outro.map(p).join('')}
+      </div>`;
+  return { text, html };
+}
+
+const SIGNATURE = ['Szczęść Boże,', 'ICPE Mission Polska'];
+
 /** Escapowanie treści wstawianej do HTML-a maila (tytuły eventów bywają z `&`, `<`). */
 const esc = (s: unknown) =>
   String(s ?? '')
@@ -9,6 +27,14 @@ const esc = (s: unknown) =>
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+
+export type MailProvider = 'resend' | 'smtp' | 'log';
+
+/** Wynik wysyłki: status + ewentualny komunikat błędu (do pokazania adminowi). */
+export interface MailResult {
+  status: 'SENT' | 'FAILED' | 'LOGGED';
+  error?: string;
+}
 
 export interface MailPayload {
   to: string;
@@ -21,7 +47,7 @@ export interface MailPayload {
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger('Mail');
-  private readonly mailMode: string;
+  private readonly mailMode: MailProvider;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private transporter: any = null;
 
@@ -29,7 +55,69 @@ export class NotificationsService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
   ) {
-    this.mailMode = this.config.get<string>('MAIL_MODE', 'log');
+    this.mailMode = this.resolveProvider();
+    this.logger.log(`Dostawca maili: ${this.mailMode}`);
+  }
+
+  /**
+   * Który dostawca wysyła maile:
+   *  - MAIL_MODE=resend | smtp | log — jawny wybór,
+   *  - MAIL_MODE puste, ale jest RESEND_API_KEY → resend (wystarczy wkleić klucz na Renderze),
+   *  - inaczej log (nic nie wychodzi — tylko wpis w logach).
+   * Literówka w MAIL_MODE nie może po cichu wyłączyć wysyłki, więc nieznana wartość
+   * traktowana jest jak puste pole (i logowana).
+   */
+  private resolveProvider(): MailProvider {
+    const raw = (this.config.get<string>('MAIL_MODE') ?? '').trim().toLowerCase();
+    const hasResend = !!(this.config.get<string>('RESEND_API_KEY') ?? '').trim();
+    if (raw === 'resend' || raw === 'smtp' || raw === 'log') return raw;
+    if (raw) this.logger.warn(`Nieznany MAIL_MODE="${raw}" — ignoruję`);
+    return hasResend ? 'resend' : 'log';
+  }
+
+  private fromAddress(): string {
+    return (
+      (this.config.get<string>('MAIL_FROM') ?? '').trim() || 'ICPE Mission <rejestracja@icpemission.pl>'
+    );
+  }
+
+  private replyTo(): string | undefined {
+    return (this.config.get<string>('MAIL_REPLY_TO') ?? '').trim() || undefined;
+  }
+
+  /**
+   * Wysyłka przez Resend (HTTP API, bez SDK — Node 20 ma wbudowany fetch).
+   * Zwraca id wiadomości albo rzuca błąd z komunikatem Resenda (np. niezweryfikowana domena).
+   */
+  private async sendViaResend(msg: { to: string; subject: string; text: string; html: string }): Promise<string> {
+    const key = (this.config.get<string>('RESEND_API_KEY') ?? '').trim();
+    if (!key) throw new Error('Brak RESEND_API_KEY w konfiguracji API');
+    const body: Record<string, unknown> = {
+      from: this.fromAddress(),
+      to: [msg.to],
+      subject: msg.subject,
+      html: msg.html,
+      text: msg.text,
+    };
+    const reply = this.replyTo();
+    if (reply) body.reply_to = reply;
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 15000);
+    try {
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: ctrl.signal,
+      });
+      const data = (await res.json().catch(() => ({}))) as { id?: string; message?: string; name?: string };
+      if (!res.ok) {
+        throw new Error(`Resend ${res.status}: ${data.message ?? data.name ?? 'nieznany błąd'}`);
+      }
+      return data.id ?? '';
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   /** Leniwie tworzy transport SMTP z ENV (tylko gdy MAIL_MODE=smtp). */
@@ -76,14 +164,18 @@ export class NotificationsService {
             : 'Płatność online zostanie potwierdzona automatycznie.',
         '',
         `Numer zgłoszenia: ${String(payload.registrationId ?? '')}`,
-        '',
-        'Szczęść Boże,',
-        'ICPE Mission Polska',
       ];
-      const text = lines.join('\n');
-      const html = `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.6;color:#1f2937">${lines
-        .map((l) => (l === '' ? '<br/>' : `<p style="margin:0 0 6px">${l}</p>`))
-        .join('')}</div>`;
+      const guestLink = String(d.guestInviteLink ?? '');
+      if (guestLink) {
+        // Ścieżka „zaproś gościa" włączona dla eventu — link działa na podstawie tokenu zgłoszenia.
+        const { text, html } = buttonMail(
+          [...lines, '', 'Chcesz zabrać kogoś ze sobą? Możesz zaprosić gościa — dostanie od nas zaproszenie z linkiem do rejestracji:'],
+          { label: 'Zaproś gościa', href: guestLink },
+          ['', ...SIGNATURE],
+        );
+        return { subject, text, html };
+      }
+      const { text, html } = buttonMail([...lines, '', ...SIGNATURE], null, []);
       return { subject, text, html };
     }
 
@@ -103,7 +195,9 @@ export class NotificationsService {
         when ? `Termin: ${when}.` : '',
         where ? `Miejsce: ${where}.` : '',
         '',
-        'To wydarzenie tylko dla zaproszonych gości. Udział potwierdzisz swoim osobistym linkiem:',
+        d.mode === 'REGISTER'
+          ? 'Zarejestrujesz się swoim osobistym linkiem — Twoje dane są już wpisane w formularz:'
+          : 'To wydarzenie tylko dla zaproszonych gości. Udział potwierdzisz swoim osobistym linkiem:',
       ];
       const outro = [
         'Prosimy nie przekazywać linku dalej — jest przypisany do Ciebie.',
@@ -115,10 +209,85 @@ export class NotificationsService {
       const p = (l: string) => (l === '' ? '<br/>' : `<p style="margin:0 0 6px">${esc(l)}</p>`);
       const html = `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.6;color:#1f2937">
         ${intro.map(p).join('')}
-        <p style="margin:18px 0"><a href="${esc(link)}" style="display:inline-block;background:#C0603C;color:#fff;text-decoration:none;padding:12px 22px;border-radius:12px;font-weight:600">Potwierdzam udział</a></p>
+        <p style="margin:18px 0"><a href="${esc(link)}" style="display:inline-block;background:#C0603C;color:#fff;text-decoration:none;padding:12px 22px;border-radius:12px;font-weight:600">${d.mode === 'REGISTER' ? 'Zarejestruj się' : 'Potwierdzam udział'}</a></p>
         <p style="margin:0 0 14px;font-size:12px;color:#6b7280">Gdyby przycisk nie działał, skopiuj link: ${esc(link)}</p>
         ${outro.map(p).join('')}
       </div>`;
+      return { subject, text, html };
+    }
+
+    if (payload.type === 'GUEST_INVITATION') {
+      // Gość dodany przez uczestnika. `mode`: CONFIRM (event na zaproszenie — potwierdza udział)
+      // albo REGISTER (zwykły event — przechodzi lejek rejestracji z wypełnionymi danymi).
+      const title = String(d.eventTitle ?? 'wydarzenie');
+      const inviter = String(d.inviterName ?? '').trim() || 'Uczestnik';
+      const name = String(d.firstName ?? '').trim();
+      const when = String(d.when ?? '');
+      const where = String(d.location ?? '');
+      const register = d.mode === 'REGISTER';
+      const subject = `${inviter} zaprasza Cię — ${title}`;
+      const { text, html } = buttonMail(
+        [
+          name ? `${name},` : 'Dzień dobry,',
+          '',
+          `${inviter} zaprasza Cię na: ${title}.`,
+          when ? `Termin: ${when}.` : '',
+          where ? `Miejsce: ${where}.` : '',
+          '',
+          register
+            ? 'Zarejestrujesz się swoim osobistym linkiem — Twoje dane są już wpisane w formularz:'
+            : 'Udział potwierdzisz swoim osobistym linkiem:',
+        ].filter((l, i, arr) => l !== '' || arr[i - 1] !== ''),
+        { label: register ? 'Zarejestruj się' : 'Potwierdzam udział', href: String(d.link ?? '') },
+        [
+          'Link jest przypisany do Ciebie — prosimy nie przekazywać go dalej.',
+          'Jeśli nie znasz osoby zapraszającej, zignoruj tę wiadomość.',
+          '',
+          ...SIGNATURE,
+        ],
+      );
+      return { subject, text, html };
+    }
+
+    if (payload.type === 'INVITE_CONFIRMED') {
+      // Potwierdzenie udziału w evencie na zaproszenie + link do zapraszania gości
+      // (wysyłane tylko, gdy event ma włączoną ścieżkę „zaproś gościa").
+      const title = String(d.eventTitle ?? 'wydarzenie');
+      const name = String(d.firstName ?? '').trim();
+      const max = Number(d.maxGuests ?? 0);
+      const subject = `Potwierdzenie udziału — ${title}`;
+      const { text, html } = buttonMail(
+        [
+          name ? `${name},` : 'Dzień dobry,',
+          '',
+          `dziękujemy za potwierdzenie udziału w: ${title}.`,
+          d.when ? `Termin: ${String(d.when)}.` : '',
+          '',
+          `Możesz zaprosić ${max === 1 ? 'jedną osobę' : `do ${max} osób`} — każda dostanie od nas imienne zaproszenie:`,
+        ],
+        { label: 'Zaproś gościa', href: String(d.guestInviteLink ?? '') },
+        [
+          `Swoją odpowiedź (osoby, dieta) zmienisz tutaj: ${String(d.link ?? '')}`,
+          '',
+          ...SIGNATURE,
+        ],
+      );
+      return { subject, text, html };
+    }
+
+    if (payload.type === 'TEST') {
+      const subject = 'Test wysyłki — panel rejestracji ICPE';
+      const { text, html } = buttonMail(
+        [
+          'To jest wiadomość testowa z panelu rejestracji ICPE Mission.',
+          `Dostawca: ${String(d.provider ?? '')}.`,
+          'Skoro ją widzisz, wysyłka maili działa.',
+          '',
+          ...SIGNATURE,
+        ],
+        null,
+        [],
+      );
       return { subject, text, html };
     }
 
@@ -136,10 +305,15 @@ export class NotificationsService {
 
   /**
    * Wysyła (albo tylko loguje) maila. Zwraca końcowy status, żeby wołający mógł pokazać
-   * adminowi, czy mail faktycznie wyszedł — błąd SMTP jest łapany tutaj.
-   * `LOGGED` = MAIL_MODE≠smtp, czyli mail NIE poszedł do nikogo (tylko wpis w logach).
+   * adminowi, czy mail faktycznie wyszedł — błąd dostawcy jest łapany tutaj.
+   * `LOGGED` = brak skonfigurowanego dostawcy, czyli mail NIE poszedł do nikogo.
    */
   async sendMail(payload: MailPayload): Promise<'SENT' | 'FAILED' | 'LOGGED'> {
+    return (await this.sendMailDetailed(payload)).status;
+  }
+
+  /** Jak `sendMail`, ale z treścią błędu — używane przez „Wyślij test" w Ustawieniach. */
+  async sendMailDetailed(payload: MailPayload): Promise<MailResult> {
     const notification = await this.prisma.notification.create({
       data: {
         type: payload.type,
@@ -147,36 +321,100 @@ export class NotificationsService {
         to: payload.to,
         locale: payload.locale,
         status: 'QUEUED',
+        provider: this.mailMode,
         payload: payload.data as object,
         registrationId: payload.registrationId,
-      },
+      } as never,
     });
+    const mark = (data: Record<string, unknown>) =>
+      this.prisma.notification
+        .update({ where: { id: notification.id }, data: data as never })
+        .catch((e: Error) => this.logger.error(`Notification update failed: ${e.message}`));
 
-    if (this.mailMode === 'smtp') {
-      try {
-        const transporter = await this.getTransporter();
-        const { subject, text, html } = this.buildEmail(payload);
-        const from = this.config.get<string>('MAIL_FROM', 'ICPE Mission <no-reply@icpemission.pl>');
-        await transporter.sendMail({ from, to: payload.to, subject, text, html });
-        await this.prisma.notification.update({ where: { id: notification.id }, data: { status: 'SENT' } });
-        return 'SENT';
-      } catch (e) {
-        this.logger.error(`SMTP send failed: ${(e as Error).message}`);
-        await this.prisma.notification.update({ where: { id: notification.id }, data: { status: 'FAILED' } });
-        return 'FAILED';
-      }
+    if (this.mailMode === 'log') {
+      // Brak dostawcy: maile tylko w logach Render — NIC nie wychodzi na zewnątrz.
+      this.logger.log(`[log] ${payload.type} → ${payload.to}`);
+      await mark({ status: 'LOGGED' });
+      return { status: 'LOGGED' };
     }
 
-    // Domyślnie: tryb log (maile tylko w logach Render — NIC nie wychodzi na zewnątrz).
-    this.logger.log(`[log] ${payload.type} → ${payload.to}`);
-    await this.prisma.notification.update({ where: { id: notification.id }, data: { status: 'LOGGED' } });
-    return 'LOGGED';
+    try {
+      const { subject, text, html } = this.buildEmail(payload);
+      let providerId: string | null = null;
+      if (this.mailMode === 'resend') {
+        providerId = await this.sendViaResend({ to: payload.to, subject, text, html });
+      } else {
+        const transporter = await this.getTransporter();
+        const info = await transporter.sendMail({
+          from: this.fromAddress(),
+          to: payload.to,
+          replyTo: this.replyTo(),
+          subject,
+          text,
+          html,
+        });
+        providerId = (info?.messageId as string) ?? null;
+      }
+      await mark({ status: 'SENT', providerId });
+      return { status: 'SENT' };
+    } catch (e) {
+      const error = (e as Error).name === 'AbortError' ? 'Przekroczony czas odpowiedzi dostawcy' : (e as Error).message;
+      this.logger.error(`${this.mailMode} send failed (${payload.type} → ${payload.to}): ${error}`);
+      await mark({ status: 'FAILED', error: error.slice(0, 500) });
+      return { status: 'FAILED', error };
+    }
+  }
+
+  /** Stan konfiguracji poczty — sekcja „E-mail" w Ustawieniach panelu (bez sekretów). */
+  status() {
+    const key = (this.config.get<string>('RESEND_API_KEY') ?? '').trim();
+    return {
+      provider: this.mailMode,
+      from: this.fromAddress(),
+      replyTo: this.replyTo() ?? null,
+      resendKeySet: !!key,
+      // Ostatnie 4 znaki pomagają sprawdzić, który klucz jest wpięty, bez ujawniania go.
+      resendKeyHint: key ? `…${key.slice(-4)}` : null,
+      smtpHost: this.mailMode === 'smtp' ? this.config.get<string>('SMTP_HOST') ?? null : null,
+      mailModeEnv: (this.config.get<string>('MAIL_MODE') ?? '').trim() || null,
+    };
+  }
+
+  /** Dziennik ostatnich maili (najnowsze pierwsze). */
+  async log(limit = 30) {
+    const rows = await this.prisma.notification.findMany({
+      where: { channel: 'email' },
+      orderBy: { createdAt: 'desc' },
+      take: Math.min(Math.max(limit, 1), 100),
+    });
+    return (rows as Array<Record<string, unknown>>).map((r) => ({
+      id: r.id as string,
+      type: r.type as string,
+      to: r.to as string,
+      status: r.status as string,
+      provider: (r.provider as string | null) ?? null,
+      error: (r.error as string | null) ?? null,
+      createdAt: (r.createdAt as Date).toISOString(),
+    }));
+  }
+
+  /** Mail testowy z panelu. */
+  async sendTest(to: string): Promise<MailResult & { provider: MailProvider }> {
+    const res = await this.sendMailDetailed({
+      to,
+      type: 'TEST',
+      locale: 'pl',
+      data: { provider: this.mailMode, sentAt: new Date().toISOString() },
+    });
+    return { ...res, provider: this.mailMode };
   }
 
   async sendConfirmation(opts: {
     to: string; locale: string; registrationId: string;
     eventTitle: string; startsAt: Date; totalPrice: number; currency: string;
     paymentMethod: string; editToken: string;
+    /** Link do strony „Zaproś gościa" — tylko gdy event ma włączoną tę ścieżkę. */
+    guestInviteLink?: string;
   }) {
     await this.sendMail({
       to: opts.to,

@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import type { EventInstanceDto, CreateRegistrationDto, RegistrationStatus, PaymentMethod } from '@icpe/shared'
 import { computePrice, DEFAULT_PRICING, validateRoomCapacity } from '@icpe/shared'
 import type { PricingConfig } from '@icpe/shared'
-import { getEventBySlug, getEventConfig, createRegistration, registerGuest, pickLang, type EventConfig } from '../lib/api'
+import { getEventBySlug, getEventConfig, createRegistration, registerGuest, getInvitation, pickLang, type EventConfig } from '../lib/api'
 import { clearDraft, loadDraft, pruneExpiredDrafts, saveDraft, type ResumableScreen } from '../lib/funnelDraft'
 
 /** Rozdziela „Imię Nazwisko" na pola DTO. */
@@ -343,7 +343,30 @@ export default function PublicFunnel() {
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [stepError, setStepError] = useState<string | null>(null)
-  const [result, setResult] = useState<{ regId: string; status: RegistrationStatus; total: number } | null>(null)
+  const [result, setResult] = useState<{ regId: string; status: RegistrationStatus; total: number; guestInviteHref?: string } | null>(null)
+  // Osobiste zaproszenie z maila (`?inv=token`): dane gościa wpisujemy w formularz,
+  // a token idzie z rejestracją, żeby zgłoszenie spięło się z listą gości w panelu.
+  const [searchParams] = useSearchParams()
+  const invToken = searchParams.get('inv')
+  const [invite, setInvite] = useState<{
+    token: string; firstName: string; lastName: string; email: string; phone: string; invitedByName: string | null
+  } | null>(null)
+
+  useEffect(() => {
+    if (!invToken) return
+    getInvitation(invToken)
+      .then((v) =>
+        setInvite({
+          token: invToken,
+          firstName: v.firstName,
+          lastName: v.lastName,
+          email: v.email,
+          phone: v.phone ?? '',
+          invitedByName: v.invitedByName ?? null,
+        }),
+      )
+      .catch(() => setInvite(null)) // nieważny link = zwykła rejestracja, bez blokowania
+  }, [invToken])
   // Niedokończone zgłoszenie z poprzedniej wizyty (localStorage) — pokazujemy je jako
   // propozycję na ekranie startowym, nie wskakujemy w lejek bez pytania.
   const [draft, setDraft] = useState<{ screen: ResumableScreen; stepper: StepperState } | null>(null)
@@ -418,7 +441,12 @@ export default function PublicFunnel() {
   }
 
   const handleStartRegister = () => {
-    setStepper(buildInitialStepper())
+    const base = buildInitialStepper()
+    if (invite) {
+      base.applicant = { ...base.applicant, firstName: invite.firstName, lastName: invite.lastName, email: invite.email, phone: invite.phone }
+      base.participants = [{ ...base.participants[0], name: `${invite.firstName} ${invite.lastName}`.trim() }]
+    }
+    setStepper(base)
     setScreen('stepper')
   }
 
@@ -544,12 +572,15 @@ export default function PublicFunnel() {
         discountCode: stepper.discountApplied ? stepper.discountCode : undefined,
         paymentMethod: toPaymentMethod(stepper.paymentMethod),
         consents: stepper.consents,
+        ...(invite ? { invitationToken: invite.token } : {}),
       }
       const res = await createRegistration(dto)
+      const editToken = (res.registration as { editToken?: string }).editToken
       setResult({
         regId: res.registration.id,
         status: res.registration.status,
         total: res.summary?.total ?? res.registration.totalPrice ?? 0,
+        guestInviteHref: res.canInviteGuests && editToken ? `/g/${editToken}` : undefined,
       })
       setScreen('success')
     } catch (e: unknown) {
@@ -654,7 +685,17 @@ export default function PublicFunnel() {
             theme={eventConfig?.theme}
             title={getEventTitle(event.title, lng)}
           />
-          {draft && (
+          {invite && (
+            <div className="mx-[22px] mt-4 px-4 py-3 rounded-[12px] text-sm" style={{ background: 'var(--brand-soft)', color: 'var(--ink)', border: '1px solid var(--brand)' }}>
+              {invite.invitedByName ? (
+                <>Zaprasza Cię <strong>{invite.invitedByName}</strong>. </>
+              ) : (
+                <>Masz osobiste zaproszenie. </>
+              )}
+              Twoje dane wpiszemy za Ciebie — kliknij „Zapisz się”.
+            </div>
+          )}
+          {draft && !invite && (
             <DraftBanner
               step={draft.stepper.step}
               totalSteps={STEPS}
@@ -713,6 +754,7 @@ export default function PublicFunnel() {
           status={result?.status}
           onBack={handleBackToLanding}
           onCreateAccount={handleCreateAccount}
+          guestInviteHref={result?.guestInviteHref}
         />
       )}
     </div>

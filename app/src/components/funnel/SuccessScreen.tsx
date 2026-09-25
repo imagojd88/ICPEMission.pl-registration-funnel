@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { UserPlus } from 'lucide-react'
+import { UserPlus, Users } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { formatMoney } from '@icpe/shared'
 import type { RegistrationStatus } from '@icpe/shared'
 
@@ -13,9 +14,11 @@ interface Props {
   status?: RegistrationStatus
   onBack: () => void
   onCreateAccount?: () => Promise<void>
+  /** Link do strony „Zaproś gościa" — tylko gdy event ma włączoną tę ścieżkę. */
+  guestInviteHref?: string
 }
 
-export default function SuccessScreen({ paymentMethod, email, total, currency, regNumber, status, onBack, onCreateAccount }: Props) {
+export default function SuccessScreen({ paymentMethod, email, total, currency, regNumber, status, onBack, onCreateAccount, guestInviteHref }: Props) {
   const { t, i18n } = useTranslation()
   const [acct, setAcct] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
 
@@ -121,6 +124,23 @@ export default function SuccessScreen({ paymentMethod, email, total, currency, r
       <p className="text-xs text-center" style={{ color: 'var(--muted)' }}>
         {t('success.email_sent', { email })}
       </p>
+
+      {/* Zaproś gościa — ten sam link jest też w mailu z potwierdzeniem */}
+      {guestInviteHref && (
+        <div className="w-full flex flex-col items-center gap-2 rounded-[15px] px-4 py-4" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+          <p className="text-sm font-semibold text-center" style={{ color: 'var(--ink)' }}>Chcesz zabrać kogoś ze sobą?</p>
+          <p className="text-xs text-center" style={{ color: 'var(--muted)' }}>
+            Zaproś gościa — dostanie od nas maila z osobistym linkiem do rejestracji.
+          </p>
+          <Link
+            to={guestInviteHref}
+            className="w-full flex items-center justify-center gap-2 text-sm font-semibold rounded-[12px] py-3 no-underline"
+            style={{ background: 'var(--brand-soft)', color: 'var(--brand)', border: '1px solid var(--brand)' }}
+          >
+            <Users size={16} /> Zaproś gościa
+          </Link>
+        </div>
+      )}
 
       {/* Załóż konto (powtórzone z poprzedniego kroku) */}
       {onCreateAccount && (

@@ -2,6 +2,7 @@ import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards } from '@n
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { InvitationsService, type ConfirmPayload } from './invitations.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { GuestInvitesService, type GuestInput } from './guest-invites.service';
 
 interface Invitee {
   firstName: string;
@@ -13,7 +14,10 @@ interface Invitee {
 @ApiTags('invitations')
 @Controller()
 export class InvitationsController {
-  constructor(private readonly invites: InvitationsService) {}
+  constructor(
+    private readonly invites: InvitationsService,
+    private readonly guestInvites: GuestInvitesService,
+  ) {}
 
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
@@ -87,5 +91,26 @@ export class InvitationsController {
   @ApiOperation({ summary: 'Publiczne: dopasuj dane do zaproszenia (bez linku) i potwierdź' })
   match(@Param('slug') slug: string, @Body() dto: Invitee & ConfirmPayload) {
     return this.invites.matchBySlug(slug, dto);
+  }
+
+  // ── Ścieżka „uczestnik zaprasza gościa" (publiczna, autoryzacja sekretnym tokenem) ──
+  // :token = token osobistego zaproszenia (event INVITE) albo editToken zgłoszenia (zwykły event).
+
+  @Get('guest-invites/:token')
+  @ApiOperation({ summary: 'Publiczne: stan zapraszania gości (limit, moi goście)' })
+  guestView(@Param('token') token: string) {
+    return this.guestInvites.view(token);
+  }
+
+  @Post('guest-invites/:token')
+  @ApiOperation({ summary: 'Publiczne: uczestnik dodaje gościa (imię, nazwisko, e-mail, telefon) — gość dostaje mail' })
+  guestAdd(@Param('token') token: string, @Body() dto: GuestInput) {
+    return this.guestInvites.add(token, dto ?? {});
+  }
+
+  @Delete('guest-invites/:token/guests/:guestId')
+  @ApiOperation({ summary: 'Publiczne: uczestnik wycofuje swojego (niepotwierdzonego) gościa' })
+  guestRemove(@Param('token') token: string, @Param('guestId') guestId: string) {
+    return this.guestInvites.remove(token, guestId);
   }
 }
