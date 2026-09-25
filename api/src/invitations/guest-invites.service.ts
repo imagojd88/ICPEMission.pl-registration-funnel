@@ -6,10 +6,12 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { InvitationsService, isParticipantGuest, type InvitationRecord } from './invitations.service';
 import {
   ACTIVE_REGISTRATION_STATUSES,
   guestInviteConfig,
+  guestInvitePageLink,
   type GuestInviteConfig,
 } from './guest-invite-config';
 
@@ -64,7 +66,85 @@ export class GuestInvitesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly invitations: InvitationsService,
+    private readonly notifications: NotificationsService,
   ) {}
+
+  /**
+   * Admin: rozsyła link „Zaproś gościa" wszystkim uprawnionym uczestnikom eventu — dla osób,
+   * które potwierdziły / zapisały się ZANIM ścieżkę włączono (nie dostały go w mailu).
+   *  - event INVITE: potwierdzone zaproszenia (bez gości uczestników),
+   *  - zwykły event: aktywne zgłoszenia (bez gości uczestników).
+   */
+  async sendLinksToAll(instanceId: string) {
+    const inst = await this.prisma.eventInstance.findUnique({
+      where: { id: instanceId },
+      include: { series: { include: { page: true } } },
+    });
+    if (!inst) throw new NotFoundException('Instance not found');
+    const gi = guestInviteConfig(inst.series.page?.customFields);
+    if (!gi.enabled) {
+      throw new BadRequestException('Najpierw zaznacz „Uczestnicy mogą sami zapraszać gości" i zapisz event.');
+    }
+    const counts = { sent: 0, failed: 0, logged: 0, skipped: 0 };
+    const tally = (st: string) => {
+      if (st === 'SENT') counts.sent += 1;
+      else if (st === 'LOGGED') counts.logged += 1;
+      else if (st === 'SKIPPED') counts.skipped += 1;
+      else counts.failed += 1;
+    };
+
+    if ((inst.series as { type?: string }).type === 'INVITE') {
+      const rows = (await this.prisma.invitation.findMany({
+        where: { instanceId, confirmedAt: { not: null } },
+      })) as InvitationRecord[];
+      for (const r of rows) {
+        if (!r.email || isParticipantGuest(r)) {
+          counts.skipped += 1;
+          continue;
+        }
+        tally(await this.invitations.sendConfirmedMail(r.id));
+      }
+      return counts;
+    }
+
+    const regs = (await this.prisma.registration.findMany({
+      where: { instanceId, status: { in: ACTIVE_REGISTRATION_STATUSES } } as never,
+      select: { id: true, contact: true, editToken: true },
+    })) as Array<{ id: string; contact: unknown; editToken: string }>;
+    const guestRegIds = new Set(
+      ((await this.prisma.invitation.findMany({
+        where: {
+          instanceId,
+          registrationId: { not: null },
+          OR: [{ invitedByInvitationId: { not: null } }, { invitedByRegistrationId: { not: null } }],
+        } as never,
+        select: { registrationId: true },
+      })) as Array<{ registrationId: string | null }>).map((x) => x.registrationId),
+    );
+    for (const r of regs) {
+      const c = (r.contact ?? {}) as { firstName?: string; email?: string };
+      if (!c.email || guestRegIds.has(r.id)) {
+        counts.skipped += 1;
+        continue;
+      }
+      tally(
+        await this.notifications.sendMail({
+          to: c.email,
+          type: 'GUEST_INVITE_LINK',
+          locale: 'pl',
+          registrationId: r.id,
+          data: {
+            firstName: c.firstName ?? '',
+            eventTitle: this.invitations.titleOf(inst.title),
+            when: this.invitations.whenOf(inst.startsAt, inst.endsAt),
+            guestInviteLink: guestInvitePageLink(r.editToken),
+            maxGuests: gi.maxPerInviter,
+          },
+        }),
+      );
+    }
+    return counts;
+  }
 
   private async resolve(token: string): Promise<Inviter> {
     const include = { instance: { include: { series: { include: { page: true } } } } } as const;

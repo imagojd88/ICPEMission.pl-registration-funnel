@@ -275,6 +275,27 @@ export class NotificationsService {
       return { subject, text, html };
     }
 
+    if (payload.type === 'GUEST_INVITE_LINK') {
+      // Zwykły event: link „Zaproś gościa" rozesłany przez admina osobom już zapisanym.
+      const title = String(d.eventTitle ?? 'wydarzenie');
+      const name = String(d.firstName ?? '').trim();
+      const max = Number(d.maxGuests ?? 0);
+      const subject = `Zaproś gościa — ${title}`;
+      const { text, html } = buttonMail(
+        [
+          name ? `${name},` : 'Dzień dobry,',
+          '',
+          `dziękujemy za zapis na: ${title}.`,
+          d.when ? `Termin: ${String(d.when)}.` : '',
+          '',
+          `Możesz zaprosić ${max === 1 ? 'jedną osobę' : `do ${max} osób`} — każda dostanie od nas osobisty link do rejestracji:`,
+        ],
+        { label: 'Zaproś gościa', href: String(d.guestInviteLink ?? '') },
+        ['', ...SIGNATURE],
+      );
+      return { subject, text, html };
+    }
+
     if (payload.type === 'TEST') {
       const subject = 'Test wysyłki — panel rejestracji ICPE';
       const { text, html } = buttonMail(

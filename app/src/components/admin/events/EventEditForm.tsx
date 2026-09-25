@@ -703,6 +703,7 @@ export default function EventEditForm({
             instanceId={editTarget.instanceId}
             eventTitle={nameMap.pl || nameMap.en || nameMap.it || 'wydarzenie'}
             eventType={eventType}
+            guestInvitesEnabled={guestInvitesEnabled}
           />
         </Section>
       )}

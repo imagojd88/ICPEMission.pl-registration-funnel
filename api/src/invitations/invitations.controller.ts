@@ -96,6 +96,14 @@ export class InvitationsController {
   // ── Ścieżka „uczestnik zaprasza gościa" (publiczna, autoryzacja sekretnym tokenem) ──
   // :token = token osobistego zaproszenia (event INVITE) albo editToken zgłoszenia (zwykły event).
 
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Post('admin/instances/:id/guest-invite-links/send')
+  @ApiOperation({ summary: 'Wyślij uczestnikom link „Zaproś gościa" (dla tych, którzy zapisali się wcześniej)' })
+  sendGuestLinks(@Param('id') id: string) {
+    return this.guestInvites.sendLinksToAll(id);
+  }
+
   @Get('guest-invites/:token')
   @ApiOperation({ summary: 'Publiczne: stan zapraszania gości (limit, moi goście)' })
   guestView(@Param('token') token: string) {

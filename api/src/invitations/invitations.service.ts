@@ -48,12 +48,15 @@ export interface InvitationRow {
   // Ścieżka „uczestnik zaprasza gościa": kto dodał (null = admin).
   invitedByName: string | null;
   invitedByParticipant: boolean;
+  // Link „Zaproś gościa" tej osoby (/g/:token) — tylko potwierdzeni, nie-goście, gdy ścieżka włączona.
+  guestInviteLink: string | null;
 }
 
 /** Kontekst eventu potrzebny do złożenia osobistego linku (zależy od typu eventu). */
 export interface InviteLinkCtx {
   type?: string;
   slug?: string | null;
+  guestInvitesEnabled?: boolean;
 }
 
 export type InvitationRecord = {
@@ -143,7 +146,11 @@ export class InvitationsService {
       where: { id: instanceId },
       include: { series: { include: { page: true } } },
     });
-    return { type: (inst?.series as { type?: string } | undefined)?.type, slug: inst?.series?.page?.slug ?? null };
+    return {
+      type: (inst?.series as { type?: string } | undefined)?.type,
+      slug: inst?.series?.page?.slug ?? null,
+      guestInvitesEnabled: guestInviteConfig(inst?.series?.page?.customFields).enabled,
+    };
   }
 
   linkFor(token: string, ctx: InviteLinkCtx): string {
@@ -170,6 +177,10 @@ export class InvitationsService {
       registrationId: r.registrationId ?? null,
       invitedByName: r.invitedByName ?? null,
       invitedByParticipant: isParticipantGuest(r),
+      guestInviteLink:
+        ctx.type === 'INVITE' && ctx.guestInvitesEnabled && r.confirmedAt && !isParticipantGuest(r)
+          ? guestInvitePageLink(r.token)
+          : null,
     };
   }
 
@@ -439,7 +450,9 @@ export class InvitationsService {
     }
     // Ścieżka bez linku: gość nie zna swojego tokenu, więc link do zapraszania (i do zmiany
     // odpowiedzi) dostaje mailem — na adres z listy, nie ten wpisany w formularzu.
-    if (!found.confirmedAt) await this.sendConfirmedMail(found.id);
+    // Wysyłamy także przy ponownym potwierdzeniu: to jedyny samoobsługowy sposób, żeby osoba,
+    // która potwierdziła wcześniej (np. przed włączeniem ścieżki gości), odzyskała swój link.
+    await this.sendConfirmedMail(found.id);
     // Nie zwracamy `token` — publiczny endpoint nie powinien wydawać osobistego linku
     // komuś, kto zgadł dane. Potwierdzenie już zostało zapisane, front potrzebuje tylko imienia.
     return { ok: true, firstName: found.firstName };
@@ -450,17 +463,17 @@ export class InvitationsService {
    * włączoną ścieżkę gości i potwierdzający sam nie jest gościem (bez łańcucha zaproszeń).
    * Błąd wysyłki nie może zablokować potwierdzenia.
    */
-  private async sendConfirmedMail(invitationId: string): Promise<void> {
+  async sendConfirmedMail(invitationId: string): Promise<'SENT' | 'FAILED' | 'LOGGED' | 'SKIPPED'> {
     try {
       const inv = await this.prisma.invitation.findUnique({
         where: { id: invitationId },
         include: { instance: { include: { series: { include: { page: true } } } } },
       });
-      if (!inv || !inv.email) return;
+      if (!inv || !inv.email) return 'SKIPPED';
       const rec = inv as unknown as InvitationRecord;
       const gi = guestInviteConfig(inv.instance.series.page?.customFields);
-      if (!gi.enabled || isParticipantGuest(rec)) return;
-      await this.notifications.sendMail({
+      if (!gi.enabled || isParticipantGuest(rec)) return 'SKIPPED';
+      return await this.notifications.sendMail({
         to: inv.email,
         type: 'INVITE_CONFIRMED',
         locale: 'pl',
@@ -475,6 +488,7 @@ export class InvitationsService {
       });
     } catch (e) {
       this.logger.error(`sendConfirmedMail failed for ${invitationId}: ${e instanceof Error ? e.message : String(e)}`);
+      return 'FAILED';
     }
   }
 

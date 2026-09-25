@@ -156,6 +156,14 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — moduł rejestracji
 
+### Link „Zaproś gościa” dla osób potwierdzonych wcześniej (2026-09-25)
+- Problem (user): kto potwierdził/zapisał się PRZED włączeniem ścieżki gości, nie dostał linku `/g/…` (mail `INVITE_CONFIRMED` szedł tylko przy pierwszym potwierdzeniu, a potwierdzający bez linku nie znają swojego tokenu).
+- Panel, lista gości: przy każdej potwierdzonej osobie (event INVITE) przycisk **„Link »Zaproś gościa«”** — kopiuje jej `/g/:token` (np. do WhatsAppa). Pole `guestInviteLink` w `InvitationRow`.
+- Panel: przycisk **„Wyślij linki »Zaproś gościa«”** (widoczny przy zaznaczonym checkboxie) → `POST /admin/instances/:id/guest-invite-links/send`: INVITE → mail `INVITE_CONFIRMED` do potwierdzonych nie-gości; zwykły event → nowy mail `GUEST_INVITE_LINK` do aktywnych zgłoszeń (bez gości uczestników). Wymaga ZAPISANEGO włączenia ścieżki (inaczej 400 z komunikatem).
+- `matchBySlug` (potwierdzenie bez linku) wysyła `INVITE_CONFIRMED` przy KAŻDYM potwierdzeniu (gdy ścieżka włączona) — samoobsługowy sposób odzyskania linku.
+- Przypomnienie: osoba z osobistym linkiem `/i/:token` widzi przycisk „Zaproś gościa” po ponownym otwarciu linku (gdy ścieżka włączona i zapisana).
+- tsc api+app czyste. Po pushu: Manual Deploy `icpe-api`.
+
 ### Resend + sekcja „E-mail” w panelu; ścieżka „uczestnik zaprasza gościa” (2026-09-25)
 **Decyzje usera:** konfiguracja poczty w ENV na Render (nie w bazie) + podgląd/test w panelu; zapraszanie gości dla eventów INVITE **i** zwykłych (z rejestracją); limit per event (domyślnie 2, twardy sufit 10); gość od razu na liście, bez akceptacji admina, **bez łańcucha** (gość uczestnika nie zaprasza dalej).
 

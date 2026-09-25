@@ -15,6 +15,7 @@ const TYPE_LABEL: Record<string, string> = {
   INVITATION: 'Zaproszenie',
   GUEST_INVITATION: 'Zaproszenie od uczestnika',
   INVITE_CONFIRMED: 'Potwierdzenie udziału',
+  GUEST_INVITE_LINK: 'Link „Zaproś gościa"',
   PAYMENT_REMINDER: 'Przypomnienie o płatności',
   TEST: 'Test',
 }

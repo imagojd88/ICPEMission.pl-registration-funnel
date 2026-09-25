@@ -559,6 +559,8 @@ export interface InvitationItem extends Omit<Invitee, 'phone'> {
   /** „Imię Nazwisko" uczestnika, który dodał tę osobę (null = dodana przez admina). */
   invitedByName?: string | null
   invitedByParticipant?: boolean
+  /** Link „Zaproś gościa" tej osoby (/g/:token) — potwierdzeni, gdy ścieżka gości włączona. */
+  guestInviteLink?: string | null
 }
 
 export async function createInvitations(
@@ -614,6 +616,17 @@ export async function sendAllInvitations(
     method: 'POST',
     headers: authHeaders(token),
     body: JSON.stringify({ onlyUnsent }),
+  })
+}
+
+/** Rozsyła uczestnikom link „Zaproś gościa" (dla tych, którzy zapisali się przed włączeniem ścieżki). */
+export async function sendGuestInviteLinks(
+  instanceId: string,
+  token?: string,
+): Promise<{ sent: number; failed: number; logged: number; skipped: number }> {
+  return apiFetch(`/admin/instances/${instanceId}/guest-invite-links/send`, {
+    method: 'POST',
+    headers: authHeaders(token),
   })
 }
 

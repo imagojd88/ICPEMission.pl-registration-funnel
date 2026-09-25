@@ -9,6 +9,7 @@ import {
   listInvitations,
   sendAllInvitations,
   sendInvitation,
+  sendGuestInviteLinks,
   syncInvitationRegistrations,
   type InvitationItem,
 } from '@/lib/api'
@@ -70,11 +71,14 @@ export default function InvitedGuestsSection({
   instanceId,
   eventTitle,
   eventType = 'INVITE',
+  guestInvitesEnabled = false,
 }: {
   instanceId: string
   eventTitle: string
   /** INVITE = gość potwierdza udział; inne typy = gość rejestruje się w lejku (z płatnością). */
   eventType?: string
+  /** Stan checkboxa „Uczestnicy mogą sami zapraszać gości" (zapisany lub nie). */
+  guestInvitesEnabled?: boolean
 }) {
   const isInvite = eventType === 'INVITE'
   const register = !isInvite
@@ -216,6 +220,35 @@ export default function InvitedGuestsSection({
     }
   }
 
+  /** Link „Zaproś gościa" konkretnej osoby — do wysłania ręcznie (WhatsApp, SMS). */
+  async function handleCopyGuestLink(inv: InvitationItem) {
+    if (!inv.guestInviteLink) return
+    try {
+      await navigator.clipboard.writeText(inv.guestInviteLink)
+      setCopiedId(`g-${inv.id}`)
+      window.setTimeout(() => setCopiedId((c) => (c === `g-${inv.id}` ? null : c)), 1600)
+    } catch {
+      setError(`Nie udało się skopiować automatycznie. Link: ${inv.guestInviteLink}`)
+    }
+  }
+
+  async function handleSendGuestLinks() {
+    const who = isInvite ? 'wszystkim, którzy potwierdzili udział' : 'wszystkim zapisanym uczestnikom'
+    if (!window.confirm(`Wysłać mail z linkiem „Zaproś gościa" ${who}?`)) return
+    setBusyId('glinks')
+    setError(null)
+    setInfo(null)
+    try {
+      const res = await sendGuestInviteLinks(instanceId)
+      if (res.logged > 0 && res.sent === 0) setError(MAIL_OFF_HINT)
+      else setInfo(`Wysłano link do zapraszania: ${res.sent}. Pominięto: ${res.skipped}. Błędy: ${res.failed}.`)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   async function handleSyncRegistrations() {
     setBusyId('sync')
     setError(null)
@@ -316,6 +349,18 @@ export default function InvitedGuestsSection({
           >
             <Users size={13} /> {busyId === 'sync' ? 'Synchronizuję…' : 'Synchronizuj z listą zgłoszeń'}
           </button>
+          )}
+          {guestInvitesEnabled && (
+            <button
+              type="button"
+              onClick={() => { void handleSendGuestLinks() }}
+              disabled={busyId === 'glinks'}
+              className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-[8px]"
+              style={{ background: 'var(--surface-2)', color: 'var(--brand)', border: '1px solid var(--border)', cursor: 'pointer' }}
+              title="Mail z linkiem do formularza zapraszania — dla osób, które zapisały się / potwierdziły przed włączeniem tej opcji"
+            >
+              <UserPlus size={13} /> {busyId === 'glinks' ? 'Wysyłam…' : 'Wyślij linki „Zaproś gościa"'}
+            </button>
           )}
           {unsent > 0 && (
             <button
@@ -425,6 +470,17 @@ export default function InvitedGuestsSection({
                   >
                     <Copy size={12} /> {copiedId === inv.id ? 'Skopiowano!' : 'Kopiuj link'}
                   </button>
+                  {inv.guestInviteLink && (
+                    <button
+                      type="button"
+                      onClick={() => { void handleCopyGuestLink(inv) }}
+                      className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-[8px]"
+                      style={{ background: 'var(--surface)', color: 'var(--brand)', border: '1px solid var(--border)', cursor: 'pointer' }}
+                      title={`Link do formularza „Zaproś gościa" tej osoby: ${inv.guestInviteLink}`}
+                    >
+                      <UserPlus size={12} /> {copiedId === `g-${inv.id}` ? 'Skopiowano!' : 'Link „Zaproś gościa"'}
+                    </button>
+                  )}
                   <a
                     href={whatsappHref(inv, eventTitle, register)}
                     target="_blank"
