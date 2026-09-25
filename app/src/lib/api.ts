@@ -521,6 +521,38 @@ export interface Invitee {
   email: string
   /** Opcjonalny telefon — pozwala wysłać zaproszenie wprost przez WhatsApp. */
   phone?: string
+  /** Personalizacja maila z zaproszeniem (puste = standardowa treść). */
+  mailSalutation?: string | null
+  mailNote?: string | null
+  mailSubject?: string | null
+  mailFormal?: boolean
+}
+
+/** Pola personalizacji maila — edytowane w panelu przy gościu. */
+export type MailPersonalization = Pick<Invitee, 'mailSalutation' | 'mailNote' | 'mailSubject' | 'mailFormal'>
+
+export interface MailPreview {
+  to: string | null
+  subject: string
+  html: string
+}
+
+/** Podgląd maila zapisanego gościa; `draft` nadpisuje zapisane pola (bez zapisu). */
+export async function previewInvitation(invId: string, draft: Partial<Invitee>, token?: string): Promise<MailPreview> {
+  return apiFetch(`/admin/invitations/${invId}/preview`, {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: JSON.stringify(draft),
+  })
+}
+
+/** Podgląd maila dla gościa, który dopiero będzie dodany. */
+export async function previewNewInvitation(instanceId: string, draft: Partial<Invitee>, token?: string): Promise<MailPreview> {
+  return apiFetch(`/admin/instances/${instanceId}/invitations/preview`, {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: JSON.stringify(draft),
+  })
 }
 
 /** Wpis dziecka w deklaracji gościa. */

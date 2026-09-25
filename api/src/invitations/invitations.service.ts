@@ -3,11 +3,30 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { guestInviteConfig, guestInvitePageLink, personalInviteLink } from './guest-invite-config';
 
-interface Invitee {
+/** Personalizacja maila z zaproszeniem — ustawiana w panelu per osoba. */
+export interface MailPersonalization {
+  mailSalutation?: string | null;
+  mailNote?: string | null;
+  mailSubject?: string | null;
+  mailFormal?: boolean;
+}
+
+interface Invitee extends MailPersonalization {
   firstName: string;
   lastName: string;
   email: string;
   phone?: string;
+}
+
+/** Przycięcie pól personalizacji do zapisu (undefined = bez zmiany). */
+function mailData(p: MailPersonalization): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  const clip = (v: string | null | undefined, n: number) => (v ?? '').trim().slice(0, n) || null;
+  if (p.mailSalutation !== undefined) out.mailSalutation = clip(p.mailSalutation, 120);
+  if (p.mailNote !== undefined) out.mailNote = clip(p.mailNote, 3000);
+  if (p.mailSubject !== undefined) out.mailSubject = clip(p.mailSubject, 200);
+  if (p.mailFormal !== undefined) out.mailFormal = p.mailFormal === true;
+  return out;
 }
 
 /** Wpis dziecka w deklaracji gościa. */
@@ -50,6 +69,11 @@ export interface InvitationRow {
   invitedByParticipant: boolean;
   // Link „Zaproś gościa" tej osoby (/g/:token) — tylko potwierdzeni, nie-goście, gdy ścieżka włączona.
   guestInviteLink: string | null;
+  // Personalizacja maila (null/false = standardowa treść).
+  mailSalutation: string | null;
+  mailNote: string | null;
+  mailSubject: string | null;
+  mailFormal: boolean;
 }
 
 /** Kontekst eventu potrzebny do złożenia osobistego linku (zależy od typu eventu). */
@@ -79,6 +103,10 @@ export type InvitationRecord = {
   invitedByInvitationId?: string | null;
   invitedByRegistrationId?: string | null;
   invitedByName?: string | null;
+  mailSalutation?: string | null;
+  mailNote?: string | null;
+  mailSubject?: string | null;
+  mailFormal?: boolean | null;
 };
 
 /** Czy zaproszenie powstało w ścieżce „uczestnik zaprasza gościa". */
@@ -181,6 +209,10 @@ export class InvitationsService {
         ctx.type === 'INVITE' && ctx.guestInvitesEnabled && r.confirmedAt && !isParticipantGuest(r)
           ? guestInvitePageLink(r.token)
           : null,
+      mailSalutation: r.mailSalutation ?? null,
+      mailNote: r.mailNote ?? null,
+      mailSubject: r.mailSubject ?? null,
+      mailFormal: r.mailFormal === true,
     };
   }
 
@@ -224,6 +256,7 @@ export class InvitationsService {
           lastName: i.lastName.trim(),
           email: (i.email || '').trim(),
           phone: (i.phone || '').trim() || null,
+          ...mailData(i),
         } as never,
       });
       created.push(row as InvitationRecord);
@@ -256,6 +289,7 @@ export class InvitationsService {
     if (patch.lastName !== undefined) data.lastName = patch.lastName.trim();
     if (patch.email !== undefined) data.email = patch.email.trim();
     if (patch.phone !== undefined) data.phone = patch.phone.trim() || null;
+    Object.assign(data, mailData(patch));
     const row = (await this.prisma.invitation.update({ where: { id }, data: data as never })) as InvitationRecord;
     return this.toRow(row, await this.linkCtx(row.instanceId));
   }
@@ -267,30 +301,67 @@ export class InvitationsService {
    *  - dodany przez admina → INVITATION,
    *  - event na zaproszenie → potwierdzenie `/i/:token`, zwykły → lejek `/r/:slug?inv=`.
    */
-  async sendInviteMail(row: InvitationRecord): Promise<'SENT' | 'FAILED' | 'LOGGED' | 'NO_EMAIL'> {
-    if (!row.email) return 'NO_EMAIL';
+  /** Payload maila z zaproszeniem (wspólny dla wysyłki i podglądu w panelu). */
+  private async inviteMailPayload(row: InvitationRecord) {
     const inst = await this.prisma.eventInstance.findUnique({
       where: { id: row.instanceId },
       include: { series: { include: { page: true } } },
     });
     if (!inst) throw new NotFoundException('Instance not found');
     const type = (inst.series as { type?: string }).type;
-    const link = personalInviteLink(row.token, type, inst.series.page?.slug);
-    const guest = isParticipantGuest(row);
-    const status = await this.notifications.sendMail({
+    return {
       to: row.email,
-      type: guest ? 'GUEST_INVITATION' : 'INVITATION',
+      type: isParticipantGuest(row) ? 'GUEST_INVITATION' : 'INVITATION',
       locale: 'pl',
       data: {
         firstName: row.firstName,
         eventTitle: this.titleOf(inst.title),
         when: this.whenOf(inst.startsAt, inst.endsAt),
         location: inst.location ?? '',
-        link,
+        link: personalInviteLink(row.token, type, inst.series.page?.slug),
         mode: type === 'INVITE' ? 'CONFIRM' : 'REGISTER',
         inviterName: row.invitedByName ?? '',
+        salutation: row.mailSalutation ?? '',
+        note: row.mailNote ?? '',
+        subject: row.mailSubject ?? '',
+        formal: row.mailFormal === true,
       },
-    });
+    };
+  }
+
+  /**
+   * Podgląd maila z zaproszeniem. `draft` nadpisuje zapisane dane — panel pokazuje podgląd
+   * jeszcze przed zapisem (nowy gość albo edycja treści). Bez `invId` = nowy gość w instancji.
+   */
+  async preview(opts: { invId?: string; instanceId?: string; draft?: Partial<Invitee> }) {
+    let base: InvitationRecord;
+    if (opts.invId) {
+      const inv = await this.prisma.invitation.findUnique({ where: { id: opts.invId } });
+      if (!inv) throw new NotFoundException('Invitation not found');
+      base = inv as unknown as InvitationRecord;
+    } else {
+      if (!opts.instanceId) throw new NotFoundException('Instance not found');
+      base = {
+        id: 'preview', instanceId: opts.instanceId, firstName: '', lastName: '', email: '', phone: null,
+        token: 'PODGLAD', confirmedAt: null, sentAt: null, dietaryNotes: null, spouseAttending: null,
+        spouseFirstName: null, spouseLastName: null, spouseDietaryNotes: null, childrenJson: null, registrationId: null,
+      };
+    }
+    const d = opts.draft ?? {};
+    const merged: InvitationRecord = {
+      ...base,
+      ...(d.firstName !== undefined ? { firstName: d.firstName.trim() } : {}),
+      ...(d.email !== undefined ? { email: d.email.trim() } : {}),
+      ...(mailData(d) as Partial<InvitationRecord>),
+    };
+    const payload = await this.inviteMailPayload(merged);
+    const { subject, html } = this.notifications.render(payload);
+    return { to: merged.email || null, subject, html };
+  }
+
+  async sendInviteMail(row: InvitationRecord): Promise<'SENT' | 'FAILED' | 'LOGGED' | 'NO_EMAIL'> {
+    if (!row.email) return 'NO_EMAIL';
+    const status = await this.notifications.sendMail(await this.inviteMailPayload(row));
     // `sentAt` stemplujemy WYŁĄCZNIE przy realnej wysyłce. Przy braku dostawcy mail nigdzie
     // nie poszedł, więc oznaczenie go jako wysłanego kłamałoby adminowi w panelu.
     if (status === 'SENT') {

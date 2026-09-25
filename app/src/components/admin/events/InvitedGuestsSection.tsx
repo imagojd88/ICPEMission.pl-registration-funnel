@@ -1,12 +1,17 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Check, Clock, Copy, Mail, MessageCircle, MessageSquare, Plus, RefreshCw, Send, Trash2, UserPlus, Users } from 'lucide-react'
+import { Check, ChevronDown, Clock, Copy, Mail, MessageCircle, MessageSquare, PenLine, Plus, RefreshCw, Send, Trash2, UserPlus, Users } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import { useAutoRefresh } from '@/hooks/useAutoRefresh'
+import InviteMailEditor, { isPersonalized } from '@/components/admin/events/InviteMailEditor'
 import {
   createInvitations,
   deleteInvitation,
   listInvitations,
+  previewInvitation,
+  previewNewInvitation,
+  updateInvitation,
+  type MailPersonalization,
   sendAllInvitations,
   sendInvitation,
   sendGuestInviteLinks,
@@ -90,6 +95,12 @@ export default function InvitedGuestsSection({
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
   const [draft, setDraft] = useState({ firstName: '', lastName: '', email: '', phone: '' })
+  // Personalizacja maila dla dodawanego gościa (zwinięta domyślnie).
+  const [draftMail, setDraftMail] = useState<MailPersonalization>({})
+  const [showDraftMail, setShowDraftMail] = useState(false)
+  // Edycja treści maila istniejącego gościa (jeden wiersz naraz).
+  const [editingMailId, setEditingMailId] = useState<string | null>(null)
+  const [editMail, setEditMail] = useState<MailPersonalization>({})
 
   const load = useCallback(async (silent = false) => {
     // `silent` — odświeżanie w tle (polling): bez spinnera, żeby lista nie mrugała.
@@ -112,10 +123,11 @@ export default function InvitedGuestsSection({
   // akcji na wierszu (wysyłka, usuwanie, synchronizacja), żeby nie podmienić danych pod ręką.
   const { lastUpdatedAt, refreshing, refreshNow } = useAutoRefresh(() => load(true), {
     intervalMs: 20000,
-    enabled: !busyId && !adding,
+    enabled: !busyId && !adding && !editingMailId,
   })
 
-  async function handleAdd() {
+  /** `send=false` — dodaj bez maila (np. ważny gość: najpierw dopracować treść, potem wysłać). */
+  async function handleAdd(send = true) {
     if (!draft.firstName.trim() || !draft.lastName.trim()) {
       setError('Podaj imię i nazwisko gościa.')
       return
@@ -130,12 +142,17 @@ export default function InvitedGuestsSection({
           lastName: draft.lastName.trim(),
           email: draft.email.trim(),
           phone: draft.phone.trim() || undefined,
+          ...draftMail,
         },
-      ])
+      ], undefined, send)
       setItems(next)
       const mail = draft.email.trim().toLowerCase()
       setDraft({ firstName: '', lastName: '', email: '', phone: '' })
-      if (!mail) {
+      setDraftMail({})
+      setShowDraftMail(false)
+      if (!send) {
+        setInfo('Gość dodany bez wysyłania. Treść dopracujesz przyciskiem „Treść maila” przy gościu, stamtąd też wyślesz.')
+      } else if (!mail) {
         setInfo('Gość dodany. Bez e-maila zaproszenie wyślij linkiem lub przez WhatsApp.')
       } else if (next.find((x) => x.email.toLowerCase() === mail)?.sentAt) {
         setInfo('Gość dodany — zaproszenie poszło na podany e-mail.')
@@ -242,6 +259,46 @@ export default function InvitedGuestsSection({
       const res = await sendGuestInviteLinks(instanceId)
       if (res.logged > 0 && res.sent === 0) setError(MAIL_OFF_HINT)
       else setInfo(`Wysłano link do zapraszania: ${res.sent}. Pominięto: ${res.skipped}. Błędy: ${res.failed}.`)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  function startEditMail(inv: InvitationItem) {
+    setEditingMailId(inv.id)
+    setEditMail({
+      mailFormal: !!inv.mailFormal,
+      mailSalutation: inv.mailSalutation ?? '',
+      mailSubject: inv.mailSubject ?? '',
+      mailNote: inv.mailNote ?? '',
+    })
+  }
+
+  /** Zapis personalizacji; `andSend` = od razu wyślij (ponownie) zaproszenie z nową treścią. */
+  async function saveMail(inv: InvitationItem, andSend: boolean) {
+    setBusyId(inv.id)
+    setError(null)
+    setInfo(null)
+    try {
+      const updated = await updateInvitation(inv.id, editMail)
+      setItems((prev) => prev.map((x) => (x.id === inv.id ? updated : x)))
+      setEditingMailId(null)
+      if (!andSend) {
+        setInfo(`Zapisano treść maila dla: ${inv.firstName} ${inv.lastName}.`)
+        return
+      }
+      if (!inv.email) {
+        setError(`${inv.firstName} ${inv.lastName} nie ma e-maila — treść zapisana, ale nie ma gdzie wysłać.`)
+        return
+      }
+      const res = await sendInvitation(inv.id)
+      if (res.status === 'SENT') {
+        setInfo(`Zapisano i wysłano zaproszenie na ${inv.email}.`)
+        await load(true)
+      } else if (res.status === 'LOGGED') setError(MAIL_OFF_HINT)
+      else setError(`Treść zapisana, ale wysyłka na ${inv.email} nie powiodła się (status: ${res.status}).`)
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -424,6 +481,11 @@ export default function InvitedGuestsSection({
                         <UserPlus size={11} /> zaproszony przez: {inv.invitedByName || 'uczestnika'}
                       </p>
                     )}
+                    {isPersonalized(inv) && (
+                      <p className="flex items-center gap-1 text-[11px] font-medium mt-0.5" style={{ color: 'var(--muted)' }}>
+                        <PenLine size={11} /> własna treść maila{inv.mailFormal ? ' · forma grzecznościowa' : ''}
+                      </p>
+                    )}
                   </div>
                   <span
                     className="flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-full shrink-0"
@@ -518,6 +580,15 @@ export default function InvitedGuestsSection({
                   </button>
                   <button
                     type="button"
+                    onClick={() => (editingMailId === inv.id ? setEditingMailId(null) : startEditMail(inv))}
+                    className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-[8px]"
+                    style={{ background: 'var(--surface)', color: 'var(--muted)', border: '1px solid var(--border)', cursor: 'pointer' }}
+                    title="Własny zwrot, dodatkowe zdania, temat, forma grzecznościowa"
+                  >
+                    <PenLine size={12} /> Treść maila
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => { void handleDelete(inv) }}
                     disabled={busyId === inv.id}
                     className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-[8px] ml-auto"
@@ -526,6 +597,30 @@ export default function InvitedGuestsSection({
                     <Trash2 size={12} /> Usuń
                   </button>
                 </div>
+
+                {editingMailId === inv.id && (
+                  <div className="flex flex-col gap-2.5 mt-1 px-3 py-3 rounded-[10px]" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+                    <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--faint)' }}>
+                      Treść maila — {inv.firstName} {inv.lastName}
+                    </p>
+                    <InviteMailEditor
+                      value={editMail}
+                      onChange={setEditMail}
+                      onPreview={() => previewInvitation(inv.id, editMail)}
+                    />
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Button size="sm" onClick={() => { void saveMail(inv, true) }} disabled={busyId === inv.id || !inv.email}>
+                        <Send size={14} /> {inv.sentAt ? 'Zapisz i wyślij ponownie' : 'Zapisz i wyślij'}
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => { void saveMail(inv, false) }} disabled={busyId === inv.id}>
+                        Zapisz bez wysyłania
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setEditingMailId(null)}>
+                        Anuluj
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             )
           })}
@@ -561,13 +656,40 @@ export default function InvitedGuestsSection({
             onChange={(e) => setDraft((d) => ({ ...d, phone: e.target.value }))}
           />
         </div>
+        <button
+          type="button"
+          onClick={() => setShowDraftMail((v) => !v)}
+          className="self-start flex items-center gap-1.5 text-xs font-semibold"
+          style={{ color: 'var(--brand)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+        >
+          <PenLine size={13} /> Personalizuj treść maila (opcjonalnie)
+          <ChevronDown size={13} style={{ transform: showDraftMail ? 'rotate(180deg)' : undefined, transition: 'transform 150ms' }} />
+        </button>
+        {showDraftMail && (
+          <InviteMailEditor
+            value={draftMail}
+            onChange={setDraftMail}
+            onPreview={() =>
+              previewNewInvitation(instanceId, {
+                firstName: draft.firstName.trim(),
+                email: draft.email.trim(),
+                ...draftMail,
+              })
+            }
+          />
+        )}
         <p className="text-[11px]" style={{ color: 'var(--faint)' }}>
           Po dodaniu zaproszenie z osobistym linkiem{register ? ' do rejestracji' : ''} idzie automatycznie
           na e-mail. Telefon z numerem kierunkowym pozwala wysłać je jednym kliknięciem przez WhatsApp.
         </p>
-        <Button onClick={() => { void handleAdd() }} size="sm" disabled={adding}>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button onClick={() => { void handleAdd(true) }} size="sm" disabled={adding}>
           <Plus size={14} /> {adding ? 'Dodaję…' : 'Dodaj i wyślij zaproszenie'}
         </Button>
+          <Button onClick={() => { void handleAdd(false) }} size="sm" variant="outline" disabled={adding}>
+            Dodaj bez wysyłania
+          </Button>
+        </div>
       </div>
     </div>
   )

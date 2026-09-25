@@ -416,6 +416,12 @@ model Invitation {
   invitedByRegistrationId String?
   // Migawka „Imię Nazwisko" zapraszającego — do etykiety w panelu bez dodatkowych zapytań.
   invitedByName           String?
+  // Personalizacja maila z zaproszeniem (panel): własny zwrot, dodatkowa treść, temat,
+  // forma grzecznościowa. Puste = standardowy szablon.
+  mailSalutation String?
+  mailNote       String?  @db.Text
+  mailSubject    String?
+  mailFormal     Boolean  @default(false)
 
   @@index([instanceId])
 }

@@ -20,6 +20,70 @@ function buttonMail(intro: string[], button: { label: string; href: string } | n
 
 const SIGNATURE = ['Szczęść Boże,', 'ICPE Mission Polska'];
 
+/**
+ * Mail z zaproszeniem — wspólny dla zaproszeń od admina (INVITATION) i od uczestnika
+ * (GUEST_INVITATION). Personalizacja z panelu (pola zaproszenia):
+ *  - `salutation` — własny zwrot zamiast „Imię,", np. „Szanowny Księże Biskupie,",
+ *  - `note` — dodatkowe akapity od organizatora (wstawiane po terminie i miejscu),
+ *  - `subject` — własny temat,
+ *  - `formal` — forma grzecznościowa (bez „Ty"/„Cię") dla ważnych gości.
+ * `mode`: CONFIRM (event na zaproszenie) albo REGISTER (zwykły event — rejestracja w lejku).
+ */
+function inviteEmail(d: Record<string, unknown>, guest: boolean): { subject: string; text: string; html: string } {
+  const title = String(d.eventTitle ?? 'wydarzenie');
+  const name = String(d.firstName ?? '').trim();
+  const when = String(d.when ?? '');
+  const where = String(d.location ?? '');
+  const inviter = String(d.inviterName ?? '').trim() || 'Uczestnik';
+  const register = d.mode === 'REGISTER';
+  const formal = d.formal === true;
+  const salutation = String(d.salutation ?? '').trim();
+  const note = String(d.note ?? '').replace(/\r\n/g, '\n').trim();
+  const customSubject = String(d.subject ?? '').trim();
+
+  const greeting = salutation || (name ? `${name},` : formal ? 'Szanowni Państwo,' : 'Dzień dobry,');
+  const inviteLine = guest
+    ? formal
+      ? `${inviter} ma przyjemność zaprosić na: ${title}.`
+      : `${inviter} zaprasza Cię na: ${title}.`
+    : formal
+      ? `mamy zaszczyt zaprosić na: ${title}.`
+      : `zapraszamy Cię na: ${title}.`;
+  const instruction = register
+    ? formal
+      ? 'Rejestracja odbywa się przez osobisty link — dane są już wpisane w formularz:'
+      : 'Zarejestrujesz się swoim osobistym linkiem — Twoje dane są już wpisane w formularz:'
+    : formal
+      ? 'Wydarzenie ma charakter zamknięty. Udział prosimy potwierdzić za pomocą osobistego linku:'
+      : guest
+        ? 'Udział potwierdzisz swoim osobistym linkiem:'
+        : 'To wydarzenie tylko dla zaproszonych gości. Udział potwierdzisz swoim osobistym linkiem:';
+  const outro = [
+    formal ? 'Link jest imienny — prosimy go nie przekazywać.' : 'Prosimy nie przekazywać linku dalej — jest przypisany do Ciebie.',
+    ...(guest
+      ? [formal ? 'Jeśli wiadomość trafiła do Państwa przez pomyłkę, prosimy ją zignorować.' : 'Jeśli nie znasz osoby zapraszającej, zignoruj tę wiadomość.']
+      : []),
+    '',
+    ...SIGNATURE,
+  ];
+
+  const intro = [greeting, '', inviteLine];
+  if (when) intro.push(`Termin: ${when}.`);
+  if (where) intro.push(`Miejsce: ${where}.`);
+  if (note) intro.push('', ...note.split('\n').map((l) => l.trim()));
+  intro.push('', instruction);
+
+  const subject =
+    customSubject || (guest && !formal ? `${inviter} zaprasza Cię — ${title}` : `Zaproszenie — ${title}`);
+  const { text, html } = buttonMail(
+    // Podwójne puste linie (np. z notatki) zwijamy do jednej — w HTML dawałyby dziurę.
+    intro.filter((l, i, arr) => l !== '' || arr[i - 1] !== ''),
+    { label: register ? 'Zarejestruj się' : 'Potwierdzam udział', href: String(d.link ?? '') },
+    outro,
+  );
+  return { subject, text, html };
+}
+
 /** Escapowanie treści wstawianej do HTML-a maila (tytuły eventów bywają z `&`, `<`). */
 const esc = (s: unknown) =>
   String(s ?? '')
@@ -141,6 +205,11 @@ export class NotificationsService {
   }
 
   /** Buduje temat i treść maila na podstawie typu i danych. */
+  /** Podgląd maila (temat + HTML) bez wysyłki — używane przez „Podgląd" w panelu. */
+  render(payload: MailPayload): { subject: string; text: string; html: string } {
+    return this.buildEmail(payload);
+  }
+
   private buildEmail(payload: MailPayload): { subject: string; text: string; html: string } {
     const d = payload.data as Record<string, unknown>;
     const money = (v: unknown, cur: unknown) => `${Number(v ?? 0)} ${String(cur ?? 'PLN')}`;
@@ -179,74 +248,8 @@ export class NotificationsService {
       return { subject, text, html };
     }
 
-    if (payload.type === 'INVITATION') {
-      const title = String(d.eventTitle ?? 'wydarzenie');
-      const link = String(d.link ?? '');
-      const name = String(d.firstName ?? '').trim();
-      const when = String(d.when ?? '');
-      const where = String(d.location ?? '');
-      const subject = `Zaproszenie — ${title}`;
-      // Treść tekstowa (z linkiem inline) i HTML (z przyciskiem) budowane osobno —
-      // wcześniej HTML powstawał przez filtrowanie linii po wartości linku, co jest kruche.
-      const intro = [
-        name ? `${name},` : 'Dzień dobry,',
-        '',
-        `zapraszamy Cię na: ${title}.`,
-        when ? `Termin: ${when}.` : '',
-        where ? `Miejsce: ${where}.` : '',
-        '',
-        d.mode === 'REGISTER'
-          ? 'Zarejestrujesz się swoim osobistym linkiem — Twoje dane są już wpisane w formularz:'
-          : 'To wydarzenie tylko dla zaproszonych gości. Udział potwierdzisz swoim osobistym linkiem:',
-      ];
-      const outro = [
-        'Prosimy nie przekazywać linku dalej — jest przypisany do Ciebie.',
-        '',
-        'Szczęść Boże,',
-        'ICPE Mission Polska',
-      ];
-      const text = [...intro, link, '', ...outro].join('\n');
-      const p = (l: string) => (l === '' ? '<br/>' : `<p style="margin:0 0 6px">${esc(l)}</p>`);
-      const html = `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.6;color:#1f2937">
-        ${intro.map(p).join('')}
-        <p style="margin:18px 0"><a href="${esc(link)}" style="display:inline-block;background:#C0603C;color:#fff;text-decoration:none;padding:12px 22px;border-radius:12px;font-weight:600">${d.mode === 'REGISTER' ? 'Zarejestruj się' : 'Potwierdzam udział'}</a></p>
-        <p style="margin:0 0 14px;font-size:12px;color:#6b7280">Gdyby przycisk nie działał, skopiuj link: ${esc(link)}</p>
-        ${outro.map(p).join('')}
-      </div>`;
-      return { subject, text, html };
-    }
-
-    if (payload.type === 'GUEST_INVITATION') {
-      // Gość dodany przez uczestnika. `mode`: CONFIRM (event na zaproszenie — potwierdza udział)
-      // albo REGISTER (zwykły event — przechodzi lejek rejestracji z wypełnionymi danymi).
-      const title = String(d.eventTitle ?? 'wydarzenie');
-      const inviter = String(d.inviterName ?? '').trim() || 'Uczestnik';
-      const name = String(d.firstName ?? '').trim();
-      const when = String(d.when ?? '');
-      const where = String(d.location ?? '');
-      const register = d.mode === 'REGISTER';
-      const subject = `${inviter} zaprasza Cię — ${title}`;
-      const { text, html } = buttonMail(
-        [
-          name ? `${name},` : 'Dzień dobry,',
-          '',
-          `${inviter} zaprasza Cię na: ${title}.`,
-          when ? `Termin: ${when}.` : '',
-          where ? `Miejsce: ${where}.` : '',
-          '',
-          register
-            ? 'Zarejestrujesz się swoim osobistym linkiem — Twoje dane są już wpisane w formularz:'
-            : 'Udział potwierdzisz swoim osobistym linkiem:',
-        ].filter((l, i, arr) => l !== '' || arr[i - 1] !== ''),
-        { label: register ? 'Zarejestruj się' : 'Potwierdzam udział', href: String(d.link ?? '') },
-        [
-          'Link jest przypisany do Ciebie — prosimy nie przekazywać go dalej.',
-          'Jeśli nie znasz osoby zapraszającej, zignoruj tę wiadomość.',
-          '',
-          ...SIGNATURE,
-        ],
-      );
-      return { subject, text, html };
+    if (payload.type === 'INVITATION' || payload.type === 'GUEST_INVITATION') {
+      return inviteEmail(d, payload.type === 'GUEST_INVITATION');
     }
 
     if (payload.type === 'INVITE_CONFIRMED') {

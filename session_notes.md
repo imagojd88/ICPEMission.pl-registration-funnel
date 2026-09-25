@@ -156,6 +156,14 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — moduł rejestracji
 
+### Personalizacja maila z zaproszeniem (ważni goście) (2026-09-25)
+- Prośba usera: móc dopisać kilka zdań do maila dla ważnych osobistości.
+- Prisma `Invitation`: `mailSalutation`, `mailNote` (@db.Text), `mailSubject`, `mailFormal` (Boolean, default false). Wszystkie per osoba; puste = standardowy szablon.
+- Szablon: `INVITATION` i `GUEST_INVITATION` zunifikowane w `inviteEmail()` (`notifications.service.ts`): własny zwrot zamiast „Imię,”; dodatkowe akapity po terminie/miejscu (Enter = nowy akapit, HTML escapowany); własny temat; forma grzecznościowa zamienia „zapraszamy Cię / potwierdzisz / przypisany do Ciebie” na formy bez „Ty” („mamy zaszczyt zaprosić…”, „Udział prosimy potwierdzić…”, „Link jest imienny…”). Sprawdzone renderem (tsx) na 3 wariantach.
+- API: `POST /admin/invitations/:id/preview` i `POST /admin/instances/:id/invitations/preview` (body = szkic pól, bez zapisu) → `{to, subject, html}` z tego samego renderera co wysyłka. `createMany`/`PATCH` przyjmują pola `mail*` (limity: zwrot 120, temat 200, treść 3000 znaków).
+- Panel (`InvitedGuestsSection` + nowy `InviteMailEditor.tsx`): w „Dodaj gościa” zwijane „Personalizuj treść maila” + przycisk **„Dodaj bez wysyłania”**; przy każdym gościu **„Treść maila”** → edytor, „Podgląd maila” (modal z iframe), „Zapisz i wyślij (ponownie)” / „Zapisz bez wysyłania”; znacznik „własna treść maila” na liście. Auto-odświeżanie pauzuje podczas edycji.
+- Po pushu: Manual Deploy `icpe-api` (nowe kolumny).
+
 ### Przełącznik języka na stronie zaproszenia + zawsze PL/EN (2026-09-25)
 - Zgłoszenie usera: anglojęzyczny gość z linku zobaczył stronę po polsku, bez przełącznika.
 - Przyczyny: (1) strona `/i/:token` (`InviteConfirm`) i `/g/:token` nie miały `LanguageSwitch` i miały zakodowane polskie teksty; (2) `LanguageSwitch` chował się, gdy event miał zaznaczony tylko PL.

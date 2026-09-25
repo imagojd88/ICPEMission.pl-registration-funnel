@@ -9,6 +9,10 @@ interface Invitee {
   lastName: string;
   email: string;
   phone?: string;
+  mailSalutation?: string | null;
+  mailNote?: string | null;
+  mailSubject?: string | null;
+  mailFormal?: boolean;
 }
 
 @ApiTags('invitations')
@@ -33,6 +37,22 @@ export class InvitationsController {
   @ApiOperation({ summary: 'Edytuj zaproszonego (np. dopisz telefon)' })
   update(@Param('invId') invId: string, @Body() dto: Partial<Invitee>) {
     return this.invites.update(invId, dto ?? {});
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Post('admin/invitations/:invId/preview')
+  @ApiOperation({ summary: 'Podgląd maila z zaproszeniem (body nadpisuje zapisane pola, bez zapisu)' })
+  previewExisting(@Param('invId') invId: string, @Body() draft?: Partial<Invitee>) {
+    return this.invites.preview({ invId, draft: draft ?? {} });
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Post('admin/instances/:id/invitations/preview')
+  @ApiOperation({ summary: 'Podgląd maila dla nowego gościa (przed dodaniem)' })
+  previewNew(@Param('id') id: string, @Body() draft?: Partial<Invitee>) {
+    return this.invites.preview({ instanceId: id, draft: draft ?? {} });
   }
 
   @UseGuards(JwtAuthGuard)
