@@ -331,7 +331,7 @@ function getEventTitle(title: EventInstanceDto['title'], lng = 'pl'): string {
 
 export default function PublicFunnel() {
   const { slug } = useParams<{ slug: string }>()
-  const { i18n } = useTranslation()
+  const { t, i18n } = useTranslation()
   const lng = i18n.language
   const [screen, setScreen] = useState<PublicScreen>('landing')
   const [stepper, setStepper] = useState<StepperState>(buildInitialStepper())
@@ -688,11 +688,11 @@ export default function PublicFunnel() {
           {invite && (
             <div className="mx-[22px] mt-4 px-4 py-3 rounded-[12px] text-sm" style={{ background: 'var(--brand-soft)', color: 'var(--ink)', border: '1px solid var(--brand)' }}>
               {invite.invitedByName ? (
-                <>Zaprasza Cię <strong>{invite.invitedByName}</strong>. </>
+                <>{t('invite.banner_by')} <strong>{invite.invitedByName}</strong>. </>
               ) : (
-                <>Masz osobiste zaproszenie. </>
+                <>{t('invite.banner_personal')} </>
               )}
-              Twoje dane wpiszemy za Ciebie — kliknij „Zapisz się”.
+              {t('invite.banner_prefill')}
             </div>
           )}
           {draft && !invite && (

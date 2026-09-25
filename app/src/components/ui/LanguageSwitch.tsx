@@ -4,9 +4,14 @@ import { useTranslation } from 'react-i18next'
 const LABELS: Record<string, string> = { pl: 'PL', en: 'EN', it: 'IT' }
 const ORDER = ['pl', 'en', 'it']
 
+/** Języki, w których zawsze jest przetłumaczony interfejs — oferowane niezależnie od ustawień eventu. */
+const ALWAYS = ['pl', 'en']
+
 /**
  * Pływający przełącznik języka (kody tekstowe PL / EN / IT) dla stron publicznych.
- * Pokazuje tylko języki wybrane dla danego eventu; chowa się, gdy jest ≤ 1 język.
+ * Pokazuje PL i EN zawsze (interfejs jest w nich w pełni przetłumaczony — gość anglojęzyczny
+ * nie może zostać z polską stroną tylko dlatego, że w evencie zaznaczono sam PL), plus
+ * ewentualne dodatkowe języki eventu (IT). Treść eventu bez tłumaczenia spada do PL.
  * Startowy język: wykrywany z przeglądarki (jeśli event go obsługuje),
  * w innym wypadku PL (gdy dostępny), inaczej pierwszy z listy.
  */
@@ -14,7 +19,7 @@ export default function LanguageSwitch({ locales }: { locales?: string[] }) {
   const { i18n } = useTranslation()
 
   // Uporządkuj i odfiltruj do znanych kodów.
-  const langs = ORDER.filter((l) => (locales ?? []).includes(l))
+  const langs = ORDER.filter((l) => ALWAYS.includes(l) || (locales ?? []).includes(l))
   const [current, setCurrent] = useState(i18n.language)
   const initialized = useRef(false)
 
@@ -34,7 +39,9 @@ export default function LanguageSwitch({ locales }: { locales?: string[] }) {
   }
 
   useEffect(() => {
-    if (langs.length === 0) return
+    // Czekamy na języki eventu (undefined = jeszcze się ładują) — inaczej wykrycie języka
+    // przeglądarki odbyłoby się tylko wśród PL/EN i Włoch nie dostałby automatycznie IT.
+    if (locales === undefined || langs.length === 0) return
     // Pierwsze realne wczytanie (po dociągnięciu locales eventu) → wykryj język przeglądarki.
     if (!initialized.current) {
       initialized.current = true

@@ -156,6 +156,14 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — moduł rejestracji
 
+### Przełącznik języka na stronie zaproszenia + zawsze PL/EN (2026-09-25)
+- Zgłoszenie usera: anglojęzyczny gość z linku zobaczył stronę po polsku, bez przełącznika.
+- Przyczyny: (1) strona `/i/:token` (`InviteConfirm`) i `/g/:token` nie miały `LanguageSwitch` i miały zakodowane polskie teksty; (2) `LanguageSwitch` chował się, gdy event miał zaznaczony tylko PL.
+- `LanguageSwitch`: PL i EN oferowane ZAWSZE (interfejs jest w nich przetłumaczony) + dodatkowe języki eventu (IT); auto-wykrycie języka przeglądarki czeka na załadowanie języków eventu. Treść eventu bez tłumaczenia spada do PL — pełne EN wymaga zaznaczenia EN w „Języki strony” i wypełnienia zakładki EN w edycji.
+- `InviteConfirm`, `GuestInvitePage`, baner zaproszenia w lejku: wszystkie teksty przez `t()` — nowe klucze `invite.*` (m.in. liczba mnoga `invite.adults_*`/`invite.kids_*`) i sekcja `guest.*` w pl/en/it. API zwraca `event.locales` w `GET /invite/:token` i `GET /guest-invites/:token`.
+- Nadal tylko PL: maile oraz komunikaty błędów z serwera (np. „Ta osoba jest już na liście”).
+- tsc api+app czyste, `vite build` OK.
+
 ### Link „Zaproś gościa” dla osób potwierdzonych wcześniej (2026-09-25)
 - Problem (user): kto potwierdził/zapisał się PRZED włączeniem ścieżki gości, nie dostał linku `/g/…` (mail `INVITE_CONFIRMED` szedł tylko przy pierwszym potwierdzeniu, a potwierdzający bez linku nie znają swojego tokenu).
 - Panel, lista gości: przy każdej potwierdzonej osobie (event INVITE) przycisk **„Link »Zaproś gościa«”** — kopiuje jej `/g/:token` (np. do WhatsAppa). Pole `guestInviteLink` w `InvitationRow`.

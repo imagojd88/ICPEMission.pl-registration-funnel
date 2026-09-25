@@ -6,6 +6,7 @@ import { getInvitation, confirmInvitation, pickLang, type InvitationView, type C
 import { formatDateRange } from '../lib/utils'
 import Spinner from '../components/ui/Spinner'
 import ThemeToggle from '../components/ui/ThemeToggle'
+import LanguageSwitch from '../components/ui/LanguageSwitch'
 import EventContentBlocks from '../components/funnel/EventContentBlocks'
 
 /** Wiersz dziecka w formularzu — `age` jako string, żeby pole mogło być puste w trakcie edycji. */
@@ -59,7 +60,7 @@ export default function InviteConfirm() {
         setChildren(
           (v.children ?? []).map((c) => ({ key: `c-${++childKeyCounter}`, age: String(c.age), firstName: c.firstName ?? '' })),
         )
-        document.title = `Zaproszenie — ${pickLang(v.event.title as string | Record<string, string>, i18n.language)}`
+        document.title = `${t('invite.title_prefix')} — ${pickLang(v.event.title as string | Record<string, string>, i18n.language)}`
       })
       .catch(() => setError(true))
   }, [token])
@@ -111,19 +112,19 @@ export default function InviteConfirm() {
   // który po potwierdzeniu odzwierciedla to, co właśnie zostało wysłane.
   const summaryChildren = children.filter((c) => c.age.trim() !== '')
   const adultsCount = 1 + (spouseChoice === 'with' ? 1 : 0)
-  const adultsLabel = `${adultsCount} ${adultsCount === 1 ? 'dorosły' : 'dorosłych'}`
+  const adultsLabel = t('invite.adults', { count: adultsCount })
   const childrenLabel =
     summaryChildren.length > 0
-      ? `${summaryChildren.length} ${summaryChildren.length === 1 ? 'dziecko' : 'dzieci'} (${summaryChildren.map((c) => c.age).join(', ')} lat)`
+      ? `${t('invite.kids', { count: summaryChildren.length })} (${t('invite.ages', { ages: summaryChildren.map((c) => c.age).join(', ') })})`
       : ''
-  const summaryText = `Osoby: ${adultsLabel}${childrenLabel ? `, ${childrenLabel}` : ''}`
+  const summaryText = `${t('invite.people')}: ${adultsLabel}${childrenLabel ? `, ${childrenLabel}` : ''}`
 
   if (error) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-3 px-6" style={{ background: 'var(--bg)', color: 'var(--ink)' }}>
         <ThemeToggle />
-        <p className="text-base font-semibold">Zaproszenie nieaktualne</p>
-        <p className="text-sm text-center" style={{ color: 'var(--muted)' }}>Ten link jest nieprawidłowy lub wygasł.</p>
+        <p className="text-base font-semibold">{t('invite.invalid_title')}</p>
+        <p className="text-sm text-center" style={{ color: 'var(--muted)' }}>{t('invite.invalid_desc')}</p>
       </div>
     )
   }
@@ -143,6 +144,7 @@ export default function InviteConfirm() {
   return (
     <div className="min-h-screen mx-auto relative" style={{ maxWidth: 452, background: 'var(--bg)' }}>
       <ThemeToggle />
+      <LanguageSwitch locales={inv.event.locales ?? []} />
       {/* Hero */}
       <div
         className="relative"
@@ -154,7 +156,7 @@ export default function InviteConfirm() {
         }}
       >
         <div className="absolute bottom-0 left-0 right-0 p-5">
-          <p className="text-xs font-medium" style={{ color: 'rgba(255,255,255,0.85)' }}>Zaproszenie imienne</p>
+          <p className="text-xs font-medium" style={{ color: 'rgba(255,255,255,0.85)' }}>{t('invite.personal')}</p>
           <h1 className="font-serif leading-tight" style={{ fontSize: 30, fontWeight: 500, color: inv.event.theme?.titleColor ?? '#fff' }}>
             {pickLang(inv.event.title as string | Record<string, string>, i18n.language)}
           </h1>
@@ -163,11 +165,11 @@ export default function InviteConfirm() {
 
       <div className="flex flex-col gap-5 px-[22px] py-6">
         <p className="text-base" style={{ color: 'var(--ink)' }}>
-          Cześć <span className="font-semibold">{inv.firstName}</span>, serdecznie zapraszamy!
+          {t('invite.hello')} <span className="font-semibold">{inv.firstName}</span>, {t('invite.welcome_after')}
         </p>
         {inv.invitedByName && (
           <p className="text-sm -mt-3" style={{ color: 'var(--muted)' }}>
-            Zaprasza Cię: <span className="font-medium" style={{ color: 'var(--ink)' }}>{inv.invitedByName}</span>
+            {t('invite.invited_by')} <span className="font-medium" style={{ color: 'var(--ink)' }}>{inv.invitedByName}</span>
           </p>
         )}
 
@@ -191,8 +193,8 @@ export default function InviteConfirm() {
             <div className="flex items-center justify-center rounded-full" style={{ width: 44, height: 44, background: 'var(--ok)' }}>
               <Check size={22} color="white" />
             </div>
-            <p className="text-sm font-semibold" style={{ color: 'var(--ok)' }}>Udział potwierdzony</p>
-            <p className="text-xs" style={{ color: 'var(--muted)' }}>Dziękujemy, {inv.firstName}! Do zobaczenia.</p>
+            <p className="text-sm font-semibold" style={{ color: 'var(--ok)' }}>{t('invite.confirmed_title')}</p>
+            <p className="text-xs" style={{ color: 'var(--muted)' }}>{t('invite.confirmed_sub', { name: inv.firstName })}</p>
             <p className="text-xs font-medium" style={{ color: 'var(--ink)' }}>{summaryText}</p>
             <button
               type="button"
@@ -208,7 +210,7 @@ export default function InviteConfirm() {
                 className="mt-2 flex items-center justify-center gap-2 w-full text-sm font-semibold rounded-[12px] py-2.5 no-underline"
                 style={{ background: 'var(--surface)', color: 'var(--brand)', border: '1px solid var(--brand)' }}
               >
-                <UserPlus size={15} /> Zaproś gościa{inv.maxGuests ? ` (do ${inv.maxGuests})` : ''}
+                <UserPlus size={15} /> {inv.maxGuests ? t('invite.invite_guest_max', { count: inv.maxGuests }) : t('invite.invite_guest')}
               </Link>
             )}
           </div>
@@ -268,7 +270,7 @@ export default function InviteConfirm() {
                     value={spouseDietary}
                     onChange={(e) => setSpouseDietary(e.target.value)}
                     rows={2}
-                    placeholder="np. wegetariańska, bez glutenu"
+                    placeholder={t('invite.dietary_ph')}
                     className="w-full rounded-[12px] px-3 py-[11px] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
                     style={{ border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--ink)', resize: 'vertical' }}
                   />
@@ -319,13 +321,13 @@ export default function InviteConfirm() {
 
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
-                Alergie / wymagania żywieniowe (opcjonalnie)
+                {t('invite.dietary')}
               </label>
               <textarea
                 value={dietary}
                 onChange={(e) => setDietary(e.target.value)}
                 rows={2}
-                placeholder="np. wegetariańska, bez glutenu"
+                placeholder={t('invite.dietary_ph')}
                 className="w-full rounded-[12px] px-3 py-[11px] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
                 style={{ border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--ink)', resize: 'vertical' }}
               />
@@ -337,7 +339,7 @@ export default function InviteConfirm() {
               className="w-full text-white text-base font-semibold rounded-[16px] py-4 transition-all duration-150 active:scale-[0.98] hover:opacity-90"
               style={{ background: 'var(--accent)', border: 'none', cursor: 'pointer', boxShadow: '0 6px 18px rgba(197,106,58,0.32)' }}
             >
-              {confirming ? 'Potwierdzam…' : 'Potwierdzam udział →'}
+              {confirming ? t('invite.confirming') : t('invite.submit')}
             </button>
           </>
         )}

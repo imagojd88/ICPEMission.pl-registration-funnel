@@ -13,6 +13,7 @@ import {
 import { formatDateRange } from '../lib/utils'
 import Spinner from '../components/ui/Spinner'
 import ThemeToggle from '../components/ui/ThemeToggle'
+import LanguageSwitch from '../components/ui/LanguageSwitch'
 
 const EMPTY = { firstName: '', lastName: '', email: '', phone: '' }
 
@@ -20,30 +21,18 @@ const inputCls =
   'w-full rounded-[12px] px-3 py-[11px] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]'
 const inputStyle = { border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--ink)' } as const
 
-function blockedText(reason: GuestBlockedReason, max: number): string {
-  switch (reason) {
-    case 'DISABLED':
-      return 'Organizator nie włączył zapraszania gości dla tego wydarzenia.'
-    case 'NOT_CONFIRMED':
-      return 'Gości możesz zapraszać po potwierdzeniu swojego udziału.'
-    case 'GUEST_CANNOT_INVITE':
-      return 'Jesteś gościem innego uczestnika — kolejne osoby może zaprosić organizator.'
-    case 'CLOSED':
-      return 'Zapisy na to wydarzenie są już zamknięte.'
-    case 'LIMIT':
-      return `Wykorzystałeś(-aś) limit gości (${max}). Możesz wycofać niepotwierdzone zaproszenie, żeby zwolnić miejsce.`
-    default:
-      return ''
-  }
-}
-
 /**
  * Strona „Zaproś gościa" (`/g/:token`). Token to osobisty link uczestnika:
  * token zaproszenia (event na zaproszenie) albo editToken zgłoszenia (zwykły event).
  * Gość trafia na tę samą listę co osoby dodane przez admina i dostaje mail z zaproszeniem.
  */
 export default function GuestInvitePage() {
-  const { i18n } = useTranslation()
+  const { t, i18n } = useTranslation()
+
+  // Komunikat, dlaczego nie można (już) zapraszać — klucze guest.blocked_<POWÓD>.
+  function blockedText(reason: GuestBlockedReason, max: number): string {
+    return reason ? t(`guest.blocked_${reason}`, { max }) : ''
+  }
   const { token } = useParams<{ token: string }>()
   const [view, setView] = useState<GuestInviteView | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -58,16 +47,16 @@ export default function GuestInvitePage() {
     getGuestInvites(token)
       .then((v) => {
         setView(v)
-        document.title = `Zaproś gościa — ${pickLang(v.event.title as string | Record<string, string>, i18n.language)}`
+        document.title = `${t('guest.page_title')} — ${pickLang(v.event.title as string | Record<string, string>, i18n.language)}`
       })
       .catch((e: unknown) => setLoadError(e instanceof Error ? e.message : String(e)))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token])
 
   function validate(): string | null {
-    if (!form.firstName.trim() || !form.lastName.trim()) return 'Podaj imię i nazwisko gościa.'
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) return 'Podaj poprawny adres e-mail gościa.'
-    if (form.phone.replace(/\D/g, '').length < 7) return 'Podaj numer telefonu gościa.'
+    if (!form.firstName.trim() || !form.lastName.trim()) return t('guest.err_name')
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) return t('guest.err_email')
+    if (form.phone.replace(/\D/g, '').length < 7) return t('guest.err_phone')
     return null
   }
 
@@ -91,10 +80,10 @@ export default function GuestInvitePage() {
       setView(next)
       const who = `${form.firstName.trim()} ${form.lastName.trim()}`
       if (next.added?.mailStatus === 'SENT') {
-        setInfo(`Gotowe! ${who} dostanie od nas zaproszenie na ${form.email.trim()}.`)
+        setInfo(t('guest.ok_sent', { name: who, email: form.email.trim() }))
       } else {
         // Gość jest na liście — organizator widzi go w panelu i może wysłać zaproszenie inną drogą.
-        setInfo(`${who} jest na liście gości. Mail z zaproszeniem nie wyszedł automatycznie — organizator prześle je osobno.`)
+        setInfo(t('guest.ok_no_mail', { name: who }))
       }
       setForm(EMPTY)
     } catch (e: unknown) {
@@ -106,7 +95,7 @@ export default function GuestInvitePage() {
 
   async function handleRemove(id: string, name: string) {
     if (!token) return
-    if (!window.confirm(`Wycofać zaproszenie dla: ${name}?`)) return
+    if (!window.confirm(t('guest.withdraw_confirm', { name }))) return
     setBusyId(id)
     setError(null)
     setInfo(null)
@@ -123,7 +112,7 @@ export default function GuestInvitePage() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-3 px-6" style={{ background: 'var(--bg)', color: 'var(--ink)' }}>
         <ThemeToggle />
-        <p className="text-base font-semibold">Link nieaktualny</p>
+        <p className="text-base font-semibold">{t('guest.invalid_title')}</p>
         <p className="text-sm text-center" style={{ color: 'var(--muted)' }}>{loadError}</p>
       </div>
     )
@@ -145,6 +134,7 @@ export default function GuestInvitePage() {
   return (
     <div className="min-h-screen mx-auto relative" style={{ maxWidth: 452, background: 'var(--bg)' }}>
       <ThemeToggle />
+      <LanguageSwitch locales={view.event.locales ?? []} />
       <div
         className="relative"
         style={{
@@ -155,7 +145,7 @@ export default function GuestInvitePage() {
         }}
       >
         <div className="absolute bottom-0 left-0 right-0 p-5">
-          <p className="text-xs font-medium" style={{ color: 'rgba(255,255,255,0.85)' }}>Zaproś gościa</p>
+          <p className="text-xs font-medium" style={{ color: 'rgba(255,255,255,0.85)' }}>{t('guest.page_title')}</p>
           <h1 className="font-serif leading-tight" style={{ fontSize: 28, fontWeight: 500, color: view.event.theme?.titleColor ?? '#fff' }}>
             {title}
           </h1>
@@ -176,15 +166,13 @@ export default function GuestInvitePage() {
 
         <div className="flex flex-col gap-1.5">
           <p className="text-base" style={{ color: 'var(--ink)' }}>
-            Cześć <span className="font-semibold">{view.inviter.firstName}</span>!
+            {t('invite.hello')} <span className="font-semibold">{view.inviter.firstName}</span>!
           </p>
           <p className="text-sm leading-relaxed" style={{ color: 'var(--muted)' }}>
-            {register
-              ? 'Zaproszona osoba dostanie od nas maila z osobistym linkiem do rejestracji — jej dane będą już wpisane, zostanie tylko wybór pokoju i płatności.'
-              : 'Zaproszona osoba dostanie od nas imienne zaproszenie mailem i sama potwierdzi swój udział.'}
+            {register ? t('guest.intro_register') : t('guest.intro_confirm')}
           </p>
           <p className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
-            Możesz zaprosić jeszcze {view.remaining} z {view.maxGuests} {view.maxGuests === 1 ? 'osoby' : 'osób'}.
+            {t('guest.remaining', { remaining: view.remaining, max: view.maxGuests })}
           </p>
         </div>
 
@@ -198,21 +186,20 @@ export default function GuestInvitePage() {
         {view.canInvite ? (
           <div className="flex flex-col gap-2.5 rounded-[15px] p-4" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
             <p className="flex items-center gap-2 text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-              <UserPlus size={16} style={{ color: 'var(--brand)' }} /> Dane gościa
+              <UserPlus size={16} style={{ color: 'var(--brand)' }} /> {t('guest.guest_data')}
             </p>
             <div className="grid grid-cols-2 gap-2">
-              <input className={inputCls} style={inputStyle} placeholder="Imię" autoComplete="off"
+              <input className={inputCls} style={inputStyle} placeholder={t('invite.first_name')} autoComplete="off"
                 value={form.firstName} onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))} />
-              <input className={inputCls} style={inputStyle} placeholder="Nazwisko" autoComplete="off"
+              <input className={inputCls} style={inputStyle} placeholder={t('invite.last_name')} autoComplete="off"
                 value={form.lastName} onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))} />
             </div>
-            <input className={inputCls} style={inputStyle} placeholder="E-mail" type="email" inputMode="email" autoComplete="off"
+            <input className={inputCls} style={inputStyle} placeholder={t('invite.email')} type="email" inputMode="email" autoComplete="off"
               value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
-            <input className={inputCls} style={inputStyle} placeholder="Telefon, np. +48 600 100 200" type="tel" inputMode="tel" autoComplete="off"
+            <input className={inputCls} style={inputStyle} placeholder={t('guest.phone_ph')} type="tel" inputMode="tel" autoComplete="off"
               value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} />
             <p className="text-[11px]" style={{ color: 'var(--faint)' }}>
-              Dane gościa trafiają do organizatora wydarzenia (ICPE Mission) wyłącznie w celu wysłania zaproszenia
-              i organizacji spotkania. Upewnij się, że ta osoba zgadza się na ich podanie.
+              {t('guest.consent')}
             </p>
             <button
               type="button"
@@ -221,7 +208,7 @@ export default function GuestInvitePage() {
               className="w-full flex items-center justify-center gap-2 text-white text-base font-semibold rounded-[16px] py-3.5 transition-all duration-150 active:scale-[0.98] hover:opacity-90"
               style={{ background: 'var(--accent)', border: 'none', cursor: 'pointer', boxShadow: '0 6px 18px rgba(197,106,58,0.32)' }}
             >
-              <Send size={16} /> {sending ? 'Wysyłam…' : 'Wyślij zaproszenie'}
+              <Send size={16} /> {sending ? t('guest.sending') : t('guest.send')}
             </button>
           </div>
         ) : (
@@ -232,7 +219,7 @@ export default function GuestInvitePage() {
 
         {view.guests.length > 0 && (
           <div className="flex flex-col gap-2">
-            <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--faint)' }}>Twoi goście</p>
+            <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--faint)' }}>{t('guest.your_guests')}</p>
             {view.guests.map((g) => {
               const confirmed = g.status === 'CONFIRMED'
               const name = `${g.firstName} ${g.lastName}`
@@ -251,15 +238,15 @@ export default function GuestInvitePage() {
                         : { background: 'var(--surface)', color: 'var(--muted)', border: '1px solid var(--border)' }}
                     >
                       {confirmed ? <Check size={12} /> : <Clock size={12} />}
-                      {confirmed ? (register ? 'Zarejestrowany' : 'Potwierdził') : 'Zaproszony'}
+                      {confirmed ? (register ? t('guest.status_registered') : t('guest.status_confirmed')) : t('guest.status_invited')}
                     </span>
                     {!confirmed && (
                       <button
                         type="button"
                         onClick={() => { void handleRemove(g.id, name) }}
                         disabled={busyId === g.id}
-                        aria-label={`Wycofaj zaproszenie: ${name}`}
-                        title="Wycofaj zaproszenie"
+                        aria-label={`${t('guest.withdraw')}: ${name}`}
+                        title={t('guest.withdraw')}
                         className="p-1.5 rounded-[8px]"
                         style={{ color: 'var(--muted)', background: 'none', border: '1px solid var(--border)', cursor: 'pointer' }}
                       >

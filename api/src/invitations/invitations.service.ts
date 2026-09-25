@@ -377,6 +377,7 @@ export class InvitationsService {
         customFields: page?.customFields ?? null,
         slug: page?.slug ?? null,
         type: type ?? null,
+        locales: page?.locales ?? ['pl'],
       },
     };
   }

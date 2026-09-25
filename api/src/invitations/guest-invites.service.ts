@@ -37,7 +37,7 @@ type InstanceWithPage = {
   location: string | null;
   status: string;
   registrationClosesAt: Date;
-  series: { type?: string; page: { slug: string; theme: unknown; customFields: unknown } | null };
+  series: { type?: string; page: { slug: string; theme: unknown; customFields: unknown; locales?: string[] } | null };
 };
 
 /**
@@ -243,6 +243,7 @@ export class GuestInvitesService {
         theme: inst.series.page?.theme ?? null,
         slug: inst.series.page?.slug ?? null,
         type: inst.series.type ?? null,
+        locales: inst.series.page?.locales ?? ['pl'],
       },
       // Gość zwykłego eventu musi przejść rejestrację (z płatnością) — front to komunikuje.
       guestFlow: registerFlow ? 'REGISTER' : 'CONFIRM',

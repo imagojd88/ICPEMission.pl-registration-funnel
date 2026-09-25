@@ -692,6 +692,8 @@ export interface InvitationView {
     customFields: EventContent | null
     slug: string | null
     type?: string | null
+    /** Języki strony wybrane dla eventu (do przełącznika). */
+    locales?: string[] | null
   }
 }
 
@@ -735,6 +737,7 @@ export interface GuestInviteView {
     theme: EventTheme | null
     slug: string | null
     type: string | null
+    locales?: string[] | null
   }
   /** CONFIRM = gość potwierdza udział (event na zaproszenie), REGISTER = gość przechodzi rejestrację. */
   guestFlow: 'CONFIRM' | 'REGISTER'
