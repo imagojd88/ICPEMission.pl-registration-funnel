@@ -17,8 +17,12 @@ const MAX_PDF = 25 * 1024 * 1024;
 type ItemRow = {
   id: string; kind: string; title: unknown; description: unknown; order: number; published: boolean;
   videoId: string | null; videoState: string | null; durationSec: number | null; thumbnailUrl: string | null;
-  fileId: string | null; createdAt: Date;
+  fileId: string | null; fileIdEn: string | null; createdAt: Date;
 };
+
+export type FileLang = 'pl' | 'en';
+const fileField = (lang: FileLang) => (lang === 'en' ? 'fileIdEn' : 'fileId');
+export const parseLang = (v: unknown): FileLang => (v === 'en' ? 'en' : 'pl');
 
 /** Logika panelu admina „Formacja online" — kursy, pozycje (wideo/PDF), kursanci. */
 @Injectable()
@@ -128,7 +132,7 @@ export class CoursesService {
       );
     }
     const files = await this.prisma.privateFile.findMany({
-      where: { id: { in: items.map((i) => i.fileId).filter((x): x is string => !!x) } },
+      where: { id: { in: items.flatMap((i) => [i.fileId, i.fileIdEn]).filter((x): x is string => !!x) } },
       select: { id: true, size: true, originalName: true },
     });
     const fileMap = new Map(files.map((f: { id: string; size: number; originalName: string | null }) => [f.id, f]));
@@ -141,7 +145,11 @@ export class CoursesService {
       url: courseUrl(c.slug),
       members,
       pendingWelcome,
-      items: items.map((i) => ({ ...i, file: i.fileId ? fileMap.get(i.fileId) ?? null : null })),
+      items: items.map((i) => ({
+        ...i,
+        file: i.fileId ? fileMap.get(i.fileId) ?? null : null,
+        fileEn: i.fileIdEn ? fileMap.get(i.fileIdEn) ?? null : null,
+      })),
     };
   }
 
@@ -208,7 +216,7 @@ export class CoursesService {
     const items = await this.prisma.courseItem.findMany({ where: { courseId: id } });
     for (const i of items as ItemRow[]) {
       if (i.videoId) await this.bunny.deleteVideo(i.videoId);
-      if (i.fileId) await this.prisma.privateFile.delete({ where: { id: i.fileId } }).catch(() => null);
+      for (const fid of [i.fileId, i.fileIdEn]) if (fid) await this.prisma.privateFile.delete({ where: { id: fid } }).catch(() => null);
     }
     await this.prisma.course.delete({ where: { id } });
     if (c.status !== 'DRAFT') this.deployHook.trigger(`usunięto kurs ${c.slug}`);
@@ -240,22 +248,55 @@ export class CoursesService {
     return { item, upload: this.bunny.tusUpload(item.videoId) };
   }
 
-  async createPdf(courseId: string, file: UploadedFileLike | undefined, rawTitle: unknown) {
-    await this.mustGet(courseId);
+  /** Walidacja + zapis PDF-a jako PrivateFile. */
+  private async savePdf(file: UploadedFileLike | undefined): Promise<string> {
     if (!file) throw new BadRequestException('Brak pliku');
     const isPdf = file.mimetype === 'application/pdf' || file.buffer.subarray(0, 5).toString('latin1') === '%PDF-';
     if (!isPdf) throw new BadRequestException('Dozwolone tylko pliki PDF.');
     if (file.size > MAX_PDF) throw new BadRequestException('Maksymalny rozmiar PDF to 25 MB.');
-    let title = normLangText(typeof rawTitle === 'string' && rawTitle.trim().startsWith('{') ? safeJson(rawTitle) : rawTitle);
-    if (!title) title = { pl: (file.originalname ?? 'Materiał').replace(/\.pdf$/i, '') };
     const f = await this.prisma.privateFile.create({
       data: { mimeType: 'application/pdf', size: file.size, originalName: fixLatin1(file.originalname ?? null), data: file.buffer },
       select: { id: true },
     });
+    return f.id;
+  }
+
+  /** Nowy materiał PDF. `lang` = język wgrywanego pliku (druga wersja językowa: setItemFile). */
+  async createPdf(courseId: string, file: UploadedFileLike | undefined, rawTitle: unknown, rawLang?: unknown) {
+    await this.mustGet(courseId);
+    const lang = parseLang(rawLang);
+    let title = normLangText(typeof rawTitle === 'string' && rawTitle.trim().startsWith('{') ? safeJson(rawTitle) : rawTitle);
+    if (!title) title = { [lang]: (fixLatin1(file?.originalname ?? null) ?? 'Materiał').replace(/\.pdf$/i, '') };
+    const fileId = await this.savePdf(file);
     const item = await this.prisma.courseItem.create({
-      data: { courseId, kind: 'PDF', title, fileId: f.id, order: await this.nextOrder(courseId) },
+      data: { courseId, kind: 'PDF', title, [fileField(lang)]: fileId, order: await this.nextOrder(courseId) } as never,
     });
     return { item };
+  }
+
+  /** Wgranie / podmiana wersji językowej PDF-a (PL albo EN) w istniejącym materiale. */
+  async setItemFile(courseId: string, itemId: string, file: UploadedFileLike | undefined, rawLang: unknown) {
+    const item = await this.mustGetItem(courseId, itemId);
+    if (item.kind !== 'PDF') throw new BadRequestException('To nie jest materiał PDF.');
+    const lang = parseLang(rawLang);
+    const newId = await this.savePdf(file);
+    const oldId = lang === 'en' ? item.fileIdEn : item.fileId;
+    const updated = await this.prisma.courseItem.update({ where: { id: itemId }, data: { [fileField(lang)]: newId } as never });
+    if (oldId) await this.prisma.privateFile.delete({ where: { id: oldId } }).catch(() => null);
+    return updated;
+  }
+
+  /** Usunięcie jednej wersji językowej — materiał musi zachować co najmniej jeden plik. */
+  async removeItemFile(courseId: string, itemId: string, rawLang: unknown) {
+    const item = await this.mustGetItem(courseId, itemId);
+    const lang = parseLang(rawLang);
+    const target = lang === 'en' ? item.fileIdEn : item.fileId;
+    const other = lang === 'en' ? item.fileId : item.fileIdEn;
+    if (!target) return item;
+    if (!other) throw new BadRequestException('To jedyna wersja pliku — usuń cały materiał albo najpierw dodaj drugą wersję.');
+    const updated = await this.prisma.courseItem.update({ where: { id: itemId }, data: { [fileField(lang)]: null } as never });
+    await this.prisma.privateFile.delete({ where: { id: target } }).catch(() => null);
+    return updated;
   }
 
   private async mustGetItem(courseId: string, itemId: string): Promise<ItemRow> {
@@ -281,7 +322,7 @@ export class CoursesService {
     const item = await this.mustGetItem(courseId, itemId);
     await this.prisma.courseItem.delete({ where: { id: itemId } });
     if (item.videoId) await this.bunny.deleteVideo(item.videoId);
-    if (item.fileId) await this.prisma.privateFile.delete({ where: { id: item.fileId } }).catch(() => null);
+    for (const fid of [item.fileId, item.fileIdEn]) if (fid) await this.prisma.privateFile.delete({ where: { id: fid } }).catch(() => null);
     return { ok: true };
   }
 

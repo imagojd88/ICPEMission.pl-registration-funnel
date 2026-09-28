@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getAuthToken, setAuthToken } from '@/lib/api'
+import { AUTH_CHANGED_EVENT, hasValidAdminToken, maybeRenewAdminToken, setAuthToken } from '@/lib/api'
 import LoginScreen from '@/components/admin/LoginScreen'
 import AdminSidebar from '@/components/admin/AdminSidebar'
 import PageHeader from '@/components/admin/PageHeader'
@@ -35,13 +35,40 @@ const SCREEN_TITLES: Record<AdminScreen, { title: string; subtitle?: string }> =
 }
 
 export default function AdminPanel() {
-  const [authed, setAuthed] = useState(!!getAuthToken())
+  // Wygasły token = od razu ekran logowania (zamiast panelu, który po chwili sypie błędami 401).
+  const [authed, setAuthed] = useState(() => {
+    if (hasValidAdminToken()) return true
+    setAuthToken(null)
+    return false
+  })
   const [view, setView] = useState<AdminScreen>('dashboard')
   const [showWizard, setShowWizard] = useState(false)
 
   useEffect(() => {
     if (authed) {
       document.title = 'Panel administratora — ICPE Mission'
+    }
+  }, [authed])
+
+  // 401 z dowolnego zapytania (setAuthToken(null)) → ekran logowania.
+  useEffect(() => {
+    const onChange = () => setAuthed(hasValidAdminToken())
+    window.addEventListener(AUTH_CHANGED_EVENT, onChange)
+    return () => window.removeEventListener(AUTH_CHANGED_EVENT, onChange)
+  }, [])
+
+  // Sesja przesuwna: przedłużaj token przy wejściu, co godzinę i po powrocie do karty.
+  useEffect(() => {
+    if (!authed) return
+    void maybeRenewAdminToken()
+    const h = window.setInterval(() => void maybeRenewAdminToken(), 60 * 60 * 1000)
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void maybeRenewAdminToken()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      window.clearInterval(h)
+      document.removeEventListener('visibilitychange', onVisible)
     }
   }, [authed])
 

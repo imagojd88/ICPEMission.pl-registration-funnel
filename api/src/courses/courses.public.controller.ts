@@ -89,8 +89,8 @@ export class CoursesPublicController {
   @UseGuards(MemberAuthGuard)
   @ApiBearerAuth()
   @Get('member/courses/:slug/items/:itemId/file')
-  fileLink(@Param('slug') slug: string, @Param('itemId') itemId: string, @Req() req: MemberRequest) {
-    return this.member.fileLink(slug, itemId, req.member!.guestId);
+  fileLink(@Param('slug') slug: string, @Param('itemId') itemId: string, @Req() req: MemberRequest, @Query('lang') lang?: string) {
+    return this.member.fileLink(slug, itemId, req.member!.guestId, lang);
   }
 
   /** PDF przez podpisany, krótko żyjący link (podgląd w przeglądarce nie wyśle nagłówka Authorization). */

@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
+import { uploadStore } from '@/lib/uploadStore'
 import { GraduationCap, Plus, ExternalLink, Users, Film, AlertTriangle } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
@@ -16,6 +17,7 @@ export default function CoursesScreen() {
   const [error, setError] = useState<string | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
+  const uploads = useSyncExternalStore(uploadStore.subscribe, uploadStore.getSnapshot)
 
   const load = useCallback(async () => {
     try {
@@ -113,6 +115,13 @@ export default function CoursesScreen() {
                 <StatusBadge status={c.status} />
               </div>
               <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--faint)' }}>{c.url.replace(/^https?:\/\//, '')}</p>
+              {Object.values(uploads)
+                .filter((u) => u.courseId === c.id && uploadStore.isActive(u))
+                .map((u) => (
+                  <p key={u.itemId} className="text-xs mt-0.5" style={{ color: 'var(--brand)' }}>
+                    Wysyłanie filmu: {u.total ? Math.round((u.sent / u.total) * 100) : 0}% — nie zamykaj karty
+                  </p>
+                ))}
             </div>
             <div className="flex items-center gap-4 text-xs shrink-0" style={{ color: 'var(--muted)' }}>
               <span className="flex items-center gap-1"><Film size={14} /> {c.items}</span>

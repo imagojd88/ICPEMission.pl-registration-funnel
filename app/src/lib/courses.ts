@@ -17,6 +17,13 @@ export interface CourseListItem {
   createdAt: string
 }
 
+export type PdfLang = 'pl' | 'en'
+export interface PdfFileMeta {
+  id: string
+  size: number
+  originalName: string | null
+}
+
 export interface CourseItem {
   id: string
   kind: 'VIDEO' | 'PDF'
@@ -29,7 +36,9 @@ export interface CourseItem {
   durationSec: number | null
   thumbnailUrl: string | null
   fileId: string | null
-  file: { id: string; size: number; originalName: string | null } | null
+  fileIdEn: string | null
+  file: PdfFileMeta | null
+  fileEn: PdfFileMeta | null
   createdAt: string
 }
 
@@ -129,12 +138,9 @@ export const deleteCourseItem = (courseId: string, itemId: string) =>
 export const reorderCourseItems = (courseId: string, ids: string[]) =>
   apiFetch<{ ok: true }>(`/admin/courses/${courseId}/items-order`, json('PUT', { ids }))
 
-/** PDF — multipart (bez Content-Type: przeglądarka doda boundary). */
-export async function uploadPdfItem(courseId: string, file: File, title: LangText): Promise<{ item: CourseItem }> {
-  const form = new FormData()
-  form.append('file', file)
-  form.append('title', JSON.stringify(title))
-  const res = await fetch(`${API_URL}/admin/courses/${courseId}/items/pdf`, { method: 'POST', headers: auth(), body: form })
+/** Wysyłka multipart (bez Content-Type: przeglądarka doda boundary). */
+async function postMultipart<T>(path: string, form: FormData): Promise<T> {
+  const res = await fetch(`${API_URL}${path}`, { method: 'POST', headers: auth(), body: form })
   if (res.status === 401) {
     setAuthToken(null)
     throw new Error('Sesja wygasła — zaloguj się ponownie.')
@@ -150,8 +156,27 @@ export async function uploadPdfItem(courseId: string, file: File, title: LangTex
     if (res.status === 413) msg = 'Plik jest za duży (limit 25 MB).'
     throw new Error(msg)
   }
-  return res.json() as Promise<{ item: CourseItem }>
+  return res.json() as Promise<T>
 }
+
+/** Nowy materiał PDF; `lang` = język wgrywanego pliku. */
+export function uploadPdfItem(courseId: string, file: File, title: LangText, lang: PdfLang = 'pl') {
+  const form = new FormData()
+  form.append('file', file)
+  form.append('title', JSON.stringify(title))
+  form.append('lang', lang)
+  return postMultipart<{ item: CourseItem }>(`/admin/courses/${courseId}/items/pdf`, form)
+}
+
+/** Dodanie / podmiana wersji językowej PDF w istniejącym materiale. */
+export function setItemPdf(courseId: string, itemId: string, file: File, lang: PdfLang) {
+  const form = new FormData()
+  form.append('file', file)
+  return postMultipart<CourseItem>(`/admin/courses/${courseId}/items/${itemId}/file?lang=${lang}`, form)
+}
+
+export const removeItemPdf = (courseId: string, itemId: string, lang: PdfLang) =>
+  apiFetch<CourseItem>(`/admin/courses/${courseId}/items/${itemId}/file?lang=${lang}`, json('DELETE'))
 
 export const listEnrollments = (courseId: string) =>
   apiFetch<Enrollment[]>(`/admin/courses/${courseId}/enrollments`, { headers: auth() })

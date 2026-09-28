@@ -13,6 +13,7 @@ interface Item {
   description: LangText;
   durationSec: number | null;
   thumbnailUrl: string | null;
+  langs?: Lang[];
 }
 interface CourseData {
   slug: string;
@@ -52,6 +53,7 @@ function init(root: HTMLElement) {
       fileErr: 'Nie udało się otworzyć pliku.',
       playErr: 'Nie udało się uruchomić filmu.',
       video: 'Wideo',
+      onlyOther: 'dostępny tylko po angielsku',
     },
     en: {
       connecting: 'Connecting to the server…',
@@ -69,6 +71,7 @@ function init(root: HTMLElement) {
       fileErr: 'Could not open the file.',
       playErr: 'Could not start the video.',
       video: 'Video',
+      onlyOther: 'available in Polish only',
     },
   };
   const tr = () => T[lang];
@@ -231,6 +234,8 @@ function init(root: HTMLElement) {
       main.append(el('div', 'ca-item-title', pick(d.title)));
       const desc = pick(d.description);
       if (desc) main.append(el('p', 'ca-item-desc', desc));
+      // Plik tylko w drugim języku — uprzedzamy (API i tak poda dostępną wersję).
+      if (d.langs && d.langs.length && !d.langs.includes(lang)) main.append(el('p', 'ca-item-desc ca-item-note', tr().onlyOther));
       const actions = el('div', 'ca-item-actions');
       const open = el('button', 'ca-btn ca-btn-light', tr().open);
       open.type = 'button';
@@ -280,7 +285,7 @@ function init(root: HTMLElement) {
     // Okno otwieramy synchronicznie (inaczej blokada wyskakujących okien), adres ustawiamy po odpowiedzi API.
     const w = download ? null : window.open('about:blank', '_blank');
     try {
-      const r = await api<{ path: string; downloadPath: string }>(`/member/courses/${slug}/items/${d.id}/file`, {}, true);
+      const r = await api<{ path: string; downloadPath: string }>(`/member/courses/${slug}/items/${d.id}/file?lang=${lang}`, {}, true);
       const url = `${API}${download ? r.downloadPath : r.path}`;
       if (w) {
         w.opener = null;

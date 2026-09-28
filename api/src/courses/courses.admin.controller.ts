@@ -65,8 +65,22 @@ export class CoursesAdminController {
   @Post(':id/items/pdf')
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 25 * 1024 * 1024 } }))
-  createPdf(@Param('id') id: string, @UploadedFile() file: UploadedFileLike, @Body('title') title?: string) {
-    return this.courses.createPdf(id, file, title);
+  createPdf(@Param('id') id: string, @UploadedFile() file: UploadedFileLike, @Body('title') title?: string, @Body('lang') lang?: string) {
+    return this.courses.createPdf(id, file, title, lang);
+  }
+
+  @Post(':id/items/:itemId/file')
+  @ApiOperation({ summary: 'Wgraj / podmień wersję językową PDF (?lang=pl|en)' })
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 25 * 1024 * 1024 } }))
+  setItemFile(@Param('id') id: string, @Param('itemId') itemId: string, @UploadedFile() file: UploadedFileLike, @Query('lang') lang?: string) {
+    return this.courses.setItemFile(id, itemId, file, lang);
+  }
+
+  @Delete(':id/items/:itemId/file')
+  @ApiOperation({ summary: 'Usuń jedną wersję językową PDF (?lang=pl|en)' })
+  removeItemFile(@Param('id') id: string, @Param('itemId') itemId: string, @Query('lang') lang?: string) {
+    return this.courses.removeItemFile(id, itemId, lang);
   }
 
   @Put(':id/items-order')

@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowLeft, ExternalLink } from 'lucide-react'
-import { getCourse, type CourseDetail, type CoursesConfig } from '@/lib/courses'
-import { tusUpload, type TusHandle } from '@/lib/tusUpload'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { ArrowLeft, ExternalLink, Send } from 'lucide-react'
+import Button from '@/components/ui/Button'
+import { getCourse, updateCourse, type CourseDetail, type CoursesConfig } from '@/lib/courses'
+import { uploadStore, type UploadState } from '@/lib/uploadStore'
 import CourseSettingsTab from './CourseSettingsTab'
 import CourseContentTab from './CourseContentTab'
 import CourseMembersTab from './CourseMembersTab'
@@ -9,22 +10,16 @@ import { Notice, StatusBadge, errMsg, t } from './shared'
 
 type Tab = 'content' | 'members' | 'settings'
 
-/** Trwające uploady filmów — trzymane tu, żeby przełączanie zakładek ich nie przerywało. */
-export interface UploadState {
-  itemId: string
-  fileName: string
-  sent: number
-  total: number
-  error?: string
-  done?: boolean
-}
+export type { UploadState }
 
 export default function CourseEditor({ id, config, onBack }: { id: string; config: CoursesConfig | null; onBack: () => void }) {
   const [course, setCourse] = useState<CourseDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+  const [publishing, setPublishing] = useState(false)
   const [tab, setTab] = useState<Tab>('content')
-  const [uploads, setUploads] = useState<Record<string, UploadState>>({})
-  const handles = useRef<Record<string, TusHandle>>({})
+  const allUploads = useSyncExternalStore(uploadStore.subscribe, uploadStore.getSnapshot)
+  const uploads = Object.fromEntries(Object.entries(allUploads).filter(([, u]) => u.courseId === id))
 
   const reload = useCallback(async () => {
     try {
@@ -39,9 +34,21 @@ export default function CourseEditor({ id, config, onBack }: { id: string; confi
     void reload()
   }, [reload])
 
+  // Po zakończeniu wysyłki odśwież stan filmu (Bunny zaczyna kodowanie).
+  const doneCount = Object.values(uploads).filter((u) => u.done).length
+  const prevDone = useRef(doneCount)
+  useEffect(() => {
+    if (doneCount > prevDone.current) {
+      const h = setTimeout(() => void reload(), 3000)
+      prevDone.current = doneCount
+      return () => clearTimeout(h)
+    }
+    prevDone.current = doneCount
+  }, [doneCount, reload])
+
   // Filmy w kodowaniu — odświeżaj co 10 s (API dociąga stan z Bunny).
   const processing = course?.items.some(
-    (i) => i.kind === 'VIDEO' && i.videoState !== 'READY' && i.videoState !== 'FAILED' && !uploads[i.id],
+    (i) => i.kind === 'VIDEO' && i.videoState !== 'READY' && i.videoState !== 'FAILED' && !uploadStore.isActive(uploads[i.id]),
   )
   useEffect(() => {
     if (!processing) return
@@ -49,45 +56,31 @@ export default function CourseEditor({ id, config, onBack }: { id: string; confi
     return () => clearInterval(h)
   }, [processing, reload])
 
-  // Ostrzeżenie przy zamykaniu karty w trakcie wysyłania.
-  const uploading = Object.values(uploads).some((u) => !u.done && !u.error)
-  useEffect(() => {
-    if (!uploading) return
-    const h = (e: BeforeUnloadEvent) => {
-      e.preventDefault()
-      e.returnValue = ''
-    }
-    window.addEventListener('beforeunload', h)
-    return () => window.removeEventListener('beforeunload', h)
-  }, [uploading])
-
-  useEffect(() => () => Object.values(handles.current).forEach((h) => h.abort()), [])
-
   const startUpload = useCallback(
-    (itemId: string, file: File, upload: { endpoint: string; headers: Record<string, string> }) => {
-      setUploads((u) => ({ ...u, [itemId]: { itemId, fileName: file.name, sent: 0, total: file.size } }))
-      const h = tusUpload({
-        endpoint: upload.endpoint,
-        headers: upload.headers,
-        file,
-        resumeKey: itemId,
-        onProgress: (sent, total) => setUploads((u) => ({ ...u, [itemId]: { ...u[itemId], sent, total } })),
-      })
-      handles.current[itemId] = h
-      h.promise
-        .then(() => {
-          setUploads((u) => ({ ...u, [itemId]: { ...u[itemId], done: true } }))
-          setTimeout(() => void reload(), 3000)
-        })
-        .catch((e: unknown) => setUploads((u) => ({ ...u, [itemId]: { ...u[itemId], error: errMsg(e) } })))
-        .finally(() => {
-          delete handles.current[itemId]
-        })
-    },
-    [reload],
+    (itemId: string, file: File, upload: { endpoint: string; headers: Record<string, string> }) =>
+      uploadStore.start(id, itemId, file, upload),
+    [id],
   )
+  const cancelUpload = (itemId: string) => uploadStore.cancel(itemId)
 
-  const cancelUpload = (itemId: string) => handles.current[itemId]?.abort()
+  async function publish() {
+    if (!course) return
+    const n = course.pendingWelcome
+    if (!window.confirm(`Opublikować kurs? Strona kursu zacznie działać${n ? `, a ${n} ${n === 1 ? 'osoba dostanie' : 'osób dostanie'} mail powitalny` : ''}.`)) return
+    setPublishing(true)
+    try {
+      const updated = await updateCourse(course.id, { status: 'PUBLISHED' })
+      setCourse(updated)
+      setNotice(
+        `Opublikowano. Strona działa pod ${updated.url.replace(/^https?:\/\//, '')} (pełna wersja po przebudowie strony, 1–3 min).` +
+          (updated.welcome?.sent ? ` Wysłane powitania: ${updated.welcome.sent}.` : ''),
+      )
+    } catch (e) {
+      setError(errMsg(e))
+    } finally {
+      setPublishing(false)
+    }
+  }
 
   if (!course) {
     return (
@@ -123,12 +116,23 @@ export default function CourseEditor({ id, config, onBack }: { id: string; confi
             {course.url.replace(/^https?:\/\//, '')} <ExternalLink size={12} />
           </a>
           {course.status === 'DRAFT' && (
-            <p className="text-xs mt-1" style={{ color: 'var(--faint)' }}>
-              Szkic — strona kursu powstanie po publikacji (Ustawienia ▸ Opublikuj).
+            <p className="text-xs mt-1" style={{ color: 'var(--warn)' }}>
+              Szkic — strona kursu jeszcze nie działa, a kursanci nie dostają maili. Opublikuj, gdy będziesz gotowy.
             </p>
           )}
         </div>
+        {course.status === 'DRAFT' && (
+          <Button onClick={() => void publish()} disabled={publishing}>
+            <Send size={15} /> {publishing ? 'Publikuję…' : 'Opublikuj kurs'}
+          </Button>
+        )}
       </div>
+      {notice && <Notice kind="ok">{notice}</Notice>}
+      {Object.values(uploads).some((u) => uploadStore.isActive(u)) && (
+        <Notice kind="info">
+          Trwa wysyłanie filmu — możesz przełączać zakładki i moduły panelu, ale nie zamykaj ani nie odświeżaj tej karty przeglądarki.
+        </Notice>
+      )}
 
       <div className="flex gap-1 border-b" style={{ borderColor: 'var(--border)' }}>
         {tabs.map((x) => (

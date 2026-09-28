@@ -3,9 +3,9 @@ import { ArrowDown, ArrowUp, Eye, EyeOff, FileText, Film, Pencil, RefreshCw, Tra
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import {
-  createVideoItem, deleteCourseItem, formatBytes, formatDuration, refreshCourseItem, renewVideoUpload,
-  reorderCourseItems, updateCourseItem, uploadPdfItem,
-  type CourseDetail, type CourseItem, type CoursesConfig,
+  createVideoItem, deleteCourseItem, formatBytes, formatDuration, refreshCourseItem, removeItemPdf, renewVideoUpload,
+  reorderCourseItems, setItemPdf, updateCourseItem, uploadPdfItem,
+  type CourseDetail, type CourseItem, type CoursesConfig, type PdfLang,
 } from '@/lib/courses'
 import type { UploadState } from './CourseEditor'
 import { Notice, Panel, VideoStateBadge, errMsg, t } from './shared'
@@ -92,6 +92,7 @@ function ItemRow({
   const [pl, setPl] = useState(item.title.pl ?? '')
   const [en, setEn] = useState(item.title.en ?? '')
   const [descPl, setDescPl] = useState(item.description?.pl ?? '')
+  const [descEn, setDescEn] = useState(item.description?.en ?? '')
   const [busy, setBusy] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const isVideo = item.kind === 'VIDEO'
@@ -113,7 +114,12 @@ function ItemRow({
   async function save() {
     const title: Record<string, string> = { pl: pl.trim() }
     if (en.trim()) title.en = en.trim()
-    await run(() => updateCourseItem(course.id, item.id, { title, description: descPl.trim() ? { pl: descPl.trim() } : null }))
+    const description: Record<string, string> = {}
+    if (descPl.trim()) description.pl = descPl.trim()
+    if (descEn.trim()) description.en = descEn.trim()
+    await run(() =>
+      updateCourseItem(course.id, item.id, { title, description: Object.keys(description).length ? description : null }),
+    )
     setEditing(false)
   }
 
@@ -137,22 +143,38 @@ function ItemRow({
           </button>
         </div>
         {isVideo && item.thumbnailUrl ? (
-          <img src={item.thumbnailUrl} alt="" className="rounded-[8px] object-cover shrink-0" style={{ width: 72, height: 40 }} />
+          <img
+            src={item.thumbnailUrl}
+            alt=""
+            className="rounded-[8px] object-cover shrink-0"
+            style={{ width: 72, height: 40, background: 'var(--brand-soft)' }}
+            onError={(e) => {
+              // Miniatura powstaje dopiero po zakodowaniu — do tego czasu pusty kafelek zamiast „zepsutego" obrazka.
+              e.currentTarget.style.visibility = 'hidden'
+            }}
+          />
         ) : (
           <div className="flex items-center justify-center rounded-[8px] shrink-0" style={{ width: 72, height: 40, background: 'var(--brand-soft)', color: 'var(--brand)' }}>
             {isVideo ? <Film size={18} /> : <FileText size={18} />}
           </div>
         )}
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold truncate" style={{ color: 'var(--ink)' }}>{t(item.title)}</p>
+          <p className="text-sm font-semibold truncate" style={{ color: 'var(--ink)' }}>
+            {t(item.title)}
+            {item.title.en && item.title.pl ? (
+              <span className="font-normal" style={{ color: 'var(--faint)' }}> · EN: {item.title.en}</span>
+            ) : !item.title.en ? (
+              <span className="font-normal text-xs" style={{ color: 'var(--faint)' }}> · brak tytułu EN</span>
+            ) : null}
+          </p>
           <div className="flex items-center gap-2 flex-wrap text-xs mt-0.5" style={{ color: 'var(--faint)' }}>
             {isVideo ? (
               <>
-                <VideoStateBadge state={activeUpload ? 'UPLOADING' : item.videoState} />
+                <VideoStateBadge state={item.videoState} uploading={!!activeUpload} />
                 {item.durationSec ? <span>{formatDuration(item.durationSec)}</span> : null}
               </>
             ) : (
-              <span>PDF · {item.file ? formatBytes(item.file.size) : '—'}{item.file?.originalName ? ` · ${item.file.originalName}` : ''}</span>
+              <span>PDF · {[item.fileId ? 'PL' : null, item.fileIdEn ? 'EN' : null].filter(Boolean).join(' + ') || 'brak pliku'}</span>
             )}
             {!item.published && <span>· ukryty</span>}
           </div>
@@ -225,18 +247,71 @@ function ItemRow({
         <p className="text-xs" style={{ color: 'var(--warn)' }}>Plik filmu nie został (w całości) wysłany — kliknij ikonę wysyłania i wybierz ten sam plik, aby wznowić.</p>
       )}
 
+      {!isVideo && (
+        <div className="flex flex-col gap-1.5 pl-[108px]">
+          <PdfLangRow course={course} item={item} lang="pl" busy={busy} run={run} />
+          <PdfLangRow course={course} item={item} lang="en" busy={busy} run={run} />
+        </div>
+      )}
+
       {editing && (
         <div className="grid md:grid-cols-2 gap-2 pt-1">
           <Input label="Tytuł (PL)" value={pl} onChange={(e) => setPl(e.target.value)} />
-          <Input label="Tytuł (EN, opcjonalnie)" value={en} onChange={(e) => setEn(e.target.value)} />
-          <div className="md:col-span-2">
-            <Input label="Krótki opis (opcjonalnie)" value={descPl} onChange={(e) => setDescPl(e.target.value)} />
-          </div>
+          <Input label="Tytuł (EN)" value={en} onChange={(e) => setEn(e.target.value)} placeholder="np. Conference 1 — God's Love" />
+          <Input label="Krótki opis (PL, opcjonalnie)" value={descPl} onChange={(e) => setDescPl(e.target.value)} />
+          <Input label="Krótki opis (EN, opcjonalnie)" value={descEn} onChange={(e) => setDescEn(e.target.value)} />
           <div className="flex gap-2 md:col-span-2">
             <Button size="sm" onClick={() => void save()} disabled={busy || !pl.trim()}>Zapisz</Button>
             <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>Anuluj</Button>
           </div>
         </div>
+      )}
+    </div>
+  )
+}
+
+/** Wiersz wersji językowej PDF: nazwa pliku + Zamień / Dodaj / Usuń. */
+function PdfLangRow({ course, item, lang, busy, run }: {
+  course: CourseDetail
+  item: CourseItem
+  lang: PdfLang
+  busy: boolean
+  run: (fn: () => Promise<unknown>) => Promise<void>
+}) {
+  const ref = useRef<HTMLInputElement>(null)
+  const meta = lang === 'en' ? item.fileEn : item.file
+  const other = lang === 'en' ? item.file : item.fileEn
+  const label = lang === 'en' ? 'EN' : 'PL'
+  function pick(f: File | undefined) {
+    if (!f) return
+    if (f.size > 25 * 1024 * 1024) {
+      window.alert('Plik jest za duży (limit 25 MB).')
+      return
+    }
+    void run(() => setItemPdf(course.id, item.id, f, lang))
+    if (ref.current) ref.current.value = ''
+  }
+  return (
+    <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--muted)' }}>
+      <span className="font-semibold w-6" style={{ color: meta ? 'var(--ink)' : 'var(--faint)' }}>{label}</span>
+      <span className="flex-1 truncate">
+        {meta ? `${meta.originalName ?? 'plik.pdf'} · ${formatBytes(meta.size)}` : lang === 'en' ? 'brak wersji angielskiej — kursanci EN dostaną wersję PL' : 'brak wersji polskiej — kursanci PL dostaną wersję EN'}
+      </span>
+      <input ref={ref} type="file" accept="application/pdf,.pdf" className="hidden" onChange={(e) => pick(e.target.files?.[0])} />
+      <button type="button" disabled={busy} onClick={() => ref.current?.click()} style={{ ...iconBtn, color: 'var(--brand)', padding: '2px 6px' }}>
+        {meta ? 'Zamień' : `Dodaj ${label}`}
+      </button>
+      {meta && other && (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => {
+            if (window.confirm(`Usunąć wersję ${label} tego materiału?`)) void run(() => removeItemPdf(course.id, item.id, lang))
+          }}
+          style={{ ...iconBtn, color: 'var(--err)', padding: '2px 6px' }}
+        >
+          Usuń
+        </button>
       )}
     </div>
   )
@@ -258,6 +333,7 @@ function AddVideo({ course, disabled, onStartUpload, onChanged }: {
   onChanged: Props['onChanged']
 }) {
   const [title, setTitle] = useState('')
+  const [titleEn, setTitleEn] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -268,9 +344,12 @@ function AddVideo({ course, disabled, onStartUpload, onChanged }: {
     setBusy(true)
     setError(null)
     try {
-      const r = await createVideoItem(course.id, { pl: title.trim() || file.name.replace(/\.[^.]+$/, '') })
+      const t: Record<string, string> = { pl: title.trim() || file.name.replace(/\.[^.]+$/, '') }
+      if (titleEn.trim()) t.en = titleEn.trim()
+      const r = await createVideoItem(course.id, t)
       onStartUpload(r.item.id, file, r.upload)
       setTitle('')
+      setTitleEn('')
       setFile(null)
       if (ref.current) ref.current.value = ''
       await onChanged()
@@ -287,7 +366,8 @@ function AddVideo({ course, disabled, onStartUpload, onChanged }: {
         <Notice kind="info">Hosting wideo nie jest skonfigurowany (Bunny Stream) — patrz komunikat na liście kursów.</Notice>
       ) : (
         <>
-          <Input label="Tytuł filmu" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="np. Konferencja 1 — Miłość Boga" />
+          <Input label="Tytuł filmu (PL)" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="np. Konferencja 1 — Miłość Boga" />
+          <Input label="Tytuł filmu (EN, opcjonalnie)" value={titleEn} onChange={(e) => setTitleEn(e.target.value)} placeholder="e.g. Conference 1 — God's Love" />
           <input
             ref={ref}
             type="file"
@@ -313,49 +393,66 @@ function AddVideo({ course, disabled, onStartUpload, onChanged }: {
 
 function AddPdf({ course, onChanged }: { course: CourseDetail; onChanged: Props['onChanged'] }) {
   const [title, setTitle] = useState('')
-  const [file, setFile] = useState<File | null>(null)
+  const [titleEn, setTitleEn] = useState('')
+  const [filePl, setFilePl] = useState<File | null>(null)
+  const [fileEn, setFileEn] = useState<File | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const ref = useRef<HTMLInputElement>(null)
+  const refPl = useRef<HTMLInputElement>(null)
+  const refEn = useRef<HTMLInputElement>(null)
 
   async function submit() {
-    if (!file) return
-    if (file.size > 25 * 1024 * 1024) {
+    const first = filePl ?? fileEn
+    if (!first) return
+    if ([filePl, fileEn].some((f) => f && f.size > 25 * 1024 * 1024)) {
       setError('Plik jest za duży (limit 25 MB).')
       return
     }
     setBusy(true)
     setError(null)
     try {
-      await uploadPdfItem(course.id, file, { pl: title.trim() || file.name.replace(/\.pdf$/i, '') })
+      const t: Record<string, string> = {}
+      if (title.trim()) t.pl = title.trim()
+      if (titleEn.trim()) t.en = titleEn.trim()
+      if (!t.pl && !t.en) t.pl = first.name.replace(/\.pdf$/i, '')
+      const { item } = await uploadPdfItem(course.id, first, t, filePl ? 'pl' : 'en')
+      if (filePl && fileEn) await setItemPdf(course.id, item.id, fileEn, 'en')
       setTitle('')
-      setFile(null)
-      if (ref.current) ref.current.value = ''
+      setTitleEn('')
+      setFilePl(null)
+      setFileEn(null)
+      if (refPl.current) refPl.current.value = ''
+      if (refEn.current) refEn.current.value = ''
       await onChanged()
     } catch (e) {
       setError(errMsg(e))
+      await onChanged()
     } finally {
       setBusy(false)
     }
   }
 
+  const fileInput = (label: string, ref: React.RefObject<HTMLInputElement>, file: File | null, set: (f: File | null) => void) => (
+    <div className="flex flex-col gap-1">
+      <span className="text-sm font-medium" style={{ color: 'var(--ink)' }}>{label}</span>
+      <input ref={ref} type="file" accept="application/pdf,.pdf" onChange={(e) => set(e.target.files?.[0] ?? null)} className="text-sm" style={{ color: 'var(--muted)' }} />
+      {file && <span className="text-xs" style={{ color: 'var(--faint)' }}>{file.name} · {formatBytes(file.size)}</span>}
+    </div>
+  )
+
   return (
     <Panel title="Dodaj PDF">
-      <Input label="Tytuł materiału" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="np. Notatki do konferencji 1" />
-      <input
-        ref={ref}
-        type="file"
-        accept="application/pdf,.pdf"
-        onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-        className="text-sm"
-        style={{ color: 'var(--muted)' }}
-      />
-      {file && <p className="text-xs" style={{ color: 'var(--faint)' }}>{file.name} · {formatBytes(file.size)}</p>}
+      <Input label="Tytuł materiału (PL)" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="np. Notatki do konferencji 1" />
+      <Input label="Tytuł materiału (EN, opcjonalnie)" value={titleEn} onChange={(e) => setTitleEn(e.target.value)} placeholder="e.g. Notes for conference 1" />
+      {fileInput('Plik PDF — wersja polska', refPl, filePl, setFilePl)}
+      {fileInput('Plik PDF — wersja angielska (opcjonalnie)', refEn, fileEn, setFileEn)}
       {error && <Notice kind="err">{error}</Notice>}
-      <Button onClick={() => void submit()} disabled={busy || !file}>
+      <Button onClick={() => void submit()} disabled={busy || (!filePl && !fileEn)}>
         <Upload size={15} /> {busy ? 'Wysyłam…' : 'Wyślij PDF'}
       </Button>
-      <p className="text-xs" style={{ color: 'var(--faint)' }}>Do 25 MB. Kursanci otwierają plik przez link ważny 10 minut.</p>
+      <p className="text-xs" style={{ color: 'var(--faint)' }}>
+        Do 25 MB na plik. Kursant widzi wersję w swoim języku strony (PL/EN); gdy jej brak — tę drugą. Wersję EN możesz dodać też później przy materiale.
+      </p>
     </Panel>
   )
 }

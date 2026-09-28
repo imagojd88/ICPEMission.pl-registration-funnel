@@ -11,6 +11,7 @@
 - **Baza:** Render Postgres `icpe-db` na planie **basic-256mb** (podniesiona z free w sierpniu 2026). W `render.yaml` musi być `plan: basic-256mb` — wpisanie `free` psuje CAŁY sync Blueprintu (`cannot downgrade database from Basic-256mb to Free`) przy każdym pushu.
 - **Backend:** Render Web Service `icpe-api` (Blueprint/`render.yaml`). **Auto-Deploy domyślnie WYŁĄCZONY** → po zmianach w backendzie trzeba **Manual Deploy** (zalecane włączyć Auto-Deploy). API URL: `https://icpe-api.onrender.com`.
 - **Frontend:** Render Static Site `icpe-frontend` — auto-deploy po pushu.
+- **Strona icpemission.pl:** Render Static Site `icpe-site` — `srv-d92mumvaqgkc73fda3sg` · panel: https://dashboard.render.com/static/srv-d92mumvaqgkc73fda3sg · reguły: https://dashboard.render.com/static/srv-d92mumvaqgkc73fda3sg/redirects (Formacja online: Rewrite `/formacja/*` → `/formacja/index.html`).
 - **Prisma:** zmiany schematu wchodzą przez `prisma db push` przy starcie Render (nowe nullable pola/tabele dodają się same).
 - **CORS:** `origin: true` w `main.ts`.
 - **SMTP:** nodemailer przez dynamiczny import + ambient shim (`api/src/nodemailer-shim.d.ts`). Konfiguracja przez ENV na Render (`MAIL_MODE=smtp`, `SMTP_HOST/PORT/USER/PASS/SECURE`, `MAIL_FROM`) jako `sync:false` w `render.yaml`. Dostawca: **Brevo** — UWAGA: NIE włączać blokowania nieautoryzowanych IP (Render ma dynamiczne IP).
@@ -42,6 +43,15 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 ---
 
 ## Dziennik prac — panel kursanta (kurs online)
+
+### Formacja online — poprawki po pierwszym użyciu + „Zapamiętaj mnie" w panelu (2026-09-28)
+- **Zapamiętaj mnie (panel admina):** checkbox na ekranie logowania (domyślnie zaznaczony, wybór pamiętany w `icpe_admin_remember`). Backend: `POST /auth/admin/login {remember}` → token 30 dni (`ADMIN_REMEMBER_TTL`, domyślnie `30d`) albo 12 h (`ADMIN_SESSION_TTL`, domyślnie `12h`; wcześniej 15 min z `JWT_EXPIRES_IN`). Claim `rmb` w JWT. Nowy `POST /auth/admin/refresh` (JwtAuthGuard, tylko realm admin, sprawdza czy konto istnieje) — **sesja przesuwna**: `maybeRenewAdminToken()` w `app/src/lib/api.ts` odnawia token po minięciu połowy ważności (przy wejściu, co 1 h, po powrocie do karty). `AdminPanel`: wygasły token → od razu ekran logowania; 401 z dowolnego zapytania → zdarzenie `icpe-admin-auth-changed` → ekran logowania (wcześniej panel „wisiał" z błędami). Unieważnienie wszystkich sesji: zmiana `JWT_SECRET`.
+- **Tytuły EN:** formularz „Dodaj film" i „Dodaj PDF" mają pole tytułu EN; edycja pozycji: tytuł + opis PL/EN; lista pokazuje „EN: …" albo „brak tytułu EN".
+- **PDF osobno PL i EN:** `CourseItem.fileIdEn` (nowa kolumna, nullable). `POST /admin/courses/:id/items/:itemId/file?lang=pl|en` (wgranie/podmiana wersji), `DELETE …/file?lang=` (nie pozwala usunąć ostatniej wersji). `createPdf` przyjmuje `lang`. Kursant: `GET …/items/:id/file?lang=` → wersja w języku strony, fallback do drugiej; strona pokazuje „dostępny tylko po angielsku / available in Polish only". Panel: przy materiale wiersze PL/EN z Dodaj/Zamień/Usuń; „Dodaj PDF" ma dwa pola plików.
+- **UX po zgłoszeniu usera (kurs „Przygotowanie do Przymierza" został w szkicu, strona 404):** przycisk **„Opublikuj kurs" w nagłówku edytora** (nie tylko w Ustawieniach) + wyraźniejszy komunikat szkicu; status „Wysyłanie…" zamiast mylącego „Czeka na plik" w trakcie uploadu; miniatura przed zakodowaniem nie pokazuje zepsutego obrazka.
+- **Upload filmu nie przerywa się po wyjściu z edytora:** nowy `app/src/lib/uploadStore.ts` (magazyn poza Reactem, `useSyncExternalStore`) — upload trwa przy przełączaniu kursów/modułów; przerywa go tylko zamknięcie/odświeżenie karty (ostrzeżenie `beforeunload`). Lista kursów pokazuje „Wysyłanie filmu: X%".
+- Weryfikacja: tsc api/app ✓, vite build ✓, astro check 0 błędów ✓; testy: auth (30d/12h, refresh zachowuje długość, konto usunięte/serwisowy odrzucone), fake-Prisma kursy (10 scenariuszy) + PDF PL/EN (wybór, fallback, ochrona ostatniej wersji, sprzątanie plików) ✓; Chromium: logowanie z/bez „Zapamiętaj", przedłużanie, wygasły token, 401→logowanie; upload przetrwał wyjście z edytora i zmianę modułu, publikacja z nagłówka ✓.
+- **Po pushu:** Manual Deploy `icpe-api` (kolumna `fileIdEn`, endpoint refresh). Stare tokeny admina (15 min) wygasną — jedno logowanie z zaznaczonym „Zapamiętaj mnie".
 
 ### WDROŻENIE v1 „Formacja online" — kod gotowy, czeka na push + konfigurację (2026-09-28)
 **Zmiana decyzji usera:** adres **`icpemission.pl/formacja/<slug>`** (bez subdomen/wildcard DNS), **wiele kursów równolegle**. Spec: `docs/13-handoff-formacja-online.md` (zastępuje część o subdomenach w `docs/12`).

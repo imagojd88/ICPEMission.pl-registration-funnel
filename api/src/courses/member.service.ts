@@ -152,11 +152,16 @@ export class MemberService {
       accessUntil: course.accessUntil,
       member: guest,
       items: items
-        .filter((i: { kind: string; videoState: string | null; fileId: string | null }) =>
-          i.kind === 'VIDEO' ? i.videoState === 'READY' : !!i.fileId,
+        .filter((i: { kind: string; videoState: string | null; fileId: string | null; fileIdEn: string | null }) =>
+          i.kind === 'VIDEO' ? i.videoState === 'READY' : !!(i.fileId || i.fileIdEn),
         )
-        .map((i: { id: string; kind: string; title: unknown; description: unknown; durationSec: number | null; thumbnailUrl: string | null }) => ({
+        .map((i: {
+          id: string; kind: string; title: unknown; description: unknown; durationSec: number | null; thumbnailUrl: string | null;
+          fileId: string | null; fileIdEn: string | null;
+        }) => ({
           id: i.id, kind: i.kind, title: i.title, description: i.description, durationSec: i.durationSec, thumbnailUrl: i.thumbnailUrl,
+          // PDF: dostępne wersje językowe — strona pokaże „tylko po polsku / English only".
+          ...(i.kind === 'PDF' ? { langs: [...(i.fileId ? ['pl'] : []), ...(i.fileIdEn ? ['en'] : [])] } : {}),
         })),
     };
   }
@@ -184,12 +189,14 @@ export class MemberService {
     return { embedUrl: url, expiresAt };
   }
 
-  async fileLink(slug: string, itemId: string, guestId: string) {
+  /** Link do PDF w języku kursanta; gdy brak tej wersji — druga dostępna. */
+  async fileLink(slug: string, itemId: string, guestId: string, lang?: string) {
     const item = await this.requireItem(slug, itemId, guestId);
-    if (item.kind !== 'PDF' || !item.fileId) throw new NotFoundException('Plik nie jest dostępny');
-    const view = signedFilePath(item.fileId, 600, false);
-    const dl = signedFilePath(item.fileId, 600, true);
-    return { path: view.path, downloadPath: dl.path, expiresAt: view.expiresAt };
+    const fileId = lang === 'en' ? item.fileIdEn ?? item.fileId : item.fileId ?? item.fileIdEn;
+    if (item.kind !== 'PDF' || !fileId) throw new NotFoundException('Plik nie jest dostępny');
+    const view = signedFilePath(fileId, 600, false);
+    const dl = signedFilePath(fileId, 600, true);
+    return { path: view.path, downloadPath: dl.path, expiresAt: view.expiresAt, lang: fileId === item.fileIdEn ? 'en' : 'pl' };
   }
 
   async file(fileId: string) {

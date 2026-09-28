@@ -31,6 +31,7 @@ let _authToken: string | null = (() => {
 })()
 
 export function setAuthToken(token: string | null): void {
+  const changed = _authToken !== token
   _authToken = token
   try {
     if (token) {
@@ -41,10 +42,63 @@ export function setAuthToken(token: string | null): void {
   } catch {
     // ignore storage errors
   }
+  if (changed && typeof window !== 'undefined') window.dispatchEvent(new Event(AUTH_CHANGED_EVENT))
 }
 
 export function getAuthToken(): string | null {
   return _authToken
+}
+
+/** Zdarzenie „sesja admina się zmieniła" (np. 401 → wylogowanie) — AdminPanel pokazuje wtedy ekran logowania. */
+export const AUTH_CHANGED_EVENT = 'icpe-admin-auth-changed'
+
+function tokenClaims(t: string | null): { exp?: number; iat?: number; rmb?: boolean } | null {
+  if (!t) return null
+  try {
+    const p = t.split('.')[1]
+    return JSON.parse(atob(p.replace(/-/g, '+').replace(/_/g, '/'))) as { exp?: number; iat?: number; rmb?: boolean }
+  } catch {
+    return null
+  }
+}
+
+/** Czy zapisany token admina jest jeszcze ważny (z 1-min zapasem). */
+export function hasValidAdminToken(): boolean {
+  const c = tokenClaims(_authToken)
+  return !!c && (!c.exp || c.exp * 1000 > Date.now() + 60_000)
+}
+
+let _renewing: Promise<void> | null = null
+
+/**
+ * Sesja „przesuwna": gdy minęła połowa ważności tokenu, pobiera nowy (ta sama długość sesji).
+ * Przy „Zapamiętaj mnie" (30 dni) aktywny admin praktycznie nigdy nie musi logować się ponownie.
+ */
+export function maybeRenewAdminToken(): Promise<void> {
+  const c = tokenClaims(_authToken)
+  if (!c?.exp || !c.iat || !API_URL) return Promise.resolve()
+  const now = Date.now() / 1000
+  if (c.exp <= now) {
+    setAuthToken(null)
+    return Promise.resolve()
+  }
+  if (now - c.iat < (c.exp - c.iat) / 2) return Promise.resolve()
+  if (_renewing) return _renewing
+  _renewing = fetch(`${API_URL}/auth/admin/refresh`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${_authToken}`, 'Content-Type': 'application/json' },
+  })
+    .then(async (res) => {
+      if (res.status === 401) return setAuthToken(null)
+      if (!res.ok) return // chwilowy błąd serwera — spróbujemy przy następnej okazji
+      const body = (await res.json()) as { accessToken?: string }
+      if (body.accessToken) setAuthToken(body.accessToken)
+    })
+    .catch(() => undefined)
+    .finally(() => {
+      _renewing = null
+    })
+  return _renewing
 }
 
 /** Odczytuje e-mail zalogowanego admina z payloadu JWT (bez zapytania do API). */
@@ -1113,10 +1167,11 @@ export async function getInstanceDetail(id: string, token?: string): Promise<Eve
 export async function adminLogin(
   email: string,
   password: string,
-): Promise<{ accessToken: string; refreshToken: string }> {
+  remember = true,
+): Promise<{ accessToken: string; remember?: boolean }> {
   return apiFetch('/auth/admin/login', {
     method: 'POST',
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, password, remember }),
   })
 }
 

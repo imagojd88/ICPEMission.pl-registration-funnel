@@ -1,4 +1,8 @@
 import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
+
+/** Czas sesji admina: zwykła (bez „Zapamiętaj mnie") i zapamiętana. Nadpisywalne z ENV. */
+const sessionTtl = (remember: boolean) =>
+  remember ? process.env.ADMIN_REMEMBER_TTL || '30d' : process.env.ADMIN_SESSION_TTL || '12h';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import * as argon2 from 'argon2';
@@ -35,16 +39,30 @@ export class AuthService {
     }
   }
 
-  async loginAdmin(email: string, password: string) {
+  async loginAdmin(email: string, password: string, remember = false) {
     const user = await this.prisma.adminUser.findUnique({ where: { email } });
     if (!user) throw new UnauthorizedException('Invalid credentials');
     const ok = await argon2.verify(user.passwordHash, password);
     if (!ok) throw new UnauthorizedException('Invalid credentials');
-    const payload = { sub: user.id, email: user.email, role: user.role, realm: 'admin' };
+    return this.issueAdminToken(user, remember);
+  }
+
+  private issueAdminToken(user: { id: string; email: string; role: string }, remember: boolean) {
+    // `rmb` zapamiętuje wybór „Zapamiętaj mnie", żeby odświeżenie zachowało długość sesji.
+    const payload = { sub: user.id, email: user.email, role: user.role, realm: 'admin', rmb: remember };
     return {
-      accessToken: this.jwt.sign(payload),
+      accessToken: this.jwt.sign(payload, { expiresIn: sessionTtl(remember) }),
       user: { id: user.id, email: user.email, role: user.role },
+      remember,
     };
+  }
+
+  /** Nowy token dla zalogowanego admina — tylko gdy konto nadal istnieje (usunięcie konta = koniec sesji). */
+  async refreshAdmin(current: { sub?: string; realm?: string; rmb?: boolean } | undefined) {
+    if (current?.realm !== 'admin' || !current.sub) throw new UnauthorizedException('Tylko sesja admina');
+    const user = await this.prisma.adminUser.findUnique({ where: { id: current.sub } });
+    if (!user) throw new UnauthorizedException('Konto nie istnieje');
+    return this.issueAdminToken(user, !!current.rmb);
   }
 
   async validateServiceToken(token: string): Promise<{ scopes: string[] } | null> {

@@ -572,7 +572,8 @@ model CourseItem {
   videoState   String? // UPLOADING | PROCESSING | READY | FAILED
   durationSec  Int?
   thumbnailUrl String?
-  fileId       String? // → PrivateFile (PDF)
+  fileId       String? // → PrivateFile (PDF, wersja PL)
+  fileIdEn     String? // → PrivateFile (PDF, wersja EN — opcjonalna)
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
 }

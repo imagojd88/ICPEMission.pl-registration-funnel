@@ -10,13 +10,25 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [remember, setRemember] = useState(() => {
+    try {
+      return localStorage.getItem('icpe_admin_remember') !== '0'
+    } catch {
+      return true
+    }
+  })
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
     setLoading(true)
     try {
-      const { accessToken } = await adminLogin(email, password)
+      const { accessToken } = await adminLogin(email, password, remember)
+      try {
+        localStorage.setItem('icpe_admin_remember', remember ? '1' : '0')
+      } catch {
+        /* ignore */
+      }
       setAuthToken(accessToken)
       onLogin()
     } catch {
@@ -92,6 +104,7 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
             </label>
             <input
               id="admin-email"
+              name="email"
               type="email"
               required
               autoComplete="email"
@@ -119,6 +132,7 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
             </label>
             <input
               id="admin-password"
+              name="password"
               type="password"
               required
               autoComplete="current-password"
@@ -135,6 +149,22 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
               onBlur={(e) => (e.currentTarget.style.borderColor = 'var(--border)')}
             />
           </div>
+
+          <label className="flex items-start gap-2 text-sm cursor-pointer select-none" style={{ color: 'var(--ink)' }}>
+            <input
+              type="checkbox"
+              checked={remember}
+              onChange={(e) => setRemember(e.target.checked)}
+              className="mt-0.5"
+              style={{ accentColor: 'var(--brand)' }}
+            />
+            <span>
+              Zapamiętaj mnie na tym urządzeniu
+              <span className="block text-xs" style={{ color: 'var(--faint)' }}>
+                Sesja 30 dni, przedłużana automatycznie przy korzystaniu. Nie zaznaczaj na cudzym komputerze.
+              </span>
+            </span>
+          </label>
 
           {error && (
             <div

@@ -13,7 +13,8 @@ export function StatusBadge({ status }: { status: CourseStatus }) {
   return <Badge variant={v}>{STATUS_LABEL[status]}</Badge>
 }
 
-export function VideoStateBadge({ state }: { state: VideoState | null }) {
+export function VideoStateBadge({ state, uploading }: { state: VideoState | null; uploading?: boolean }) {
+  if (uploading) return <Badge variant="brand">Wysyłanie…</Badge>
   switch (state) {
     case 'READY':
       return <Badge variant="ok">Gotowy</Badge>
