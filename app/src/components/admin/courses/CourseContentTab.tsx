@@ -171,6 +171,12 @@ function ItemRow({
             {isVideo ? (
               <>
                 <VideoStateBadge state={item.videoState} uploading={!!activeUpload} />
+                {!activeUpload && item.videoState === 'PROCESSING' && typeof item.live?.encodeProgress === 'number' && (
+                  <span>kodowanie {item.live.encodeProgress}% · odświeża się samo co 10 s</span>
+                )}
+                {!activeUpload && item.live?.error && (
+                  <span style={{ color: 'var(--err)' }}>Nie udało się sprawdzić stanu w Bunny: {item.live.error}</span>
+                )}
                 {item.durationSec ? <span>{formatDuration(item.durationSec)}</span> : null}
               </>
             ) : (

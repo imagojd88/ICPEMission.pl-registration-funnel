@@ -44,6 +44,16 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — panel kursanta (kurs online)
 
+### Panel: postęp kodowania filmu na żywo (2026-09-28)
+- Pytanie usera: czy „Kodowanie…" samo się zmieni — TAK: edytor co 10 s pobiera kurs, a API przy tym odpytuje Bunny (GET video) i zapisuje stan (READY → zielone „Gotowy", miniatura, czas trwania). Działa tylko przy otwartym edytorze; bez niego stan aktualizuje webhook Bunny albo najbliższe otwarcie kursu w panelu.
+- Mapowanie statusów Bunny zweryfikowane z dokumentacją Get Video: 0 Created, 1 Uploaded, 2 Processing, 3 Transcoding, 4 Finished, 5 Error, 6 UploadFailed, 7 JitSegmenting, 8 JitPlaylistsCreated (+ `encodeProgress` 0–100, `availableResolutions`).
+- Nowe: `courses.service.get()` zwraca per film `live` = `{ encodeProgress, rawStatus }` albo `{ error }` (gdy zapytanie do Bunny się nie uda — np. zły klucz API); panel pokazuje „kodowanie N% · odświeża się samo co 10 s" albo czerwony komunikat błędu. Pliki: `courses.service.ts` (refreshVideoWithInfo), `app/src/lib/courses.ts`, `CourseContentTab.tsx`. tsc api/app ✓, vite build ✓, testy logiki ✓.
+
+### Zaślepka „Film będzie wkrótce dostępny" (2026-09-28)
+- `member.service.ts`: kursant widzi też opublikowane filmy w trakcie wysyłki/kodowania (`videoId` jest, stan ≠ READY) z flagą `pending: true`; `play` dla nich nadal zwraca 404.
+- Strona (`course-app.ts`, `CourseApp.astro`): nieklikalna karta z paskowanym tłem i napisem „Film będzie wkrótce dostępny" / „Video will soon be available" (PL/EN); gdy jest jakakolwiek zaślepka — ciche odświeżenie listy co 60 s (tylko przy widocznej karcie), więc film pojawia się sam po zakodowaniu. Chcąc ukryć film do czasu publikacji — przełącznik „oko" przy materiale w panelu.
+- Testy: logika (kodowany film jako zaślepka, play odrzucony) + wszystkie poprzednie zestawy ✓; Chromium: zaślepka PL/EN, nieklikalna ✓; tsc api ✓, astro check/build ✓. Wymaga Manual Deploy `icpe-api` + auto-deploy strony.
+
 ### Reset hasła kursanta z panelu (2026-09-28)
 - Panel ▸ kurs ▸ **Kursanci**: przy każdej aktywnej osobie ikona klucza → panel z dwiema opcjami:
   - **Wyślij link mailem** — `POST /admin/courses/:id/enrollments/:eid/reset-link`: konto z hasłem → mail `MEMBER_PASSWORD_RESET` z linkiem ważnym **48 h** (samoobsługowy „Nie pamiętam hasła" nadal 1 h; treść maila liczy godziny: „ważny 1 godzinę / 48 godzin"); konto bez hasła → mail powitalny „Ustaw hasło". Wymaga opublikowanego kursu. Zdarzenie RESET_REQUEST (meta.by=admin).

@@ -190,15 +190,17 @@ export class MemberService {
       accessUntil: course.accessUntil,
       member: guest,
       items: items
-        .filter((i: { kind: string; videoState: string | null; fileId: string | null; fileIdEn: string | null }) =>
-          i.kind === 'VIDEO' ? i.videoState === 'READY' : !!(i.fileId || i.fileIdEn),
+        .filter((i: { kind: string; videoId: string | null; videoState: string | null; fileId: string | null; fileIdEn: string | null }) =>
+          // Film w trakcie wysyłki/kodowania też jest pokazywany — jako zaślepka „wkrótce dostępny".
+          i.kind === 'VIDEO' ? !!i.videoId : !!(i.fileId || i.fileIdEn),
         )
         .map((i: {
           id: string; kind: string; title: unknown; description: unknown; durationSec: number | null; thumbnailUrl: string | null;
-          fileId: string | null; fileIdEn: string | null;
+          fileId: string | null; fileIdEn: string | null; videoState: string | null;
         }) => ({
           id: i.id, kind: i.kind, title: i.title, description: i.description, durationSec: i.durationSec, thumbnailUrl: i.thumbnailUrl,
           // PDF: dostępne wersje językowe — strona pokaże „tylko po polsku / English only".
+          ...(i.kind === 'VIDEO' && i.videoState !== 'READY' ? { pending: true } : {}),
           ...(i.kind === 'PDF' ? { langs: [...(i.fileId ? ['pl'] : []), ...(i.fileIdEn ? ['en'] : [])] } : {}),
         })),
     };

@@ -124,13 +124,20 @@ export class CoursesService {
   async get(id: string) {
     const c = await this.mustGet(id);
     const items = (await this.prisma.courseItem.findMany({ where: { courseId: id }, orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] })) as ItemRow[];
+    // Stan „na żywo" z Bunny dla filmów w toku: % kodowania albo treść błędu (widoczne w panelu).
+    const live: Record<string, { encodeProgress?: number | null; rawStatus?: number; error?: string }> = {};
     if (this.bunny.isConfigured()) {
       await Promise.all(
         items
           .filter((i) => i.kind === 'VIDEO' && i.videoId && i.videoState !== 'READY' && i.videoState !== 'FAILED')
           .map(async (i) => {
-            const updated = await this.refreshVideo(i).catch(() => null);
-            if (updated) Object.assign(i, updated);
+            try {
+              const { updated, info } = await this.refreshVideoWithInfo(i);
+              if (updated) Object.assign(i, updated);
+              live[i.id] = { encodeProgress: info.encodeProgress, rawStatus: info.rawStatus };
+            } catch (e) {
+              live[i.id] = { error: (e as Error).message };
+            }
           }),
       );
     }
@@ -152,6 +159,7 @@ export class CoursesService {
         ...i,
         file: i.fileId ? fileMap.get(i.fileId) ?? null : null,
         fileEn: i.fileIdEn ? fileMap.get(i.fileIdEn) ?? null : null,
+        live: live[i.id] ?? null,
       })),
     };
   }
@@ -341,9 +349,13 @@ export class CoursesService {
 
   /** Pobiera stan wideo z Bunny i zapisuje. */
   async refreshVideo(item: ItemRow) {
-    if (!item.videoId) return null;
+    return (await this.refreshVideoWithInfo(item)).updated;
+  }
+
+  private async refreshVideoWithInfo(item: ItemRow) {
+    if (!item.videoId) return { updated: null, info: { encodeProgress: null, rawStatus: -1 } };
     const info = await this.bunny.getVideo(item.videoId);
-    return this.prisma.courseItem.update({
+    const updated = await this.prisma.courseItem.update({
       where: { id: item.id },
       data: {
         videoState: info.state,
@@ -351,6 +363,7 @@ export class CoursesService {
         thumbnailUrl: info.thumbnailUrl ?? item.thumbnailUrl,
       },
     });
+    return { updated, info };
   }
 
   async refreshItem(courseId: string, itemId: string) {

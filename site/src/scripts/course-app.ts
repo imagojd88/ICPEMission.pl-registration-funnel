@@ -14,6 +14,8 @@ interface Item {
   durationSec: number | null;
   thumbnailUrl: string | null;
   langs?: Lang[];
+  /** Film jeszcze się koduje — pokazujemy zaślepkę. */
+  pending?: boolean;
 }
 interface CourseData {
   preview?: { status: string } | null;
@@ -55,6 +57,7 @@ function init(root: HTMLElement) {
       playErr: 'Nie udało się uruchomić filmu.',
       video: 'Wideo',
       onlyOther: 'dostępny tylko po angielsku',
+      soon: 'Film będzie wkrótce dostępny',
       preview: 'Podgląd administratora — tak widzą kurs kursanci. Twoja aktywność nie jest zapisywana.',
       previewDraft: ' Kurs jest jeszcze szkicem — kursanci go nie widzą.',
       linkExpired: 'Ten link wygasł albo został już użyty. Wpisz e-mail w „Nie pamiętam hasła", a wyślemy nowy.',
@@ -76,6 +79,7 @@ function init(root: HTMLElement) {
       playErr: 'Could not start the video.',
       video: 'Video',
       onlyOther: 'available in Polish only',
+      soon: 'Video will soon be available',
       preview: 'Administrator preview — this is what participants see. Your activity is not recorded.',
       previewDraft: ' The course is still a draft — participants cannot see it.',
       linkExpired: 'This link has expired or was already used. Use "Forgot password" to get a new one.',
@@ -224,6 +228,19 @@ function init(root: HTMLElement) {
     $('#ca-empty')!.hidden = course.items.length > 0;
 
     for (const v of videos) {
+      if (v.pending) {
+        // Zaślepka: film jeszcze się koduje — nieklikalna karta z informacją.
+        const card = el('div', 'ca-video ca-video-pending');
+        const thumb = el('div', 'ca-thumb ca-thumb-pending');
+        thumb.append(el('span', 'ca-soon', tr().soon));
+        const body = el('div', 'ca-video-body');
+        body.append(el('div', 'ca-item-title', pick(v.title)));
+        const desc = pick(v.description);
+        if (desc) body.append(el('p', 'ca-item-desc', desc));
+        card.append(thumb, body);
+        vBox.append(card);
+        continue;
+      }
       const card = el('button', 'ca-video');
       card.type = 'button';
       const thumb = el('div', 'ca-thumb');
@@ -415,12 +432,30 @@ function init(root: HTMLElement) {
     window.alert(e instanceof Error && e.message ? e.message : fallback);
   }
 
+  // Gdy któryś film się koduje — co 60 s ciche odświeżenie listy (zaślepka sama zamieni się w film).
+  let pendingTimer: number | undefined;
+  function schedulePendingRefresh() {
+    window.clearTimeout(pendingTimer);
+    if (!course?.items.some((i) => i.pending)) return;
+    pendingTimer = window.setTimeout(async () => {
+      if (current !== 'dashboard' || document.visibilityState !== 'visible') return schedulePendingRefresh();
+      try {
+        course = await api<CourseData>(`/member/courses/${slug}`, {}, true);
+        renderDashboard();
+      } catch {
+        /* błąd sieci — spróbujemy za chwilę */
+      }
+      schedulePendingRefresh();
+    }, 60_000);
+  }
+
   async function loadCourse(): Promise<void> {
     setLoading(tr().connecting);
     try {
       course = await api<CourseData>(`/member/courses/${slug}`, {}, true);
       show('dashboard');
       renderDashboard();
+      schedulePendingRefresh();
     } catch (e) {
       const err = e as ApiError;
       if (err.status === 401) {

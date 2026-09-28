@@ -204,6 +204,10 @@ const descEn = course ? pickLang(course.description ?? '', 'en') : '';
   .ca-play::after { content: ''; margin-left: 5px; border-left: 17px solid var(--ink); border-top: 11px solid transparent; border-bottom: 11px solid transparent; }
   .ca-dur { position: absolute; right: 10px; bottom: 10px; background: rgba(0,0,0,.65); color: #fff; font-size: 12px; padding: 2px 7px; border-radius: 6px; font-family: 'Space Mono', monospace; }
   .ca-video-body { padding: 14px 16px 16px; }
+  .ca-video-pending { cursor: default; }
+  .ca-video-pending:hover { transform: none; box-shadow: none; }
+  .ca-thumb-pending { display: flex; align-items: center; justify-content: center; background: repeating-linear-gradient(135deg, #3a2f28 0 14px, #332923 14px 28px); }
+  .ca-soon { padding: 8px 14px; border-radius: 100px; background: rgba(244,238,227,.92); color: var(--ink); font-size: 14px; font-weight: 600; text-align: center; max-width: 85%; }
   .ca-item-title { font-weight: 700; font-size: 16px; line-height: 1.3; }
   .ca-item-desc { margin: 6px 0 0; font-size: 14px; color: var(--muted); line-height: 1.45; }
   .ca-item-note { font-style: italic; font-size: 13px; }

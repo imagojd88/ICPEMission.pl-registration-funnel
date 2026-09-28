@@ -39,6 +39,8 @@ export interface CourseItem {
   fileIdEn: string | null
   file: PdfFileMeta | null
   fileEn: PdfFileMeta | null
+  /** Stan z Bunny dla filmów w toku (tylko w szczegółach kursu). */
+  live?: { encodeProgress?: number | null; rawStatus?: number; error?: string } | null
   createdAt: string
 }
 
