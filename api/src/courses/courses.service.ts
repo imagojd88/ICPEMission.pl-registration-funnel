@@ -5,7 +5,7 @@ import { DeployHookService } from '../content/deploy-hook.service';
 import { BunnyStreamService } from './bunny-stream.service';
 import { CourseAccessService } from './course-access.service';
 import { CourseTrackingService } from './course-tracking.service';
-import { courseUrl, isEmail, normEmail, normLangText, pickText, slugify, slugProblem } from './course-utils';
+import { courseUrl, siteBase, isEmail, normEmail, normLangText, pickText, slugify, slugProblem } from './course-utils';
 
 export interface UploadedFileLike {
   buffer: Buffer;
@@ -364,6 +364,12 @@ export class CoursesService {
       },
     });
     return { updated, info };
+  }
+
+  async diagnoseVideo(courseId: string, itemId: string) {
+    const item = await this.mustGetItem(courseId, itemId);
+    if (item.kind !== 'VIDEO' || !item.videoId) throw new BadRequestException('To nie jest film.');
+    return this.bunny.diagnosePlayback(item.videoId, siteBase());
   }
 
   async refreshItem(courseId: string, itemId: string) {

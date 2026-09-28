@@ -135,6 +135,8 @@ export const updateCourseItem = (
 ) => apiFetch<CourseItem>(`/admin/courses/${courseId}/items/${itemId}`, json('PATCH', body))
 export const refreshCourseItem = (courseId: string, itemId: string) =>
   apiFetch<CourseItem>(`/admin/courses/${courseId}/items/${itemId}/refresh`, json('POST'))
+export const diagnoseVideo = (courseId: string, itemId: string) =>
+  apiFetch<{ ok: boolean; verdict: string; details: Record<string, unknown> }>(`/admin/courses/${courseId}/items/${itemId}/diagnose`, json('POST'))
 export const deleteCourseItem = (courseId: string, itemId: string) =>
   apiFetch<{ ok: true }>(`/admin/courses/${courseId}/items/${itemId}`, json('DELETE'))
 export const reorderCourseItems = (courseId: string, ids: string[]) =>

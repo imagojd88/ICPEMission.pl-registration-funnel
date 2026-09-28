@@ -44,6 +44,11 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — panel kursanta (kurs online)
 
+### Film: błąd 403 z Bunny + przycisk „Sprawdź odtwarzanie" (2026-09-28)
+- Zgłoszenie usera: zakodowany film w odtwarzaczu na stronie kursu pokazuje ekran Bunny „403" (Bunny odrzuca embed). Kod podpisu zgodny z dokumentacją (`sha256hex(tokenKey + videoId + expires)`, parametry `token`/`expires`) — przyczyna po stronie konfiguracji: (1) `BUNNY_STREAM_TOKEN_KEY` pusty lub inny niż „Token authentication key" z Security biblioteki (częsta pomyłka: wklejony „API Key"), albo (2) „Allowed domains" bez `icpemission.pl` / wpisane z https:// i ukośnikiem.
+- Nowe: przy gotowym filmie w panelu ikona ▶ „Sprawdź odtwarzanie" → `POST /admin/courses/:id/items/:itemId/diagnose` → `BunnyStreamService.diagnosePlayback()`: serwer otwiera embed Bunny w 3 wariantach (podpisany z Referer `PUBLIC_SITE_URL`, podpisany bez Referer, niepodpisany z Referer) i wskazuje przyczynę po polsku (brak klucza / zła domena / zły klucz / OK). Test logiki 4 scenariuszy ✓, poprzednie zestawy ✓, tsc api/app ✓, vite build ✓.
+- Status: czeka na sprawdzenie ustawień przez Jacka (Security biblioteki Bunny + zmienna na Renderze) i na push + Manual Deploy `icpe-api`.
+
 ### Panel: postęp kodowania filmu na żywo (2026-09-28)
 - Pytanie usera: czy „Kodowanie…" samo się zmieni — TAK: edytor co 10 s pobiera kurs, a API przy tym odpytuje Bunny (GET video) i zapisuje stan (READY → zielone „Gotowy", miniatura, czas trwania). Działa tylko przy otwartym edytorze; bez niego stan aktualizuje webhook Bunny albo najbliższe otwarcie kursu w panelu.
 - Mapowanie statusów Bunny zweryfikowane z dokumentacją Get Video: 0 Created, 1 Uploaded, 2 Processing, 3 Transcoding, 4 Finished, 5 Error, 6 UploadFailed, 7 JitSegmenting, 8 JitPlaylistsCreated (+ `encodeProgress` 0–100, `availableResolutions`).

@@ -1,9 +1,9 @@
 import { useRef, useState } from 'react'
-import { ArrowDown, ArrowUp, Eye, EyeOff, FileText, Film, Pencil, RefreshCw, Trash2, Upload, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, Eye, EyeOff, FileText, Film, Pencil, PlayCircle, RefreshCw, Trash2, Upload, X } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import {
-  createVideoItem, deleteCourseItem, formatBytes, formatDuration, refreshCourseItem, removeItemPdf, renewVideoUpload,
+  createVideoItem, deleteCourseItem, diagnoseVideo, formatBytes, formatDuration, refreshCourseItem, removeItemPdf, renewVideoUpload,
   reorderCourseItems, setItemPdf, updateCourseItem, uploadPdfItem,
   type CourseDetail, type CourseItem, type CoursesConfig, type PdfLang,
 } from '@/lib/courses'
@@ -89,6 +89,7 @@ function ItemRow({
   onError: (m: string | null) => void
 }) {
   const [editing, setEditing] = useState(false)
+  const [diag, setDiag] = useState<{ ok: boolean; verdict: string } | 'loading' | null>(null)
   const [pl, setPl] = useState(item.title.pl ?? '')
   const [en, setEn] = useState(item.title.en ?? '')
   const [descPl, setDescPl] = useState(item.description?.pl ?? '')
@@ -197,6 +198,21 @@ function ItemRow({
               </button>
             </>
           )}
+          {isVideo && item.videoState === 'READY' && (
+            <button
+              type="button"
+              title="Sprawdź odtwarzanie (diagnoza błędu 403)"
+              style={iconBtn}
+              onClick={() => {
+                setDiag('loading')
+                diagnoseVideo(course.id, item.id)
+                  .then((r) => setDiag(r))
+                  .catch((e) => setDiag({ ok: false, verdict: errMsg(e) }))
+              }}
+            >
+              <PlayCircle size={15} />
+            </button>
+          )}
           <button type="button" onClick={() => setEditing((v) => !v)} style={iconBtn} title="Edytuj tytuł">
             <Pencil size={15} />
           </button>
@@ -251,6 +267,23 @@ function ItemRow({
       )}
       {isVideo && item.videoState === 'UPLOADING' && !upload && (
         <p className="text-xs" style={{ color: 'var(--warn)' }}>Plik filmu nie został (w całości) wysłany — kliknij ikonę wysyłania i wybierz ten sam plik, aby wznowić.</p>
+      )}
+
+      {diag && (
+        <div className="flex items-start gap-2">
+          <div className="flex-1">
+            {diag === 'loading' ? (
+              <Notice kind="info">Sprawdzam odtwarzanie w Bunny…</Notice>
+            ) : (
+              <Notice kind={diag.ok ? 'ok' : 'err'}>{diag.verdict}</Notice>
+            )}
+          </div>
+          {diag !== 'loading' && (
+            <button type="button" onClick={() => setDiag(null)} style={iconBtn} title="Zamknij">
+              <X size={14} />
+            </button>
+          )}
+        </div>
       )}
 
       {!isVideo && (

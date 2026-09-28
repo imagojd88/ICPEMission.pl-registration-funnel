@@ -100,6 +100,12 @@ export class CoursesAdminController {
     return this.courses.updateItem(id, itemId, body);
   }
 
+  @Post(':id/items/:itemId/diagnose')
+  @ApiOperation({ summary: 'Sprawdź, czy film da się odtworzyć ze strony (diagnoza 403 z Bunny)' })
+  diagnose(@Param('id') id: string, @Param('itemId') itemId: string) {
+    return this.courses.diagnoseVideo(id, itemId);
+  }
+
   @Post(':id/items/:itemId/refresh')
   refreshItem(@Param('id') id: string, @Param('itemId') itemId: string) {
     return this.courses.refreshItem(id, itemId);
