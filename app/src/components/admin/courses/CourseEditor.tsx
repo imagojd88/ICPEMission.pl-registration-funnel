@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { ArrowLeft, ExternalLink, Send } from 'lucide-react'
+import { ArrowLeft, Eye, ExternalLink, Send } from 'lucide-react'
 import Button from '@/components/ui/Button'
-import { getCourse, updateCourse, type CourseDetail, type CoursesConfig } from '@/lib/courses'
+import { getCourse, getPreviewUrl, updateCourse, type CourseDetail, type CoursesConfig } from '@/lib/courses'
 import { uploadStore, type UploadState } from '@/lib/uploadStore'
 import CourseSettingsTab from './CourseSettingsTab'
 import CourseContentTab from './CourseContentTab'
 import CourseMembersTab from './CourseMembersTab'
+import CourseActivityTab from './CourseActivityTab'
 import { Notice, StatusBadge, errMsg, t } from './shared'
 
-type Tab = 'content' | 'members' | 'settings'
+type Tab = 'content' | 'members' | 'activity' | 'settings'
 
 export type { UploadState }
 
@@ -63,6 +64,22 @@ export default function CourseEditor({ id, config, onBack }: { id: string; confi
   )
   const cancelUpload = (itemId: string) => uploadStore.cancel(itemId)
 
+  /** Podgląd kursu jako kursant — okno otwierane od razu (blokada wyskakujących okien), adres po odpowiedzi API. */
+  async function preview() {
+    if (!course) return
+    const w = window.open('about:blank', '_blank')
+    try {
+      const { url } = await getPreviewUrl(course.id)
+      if (w) {
+        w.opener = null
+        w.location.href = url
+      } else window.location.href = url
+    } catch (e) {
+      w?.close()
+      setError(errMsg(e))
+    }
+  }
+
   async function publish() {
     if (!course) return
     const n = course.pendingWelcome
@@ -94,6 +111,7 @@ export default function CourseEditor({ id, config, onBack }: { id: string; confi
   const tabs: { id: Tab; label: string }[] = [
     { id: 'content', label: `Zawartość (${course.items.length})` },
     { id: 'members', label: `Kursanci (${course.members})` },
+    { id: 'activity', label: 'Aktywność' },
     { id: 'settings', label: 'Ustawienia' },
   ]
 
@@ -121,11 +139,16 @@ export default function CourseEditor({ id, config, onBack }: { id: string; confi
             </p>
           )}
         </div>
-        {course.status === 'DRAFT' && (
-          <Button onClick={() => void publish()} disabled={publishing}>
-            <Send size={15} /> {publishing ? 'Publikuję…' : 'Opublikuj kurs'}
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button variant="outline" onClick={() => void preview()} title="Otwiera stronę kursu zalogowaną jako Ty — działa także dla szkicu">
+            <Eye size={15} /> Podgląd jako kursant
           </Button>
-        )}
+          {course.status === 'DRAFT' && (
+            <Button onClick={() => void publish()} disabled={publishing}>
+              <Send size={15} /> {publishing ? 'Publikuję…' : 'Opublikuj kurs'}
+            </Button>
+          )}
+        </div>
       </div>
       {notice && <Notice kind="ok">{notice}</Notice>}
       {Object.values(uploads).some((u) => uploadStore.isActive(u)) && (
@@ -166,6 +189,7 @@ export default function CourseEditor({ id, config, onBack }: { id: string; confi
         />
       )}
       {tab === 'members' && <CourseMembersTab course={course} onChanged={reload} />}
+      {tab === 'activity' && <CourseActivityTab course={course} />}
       {tab === 'settings' && <CourseSettingsTab course={course} onSaved={setCourse} onDeleted={onBack} />}
     </div>
   )

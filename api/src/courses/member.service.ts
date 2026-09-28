@@ -6,7 +6,9 @@ import * as argon2 from 'argon2';
 import { PrismaService } from '../prisma/prisma.service';
 import { BunnyStreamService } from './bunny-stream.service';
 import { CourseAccessService } from './course-access.service';
-import { memberJwtSecret, normEmail, rateLimit, sha256hex, signedFilePath } from './course-utils';
+import { CourseTrackingService } from './course-tracking.service';
+import type { MemberCtx } from './member-auth.guard';
+import { courseUrl, memberJwtSecret, normEmail, rateLimit, sha256hex, signedFilePath } from './course-utils';
 
 const GENERIC_LOGIN_ERROR =
   'Nieprawidłowy e-mail lub hasło. Jeśli logujesz się pierwszy raz, użyj linku z maila powitalnego albo „Nie pamiętam hasła".';
@@ -21,7 +23,22 @@ export class MemberService {
     private readonly jwt: JwtService,
     private readonly access: CourseAccessService,
     private readonly bunny: BunnyStreamService,
+    private readonly tracking: CourseTrackingService,
   ) {}
+
+  /**
+   * Podgląd kursu przez admina: token kursanta z flagą `adm` (12 h) — działa w każdym kursie, także w szkicu,
+   * bez zapisu aktywności. Przekazywany w #fragmencie adresu (nie trafia do logów serwera).
+   */
+  async previewUrl(courseId: string, admin: { sub?: string; email?: string } | undefined) {
+    const c = await this.prisma.course.findUnique({ where: { id: courseId } });
+    if (!c) throw new NotFoundException('Nie znaleziono kursu');
+    const token = this.jwt.sign(
+      { sub: `admin:${admin?.sub ?? 'service'}`, email: admin?.email ?? 'admin', realm: 'member', adm: true },
+      { secret: memberJwtSecret(), expiresIn: '12h' },
+    );
+    return { url: `${courseUrl(c.slug)}#podglad=${token}` };
+  }
 
   private sign(guest: { id: string; email: string }) {
     return this.jwt.sign({ sub: guest.id, email: guest.email, realm: 'member' }, { secret: memberJwtSecret(), expiresIn: '7d' });
@@ -87,6 +104,7 @@ export class MemberService {
     if (!enr) throw new ForbiddenException('To konto nie ma dostępu do tego kursu. Skontaktuj się z organizatorem.');
 
     await this.prisma.guestAccount.update({ where: { id: guest.id }, data: { lastLoginAt: new Date() } });
+    this.tracking.log(course.id, guest.id, 'LOGIN');
     return { accessToken: this.sign(guest), member: { firstName: guest.firstName, email: guest.email } };
   }
 
@@ -106,6 +124,7 @@ export class MemberService {
     });
     // Zużywamy ten i wszystkie inne niewykorzystane linki tej osoby.
     await this.prisma.memberToken.updateMany({ where: { guestId: guest.id, usedAt: null }, data: { usedAt: new Date() } });
+    this.tracking.log(rec.courseId, guest.id, 'PASSWORD_SET', null, { via: rec.purpose });
     return { accessToken: this.sign(guest), member: { firstName: guest.firstName, email: guest.email } };
   }
 
@@ -130,22 +149,41 @@ export class MemberService {
         if (enr?.welcomeSentAt && !guest?.passwordHash) return done;
       }
     }
-    if (guest && enr) await this.access.sendPasswordReset(guest.id, course);
+    if (guest && enr) {
+      await this.access.sendPasswordReset(guest.id, course);
+      this.tracking.log(course.id, guest.id, 'RESET_REQUEST');
+    }
     return done;
   }
 
+  /**
+   * Otwarcie linku z maila (?haslo=…): zapis kliknięcia + informacja, czy link jest jeszcze ważny
+   * (strona od razu pokaże „link wygasł" zamiast formularza, który się nie uda).
+   */
+  async linkOpen(body: { token?: string }, ip: string) {
+    this.limit(`link:${ip}`, 30, 15 * 60 * 1000);
+    const rec = await this.prisma.memberToken.findUnique({ where: { tokenHash: sha256hex(String(body.token ?? '')) } });
+    if (!rec) return { valid: false };
+    this.tracking.log(rec.courseId, rec.guestId, 'EMAIL_LINK', null, { purpose: rec.purpose });
+    return { valid: !rec.usedAt && rec.expiresAt.getTime() > Date.now() };
+  }
+
   /** Kurs + pozycje widoczne dla kursanta. */
-  async course(slug: string, guestId: string) {
-    const { course, enrollment } = await this.requireAccess(slug, guestId);
-    if (!enrollment.lastSeenAt || Date.now() - enrollment.lastSeenAt.getTime() > 5 * 60 * 1000) {
+  async course(slug: string, m: MemberCtx) {
+    const { course, enrollment } = await this.requireAccess(slug, m);
+    if (enrollment && (!enrollment.lastSeenAt || Date.now() - enrollment.lastSeenAt.getTime() > 5 * 60 * 1000)) {
       await this.prisma.courseEnrollment.update({ where: { id: enrollment.id }, data: { lastSeenAt: new Date() } });
     }
+    if (!m.admin) await this.tracking.logCourseView(course.id, m.guestId).catch(() => undefined);
     const items = await this.prisma.courseItem.findMany({
       where: { courseId: course.id, published: true },
       orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
     });
-    const guest = await this.prisma.guestAccount.findUnique({ where: { id: guestId }, select: { firstName: true, email: true } });
+    const guest = m.admin
+      ? { firstName: '', email: m.email }
+      : await this.prisma.guestAccount.findUnique({ where: { id: m.guestId }, select: { firstName: true, email: true } });
     return {
+      preview: m.admin ? { status: course.status } : null,
       slug: course.slug,
       title: course.title,
       description: course.description,
@@ -166,7 +204,14 @@ export class MemberService {
     };
   }
 
-  private async requireAccess(slug: string, guestId: string) {
+  private async requireAccess(slug: string, m: MemberCtx) {
+    if (m.admin) {
+      // Admin (podgląd): każdy kurs, także szkic i archiwum; brak enrollmentu.
+      const c = (await this.prisma.course.findFirst({ where: { slug: String(slug ?? '') } })) as CourseRow | null;
+      if (!c) throw new NotFoundException('Nie znaleziono kursu');
+      return { course: c, enrollment: null };
+    }
+    const guestId = m.guestId;
     const course = await this.courseBySlug(slug);
     if (!course) throw new NotFoundException('Nie znaleziono kursu');
     if (!this.isOpen(course)) throw new ForbiddenException('Dostęp do tego kursu jest zamknięty.');
@@ -175,27 +220,42 @@ export class MemberService {
     return { course, enrollment };
   }
 
-  private async requireItem(slug: string, itemId: string, guestId: string) {
-    const { course } = await this.requireAccess(slug, guestId);
+  private async requireItem(slug: string, itemId: string, m: MemberCtx) {
+    const { course } = await this.requireAccess(slug, m);
     const item = await this.prisma.courseItem.findFirst({ where: { id: itemId, courseId: course.id, published: true } });
     if (!item) throw new NotFoundException('Nie znaleziono materiału');
     return item;
   }
 
-  async play(slug: string, itemId: string, guestId: string) {
-    const item = await this.requireItem(slug, itemId, guestId);
+  async play(slug: string, itemId: string, m: MemberCtx) {
+    const item = await this.requireItem(slug, itemId, m);
     if (item.kind !== 'VIDEO' || !item.videoId || item.videoState !== 'READY') throw new NotFoundException('Film nie jest dostępny');
     const { url, expiresAt } = this.bunny.embedUrl(item.videoId);
-    return { embedUrl: url, expiresAt };
+    if (!m.admin) this.tracking.log(item.courseId, m.guestId, 'VIDEO_PLAY', item.id);
+    // `track: false` dla podglądu admina — strona nie wysyła wtedy postępu oglądania.
+    return { embedUrl: url, expiresAt, track: !m.admin };
+  }
+
+  /** Heartbeat postępu oglądania (co ~15 s z odtwarzacza). */
+  async progress(slug: string, itemId: string, m: MemberCtx, body: { buckets?: unknown; position?: unknown; duration?: unknown }) {
+    if (m.admin) return { ok: true, skipped: true };
+    const item = await this.requireItem(slug, itemId, m);
+    if (item.kind !== 'VIDEO') throw new BadRequestException('To nie jest film');
+    return this.tracking.recordProgress(item.courseId, item.id, m.guestId, body);
   }
 
   /** Link do PDF w języku kursanta; gdy brak tej wersji — druga dostępna. */
-  async fileLink(slug: string, itemId: string, guestId: string, lang?: string) {
-    const item = await this.requireItem(slug, itemId, guestId);
+  async fileLink(slug: string, itemId: string, m: MemberCtx, lang?: string, action?: string) {
+    const item = await this.requireItem(slug, itemId, m);
     const fileId = lang === 'en' ? item.fileIdEn ?? item.fileId : item.fileId ?? item.fileIdEn;
     if (item.kind !== 'PDF' || !fileId) throw new NotFoundException('Plik nie jest dostępny');
     const view = signedFilePath(fileId, 600, false);
     const dl = signedFilePath(fileId, 600, true);
+    if (!m.admin && (action === 'open' || action === 'download')) {
+      this.tracking.log(item.courseId, m.guestId, action === 'open' ? 'PDF_OPEN' : 'PDF_DOWNLOAD', item.id, {
+        lang: fileId === item.fileIdEn ? 'en' : 'pl',
+      });
+    }
     return { path: view.path, downloadPath: dl.path, expiresAt: view.expiresAt, lang: fileId === item.fileIdEn ? 'en' : 'pl' };
   }
 

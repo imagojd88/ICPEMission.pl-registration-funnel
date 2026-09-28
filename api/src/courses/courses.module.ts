@@ -5,6 +5,7 @@ import { BunnyStreamService } from './bunny-stream.service';
 import { CoursesService } from './courses.service';
 import { MemberService } from './member.service';
 import { MemberAuthGuard } from './member-auth.guard';
+import { CourseTrackingService } from './course-tracking.service';
 import { CoursesAdminController } from './courses.admin.controller';
 import { CoursesPublicController } from './courses.public.controller';
 
@@ -12,6 +13,6 @@ import { CoursesPublicController } from './courses.public.controller';
 @Module({
   imports: [AuthModule, ContentModule],
   controllers: [CoursesAdminController, CoursesPublicController],
-  providers: [BunnyStreamService, CoursesService, MemberService, MemberAuthGuard],
+  providers: [BunnyStreamService, CoursesService, MemberService, MemberAuthGuard, CourseTrackingService],
 })
 export class CoursesModule {}

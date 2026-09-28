@@ -65,6 +65,12 @@ export class CoursesPublicController {
     return this.member.setPassword(body, clientIp(req));
   }
 
+  @Post('member/auth/link-open')
+  @HttpCode(200)
+  linkOpen(@Body() body: { token?: string }, @Req() req: Request) {
+    return this.member.linkOpen(body, clientIp(req));
+  }
+
   @Post('member/auth/forgot')
   @HttpCode(200)
   forgot(@Body() body: { email?: string; slug?: string }, @Req() req: Request) {
@@ -76,21 +82,40 @@ export class CoursesPublicController {
   @ApiBearerAuth()
   @Get('member/courses/:slug')
   course(@Param('slug') slug: string, @Req() req: MemberRequest) {
-    return this.member.course(slug, req.member!.guestId);
+    return this.member.course(slug, req.member!);
   }
 
   @UseGuards(MemberAuthGuard)
   @ApiBearerAuth()
   @Get('member/courses/:slug/items/:itemId/play')
   play(@Param('slug') slug: string, @Param('itemId') itemId: string, @Req() req: MemberRequest) {
-    return this.member.play(slug, itemId, req.member!.guestId);
+    return this.member.play(slug, itemId, req.member!);
+  }
+
+  @UseGuards(MemberAuthGuard)
+  @ApiBearerAuth()
+  @Post('member/courses/:slug/items/:itemId/progress')
+  @HttpCode(200)
+  progress(
+    @Param('slug') slug: string,
+    @Param('itemId') itemId: string,
+    @Req() req: MemberRequest,
+    @Body() body: { buckets?: unknown; position?: unknown; duration?: unknown },
+  ) {
+    return this.member.progress(slug, itemId, req.member!, body);
   }
 
   @UseGuards(MemberAuthGuard)
   @ApiBearerAuth()
   @Get('member/courses/:slug/items/:itemId/file')
-  fileLink(@Param('slug') slug: string, @Param('itemId') itemId: string, @Req() req: MemberRequest, @Query('lang') lang?: string) {
-    return this.member.fileLink(slug, itemId, req.member!.guestId, lang);
+  fileLink(
+    @Param('slug') slug: string,
+    @Param('itemId') itemId: string,
+    @Req() req: MemberRequest,
+    @Query('lang') lang?: string,
+    @Query('action') action?: string,
+  ) {
+    return this.member.fileLink(slug, itemId, req.member!, lang, action);
   }
 
   /** PDF przez podpisany, krótko żyjący link (podgląd w przeglądarce nie wyśle nagłówka Authorization). */

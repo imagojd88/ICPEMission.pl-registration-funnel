@@ -1,15 +1,22 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Delete, Get, NotFoundException, Param, Patch, Post, Put, Query, Req, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import type { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CoursesService, UploadedFileLike } from './courses.service';
+import { CourseTrackingService } from './course-tracking.service';
+import { MemberService } from './member.service';
 
 @ApiTags('admin: formacja online')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 @Controller('admin/courses')
 export class CoursesAdminController {
-  constructor(private readonly courses: CoursesService) {}
+  constructor(
+    private readonly courses: CoursesService,
+    private readonly tracking: CourseTrackingService,
+    private readonly member: MemberService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'Lista kursów' })
@@ -127,6 +134,37 @@ export class CoursesAdminController {
   @Post(':id/enrollments/:eid/resend')
   resend(@Param('id') id: string, @Param('eid') eid: string) {
     return this.courses.resend(id, eid);
+  }
+
+  // ── Podgląd i aktywność ──
+  @Post(':id/preview')
+  @ApiOperation({ summary: 'Link podglądu kursu jako kursant (admin, 12 h, także dla szkicu)' })
+  preview(@Param('id') id: string, @Req() req: { user?: { sub?: string; email?: string } }) {
+    return this.member.previewUrl(id, req.user);
+  }
+
+  @Get(':id/activity')
+  @ApiOperation({ summary: 'Tabela postępów: kursant × materiały' })
+  activity(@Param('id') id: string) {
+    return this.tracking.activity(id);
+  }
+
+  @Get(':id/activity.csv')
+  @ApiOperation({ summary: 'Eksport tabeli postępów (CSV, średniki, UTF-8 BOM)' })
+  async activityCsv(@Param('id') id: string, @Res() res: Response) {
+    const csv = await this.tracking.csv(id);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="aktywnosc-kursu-${new Date().toISOString().slice(0, 10)}.csv"`);
+    res.setHeader('Cache-Control', 'no-store');
+    res.send(csv);
+  }
+
+  @Get(':id/activity/:eid')
+  @ApiOperation({ summary: 'Historia zdarzeń jednego kursanta' })
+  async history(@Param('id') id: string, @Param('eid') eid: string) {
+    const h = await this.tracking.history(id, eid);
+    if (!h) throw new NotFoundException('Nie znaleziono kursanta');
+    return h;
   }
 
   @Post(':id/sync')

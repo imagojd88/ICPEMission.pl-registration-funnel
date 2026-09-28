@@ -100,6 +100,7 @@ const descEn = course ? pickLang(course.description ?? '', 'en') : '';
     </section>
 
     <section data-view="dashboard" hidden>
+      <p class="ca-preview" id="ca-preview" hidden></p>
       <p class="ca-hello" id="ca-hello"></p>
       <div id="ca-player" class="ca-player" hidden>
         <div class="ca-player-head">
@@ -191,6 +192,8 @@ const descEn = course ? pickLang(course.description ?? '', 'en') : '';
   .ca-msg.ok { background: #e6efe2; color: #3d6b2f; }
   .ca-spinner { width: 28px; height: 28px; border-radius: 50%; border: 3px solid var(--border); border-top-color: var(--brand); animation: ca-spin 0.9s linear infinite; }
   @keyframes ca-spin { to { transform: rotate(360deg); } }
+  .ca-preview { margin: 0 0 20px; padding: 12px 16px; border-radius: 12px; background: #fdf1d6; color: #7a5410; font-size: 14px; line-height: 1.45; }
+  .ca-hello:empty { display: none; }
   .ca-hello { font-size: 17px; margin: 0 0 24px; color: var(--ink-2); }
   .ca-h2 { font-size: 13px; font-family: 'Space Mono', monospace; letter-spacing: .1em; text-transform: uppercase; color: var(--brand-2); margin: 32px 0 14px; font-weight: 400; }
   .ca-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 18px; }

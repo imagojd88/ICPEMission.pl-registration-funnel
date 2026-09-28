@@ -617,3 +617,34 @@ model MemberToken {
 
   @@index([guestId])
 }
+
+// ─── Formacja online — aktywność kursantów (raport w panelu ▸ Aktywność) ───
+
+model CourseEvent {
+  id        String   @id @default(cuid())
+  courseId  String
+  guestId   String
+  itemId    String?
+  type      String // LOGIN | COURSE_VIEW | VIDEO_PLAY | PDF_OPEN | PDF_DOWNLOAD | EMAIL_LINK | PASSWORD_SET | RESET_REQUEST
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  @@index([courseId, guestId, createdAt])
+}
+
+model VideoProgress {
+  id          String    @id @default(cuid())
+  courseId    String
+  itemId      String
+  guestId     String
+  buckets     String    @default("") // '1' = obejrzany 10-sekundowy odcinek filmu
+  durationSec Int?
+  positionSec Int       @default(0) // gdzie ostatnio skończył
+  percent     Int       @default(0) // % unikalnie obejrzanych odcinków
+  completedAt DateTime? // pierwsze przekroczenie 90%
+  firstAt     DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([itemId, guestId])
+  @@index([courseId])
+}

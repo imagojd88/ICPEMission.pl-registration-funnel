@@ -231,3 +231,64 @@ export function formatDuration(sec: number | null | undefined): string {
   const s = sec % 60
   return h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`
 }
+
+// ── Podgląd i aktywność ──
+
+export const getPreviewUrl = (courseId: string) =>
+  apiFetch<{ url: string }>(`/admin/courses/${courseId}/preview`, json('POST'))
+
+export interface ActivityVideoCell {
+  percent: number
+  completed: boolean
+  positionSec: number
+  plays: number
+  lastAt: string | null
+}
+export interface ActivityPdfCell {
+  opened: number
+  downloaded: number
+}
+export interface ActivityRow {
+  enrollmentId: string
+  email: string
+  firstName: string
+  lastName: string
+  source: 'AUTO' | 'MANUAL'
+  active: boolean
+  passwordSet: boolean
+  logins: number
+  lastActivityAt: string | null
+  items: Record<string, ActivityVideoCell | ActivityPdfCell | null>
+}
+export interface ActivityReport {
+  items: { id: string; kind: 'VIDEO' | 'PDF'; title: LangText; durationSec: number | null }[]
+  rows: ActivityRow[]
+}
+export interface ActivityHistory {
+  person: { email: string; firstName: string; lastName: string }
+  videos: { itemId: string; title: string | null; percent: number; completedAt: string | null; positionSec: number; durationSec: number | null; firstAt: string; lastAt: string }[]
+  events: { type: string; label: string; itemId: string | null; itemTitle: string | null; meta: Record<string, unknown> | null; at: string }[]
+}
+
+export const getActivity = (courseId: string) =>
+  apiFetch<ActivityReport>(`/admin/courses/${courseId}/activity`, { headers: auth() })
+export const getActivityHistory = (courseId: string, enrollmentId: string) =>
+  apiFetch<ActivityHistory>(`/admin/courses/${courseId}/activity/${enrollmentId}`, { headers: auth() })
+
+/** Pobiera CSV (z autoryzacją) i zapisuje plik w przeglądarce. */
+export async function downloadActivityCsv(courseId: string, slug: string): Promise<void> {
+  const res = await fetch(`${API_URL}/admin/courses/${courseId}/activity.csv`, { headers: auth() })
+  if (res.status === 401) {
+    setAuthToken(null)
+    throw new Error('Sesja wygasła — zaloguj się ponownie.')
+  }
+  if (!res.ok) throw new Error(`Błąd serwera (${res.status})`)
+  const blob = await res.blob()
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(blob)
+  a.download = `aktywnosc-${slug}-${new Date().toISOString().slice(0, 10)}.csv`
+  document.body.append(a)
+  a.click()
+  a.remove()
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000)
+}

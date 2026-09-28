@@ -16,6 +16,7 @@ interface Item {
   langs?: Lang[];
 }
 interface CourseData {
+  preview?: { status: string } | null;
   slug: string;
   title: LangText;
   description: LangText;
@@ -54,6 +55,9 @@ function init(root: HTMLElement) {
       playErr: 'Nie udało się uruchomić filmu.',
       video: 'Wideo',
       onlyOther: 'dostępny tylko po angielsku',
+      preview: 'Podgląd administratora — tak widzą kurs kursanci. Twoja aktywność nie jest zapisywana.',
+      previewDraft: ' Kurs jest jeszcze szkicem — kursanci go nie widzą.',
+      linkExpired: 'Ten link wygasł albo został już użyty. Wpisz e-mail w „Nie pamiętam hasła", a wyślemy nowy.',
     },
     en: {
       connecting: 'Connecting to the server…',
@@ -72,6 +76,9 @@ function init(root: HTMLElement) {
       playErr: 'Could not start the video.',
       video: 'Video',
       onlyOther: 'available in Polish only',
+      preview: 'Administrator preview — this is what participants see. Your activity is not recorded.',
+      previewDraft: ' The course is still a draft — participants cannot see it.',
+      linkExpired: 'This link has expired or was already used. Use "Forgot password" to get a new one.',
     },
   };
   const tr = () => T[lang];
@@ -198,7 +205,12 @@ function init(root: HTMLElement) {
     headerData = { title: course.title, description: course.description };
     renderHeader();
     const hello = $('#ca-hello');
-    if (hello) hello.textContent = tr().hello(course.member?.firstName ?? '');
+    if (hello) hello.textContent = course.preview ? '' : tr().hello(course.member?.firstName ?? '');
+    const pv = $('#ca-preview');
+    if (pv) {
+      pv.hidden = !course.preview;
+      pv.textContent = course.preview ? tr().preview + (course.preview.status === 'DRAFT' ? tr().previewDraft : '') : '';
+    }
     const videos = course.items.filter((i) => i.kind === 'VIDEO');
     const docs = course.items.filter((i) => i.kind === 'PDF');
     const vBox = $('#ca-videos')!;
@@ -251,11 +263,12 @@ function init(root: HTMLElement) {
 
   async function play(v: Item) {
     try {
-      const r = await api<{ embedUrl: string; expiresAt: string }>(
+      const r = await api<{ embedUrl: string; expiresAt: string; track?: boolean }>(
         `/member/courses/${slug}/items/${v.id}/play`,
         {},
         true,
       );
+      tracker.stop();
       const player = $('#ca-player')!;
       const frame = $('#ca-iframe') as HTMLIFrameElement;
       frame.src = r.embedUrl;
@@ -263,12 +276,14 @@ function init(root: HTMLElement) {
       $('#ca-player-title')!.textContent = pick(v.title);
       player.hidden = false;
       playing = { id: v.id, expiresAt: Date.parse(r.expiresAt) };
+      if (r.track !== false) tracker.start(v.id, frame);
       player.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (e) {
       handleAuthError(e, tr().playErr);
     }
   }
   $('#ca-player-close')?.addEventListener('click', () => {
+    tracker.stop();
     ($('#ca-iframe') as HTMLIFrameElement).src = 'about:blank';
     $('#ca-player')!.hidden = true;
     playing = null;
@@ -281,11 +296,97 @@ function init(root: HTMLElement) {
     }
   });
 
+  // ── Postęp oglądania (Bunny Player.js): zbieramy obejrzane 10-sekundowe odcinki, wysyłamy co 15 s ──
+  const tracker = (() => {
+    const BUCKET = 10;
+    let itemId: string | null = null;
+    let pending = new Set<number>();
+    let position = 0;
+    let duration = 0;
+    let timer: number | undefined;
+    let dirty = false;
+    let gen = 0;
+
+    function loadPlayerJs(): Promise<unknown> {
+      const w = window as unknown as { playerjs?: unknown; __pjs?: Promise<unknown> };
+      if (w.playerjs) return Promise.resolve(w.playerjs);
+      if (!w.__pjs) {
+        w.__pjs = new Promise((resolve, reject) => {
+          const sc = document.createElement('script');
+          sc.src = 'https://assets.mediadelivery.net/playerjs/playerjs-latest.min.js';
+          sc.async = true;
+          sc.onload = () => resolve(w.playerjs);
+          sc.onerror = reject;
+          document.head.append(sc);
+        });
+      }
+      return w.__pjs;
+    }
+
+    function flush() {
+      if (!itemId || !dirty || !duration) return;
+      const body = JSON.stringify({ buckets: [...pending], position: Math.round(position), duration: Math.round(duration) });
+      const id = itemId;
+      pending = new Set();
+      dirty = false;
+      const tok = store.get(TOKEN_KEY);
+      // keepalive: wysyłka przetrwa zamknięcie karty
+      void fetch(`${API}/member/courses/${slug}/items/${id}/progress`, {
+        method: 'POST',
+        keepalive: true,
+        headers: { 'Content-Type': 'application/json', ...(tok ? { Authorization: `Bearer ${tok}` } : {}) },
+        body,
+      }).catch(() => undefined);
+    }
+
+    function start(id: string, frame: HTMLIFrameElement) {
+      stop();
+      itemId = id;
+      const my = ++gen;
+      loadPlayerJs()
+        .then((pj) => {
+          if (my !== gen) return;
+          const Player = (pj as { Player: new (el: HTMLIFrameElement) => { on: (ev: string, cb: (d?: { seconds?: number; duration?: number }) => void) => void } }).Player;
+          const p = new Player(frame);
+          p.on('ready', () => {
+            p.on('timeupdate', (d) => {
+              if (my !== gen || !d) return;
+              position = d.seconds ?? position;
+              duration = d.duration ?? duration;
+              pending.add(Math.floor(position / BUCKET));
+              dirty = true;
+            });
+            p.on('pause', () => flush());
+            p.on('ended', () => flush());
+          });
+        })
+        .catch(() => undefined); // brak skryptu → film działa, tylko bez statystyk
+      timer = window.setInterval(flush, 15000);
+    }
+
+    function stop() {
+      flush();
+      window.clearInterval(timer);
+      itemId = null;
+      gen++;
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') flush();
+    });
+    window.addEventListener('pagehide', flush);
+    return { start, stop };
+  })();
+
   async function openFile(d: Item, download: boolean) {
     // Okno otwieramy synchronicznie (inaczej blokada wyskakujących okien), adres ustawiamy po odpowiedzi API.
     const w = download ? null : window.open('about:blank', '_blank');
     try {
-      const r = await api<{ path: string; downloadPath: string }>(`/member/courses/${slug}/items/${d.id}/file?lang=${lang}`, {}, true);
+      const r = await api<{ path: string; downloadPath: string }>(
+        `/member/courses/${slug}/items/${d.id}/file?lang=${lang}&action=${download ? 'download' : 'open'}`,
+        {},
+        true,
+      );
       const url = `${API}${download ? r.downloadPath : r.path}`;
       if (w) {
         w.opener = null;
@@ -405,6 +506,7 @@ function init(root: HTMLElement) {
   );
 
   $('#ca-logout')?.addEventListener('click', () => {
+    tracker.stop();
     store.set(TOKEN_KEY, null);
     course = null;
     ($('#ca-iframe') as HTMLIFrameElement).src = 'about:blank';
@@ -419,6 +521,16 @@ function init(root: HTMLElement) {
 
     if (!slug) {
       show('list');
+      return;
+    }
+
+    // Podgląd admina: token w #fragmencie (nie trafia do serwera ani historii) → od razu treść, także szkicu.
+    const hash = new URLSearchParams(location.hash.slice(1));
+    const previewToken = hash.get('podglad');
+    if (previewToken) {
+      store.set(TOKEN_KEY, previewToken);
+      history.replaceState(null, '', location.pathname + location.search);
+      await loadCourse();
       return;
     }
 
@@ -453,6 +565,16 @@ function init(root: HTMLElement) {
     const pwToken = new URLSearchParams(location.search).get('haslo');
     if (pwToken) {
       show('setpw');
+      // Zapis kliknięcia linku z maila + sprawdzenie ważności (wygasły → od razu komunikat).
+      api<{ valid: boolean }>('/member/auth/link-open', { method: 'POST', body: JSON.stringify({ token: pwToken }) })
+        .then((r) => {
+          if (!r.valid) {
+            history.replaceState(null, '', location.pathname);
+            show('forgot');
+            msg($('#ca-forgot-form')!, tr().linkExpired);
+          }
+        })
+        .catch(() => undefined);
       return;
     }
     if (store.get(TOKEN_KEY)) await loadCourse();

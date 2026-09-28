@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { DeployHookService } from '../content/deploy-hook.service';
 import { BunnyStreamService } from './bunny-stream.service';
 import { CourseAccessService } from './course-access.service';
+import { CourseTrackingService } from './course-tracking.service';
 import { courseUrl, isEmail, normEmail, normLangText, pickText, slugify, slugProblem } from './course-utils';
 
 export interface UploadedFileLike {
@@ -34,6 +35,7 @@ export class CoursesService {
     private readonly bunny: BunnyStreamService,
     private readonly access: CourseAccessService,
     private readonly deployHook: DeployHookService,
+    private readonly tracking: CourseTrackingService,
   ) {}
 
   config() {
@@ -218,6 +220,7 @@ export class CoursesService {
       if (i.videoId) await this.bunny.deleteVideo(i.videoId);
       for (const fid of [i.fileId, i.fileIdEn]) if (fid) await this.prisma.privateFile.delete({ where: { id: fid } }).catch(() => null);
     }
+    await this.tracking.purge({ courseId: id });
     await this.prisma.course.delete({ where: { id } });
     if (c.status !== 'DRAFT') this.deployHook.trigger(`usunięto kurs ${c.slug}`);
     return { ok: true };
@@ -321,6 +324,7 @@ export class CoursesService {
   async removeItem(courseId: string, itemId: string) {
     const item = await this.mustGetItem(courseId, itemId);
     await this.prisma.courseItem.delete({ where: { id: itemId } });
+    await this.tracking.purge({ courseId, itemId });
     if (item.videoId) await this.bunny.deleteVideo(item.videoId);
     for (const fid of [item.fileId, item.fileIdEn]) if (fid) await this.prisma.privateFile.delete({ where: { id: fid } }).catch(() => null);
     return { ok: true };
