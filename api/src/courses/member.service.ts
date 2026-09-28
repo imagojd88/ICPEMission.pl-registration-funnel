@@ -27,7 +27,7 @@ export class MemberService {
   ) {}
 
   /**
-   * Podgląd kursu przez admina: token kursanta z flagą `adm` (12 h) — działa w każdym kursie, także w szkicu,
+   * Podgląd kursu przez admina: token kursanta z flagą `adm` (30 dni — jak „Zapamiętaj mnie" w panelu) — działa w każdym kursie, także w szkicu,
    * bez zapisu aktywności. Przekazywany w #fragmencie adresu (nie trafia do logów serwera).
    */
   async previewUrl(courseId: string, admin: { sub?: string; email?: string } | undefined) {
@@ -35,7 +35,7 @@ export class MemberService {
     if (!c) throw new NotFoundException('Nie znaleziono kursu');
     const token = this.jwt.sign(
       { sub: `admin:${admin?.sub ?? 'service'}`, email: admin?.email ?? 'admin', realm: 'member', adm: true },
-      { secret: memberJwtSecret(), expiresIn: '12h' },
+      { secret: memberJwtSecret(), expiresIn: '30d' },
     );
     return { url: `${courseUrl(c.slug)}#podglad=${token}` };
   }

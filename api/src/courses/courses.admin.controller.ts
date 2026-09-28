@@ -138,7 +138,7 @@ export class CoursesAdminController {
 
   // ── Podgląd i aktywność ──
   @Post(':id/preview')
-  @ApiOperation({ summary: 'Link podglądu kursu jako kursant (admin, 12 h, także dla szkicu)' })
+  @ApiOperation({ summary: 'Link podglądu kursu jako kursant (admin, 30 dni, także dla szkicu)' })
   preview(@Param('id') id: string, @Req() req: { user?: { sub?: string; email?: string } }) {
     return this.member.previewUrl(id, req.user);
   }

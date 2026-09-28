@@ -124,15 +124,22 @@ export default function CourseEditor({ id, config, onBack }: { id: string; confi
             <h2 className="text-xl font-bold" style={{ color: 'var(--ink)' }}>{t(course.title)}</h2>
             <StatusBadge status={course.status} />
           </div>
-          <a
-            href={course.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs inline-flex items-center gap-1 mt-1"
-            style={{ color: course.status === 'DRAFT' ? 'var(--faint)' : 'var(--brand)' }}
-          >
-            {course.url.replace(/^https?:\/\//, '')} <ExternalLink size={12} />
-          </a>
+          <div className="flex items-center gap-3 mt-1 flex-wrap">
+            {/* Klik w adres = wejście na stronę kursu od razu zalogowanym (podgląd admina), bez ekranu logowania. */}
+            <a
+              href={course.url}
+              onClick={(e) => {
+                e.preventDefault()
+                void preview()
+              }}
+              className="text-xs inline-flex items-center gap-1"
+              style={{ color: 'var(--brand)' }}
+              title="Otwiera stronę kursu od razu zalogowaną jako Ty"
+            >
+              {course.url.replace(/^https?:\/\//, '')} <ExternalLink size={12} />
+            </a>
+            <CopyLink url={course.url} />
+          </div>
           {course.status === 'DRAFT' && (
             <p className="text-xs mt-1" style={{ color: 'var(--warn)' }}>
               Szkic — strona kursu jeszcze nie działa, a kursanci nie dostają maili. Opublikuj, gdy będziesz gotowy.
@@ -192,6 +199,26 @@ export default function CourseEditor({ id, config, onBack }: { id: string; confi
       {tab === 'activity' && <CourseActivityTab course={course} />}
       {tab === 'settings' && <CourseSettingsTab course={course} onSaved={setCourse} onDeleted={onBack} />}
     </div>
+  )
+}
+
+function CopyLink({ url }: { url: string }) {
+  const [done, setDone] = useState(false)
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        void navigator.clipboard?.writeText(url).then(() => {
+          setDone(true)
+          setTimeout(() => setDone(false), 2000)
+        })
+      }}
+      className="text-xs"
+      style={{ color: 'var(--muted)', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
+      title="Adres dla kursantów (z ekranem logowania)"
+    >
+      {done ? 'Skopiowano ✓' : 'Kopiuj link dla kursantów'}
+    </button>
   )
 }
 

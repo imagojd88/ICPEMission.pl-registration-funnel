@@ -4,7 +4,7 @@ import { GraduationCap, Plus, ExternalLink, Users, Film, AlertTriangle } from 'l
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import {
-  checkCourseSlug, createCourse, getCoursesConfig, listCourses, slugify,
+  checkCourseSlug, createCourse, getCoursesConfig, getPreviewUrl, listCourses, slugify,
   type CourseListItem, type CoursesConfig,
 } from '@/lib/courses'
 import CourseEditor from './CourseEditor'
@@ -126,18 +126,31 @@ export default function CoursesScreen() {
             <div className="flex items-center gap-4 text-xs shrink-0" style={{ color: 'var(--muted)' }}>
               <span className="flex items-center gap-1"><Film size={14} /> {c.items}</span>
               <span className="flex items-center gap-1"><Users size={14} /> {c.members}</span>
-              {c.status !== 'DRAFT' && (
-                <a
-                  href={c.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={(e) => e.stopPropagation()}
-                  className="flex items-center gap-1"
-                  style={{ color: 'var(--brand)' }}
-                >
-                  <ExternalLink size={14} /> Otwórz
-                </a>
-              )}
+              <a
+                href={c.url}
+                onClick={(e) => {
+                  // Otwiera kurs od razu zalogowanym (podgląd admina) — także szkic.
+                  e.preventDefault()
+                  e.stopPropagation()
+                  const w = window.open('about:blank', '_blank')
+                  getPreviewUrl(c.id)
+                    .then(({ url }) => {
+                      if (w) {
+                        w.opener = null
+                        w.location.href = url
+                      } else window.location.href = url
+                    })
+                    .catch((err) => {
+                      w?.close()
+                      setError(errMsg(err))
+                    })
+                }}
+                className="flex items-center gap-1"
+                style={{ color: 'var(--brand)' }}
+                title="Otwiera stronę kursu od razu zalogowaną jako Ty"
+              >
+                <ExternalLink size={14} /> Otwórz
+              </a>
             </div>
           </button>
         ))}

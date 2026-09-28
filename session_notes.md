@@ -44,6 +44,12 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — panel kursanta (kurs online)
 
+### Admin wchodzi do kursu bez logowania (2026-09-28)
+- Zgłoszenie usera: klik w adres kursu w panelu kazał się logować; przycisku „Podgląd jako kursant" nie widział (zrzut z wersji sprzed deployu frontu — zakładki bez „Aktywność").
+- **Adres kursu w nagłówku edytora i „Otwórz" na liście kursów** otwierają teraz stronę kursu od razu zalogowaną (token podglądu admina), także dla szkicu; obok „Kopiuj link dla kursantów" (zwykły adres z ekranem logowania).
+- Token podglądu admina: **30 dni** (było 12 h) — zapisany w przeglądarce, więc także zwykły adres kursu (np. z maila) otwiera się bez logowania. Strona: przy 404 publicznego kursu (szkic), gdy jest zapisany token → próbuje `loadCourse` (admin zobaczy szkic).
+- Pliki: `CourseEditor.tsx` (link + `CopyLink`), `CoursesScreen.tsx`, `member.service.ts` (30d), `course-app.ts`. Testy Chromium (mock): lista „Otwórz" i klik w adres → od razu dashboard z banerem; ponowne wejście na zwykły adres bez logowania; wcześniejsze scenariusze strony ✓. tsc api/app ✓, astro build ✓.
+
 ### Formacja online — śledzenie aktywności kursantów + podgląd admina (2026-09-28)
 **Decyzje usera:** filmy = % obejrzenia (nie tylko „kliknął Play"); informacja o śledzeniu **tylko w polityce prywatności** (bez notki na stronie kursu — do dopisania przez Jacka); raport: tabela postępów + historia per osoba + CSV. Dodatkowo: admin ma mieć dostęp do każdego kursu.
 - **Model:** `CourseEvent` (courseId, guestId, itemId?, type, meta, createdAt) — typy: LOGIN, COURSE_VIEW (max 1×/30 min), VIDEO_PLAY, PDF_OPEN, PDF_DOWNLOAD (meta.lang), EMAIL_LINK (otwarcie linku ?haslo z maila, meta.purpose), PASSWORD_SET, RESET_REQUEST. `VideoProgress` (@@unique itemId+guestId): `buckets` = ciąg '0/1' 10-sekundowych odcinków (scalany OR → przewijanie/powtórki nie zawyżają), `percent`, `positionSec`, `completedAt` (≥90%).

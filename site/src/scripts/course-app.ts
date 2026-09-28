@@ -553,7 +553,9 @@ function init(root: HTMLElement) {
         }
       } catch (e) {
         if ((e as ApiError).status === 404) {
-          show('notfound');
+          // Szkic nie jest publiczny — ale zapamiętany podgląd admina go otworzy (loadCourse sam pokaże 404, gdy brak dostępu).
+          if (store.get(TOKEN_KEY)) await loadCourse();
+          else show('notfound');
           return;
         }
       }
