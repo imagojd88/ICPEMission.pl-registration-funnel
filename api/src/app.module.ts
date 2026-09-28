@@ -16,6 +16,8 @@ import { UploadsModule } from './uploads/uploads.module';
 import { PlacesModule } from './places/places.module';
 import { InvitationsModule } from './invitations/invitations.module';
 import { ContentModule } from './content/content.module';
+import { CourseAccessModule } from './courses/course-access.module';
+import { CoursesModule } from './courses/courses.module';
 
 @Module({
   imports: [
@@ -36,6 +38,8 @@ import { ContentModule } from './content/content.module';
     PlacesModule,
     InvitationsModule,
     ContentModule,
+    CourseAccessModule,
+    CoursesModule,
   ],
 })
 export class AppModule {}

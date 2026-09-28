@@ -1,0 +1,233 @@
+---
+// Panel kursanta „Formacja online" — statyczny szkielet + aplikacja kliencka (src/scripts/course-app.ts).
+// Używany przez /formacja/[slug] (strony budowane z API) i /formacja/ (fallback reguły Rewrite w Render).
+import { API_BASE_URL, pickLang, type CourseLite } from '../lib/api';
+
+interface Props {
+  course?: CourseLite | null;
+  courses?: CourseLite[];
+}
+const { course = null, courses = [] } = Astro.props;
+const titlePl = course ? pickLang(course.title, 'pl') : '';
+const titleEn = course ? pickLang(course.title, 'en') : '';
+const descPl = course ? pickLang(course.description ?? '', 'pl') : '';
+const descEn = course ? pickLang(course.description ?? '', 'en') : '';
+---
+
+<div
+  id="course-app"
+  data-lang="pl"
+  data-api={API_BASE_URL}
+  data-slug={course?.slug ?? ''}
+  data-status={course?.status ?? ''}
+  class="ca-root"
+>
+  <header class="ca-nav">
+    <a href="/" class="ca-brand">
+      <img src="/assets/icpe-globe.png" alt="" width="34" height="34" />
+      <span>ICPE Mission <span class="ca-brand-sub">Warszawa</span></span>
+    </a>
+    <div class="ca-nav-right">
+      <div class="ca-lang">
+        <button type="button" data-langbtn="pl">PL</button><span>/</span><button type="button" data-langbtn="en">EN</button>
+      </div>
+      <button type="button" class="ca-link" id="ca-logout" hidden>
+        <span data-pl>Wyloguj</span><span data-en>Log out</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="ca-main">
+    <div class="ca-kicker"><span class="ca-kicker-line"></span><span data-pl>Formacja online</span><span data-en>Online formation</span></div>
+    <h1 class="ca-title" id="ca-title">
+      {titlePl && <span data-pl>{titlePl}</span>}
+      {titleEn && <span data-en>{titleEn}</span>}
+    </h1>
+    <p class="ca-desc" id="ca-desc">
+      {descPl && <span data-pl>{descPl}</span>}
+      {descEn && <span data-en>{descEn}</span>}
+    </p>
+
+    <!-- Widoki przełączane przez skrypt (atrybut hidden). -->
+    <section data-view="loading" class="ca-card ca-center">
+      <div class="ca-spinner" aria-hidden="true"></div>
+      <p id="ca-loading-text" class="ca-muted"></p>
+    </section>
+
+    <section data-view="login" class="ca-card ca-narrow" hidden>
+      <h2><span data-pl>Zaloguj się</span><span data-en>Log in</span></h2>
+      <form id="ca-login-form" class="ca-form" novalidate>
+        <label><span data-pl>E-mail</span><span data-en>E-mail</span>
+          <input name="email" type="email" autocomplete="username" required />
+        </label>
+        <label><span data-pl>Hasło</span><span data-en>Password</span>
+          <input name="password" type="password" autocomplete="current-password" required />
+        </label>
+        <p class="ca-msg" data-msg hidden></p>
+        <button type="submit" class="ca-btn"><span data-pl>Zaloguj</span><span data-en>Log in</span></button>
+      </form>
+      <button type="button" class="ca-link" data-go="forgot"><span data-pl>Nie pamiętam hasła / pierwsze logowanie</span><span data-en>Forgot password / first login</span></button>
+    </section>
+
+    <section data-view="forgot" class="ca-card ca-narrow" hidden>
+      <h2><span data-pl>Link do ustawienia hasła</span><span data-en>Password link</span></h2>
+      <p class="ca-muted">
+        <span data-pl>Podaj e-mail, którego użyłeś(-aś) przy zapisie. Jeśli masz dostęp do kursu, wyślemy link do ustawienia hasła.</span>
+        <span data-en>Enter the e-mail you registered with. If you have access to the course, we will send you a link to set your password.</span>
+      </p>
+      <form id="ca-forgot-form" class="ca-form" novalidate>
+        <label><span data-pl>E-mail</span><span data-en>E-mail</span>
+          <input name="email" type="email" autocomplete="username" required />
+        </label>
+        <p class="ca-msg" data-msg hidden></p>
+        <button type="submit" class="ca-btn"><span data-pl>Wyślij link</span><span data-en>Send link</span></button>
+      </form>
+      <button type="button" class="ca-link" data-go="login"><span data-pl>← Wróć do logowania</span><span data-en>← Back to login</span></button>
+    </section>
+
+    <section data-view="setpw" class="ca-card ca-narrow" hidden>
+      <h2><span data-pl>Ustaw hasło</span><span data-en>Set your password</span></h2>
+      <form id="ca-setpw-form" class="ca-form" novalidate>
+        <label><span data-pl>Nowe hasło (min. 8 znaków)</span><span data-en>New password (min. 8 characters)</span>
+          <input name="password" type="password" autocomplete="new-password" minlength="8" required />
+        </label>
+        <label><span data-pl>Powtórz hasło</span><span data-en>Repeat password</span>
+          <input name="password2" type="password" autocomplete="new-password" minlength="8" required />
+        </label>
+        <p class="ca-msg" data-msg hidden></p>
+        <button type="submit" class="ca-btn"><span data-pl>Zapisz i wejdź</span><span data-en>Save and continue</span></button>
+      </form>
+    </section>
+
+    <section data-view="dashboard" hidden>
+      <p class="ca-hello" id="ca-hello"></p>
+      <div id="ca-player" class="ca-player" hidden>
+        <div class="ca-player-head">
+          <p id="ca-player-title"></p>
+          <button type="button" class="ca-link" id="ca-player-close"><span data-pl>Zamknij ✕</span><span data-en>Close ✕</span></button>
+        </div>
+        <div class="ca-player-frame"><iframe id="ca-iframe" title="Wideo" allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe></div>
+      </div>
+      <h2 class="ca-h2" id="ca-videos-h"><span data-pl>Filmy</span><span data-en>Videos</span></h2>
+      <div class="ca-grid" id="ca-videos"></div>
+      <h2 class="ca-h2" id="ca-docs-h"><span data-pl>Materiały</span><span data-en>Materials</span></h2>
+      <div class="ca-list" id="ca-docs"></div>
+      <p class="ca-muted ca-empty" id="ca-empty" hidden>
+        <span data-pl>Materiały kursu pojawią się tutaj wkrótce.</span><span data-en>Course materials will appear here soon.</span>
+      </p>
+    </section>
+
+    <section data-view="closed" class="ca-card ca-narrow" hidden>
+      <h2><span data-pl>Kurs zakończony</span><span data-en>Course closed</span></h2>
+      <p class="ca-muted"><span data-pl>Dostęp do materiałów tego kursu został zamknięty. W razie pytań napisz do nas: warszawa@icpemission.pl.</span><span data-en>Access to this course has been closed. Questions? Write to warszawa@icpemission.pl.</span></p>
+    </section>
+
+    <section data-view="notfound" class="ca-card ca-narrow" hidden>
+      <h2><span data-pl>Nie znaleziono kursu</span><span data-en>Course not found</span></h2>
+      <p class="ca-muted"><span data-pl>Sprawdź adres z maila albo wróć na stronę główną.</span><span data-en>Check the link from your e-mail or go back to the home page.</span></p>
+      <a class="ca-btn" href="/"><span data-pl>Strona główna</span><span data-en>Home page</span></a>
+    </section>
+
+    <section data-view="list" hidden>
+      {courses.length > 0 ? (
+        <div class="ca-list">
+          {courses.filter((c) => c.status === 'PUBLISHED').map((c) => (
+            <a class="ca-item ca-item-link" href={`/formacja/${c.slug}/`}>
+              <span class="ca-item-title">
+                <span data-pl>{pickLang(c.title, 'pl')}</span><span data-en>{pickLang(c.title, 'en')}</span>
+              </span>
+              <span class="ca-arrow">→</span>
+            </a>
+          ))}
+        </div>
+      ) : (
+        <p class="ca-muted"><span data-pl>Obecnie nie prowadzimy kursów online.</span><span data-en>There are no online courses at the moment.</span></p>
+      )}
+    </section>
+  </main>
+
+  <footer class="ca-footer">
+    <span>Institute for World Evangelisation – ICPE Mission</span>
+    <a href="/">icpemission.pl</a>
+  </footer>
+</div>
+
+<script>
+  import '../scripts/course-app';
+</script>
+
+<style is:global>
+  /* Style globalne z prefiksem ca- — elementy tworzone w JS nie dostają atrybutu scope Astro. */
+  .ca-root { min-height: 100vh; display: flex; flex-direction: column; background: var(--bg); color: var(--ink); font-family: 'Bricolage Grotesque', system-ui, sans-serif; }
+  .ca-root [hidden] { display: none !important; }
+  .ca-nav { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 32px; border-bottom: 1px solid var(--border); }
+  .ca-brand { display: flex; align-items: center; gap: 10px; color: inherit; text-decoration: none; font-weight: 800; font-size: 17px; letter-spacing: -.02em; }
+  .ca-brand img { height: 34px; width: auto; }
+  .ca-brand-sub { font-weight: 400; color: var(--muted); }
+  .ca-nav-right { display: flex; align-items: center; gap: 22px; }
+  .ca-lang { display: flex; gap: 8px; align-items: center; font-family: 'Space Mono', monospace; font-size: 13px; }
+  .ca-lang button { background: none; border: none; font: inherit; color: inherit; padding: 0; }
+  .ca-lang span { color: var(--border-2); }
+  .ca-main { flex: 1; width: 100%; max-width: 1080px; margin: 0 auto; padding: 48px 32px 64px; }
+  .ca-kicker { display: flex; align-items: center; gap: 14px; font-family: 'Space Mono', monospace; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--brand-2); margin-bottom: 18px; }
+  .ca-kicker-line { width: 40px; height: 1px; background: var(--brand); }
+  .ca-title { margin: 0 0 12px; font-size: clamp(32px, 5vw, 52px); line-height: 1.03; letter-spacing: -.03em; font-weight: 800; }
+  .ca-desc { margin: 0 0 32px; max-width: 720px; font-size: 17px; line-height: 1.55; color: var(--ink-3); white-space: pre-line; }
+  .ca-desc:empty { display: none; }
+  .ca-card { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 28px; }
+  .ca-card h2 { margin: 0 0 16px; font-size: 22px; letter-spacing: -.02em; }
+  .ca-narrow { max-width: 460px; }
+  .ca-center { display: flex; flex-direction: column; align-items: center; gap: 14px; max-width: 460px; text-align: center; }
+  .ca-muted { color: var(--muted); font-size: 15px; line-height: 1.5; margin: 0 0 16px; }
+  .ca-form { display: flex; flex-direction: column; gap: 14px; margin-bottom: 14px; }
+  .ca-form label { display: flex; flex-direction: column; gap: 6px; font-size: 14px; font-weight: 600; }
+  .ca-form input { font: inherit; font-weight: 400; font-size: 16px; padding: 13px 14px; border-radius: 12px; border: 1px solid var(--border-2); background: #fff; color: var(--ink); }
+  .ca-form input:focus { outline: 2px solid var(--brand); outline-offset: 1px; border-color: var(--brand); }
+  .ca-btn { display: inline-flex; justify-content: center; align-items: center; gap: 8px; padding: 14px 24px; border-radius: 100px; border: none; background: var(--ink-panel); color: var(--bg); font: inherit; font-weight: 600; font-size: 15px; cursor: pointer; text-decoration: none; }
+  .ca-btn:disabled { opacity: .55; cursor: default; }
+  .ca-btn-light { background: transparent; color: var(--ink); border: 1px solid var(--border-2); padding: 9px 16px; font-size: 14px; }
+  .ca-link { background: none; border: none; padding: 0; font: inherit; font-size: 14px; color: var(--brand); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+  .ca-msg { margin: 0; font-size: 14px; padding: 10px 12px; border-radius: 10px; background: #f6e3dc; color: #8f3d22; }
+  .ca-msg.ok { background: #e6efe2; color: #3d6b2f; }
+  .ca-spinner { width: 28px; height: 28px; border-radius: 50%; border: 3px solid var(--border); border-top-color: var(--brand); animation: ca-spin 0.9s linear infinite; }
+  @keyframes ca-spin { to { transform: rotate(360deg); } }
+  .ca-hello { font-size: 17px; margin: 0 0 24px; color: var(--ink-2); }
+  .ca-h2 { font-size: 13px; font-family: 'Space Mono', monospace; letter-spacing: .1em; text-transform: uppercase; color: var(--brand-2); margin: 32px 0 14px; font-weight: 400; }
+  .ca-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 18px; }
+  .ca-video { text-align: left; background: var(--surface); border: 1px solid var(--border); border-radius: 18px; overflow: hidden; padding: 0; cursor: pointer; font: inherit; color: inherit; transition: transform .15s ease, box-shadow .15s ease; }
+  .ca-video:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(36,30,26,.1); }
+  .ca-thumb { position: relative; aspect-ratio: 16 / 9; background: #2c231d center / cover no-repeat; }
+  .ca-play { position: absolute; inset: 0; margin: auto; width: 58px; height: 58px; border-radius: 50%; background: rgba(244,238,227,.92); display: flex; align-items: center; justify-content: center; }
+  .ca-play::after { content: ''; margin-left: 5px; border-left: 17px solid var(--ink); border-top: 11px solid transparent; border-bottom: 11px solid transparent; }
+  .ca-dur { position: absolute; right: 10px; bottom: 10px; background: rgba(0,0,0,.65); color: #fff; font-size: 12px; padding: 2px 7px; border-radius: 6px; font-family: 'Space Mono', monospace; }
+  .ca-video-body { padding: 14px 16px 16px; }
+  .ca-item-title { font-weight: 700; font-size: 16px; line-height: 1.3; }
+  .ca-item-desc { margin: 6px 0 0; font-size: 14px; color: var(--muted); line-height: 1.45; }
+  .ca-list { display: flex; flex-direction: column; gap: 12px; }
+  .ca-item { display: flex; align-items: center; gap: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 16px 18px; }
+  .ca-item-link { color: inherit; text-decoration: none; }
+  .ca-item-link:hover { border-color: var(--border-2); }
+  .ca-arrow { margin-left: auto; color: var(--brand); font-size: 20px; }
+  .ca-pdf-ico { flex-shrink: 0; width: 44px; height: 52px; border-radius: 8px; background: var(--brand-soft); color: var(--brand); display: flex; align-items: center; justify-content: center; font-family: 'Space Mono', monospace; font-size: 11px; font-weight: 700; }
+  .ca-item-main { flex: 1; min-width: 0; }
+  .ca-item-actions { display: flex; gap: 8px; flex-shrink: 0; }
+  .ca-player { background: #1b1511; border-radius: 20px; overflow: hidden; margin-bottom: 8px; scroll-margin-top: 16px; }
+  .ca-player-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 18px; color: var(--on-dark); }
+  .ca-player-head p { margin: 0; font-weight: 700; }
+  .ca-player-head .ca-link { color: var(--on-dark); }
+  .ca-player-frame { position: relative; aspect-ratio: 16 / 9; }
+  .ca-player-frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+  .ca-empty { margin-top: 24px; }
+  .ca-footer { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 22px 32px; border-top: 1px solid var(--border); font-size: 13px; color: var(--faint); }
+  .ca-footer a { color: inherit; }
+  @media (max-width: 640px) {
+    .ca-nav { padding: 14px 16px; }
+    .ca-brand-sub { display: none; }
+    .ca-main { padding: 32px 16px 48px; }
+    .ca-card { padding: 22px 18px; }
+    .ca-item { flex-wrap: wrap; }
+    .ca-item-actions { width: 100%; }
+    .ca-item-actions .ca-btn { flex: 1; }
+    .ca-footer { padding: 18px 16px; }
+  }
+</style>

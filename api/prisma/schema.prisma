@@ -144,6 +144,9 @@ model GuestAccount {
   locale       String         @default("pl")
   profile      Json?
   registrations Registration[]
+  enrollments   CourseEnrollment[]
+  passwordSetAt DateTime?        // panel kursanta: kiedy ustawiono hasło
+  lastLoginAt   DateTime?
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
 }
@@ -519,4 +522,97 @@ model SiteSettings {
   defaultOgImageUrl String?
   hero              Json?    // { rotate: bool, defaultUrl: string|null, images: [{url, position?, alt?}] }
   updatedAt         DateTime @updatedAt
+}
+
+
+// ─── Formacja online (panel kursanta) — docs/13-handoff-formacja-online.md ───
+
+enum CourseStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum CourseItemKind {
+  VIDEO
+  PDF
+}
+
+enum MemberTokenPurpose {
+  SET_PASSWORD
+  RESET_PASSWORD
+}
+
+model Course {
+  id                String             @id @default(cuid())
+  slug              String             @unique // adres: icpemission.pl/formacja/<slug>
+  slugHistory       String[]           @default([]) // stare slugi → przekierowanie
+  title             Json // { pl, en? }
+  description       Json?
+  status            CourseStatus       @default(DRAFT)
+  sourceInstanceIds String[]           @default([]) // eventy, których zgłoszenia dają dostęp
+  grantOn           String             @default("CONFIRMED") // 'CONFIRMED' | 'ANY_ACTIVE'
+  accessUntil       DateTime?
+  items             CourseItem[]
+  enrollments       CourseEnrollment[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+}
+
+model CourseItem {
+  id           String         @id @default(cuid())
+  courseId     String
+  course       Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  kind         CourseItemKind
+  title        Json
+  description  Json?
+  order        Int            @default(0)
+  published    Boolean        @default(true)
+  videoId      String? // GUID w Bunny Stream
+  videoState   String? // UPLOADING | PROCESSING | READY | FAILED
+  durationSec  Int?
+  thumbnailUrl String?
+  fileId       String? // → PrivateFile (PDF)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+}
+
+model PrivateFile {
+  id           String   @id @default(cuid())
+  mimeType     String
+  size         Int
+  originalName String?
+  data         Bytes
+  createdAt    DateTime @default(now())
+}
+
+model CourseEnrollment {
+  id             String       @id @default(cuid())
+  courseId       String
+  course         Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  guestId        String
+  guest          GuestAccount @relation(fields: [guestId], references: [id])
+  source         String // 'AUTO' | 'MANUAL'
+  registrationId String?
+  revokedAt      DateTime?
+  revokedReason  String? // 'ADMIN' (ręcznie — auto-sync nie przywraca) | 'AUTO' (anulowane zgłoszenie)
+  welcomeSentAt  DateTime?
+  lastSeenAt     DateTime?
+  createdAt      DateTime     @default(now())
+
+  @@unique([courseId, guestId])
+  @@index([registrationId])
+}
+
+model MemberToken {
+  id        String             @id @default(cuid())
+  guestId   String
+  purpose   MemberTokenPurpose
+  tokenHash String             @unique
+  courseId  String?
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime           @default(now())
+
+  @@index([guestId])
 }

@@ -17,6 +17,9 @@ const TYPE_LABEL: Record<string, string> = {
   INVITE_CONFIRMED: 'Potwierdzenie udziału',
   GUEST_INVITE_LINK: 'Link „Zaproś gościa"',
   PAYMENT_REMINDER: 'Przypomnienie o płatności',
+  COURSE_WELCOME: 'Kurs: powitanie (ustaw hasło)',
+  COURSE_ACCESS: 'Kurs: nowy dostęp',
+  MEMBER_PASSWORD_RESET: 'Kurs: reset hasła',
   TEST: 'Test',
 }
 

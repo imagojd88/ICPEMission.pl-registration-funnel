@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { CourseAccessService } from '../courses/course-access.service';
 import { RoomsService } from '../rooms/rooms.service';
 import { AdminSummaryDto } from '../shared';
 import {
@@ -21,6 +22,7 @@ export class AdminService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly rooms: RoomsService,
+    private readonly courseAccess: CourseAccessService,
   ) {}
 
   async getSummary(): Promise<AdminSummaryDto> {
@@ -79,6 +81,7 @@ export class AdminService {
           | 'CANCELLED',
       },
     });
+    this.courseAccess.syncRegistrationSafe(id);
     return this.loadContractRegistration(id);
   }
 
@@ -108,6 +111,7 @@ export class AdminService {
         data: { status: 'CONFIRMED' },
       });
     }
+    this.courseAccess.syncRegistrationSafe(registrationId);
     return this.loadContractRegistration(registrationId);
   }
 

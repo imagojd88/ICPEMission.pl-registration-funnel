@@ -68,3 +68,20 @@ services:
       # publikacja treści tylko loguje zdarzenie (bez rebuildu). Blueprint nie nadpisuje.
       - key: SITE_DEPLOY_HOOK_URL
         sync: false
+      # ── Formacja online (panel kursanta) — docs/13-handoff-formacja-online.md ──
+      - key: MEMBER_JWT_SECRET      # osobny sekret tokenów kursantów (≠ JWT_SECRET admina)
+        generateValue: true
+      - key: FILE_SIGNING_SECRET    # podpisy krótko żyjących linków do PDF
+        generateValue: true
+      - key: PUBLIC_SITE_URL        # linki w mailach: <PUBLIC_SITE_URL>/formacja/<slug>/
+        value: https://icpemission.pl
+      - key: BUNNY_STREAM_LIBRARY_ID    # Bunny ▸ Stream ▸ biblioteka ▸ API ▸ Video Library ID
+        sync: false
+      - key: BUNNY_STREAM_API_KEY       # Bunny ▸ Stream ▸ biblioteka ▸ API ▸ API Key
+        sync: false
+      - key: BUNNY_STREAM_TOKEN_KEY     # Bunny ▸ Stream ▸ biblioteka ▸ Security ▸ Token authentication key
+        sync: false
+      - key: BUNNY_STREAM_CDN_HOSTNAME  # Bunny ▸ Stream ▸ biblioteka ▸ API ▸ CDN Hostname (miniatury), np. vz-xxxx.b-cdn.net
+        sync: false
+      - key: BUNNY_STREAM_WEBHOOK_KEY   # opcjonalnie: Read-only API key — weryfikacja podpisu webhooka
+        sync: false

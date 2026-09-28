@@ -7,6 +7,7 @@ import {
   CreditCard,
   UserCheck,
   Settings,
+  GraduationCap,
   LogOut,
   Sun,
   Moon,
@@ -22,6 +23,7 @@ type AdminScreen =
   | 'accommodation'
   | 'payments'
   | 'attendance'
+  | 'courses'
   | 'settings'
 
 interface NavItem {
@@ -38,6 +40,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'accommodation', label: 'Zakwaterowanie', icon: BedDouble },
   { id: 'payments', label: 'Płatności', icon: CreditCard },
   { id: 'attendance', label: 'Obecność', icon: UserCheck },
+  { id: 'courses', label: 'Formacja online', icon: GraduationCap },
   { id: 'settings', label: 'Ustawienia', icon: Settings },
 ]
 

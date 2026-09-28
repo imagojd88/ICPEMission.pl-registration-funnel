@@ -299,6 +299,52 @@ export class NotificationsService {
       return { subject, text, html };
     }
 
+    if (payload.type === 'COURSE_WELCOME' || payload.type === 'COURSE_ACCESS' || payload.type === 'MEMBER_PASSWORD_RESET') {
+      // Formacja online (panel kursanta) — PL/EN wg języka konta.
+      const en = payload.locale === 'en';
+      const course = String(d.courseTitle ?? (en ? 'online course' : 'kurs online'));
+      const name = String(d.firstName ?? '').trim();
+      const hello = name ? `${name},` : en ? 'Hello,' : 'Dzień dobry,';
+      const sig = en ? ['God bless,', 'ICPE Mission Poland'] : SIGNATURE;
+      const href = String(d.link ?? '');
+      if (payload.type === 'COURSE_WELCOME') {
+        const subject = en ? `Your access to: ${course}` : `Dostęp do kursu: ${course}`;
+        const { text, html } = buttonMail(
+          en
+            ? [hello, '', `you now have access to the online course "${course}".`, `Your login is your e-mail address: ${String(d.email ?? '')}.`, '', 'To start, set your password:']
+            : [hello, '', `masz już dostęp do kursu online „${course}".`, `Loginem jest Twój adres e-mail: ${String(d.email ?? '')}.`, '', 'Na początek ustaw swoje hasło:'],
+          { label: en ? 'Set password' : 'Ustaw hasło', href },
+          [
+            en ? 'The link is personal and valid for 14 days. After that, use "Forgot password" on the course page.' : 'Link jest osobisty i ważny 14 dni. Później użyj „Nie pamiętam hasła" na stronie kursu.',
+            en ? `Course page: ${String(d.courseLink ?? '')}` : `Strona kursu: ${String(d.courseLink ?? '')}`,
+            '',
+            ...sig,
+          ],
+        );
+        return { subject, text, html };
+      }
+      if (payload.type === 'COURSE_ACCESS') {
+        const subject = en ? `New course available: ${course}` : `Nowy kurs w Twoim koncie: ${course}`;
+        const { text, html } = buttonMail(
+          en
+            ? [hello, '', `you now have access to the online course "${course}".`, 'Log in with your e-mail address and the password you already use:']
+            : [hello, '', `masz już dostęp do kursu online „${course}".`, 'Zaloguj się swoim adresem e-mail i hasłem, którego już używasz:'],
+          { label: en ? 'Go to the course' : 'Przejdź do kursu', href },
+          ['', ...sig],
+        );
+        return { subject, text, html };
+      }
+      const subject = en ? `Password reset — ${course}` : `Reset hasła — ${course}`;
+      const { text, html } = buttonMail(
+        en
+          ? [hello, '', `we received a request to reset your password for "${course}".`, 'Set a new password here (the link is valid for 1 hour):']
+          : [hello, '', `otrzymaliśmy prośbę o zmianę hasła do kursu „${course}".`, 'Nowe hasło ustawisz tutaj (link ważny 1 godzinę):'],
+        { label: en ? 'Set a new password' : 'Ustaw nowe hasło', href },
+        [en ? 'If you did not ask for this, just ignore this message.' : 'Jeśli to nie Ty, po prostu zignoruj tę wiadomość.', '', ...sig],
+      );
+      return { subject, text, html };
+    }
+
     if (payload.type === 'TEST') {
       const subject = 'Test wysyłki — panel rejestracji ICPE';
       const { text, html } = buttonMail(

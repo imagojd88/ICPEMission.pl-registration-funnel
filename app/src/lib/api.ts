@@ -14,7 +14,7 @@ import type {
 // Config
 // ---------------------------------------------------------------------------
 
-const API_URL = (import.meta as ImportMeta & { env: Record<string, string> }).env.VITE_API_URL ?? ''
+export const API_URL = (import.meta as ImportMeta & { env: Record<string, string> }).env.VITE_API_URL ?? ''
 
 // ---------------------------------------------------------------------------
 // Auth token management
@@ -84,7 +84,7 @@ export async function uploadImage(file: File): Promise<string> {
 // HTTP helper
 // ---------------------------------------------------------------------------
 
-async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   if (!API_URL) throw new Error('No API URL configured')
   const res = await fetch(`${API_URL}${path}`, {
     ...init,

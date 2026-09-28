@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { CourseAccessService } from '../courses/course-access.service';
 import { PricingService } from '../pricing/pricing.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { buildIcs, googleCalendarUrl } from '../shared';
@@ -24,6 +25,7 @@ export class RegistrationsService {
     private readonly prisma: PrismaService,
     private readonly pricing: PricingService,
     private readonly notifications: NotificationsService,
+    private readonly courseAccess: CourseAccessService,
   ) {}
 
   async create(dto: CreateRegistrationDto) {
@@ -133,6 +135,9 @@ export class RegistrationsService {
       guestInviteLink,
     }).catch(console.error);
 
+    // Formacja online: kurs z `grantOn = ANY_ACTIVE` daje dostęp już od zapisu.
+    this.courseAccess.syncRegistrationSafe(registration.id);
+
     return {
       registration: this.mapToDto(registration),
       summary: priceResult,
@@ -215,6 +220,7 @@ export class RegistrationsService {
 
     const updated = await this.prisma.registration.findUnique({ where: { id }, include: { participants: true } });
     if (!updated) throw new NotFoundException('Registration not found');
+    this.courseAccess.syncRegistrationSafe(id); // mógł się zmienić e-mail
     return { registration: this.mapToDto(updated), summary: priceResult };
   }
 
@@ -245,6 +251,7 @@ export class RegistrationsService {
       },
       include: { participants: true, payments: true },
     });
+    this.courseAccess.syncRegistrationSafe(id);
     return this.mapToDto(updated);
   }
 
@@ -394,14 +401,17 @@ export class RegistrationsService {
   }
 
   async updateStatus(id: string, status: string) {
-    return this.prisma.registration.update({
+    const updated = await this.prisma.registration.update({
       where: { id },
       data: { status: status as 'DRAFT' | 'PENDING_PAYMENT' | 'AWAITING_TRANSFER' | 'CONFIRMED' | 'WAITLIST' | 'CANCELLED' },
     });
+    this.courseAccess.syncRegistrationSafe(id);
+    return updated;
   }
 
   async markPaid(id: string) {
     await this.prisma.registration.update({ where: { id }, data: { status: 'CONFIRMED' } });
+    this.courseAccess.syncRegistrationSafe(id);
     return this.prisma.payment.create({
       data: {
         registrationId: id,

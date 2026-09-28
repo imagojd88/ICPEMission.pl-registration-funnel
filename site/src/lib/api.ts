@@ -144,3 +144,18 @@ export function formatDateRange(startIso?: string, endIso?: string): string {
   if (s.toDateString() === e.toDateString()) return full(s);
   return `${s.toLocaleDateString('pl-PL', { day: 'numeric', month: 'long' })} – ${full(e)}`;
 }
+
+// ── Formacja online (panel kursanta) — docs/13-handoff-formacja-online.md ──
+export interface CourseLite {
+  slug: string;
+  title: LangText;
+  description?: LangText | null;
+  status: 'PUBLISHED' | 'ARCHIVED';
+}
+export interface SiteCourses {
+  courses: CourseLite[];
+  redirects: { from: string; to: string }[];
+}
+/** Opublikowane kursy (strony /formacja/<slug>) + przekierowania starych adresów. */
+export const getCourses = () => get<SiteCourses>('/site/courses', { courses: [], redirects: [] });
+export const API_BASE_URL = API_BASE;

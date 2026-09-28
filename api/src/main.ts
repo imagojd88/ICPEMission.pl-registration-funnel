@@ -5,7 +5,8 @@ import { AppModule } from './app.module';
 import { AuthService } from './auth/auth.service';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  // rawBody: podpis HMAC webhooka Bunny Stream liczony z surowego ciała żądania.
+  const app = await NestFactory.create(AppModule, { rawBody: true });
 
   // Bootstrap admina i tokenu serwisowego z ENV (gdy baza pusta).
   try {

@@ -1,5 +1,6 @@
 import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { CourseAccessService } from '../courses/course-access.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { guestInviteConfig, guestInvitePageLink, personalInviteLink } from './guest-invite-config';
 
@@ -166,6 +167,7 @@ export class InvitationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    private readonly courseAccess: CourseAccessService,
   ) {}
 
   /** Typ serii + slug strony dla instancji — do składania linków. */
@@ -699,6 +701,7 @@ export class InvitationsService {
       });
     }
 
+    this.courseAccess.syncRegistrationSafe(registrationId);
     return registrationId;
   }
 

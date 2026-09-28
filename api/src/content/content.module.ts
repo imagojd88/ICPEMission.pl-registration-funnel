@@ -10,6 +10,6 @@ import { EventsModule } from '../events/events.module';
   imports: [AuthModule, EventsModule],
   controllers: [ContentAdminController, ContentPublicController],
   providers: [ContentService, DeployHookService],
-  exports: [ContentService],
+  exports: [ContentService, DeployHookService],
 })
 export class ContentModule {}

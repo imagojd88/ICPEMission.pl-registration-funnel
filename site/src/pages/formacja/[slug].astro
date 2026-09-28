@@ -1,0 +1,42 @@
+---
+// Strony kursów „Formacji online" — generowane przy buildzie z /site/courses.
+// Nowy/zmieniony kurs → Deploy Hook przebudowuje stronę. Stare adresy (po zmianie slugu) przekierowują.
+import LandingLayout from '../../layouts/LandingLayout.astro';
+import CourseApp from '../../components/CourseApp.astro';
+import { getCourses, pickLang, type CourseLite } from '../../lib/api';
+
+export async function getStaticPaths() {
+  const { courses, redirects } = await getCourses();
+  const live = new Set(courses.map((c) => c.slug));
+  return [
+    ...courses.map((c) => ({ params: { slug: c.slug }, props: { course: c, redirectTo: null } })),
+    ...redirects
+      .filter((r) => !live.has(r.from))
+      .map((r) => ({ params: { slug: r.from }, props: { course: null, redirectTo: r.to } })),
+  ];
+}
+
+interface Props {
+  course: CourseLite | null;
+  redirectTo: string | null;
+}
+const { course, redirectTo } = Astro.props;
+const title = course ? `${pickLang(course.title, 'pl')} — Formacja online · ICPE Mission` : 'Formacja online · ICPE Mission';
+---
+
+{redirectTo ? (
+  <html lang="pl">
+    <head>
+      <meta charset="utf-8" />
+      <meta name="robots" content="noindex" />
+      <meta http-equiv="refresh" content={`0; url=/formacja/${redirectTo}/`} />
+      <title>Przekierowanie…</title>
+      <script is:inline define:vars={{ to: redirectTo }}>location.replace('/formacja/' + to + '/' + location.search);</script>
+    </head>
+    <body><a href={`/formacja/${redirectTo}/`}>Kurs przeniesiony — przejdź dalej</a></body>
+  </html>
+) : (
+  <LandingLayout title={title} description="Panel kursanta — Formacja online ICPE Mission." noindex>
+    <CourseApp course={course} />
+  </LandingLayout>
+)}

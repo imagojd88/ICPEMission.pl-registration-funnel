@@ -1,0 +1,13 @@
+---
+// /formacja/ — lista kursów, a jednocześnie fallback dla reguły Rewrite w Render
+// (/formacja/* → /formacja/index.html): skrypt odczyta slug z adresu i dociągnie kurs z API.
+import LandingLayout from '../../layouts/LandingLayout.astro';
+import CourseApp from '../../components/CourseApp.astro';
+import { getCourses } from '../../lib/api';
+
+const { courses } = await getCourses();
+---
+
+<LandingLayout title="Formacja online · ICPE Mission" description="Kursy online ICPE Mission Warszawa — panel kursanta.">
+  <CourseApp courses={courses} />
+</LandingLayout>

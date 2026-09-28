@@ -11,3 +11,6 @@ app/.vite/
 app/dist*/
 app/vite.config.ts.timestamp-*.mjs
 api/prisma/*.db
+
+# paczka weryfikacyjna sesji Claude (można usunąć)
+.verify-bundle.tgz

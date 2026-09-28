@@ -11,6 +11,7 @@ import SettingsScreen from '@/components/admin/settings/SettingsScreen'
 import AttendanceScreen from '@/components/admin/attendance/AttendanceScreen'
 import AccommodationScreen from '@/components/admin/accommodation/AccommodationScreen'
 import PaymentsScreen from '@/components/admin/payments/PaymentsScreen'
+import CoursesScreen from '@/components/admin/courses/CoursesScreen'
 
 type AdminScreen =
   | 'dashboard'
@@ -19,6 +20,7 @@ type AdminScreen =
   | 'accommodation'
   | 'payments'
   | 'attendance'
+  | 'courses'
   | 'settings'
 
 const SCREEN_TITLES: Record<AdminScreen, { title: string; subtitle?: string }> = {
@@ -28,6 +30,7 @@ const SCREEN_TITLES: Record<AdminScreen, { title: string; subtitle?: string }> =
   accommodation: { title: 'Zakwaterowanie', subtitle: 'Zarządzaj pokojami i przydziałami' },
   payments: { title: 'Płatności', subtitle: 'Historia transakcji i rozliczenia' },
   attendance: { title: 'Obecność', subtitle: 'Lista obecności i weryfikacja uczestników' },
+  courses: { title: 'Formacja online', subtitle: 'Kursy online: filmy, materiały PDF i dostęp kursantów' },
   settings: { title: 'Ustawienia', subtitle: 'Konfiguracja systemu i konta' },
 }
 
@@ -85,6 +88,8 @@ export default function AdminPanel() {
         return <PaymentsScreen />
       case 'attendance':
         return <AttendanceScreen />
+      case 'courses':
+        return <CoursesScreen />
       case 'settings':
         return <SettingsScreen onLogout={handleLogout} />
       default:

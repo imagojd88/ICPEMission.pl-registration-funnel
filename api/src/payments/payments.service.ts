@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
+import { CourseAccessService } from '../courses/course-access.service';
 
 @Injectable()
 export class PaymentsService {
@@ -9,6 +10,7 @@ export class PaymentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
+    private readonly courseAccess: CourseAccessService,
   ) {
     this.mode = this.config.get<string>('PAYMENTS_MODE', 'mock');
   }
@@ -65,6 +67,7 @@ export class PaymentsService {
     if (!payment) throw new NotFoundException('Pending payment not found');
     await this.prisma.payment.update({ where: { id: payment.id }, data: { status: 'PAID' } });
     await this.prisma.registration.update({ where: { id: regId }, data: { status: 'CONFIRMED' } });
+    this.courseAccess.syncRegistrationSafe(regId);
     return { ok: true, regId, paymentId: payment.id };
   }
 

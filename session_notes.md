@@ -41,6 +41,46 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ---
 
+## Dziennik prac — panel kursanta (kurs online)
+
+### WDROŻENIE v1 „Formacja online" — kod gotowy, czeka na push + konfigurację (2026-09-28)
+**Zmiana decyzji usera:** adres **`icpemission.pl/formacja/<slug>`** (bez subdomen/wildcard DNS), **wiele kursów równolegle**. Spec: `docs/13-handoff-formacja-online.md` (zastępuje część o subdomenach w `docs/12`).
+
+**Backend (`api/`):**
+- **E0 bezpieczeństwo:** `auth/jwt-auth.guard.ts` — JWT przechodzi tylko z `realm === 'admin'` (wcześniej każdy JWT podpisany `JWT_SECRET`). Tokeny serwisowe bez zmian.
+- Prisma: `Course`, `CourseItem`, `PrivateFile`, `CourseEnrollment` (z `revokedReason` ADMIN/AUTO), `MemberToken`, enumy; `GuestAccount` + `enrollments`, `passwordSetAt`, `lastLoginAt`. Wszystko nowe/nullable → `prisma db push` na starcie.
+- Nowy katalog `api/src/courses/`: `course-utils.ts` (slugify PL, podpisy HMAC PDF, sekret member JWT, limiter prób w pamięci), `bunny-stream.service.ts` (create video, podpis TUS, stan z API — źródło prawdy, podpisany embed, weryfikacja webhooka), `course-access.service.ts` + `course-access.module.ts` (**@Global**: grant/revoke AUTO/MANUAL, maile powitalne, tokeny, `reconcileCourse`, leniwe `syncByEmail`), `courses.service.ts` + `courses.admin.controller.ts` (`/admin/courses/*`), `member.service.ts` + `member-auth.guard.ts` + `courses.public.controller.ts` (`/site/courses`, `/courses/public/:slug`, `/member/auth/*`, `/member/courses/*`, `/member/files/:id`, `/webhooks/bunny-stream`), `courses.module.ts`.
+- Hooki dostępu `courseAccess.syncRegistrationSafe(id)` w: `registrations.service` (create, adminUpdate, update, updateStatus, markPaid), `payments.service` (devConfirm), `admin.service` (updateRegistrationStatus, markPaid), `invitations.service` (upsert zgłoszenia przy potwierdzeniu).
+- `main.ts`: `NestFactory.create(AppModule, { rawBody: true })` (HMAC webhooka). `ContentModule` eksportuje `DeployHookService` (rebuild strony po publikacji/zmianie kursu).
+- Maile (`notifications.service.ts`): `COURSE_WELCOME` (ustaw hasło, 14 dni), `COURSE_ACCESS` (konto z hasłem), `MEMBER_PASSWORD_RESET` (1 h) — PL/EN.
+- `render.yaml`: `MEMBER_JWT_SECRET`, `FILE_SIGNING_SECRET` (generateValue), `PUBLIC_SITE_URL`, `BUNNY_STREAM_*` (sync:false). `.env.example` uzupełniony.
+
+**Panel admina (`app/`):** sidebar ▸ **Formacja online** (`components/admin/courses/*`): lista kursów, tworzenie (slug na żywo + walidacja), edytor z zakładkami Zawartość (film: upload TUS z paskiem postępu i wznawianiem, stan kodowania odpytywany co 10 s; PDF ≤25 MB; kolejność, ukrywanie, edycja tytułów, usuwanie), Kursanci (dodaj, import listy, synchronizuj z eventami, odbierz/przywróć, wyślij ponownie powitanie), Ustawienia (publikacja/archiwum/szkic, nazwa PL/EN, opis, adres z przekierowaniem starego, eventy źródłowe, „dostęp od: potwierdzenia | zapisu”, data wygaśnięcia, usuwanie z potwierdzeniem slugiem). `lib/courses.ts`, `lib/tusUpload.ts` (własny klient TUS, bez zależności). `lib/api.ts`: eksport `API_URL`, `apiFetch`. MailSettings: etykiety nowych maili.
+
+**Strona (`site/`):** `pages/formacja/[slug].astro` (strony z `/site/courses` + strony-przekierowania starych slugów), `pages/formacja/index.astro` (lista kursów + fallback reguły Rewrite), `components/CourseApp.astro` (style `is:global` z prefiksem `ca-` — lekcja z WorldMap), `scripts/course-app.ts` (logowanie, `?haslo=` ustaw/reset hasła, „nie pamiętam hasła”, dashboard: filmy w iframe Bunny, PDF przez podpisany link; PL/EN; komunikat o wybudzaniu serwera). `LandingLayout` + prop `noindex`.
+
+**Weryfikacja (w kontenerze na kopii repo):** `tsc --noEmit` api ✓ i app ✓ (prisma generate `--no-engine`, schema valid), `vite build` ✓, `astro check` 0 błędów ✓, `astro build` ✓. **Test logiki backendu** (fake Prisma, 10 scenariuszy): slugi, dostęp AUTO/grantOn, publikacja→powitania+deploy hook, ustaw hasło (jednorazowy token), guard admina odrzuca tokeny kursanta, guard kursanta odrzuca admina, treść tylko READY/published, podpisy PDF/embed/TUS, logowanie, anulowanie/odebranie przez admina (auto nie przywraca), leniwa synchronizacja w „nie pamiętam hasła”, import, zmiana slugu→przekierowanie, archiwum — **OK**. **Test E2E strony w Chromium** (mock API): login, błędne hasło, dashboard, player, PDF w nowej karcie, PL/EN, sesja po reloadzie, wylogowanie, `?haslo=`, forgot, przekierowanie, fallback Rewrite, 404, lista, mobile bez poziomego scrolla — **OK**. Nie testowane na żywo: realne API Bunny (egress sandboxa blokuje), baza Render.
+
+**Po stronie Jacka (kolejność):**
+1. Push (przed nim `rm -f .git/index.lock` — sandbox zostawia pusty lock).
+2. Render ▸ `icpe-api` ▸ **Manual Deploy** (nowe tabele). Blueprint sync doda `MEMBER_JWT_SECRET`, `FILE_SIGNING_SECRET`, `PUBLIC_SITE_URL`.
+3. Bunny.net: Stream ▸ biblioteka (Frankfurt) ▸ Security: *Embed view token authentication* ON, *Allowed domains* `icpemission.pl`; webhook `https://icpe-api.onrender.com/webhooks/bunny-stream`. Klucze do Render: `BUNNY_STREAM_LIBRARY_ID`, `BUNNY_STREAM_API_KEY`, `BUNNY_STREAM_TOKEN_KEY`, `BUNNY_STREAM_CDN_HOSTNAME`, opcjonalnie `BUNNY_STREAM_WEBHOOK_KEY`.
+4. Render ▸ static site strony ▸ Redirects/Rewrites: `/formacja/*` → `/formacja/index.html` (Rewrite) — zalecane.
+5. Test: kurs „Test” → film + PDF → Opublikuj → dodaj siebie → mail → ustaw hasło.
+- Plik roboczy: `.verify-bundle.tgz` w katalogu projektu (paczka do weryfikacji, gitignored — można usunąć).
+- Otwarte / v2: znak wodny w PDF, postęp oglądania, handoff Personal OS (API gotowe na token serwisowy), polityka prywatności (Bunny).
+
+### Plan panelu kursanta + research hostingu wideo (2026-09-28) — TYLKO PLAN, bez zmian w kodzie
+- Plan: `docs/12-plan-panel-kursanta.md` (architektura, porównanie hostingu, model danych, API, UI, DNS, etapy E0–E6, checklista dla Jacka).
+- **Decyzje usera:** dostęp AUTO (zgłoszenie z powiązanego eventu) + RĘCZNY; logowanie e-mail + hasło (mail „Ustaw hasło"); **adres zmienny z nazwy kursu nadawanej przez admina → subdomena `<slug>.icpemission.pl`** (wildcard `*` CNAME → `icpe-frontend`, fallback `/k/:slug`); plan jako markdown w repo.
+- **Wideo — rekomendacja Bunny Stream** (Frankfurt, TUS upload z przeglądarki admina bez przechodzenia przez icpe-api, podpisany embed `SHA256(tokenKey+videoId+expires)`, webhook HMAC, ~$1/mies. przy tej skali). Alternatywy opisane: AWS S3+CloudFront(+MediaConvert), Cloudflare Stream (~$11/mies.), Mux (free: 10 filmów + badge).
+- PDF: nowy model `PrivateFile` (Postgres, ≤25 MB) + podpisane linki 10 min — NIE przez publiczne `Upload` (to ma cache immutable i brak auth).
+- **Znalezisko bezpieczeństwa (E0, blokujące):** `JwtAuthGuard` nie sprawdza `realm` — każdy JWT podpisany `JWT_SECRET` wchodzi na `/admin/*`. Przed wydaniem tokenów kursantom: wymusić `realm==='admin'` + osobny `MEMBER_JWT_SECRET`.
+- **Znalezisko:** zgłoszenia zawsze startują jako PENDING_PAYMENT/AWAITING_TRANSFER (także przy `free: true`), CONFIRMED ustawiają: payments.service, registrations.service (updateStatus/markPaid), admin.service, invitations.service → tam wpiąć `syncRegistration`; dla kursów darmowych ustawienie `grantOn=ANY_ACTIVE`.
+- Następny krok: po akceptacji planu start od E0 (guard) → E1. Po stronie Jacka: konto Bunny + ENV, DNS wildcard + custom domain `*.icpemission.pl` w Render (sprawdzić limit domen planu), rozważyć płatny plan `icpe-api` na czas kursu.
+
+---
+
 ## Dziennik prac — strona ICPE Mission PL (CMS)
 
 ### Nowy cytat: ks. Jerome Barnabas (2026-09-05)
@@ -381,11 +421,14 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 ---
 
 ## Powiązane dokumenty
+- `docs/13-handoff-formacja-online.md` — **obowiązująca spec** Formacji online (`/formacja/<slug>`, wiele kursów).
+- `docs/12-plan-panel-kursanta.md` — pierwotny plan + research hostingu wideo i koszty (część o subdomenach nieaktualna).
 - `docs/HANDOFF-strona-ICPE-Mission-PL.md` — architektura publicznej strony ICPE Mission PL (headless CMS na API + Astro, statystyki Umami). Nowy kierunek prac (osobny od modułu rejestracji).
 
 ---
 
 ## Do zrobienia / otwarte
+- Formacja online: kod v1 gotowy (dziennik 2026-09-28) — push, Manual Deploy `icpe-api`, konfiguracja Bunny + reguła Rewrite, test na kursie testowym.
 - Po pushu zmian backendowych: **Manual Deploy** `icpe-api` (INVITE enum, `Invitation.dietaryNotes`, `customFields`, tabela `Place`).
 - Opcjonalnie (zaproponowane, nieprzyjęte): panel zarządzania zaproszonymi w `EventEditForm` (podgląd linków + kto potwierdził).
 - Faza 1 strony ICPE Mission PL: moduł `content` w `icpe-api` (patrz handoff).

@@ -22,10 +22,13 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     if (!authHeader?.startsWith('Bearer ')) throw new UnauthorizedException();
     const token = authHeader.slice(7);
 
-    // Try JWT first
+    // Try JWT first — tylko realm 'admin'. Inne JWT (np. kursanci, realm 'member',
+    // podpisywane osobnym sekretem) NIE mogą wejść na /admin/*, nawet gdyby sekret był wspólny.
     try {
       const result = (await super.canActivate(context)) as boolean;
-      if (result) return true;
+      const user = req.user as { realm?: string } | undefined;
+      if (result && user?.realm === 'admin') return true;
+      req.user = undefined;
     } catch {
       // fall through
     }
