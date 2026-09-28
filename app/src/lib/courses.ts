@@ -292,3 +292,17 @@ export async function downloadActivityCsv(courseId: string, slug: string): Promi
   a.remove()
   setTimeout(() => URL.revokeObjectURL(a.href), 5000)
 }
+
+// ── Hasła kursantów (panel ▸ Kursanci) ──
+export const sendResetLink = (courseId: string, eid: string) =>
+  apiFetch<{ status: string; kind: 'RESET' | 'WELCOME' }>(`/admin/courses/${courseId}/enrollments/${eid}/reset-link`, json('POST'))
+export const setMemberPassword = (courseId: string, eid: string, password: string) =>
+  apiFetch<{ ok: true }>(`/admin/courses/${courseId}/enrollments/${eid}/password`, json('POST', { password }))
+
+/** Czytelne hasło do przekazania (bez mylących znaków 0/O, 1/l/I). */
+export function generatePassword(len = 10): string {
+  const chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789'
+  const arr = new Uint32Array(len)
+  crypto.getRandomValues(arr)
+  return Array.from(arr, (n) => chars[n % chars.length]).join('')
+}

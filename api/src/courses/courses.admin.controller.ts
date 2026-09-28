@@ -131,6 +131,18 @@ export class CoursesAdminController {
     return this.courses.setRevoked(id, eid, !!body.revoked);
   }
 
+  @Post(':id/enrollments/:eid/reset-link')
+  @ApiOperation({ summary: 'Wyślij kursantowi mail z linkiem do ustawienia nowego hasła (48 h)' })
+  sendResetLink(@Param('id') id: string, @Param('eid') eid: string) {
+    return this.courses.sendResetLink(id, eid);
+  }
+
+  @Post(':id/enrollments/:eid/password')
+  @ApiOperation({ summary: 'Ustaw kursantowi hasło ręcznie (wylogowuje go z innych urządzeń)' })
+  setPassword(@Param('id') id: string, @Param('eid') eid: string, @Body() body: { password?: string }) {
+    return this.courses.setPasswordManually(id, eid, body.password ?? '');
+  }
+
   @Post(':id/enrollments/:eid/resend')
   resend(@Param('id') id: string, @Param('eid') eid: string) {
     return this.courses.resend(id, eid);

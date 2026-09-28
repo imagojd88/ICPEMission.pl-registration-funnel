@@ -212,6 +212,12 @@ export class MemberService {
       return { course: c, enrollment: null };
     }
     const guestId = m.guestId;
+    // Zmiana hasła (także przez admina) unieważnia wcześniejsze sesje na innych urządzeniach.
+    const g = await this.prisma.guestAccount.findUnique({ where: { id: guestId }, select: { passwordSetAt: true } });
+    if (!g) throw new UnauthorizedException('Sesja wygasła — zaloguj się ponownie.');
+    if (g.passwordSetAt && m.iat && m.iat * 1000 < g.passwordSetAt.getTime() - 2000) {
+      throw new UnauthorizedException('Hasło zostało zmienione — zaloguj się ponownie.');
+    }
     const course = await this.courseBySlug(slug);
     if (!course) throw new NotFoundException('Nie znaleziono kursu');
     if (!this.isOpen(course)) throw new ForbiddenException('Dostęp do tego kursu jest zamknięty.');

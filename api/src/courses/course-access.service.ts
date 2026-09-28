@@ -235,16 +235,22 @@ export class CourseAccessService {
   }
 
   /** Mail z linkiem resetu hasła (1 h). */
-  async sendPasswordReset(guestId: string, course: { id: string; slug: string; title: unknown }): Promise<void> {
+  /** Mail z linkiem do ustawienia nowego hasła. Domyślnie 1 h (samoobsługa); z panelu admina dłużej. */
+  async sendPasswordReset(guestId: string, course: { id: string; slug: string; title: unknown }, ttlMs = 3600 * 1000): Promise<string> {
     const guest = await this.prisma.guestAccount.findUnique({ where: { id: guestId } });
-    if (!guest) return;
+    if (!guest) return 'SKIPPED';
     const lng = guest.locale === 'en' ? 'en' : 'pl';
-    const raw = await this.issueToken(guest.id, 'RESET_PASSWORD', course.id, 3600 * 1000);
-    await this.mail.sendMail({
+    const raw = await this.issueToken(guest.id, 'RESET_PASSWORD', course.id, ttlMs);
+    return this.mail.sendMail({
       to: guest.email,
       type: 'MEMBER_PASSWORD_RESET',
       locale: lng,
-      data: { courseTitle: pickText(course.title, lng), firstName: guest.firstName, link: `${courseUrl(course.slug)}?haslo=${raw}` },
+      data: {
+        courseTitle: pickText(course.title, lng),
+        firstName: guest.firstName,
+        link: `${courseUrl(course.slug)}?haslo=${raw}`,
+        validHours: Math.round(ttlMs / 3600000),
+      },
     });
   }
 }

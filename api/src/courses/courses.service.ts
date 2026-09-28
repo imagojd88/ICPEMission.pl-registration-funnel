@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import * as argon2 from 'argon2';
 import { PrismaService } from '../prisma/prisma.service';
 import { DeployHookService } from '../content/deploy-hook.service';
 import { BunnyStreamService } from './bunny-stream.service';
@@ -449,6 +450,41 @@ export class CoursesService {
     if (e.course.status !== 'PUBLISHED') throw new ConflictException('Kurs nie jest opublikowany — powitanie wyjdzie automatycznie przy publikacji.');
     const status = await this.access.sendWelcome(e.id);
     return { status };
+  }
+
+  /**
+   * Reset hasła z panelu: mail z linkiem do ustawienia nowego hasła (ważny 48 h).
+   * Konto bez hasła dostaje zamiast tego powitanie z linkiem „Ustaw hasło".
+   */
+  async sendResetLink(courseId: string, enrollmentId: string) {
+    const e = await this.prisma.courseEnrollment.findFirst({ where: { id: enrollmentId, courseId }, include: { course: true, guest: true } });
+    if (!e) throw new NotFoundException('Nie znaleziono kursanta');
+    if (e.revokedAt) throw new ConflictException('Dostęp jest odebrany — najpierw go przywróć.');
+    if (e.course.status !== 'PUBLISHED') throw new ConflictException('Kurs nie jest opublikowany — link zadziała dopiero po publikacji.');
+    if (!e.guest.passwordHash) return { status: await this.access.sendWelcome(e.id), kind: 'WELCOME' };
+    const status = await this.access.sendPasswordReset(e.guestId, e.course, 48 * 3600 * 1000);
+    this.tracking.log(courseId, e.guestId, 'RESET_REQUEST', null, { by: 'admin' });
+    return { status, kind: 'RESET' };
+  }
+
+  /**
+   * Ręczne ustawienie hasła przez admina (np. przekazanie telefonicznie). Hasło dotyczy KONTA —
+   * działa we wszystkich kursach tej osoby. Wylogowuje ją ze wszystkich urządzeń (passwordSetAt).
+   */
+  async setPasswordManually(courseId: string, enrollmentId: string, password: string) {
+    const e = await this.prisma.courseEnrollment.findFirst({ where: { id: enrollmentId, courseId } });
+    if (!e) throw new NotFoundException('Nie znaleziono kursanta');
+    const pw = String(password ?? '');
+    if (pw.length < 8) throw new BadRequestException('Hasło musi mieć co najmniej 8 znaków.');
+    if (pw.length > 200) throw new BadRequestException('Hasło jest za długie.');
+    await this.prisma.guestAccount.update({
+      where: { id: e.guestId },
+      data: { passwordHash: await argon2.hash(pw), passwordSetAt: new Date() },
+    });
+    // Stare linki „ustaw hasło" przestają działać.
+    await this.prisma.memberToken.updateMany({ where: { guestId: e.guestId, usedAt: null }, data: { usedAt: new Date() } });
+    this.tracking.log(courseId, e.guestId, 'PASSWORD_SET', null, { by: 'admin' });
+    return { ok: true };
   }
 
   async sync(courseId: string) {

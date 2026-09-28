@@ -334,11 +334,14 @@ export class NotificationsService {
         );
         return { subject, text, html };
       }
+      const hours = Math.max(1, Number(d.validHours ?? 1));
+      const hPl = hours === 1 ? '1 godzinę' : hours % 10 >= 2 && hours % 10 <= 4 && (hours < 10 || hours > 20) ? `${hours} godziny` : `${hours} godzin`;
+      const hEn = hours === 1 ? '1 hour' : `${hours} hours`;
       const subject = en ? `Password reset — ${course}` : `Reset hasła — ${course}`;
       const { text, html } = buttonMail(
         en
-          ? [hello, '', `we received a request to reset your password for "${course}".`, 'Set a new password here (the link is valid for 1 hour):']
-          : [hello, '', `otrzymaliśmy prośbę o zmianę hasła do kursu „${course}".`, 'Nowe hasło ustawisz tutaj (link ważny 1 godzinę):'],
+          ? [hello, '', `here is a link to set a new password for "${course}".`, `Set a new password here (the link is valid for ${hEn}):`]
+          : [hello, '', `przesyłamy link do ustawienia nowego hasła do kursu „${course}".`, `Nowe hasło ustawisz tutaj (link ważny ${hPl}):`],
         { label: en ? 'Set a new password' : 'Ustaw nowe hasło', href },
         [en ? 'If you did not ask for this, just ignore this message.' : 'Jeśli to nie Ty, po prostu zignoruj tę wiadomość.', '', ...sig],
       );

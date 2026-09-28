@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { RefreshCw, UserPlus, Mail, Ban, RotateCcw, Upload } from 'lucide-react'
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
+import { RefreshCw, UserPlus, Mail, Ban, RotateCcw, Upload, KeyRound, Copy } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Textarea from '@/components/ui/Textarea'
 import Badge from '@/components/ui/Badge'
 import {
-  addEnrollment, importEnrollments, listEnrollments, resendWelcome, setEnrollmentRevoked, syncCourseAccess,
+  addEnrollment, generatePassword, importEnrollments, listEnrollments, resendWelcome, sendResetLink, setEnrollmentRevoked,
+  setMemberPassword, syncCourseAccess,
   type CourseDetail, type Enrollment,
 } from '@/lib/courses'
 import { Notice, Panel, errMsg, fmtDate } from './shared'
@@ -24,6 +25,7 @@ export default function CourseMembersTab({ course, onChanged }: { course: Course
   const [filter, setFilter] = useState('')
   const [showAdd, setShowAdd] = useState(false)
   const [showImport, setShowImport] = useState(false)
+  const [pwFor, setPwFor] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -127,7 +129,8 @@ export default function CourseMembersTab({ course, onChanged }: { course: Course
               </thead>
               <tbody>
                 {visible.map((r) => (
-                  <tr key={r.id} style={{ borderTop: '1px solid var(--border)', opacity: r.active ? 1 : 0.55 }}>
+                  <Fragment key={r.id}>
+                  <tr style={{ borderTop: '1px solid var(--border)', opacity: r.active ? 1 : 0.55 }}>
                     <td className="px-5 py-2">
                       <p className="font-medium" style={{ color: 'var(--ink)' }}>{`${r.firstName} ${r.lastName}`.trim() || '—'}</p>
                       <p className="text-xs" style={{ color: 'var(--faint)' }}>{r.email}</p>
@@ -142,6 +145,16 @@ export default function CourseMembersTab({ course, onChanged }: { course: Course
                     <td className="px-2 py-2 text-xs" style={{ color: 'var(--muted)' }}>{fmtDate(r.lastSeenAt ?? r.lastLoginAt)}</td>
                     <td className="px-5 py-2">
                       <div className="flex gap-1 justify-end">
+                        {r.active && (
+                          <button
+                            type="button"
+                            title="Hasło: wyślij link do zmiany albo ustaw ręcznie"
+                            onClick={() => setPwFor(pwFor === r.id ? null : r.id)}
+                            style={{ ...iconBtn, color: pwFor === r.id ? 'var(--brand)' : 'var(--muted)' }}
+                          >
+                            <KeyRound size={15} />
+                          </button>
+                        )}
                         {r.active && !r.passwordSet && (
                           <button
                             type="button"
@@ -182,6 +195,28 @@ export default function CourseMembersTab({ course, onChanged }: { course: Course
                       </div>
                     </td>
                   </tr>
+                  {pwFor === r.id && (
+                    <tr>
+                      <td colSpan={5} className="px-5 pb-4" style={{ background: 'var(--surface-2)' }}>
+                        <PasswordPanel
+                          person={r}
+                          courseStatus={course.status}
+                          onClose={() => setPwFor(null)}
+                          onSendLink={() => act(async () => {
+                            const x = await sendResetLink(course.id, r.id)
+                            setPwFor(null)
+                            const what = x.kind === 'WELCOME' ? 'Mail powitalny z linkiem „Ustaw hasło"' : 'Link do zmiany hasła (ważny 48 h)'
+                            return `${what} → ${r.email}: ${MAIL_STATUS[x.status] ?? x.status}.`
+                          })}
+                          onSetPassword={async (pw) => {
+                            await setMemberPassword(course.id, r.id, pw)
+                            await load()
+                          }}
+                        />
+                      </td>
+                    </tr>
+                  )}
+                  </Fragment>
                 ))}
               </tbody>
             </table>
@@ -193,6 +228,86 @@ export default function CourseMembersTab({ course, onChanged }: { course: Course
 }
 
 const iconBtn: React.CSSProperties = { background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: 6, borderRadius: 8 }
+
+function PasswordPanel({ person, courseStatus, onClose, onSendLink, onSetPassword }: {
+  person: Enrollment
+  courseStatus: string
+  onClose: () => void
+  onSendLink: () => void
+  onSetPassword: (pw: string) => Promise<void>
+}) {
+  const [pw, setPw] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const [saved, setSaved] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
+
+  async function save() {
+    if (pw.length < 8) return setErr('Hasło musi mieć co najmniej 8 znaków.')
+    setBusy(true)
+    setErr(null)
+    try {
+      await onSetPassword(pw)
+      setSaved(pw)
+    } catch (e) {
+      setErr(errMsg(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (saved) {
+    const msg = `Twoje dane do kursu:\nE-mail: ${person.email}\nHasło: ${saved}`
+    return (
+      <div className="flex flex-col gap-2 pt-3">
+        <Notice kind="ok">
+          Hasło ustawione. Przekaż je kursantowi — działa we wszystkich jego kursach. Wcześniejsze logowania na innych urządzeniach zostały wylogowane.
+        </Notice>
+        <div className="flex items-center gap-3 flex-wrap">
+          <code className="text-sm px-3 py-1.5 rounded-[8px]" style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--ink)' }}>
+            {person.email} · {saved}
+          </code>
+          <Button size="sm" variant="outline" onClick={() => { void navigator.clipboard?.writeText(msg).then(() => setCopied(true)) }}>
+            <Copy size={14} /> {copied ? 'Skopiowano' : 'Kopiuj dane logowania'}
+          </Button>
+          <Button size="sm" variant="ghost" onClick={onClose}>Zamknij</Button>
+        </div>
+        <p className="text-xs" style={{ color: 'var(--faint)' }}>Hasło nie jest nigdzie zapisywane jawnie — po zamknięciu nie da się go już podejrzeć.</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="grid md:grid-cols-2 gap-4 pt-3">
+      <div className="flex flex-col gap-2">
+        <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>Wyślij link mailem</p>
+        <p className="text-xs" style={{ color: 'var(--muted)' }}>
+          {person.passwordSet
+            ? `Kursant dostanie na ${person.email} link do ustawienia nowego hasła (ważny 48 h). Obecne hasło działa, dopóki nie ustawi nowego.`
+            : `Kursant nie ma jeszcze hasła — dostanie mail powitalny z linkiem „Ustaw hasło".`}
+        </p>
+        <div>
+          <Button size="sm" onClick={onSendLink} disabled={courseStatus !== 'PUBLISHED'}>
+            <Mail size={14} /> Wyślij link
+          </Button>
+          {courseStatus !== 'PUBLISHED' && <p className="text-xs mt-1" style={{ color: 'var(--warn)' }}>Najpierw opublikuj kurs.</p>}
+        </div>
+      </div>
+      <div className="flex flex-col gap-2">
+        <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>Ustaw hasło ręcznie</p>
+        <p className="text-xs" style={{ color: 'var(--muted)' }}>Np. gdy kursant nie odbiera maili — ustaw hasło i przekaż je telefonicznie lub SMS-em.</p>
+        <div className="flex items-center gap-2">
+          <div className="flex-1">
+            <Input value={pw} onChange={(e) => setPw(e.target.value)} placeholder="min. 8 znaków" className="py-2" autoComplete="new-password" />
+          </div>
+          <Button size="sm" variant="outline" onClick={() => setPw(generatePassword())} type="button">Generuj</Button>
+          <Button size="sm" onClick={() => void save()} disabled={busy || pw.length < 8}>{busy ? 'Zapisuję…' : 'Ustaw'}</Button>
+        </div>
+        {err && <p className="text-xs" style={{ color: 'var(--err)' }}>{err}</p>}
+      </div>
+    </div>
+  )
+}
 
 function AddForm({ busy, onSubmit }: { busy: boolean; onSubmit: (b: { email: string; firstName: string; lastName: string; locale: string; sendWelcome: boolean }) => void }) {
   const [email, setEmail] = useState('')

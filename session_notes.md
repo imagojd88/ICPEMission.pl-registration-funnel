@@ -44,6 +44,14 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — panel kursanta (kurs online)
 
+### Reset hasła kursanta z panelu (2026-09-28)
+- Panel ▸ kurs ▸ **Kursanci**: przy każdej aktywnej osobie ikona klucza → panel z dwiema opcjami:
+  - **Wyślij link mailem** — `POST /admin/courses/:id/enrollments/:eid/reset-link`: konto z hasłem → mail `MEMBER_PASSWORD_RESET` z linkiem ważnym **48 h** (samoobsługowy „Nie pamiętam hasła" nadal 1 h; treść maila liczy godziny: „ważny 1 godzinę / 48 godzin"); konto bez hasła → mail powitalny „Ustaw hasło". Wymaga opublikowanego kursu. Zdarzenie RESET_REQUEST (meta.by=admin).
+  - **Ustaw hasło ręcznie** — `POST …/enrollments/:eid/password {password}` (min. 8; przycisk „Generuj" daje czytelne 10 znaków bez 0/O/1/l/I). Hasło dotyczy konta (wszystkie kursy tej osoby); unieważnia niewykorzystane linki „ustaw hasło"; zdarzenie PASSWORD_SET (meta.by=admin). Po zapisie panel pokazuje hasło raz + „Kopiuj dane logowania" (e-mail + hasło) — nigdzie nie jest przechowywane jawnie.
+- **Bezpieczeństwo:** zmiana hasła (przez admina albo przez kursanta) wylogowuje wcześniejsze sesje — `MemberAuthGuard` przekazuje `iat`, `requireAccess` odrzuca token wydany przed `GuestAccount.passwordSetAt` (tolerancja 2 s).
+- Pliki: `course-access.service.ts` (sendPasswordReset z TTL, zwraca status), `courses.service.ts` (sendResetLink, setPasswordManually), `courses.admin.controller.ts`, `member-auth.guard.ts`, `member.service.ts`, `notifications.service.ts`, `app/src/lib/courses.ts`, `CourseMembersTab.tsx` (PasswordPanel).
+- Testy: logika (fake Prisma) — walidacja, logowanie nowym hasłem, stare linki unieważnione, mail 48 h / 1 h, wylogowanie starych sesji ✓; poprzednie zestawy ✓; Chromium (mock) — wyślij link, generuj + ustaw, kopiowanie danych ✓; tsc api/app ✓. Wymaga Manual Deploy `icpe-api` (nowe endpointy; bez zmian schematu).
+
 ### Admin wchodzi do kursu bez logowania (2026-09-28)
 - Zgłoszenie usera: klik w adres kursu w panelu kazał się logować; przycisku „Podgląd jako kursant" nie widział (zrzut z wersji sprzed deployu frontu — zakładki bez „Aktywność").
 - **Adres kursu w nagłówku edytora i „Otwórz" na liście kursów** otwierają teraz stronę kursu od razu zalogowaną (token podglądu admina), także dla szkicu; obok „Kopiuj link dla kursantów" (zwykły adres z ekranem logowania).
