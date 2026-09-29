@@ -299,6 +299,33 @@ export class NotificationsService {
       return { subject, text, html };
     }
 
+    if (payload.type === 'COURSE_NEW_MATERIALS') {
+      // Publikacja stopniowa: w panelu formacyjnym pojawiły się zaplanowane materiały.
+      const en = payload.locale === 'en';
+      const course = String(d.courseTitle ?? (en ? 'online course' : 'kurs online'));
+      const name = String(d.firstName ?? '').trim();
+      const hello = name ? `${name},` : en ? 'Hello,' : 'Dzień dobry,';
+      const sig = en ? ['God bless,', 'ICPE Mission Poland'] : SIGNATURE;
+      const items = Array.isArray(d.items) ? (d.items as Array<{ kind?: string; title?: string }>) : [];
+      const lines = items.map((i) =>
+        `• ${en ? (i.kind === 'VIDEO' ? 'Video' : 'Material') : i.kind === 'VIDEO' ? 'Film' : 'Materiał'}: ${String(i.title ?? '')}`,
+      );
+      const subject = en ? `New materials are waiting for you — ${course}` : `Nowe materiały czekają na Ciebie — ${course}`;
+      const { text, html } = buttonMail(
+        en
+          ? [hello, '', `new materials are waiting for you in the formation panel of "${course}":`, '', ...lines]
+          : [hello, '', `nowe materiały czekają na Ciebie w panelu formacyjnym kursu „${course}":`, '', ...lines],
+        { label: en ? 'Go to the formation panel' : 'Przejdź do panelu formacyjnego', href: String(d.link ?? '') },
+        [
+          ...(d.hasPassword === false
+            ? [en ? 'No password yet? Use "Forgot password / first login" on the course page.' : 'Nie masz jeszcze hasła? Użyj „Nie pamiętam hasła / pierwsze logowanie" na stronie kursu.', '']
+            : []),
+          ...sig,
+        ],
+      );
+      return { subject, text, html };
+    }
+
     if (payload.type === 'COURSE_WELCOME' || payload.type === 'COURSE_ACCESS' || payload.type === 'MEMBER_PASSWORD_RESET') {
       // Formacja online (panel kursanta) — PL/EN wg języka konta.
       const en = payload.locale === 'en';

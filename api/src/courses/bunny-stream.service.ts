@@ -173,14 +173,18 @@ export class BunnyStreamService {
   }
 
   /**
-   * Diagnoza odtwarzania (panel ▸ „Sprawdź odtwarzanie"): serwer sam otwiera odtwarzacz Bunny
-   * w kilku wariantach i na tej podstawie wskazuje przyczynę błędu 403.
+   * Diagnoza odtwarzania (panel ▸ „Sprawdź odtwarzanie"). Uwaga: strona błędu Bunny („403"/„404")
+   * bywa zwracana z kodem HTTP 200 — dlatego oceniamy też <title> odpowiedzi (liczba = strona błędu),
+   * a dla porównania otwieramy celowo źle podpisany link (musi dać błąd, inaczej test jest niemiarodajny).
    */
   async diagnosePlayback(videoId: string, siteOrigin: string) {
     const c = this.requireCfg();
     const signed = this.embedUrl(videoId, 600).url;
+    const exp = Math.floor(Date.now() / 1000) + 600;
+    const badSigned = `https://iframe.mediadelivery.net/embed/${c.libraryId}/${encodeURIComponent(videoId)}?token=${'0'.repeat(64)}&expires=${exp}`;
     const unsigned = `https://iframe.mediadelivery.net/embed/${c.libraryId}/${encodeURIComponent(videoId)}`;
-    const probe = async (url: string, referer?: string): Promise<number> => {
+    type Probe = { status: number; title: string; error: boolean };
+    const probe = async (url: string, referer?: string): Promise<Probe> => {
       const ctrl = new AbortController();
       const t = setTimeout(() => ctrl.abort(), 15000);
       try {
@@ -193,46 +197,71 @@ export class BunnyStreamService {
           redirect: 'follow',
           signal: ctrl.signal,
         });
-        return res.status;
+        const html = (await res.text()).slice(0, 20000);
+        const title = (html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? '').trim();
+        const error = res.status !== 200 || /^\d{3}$/.test(title) || /forbidden|access denied/i.test(title);
+        return { status: res.status, title: title.slice(0, 80), error };
       } catch {
-        return 0;
+        return { status: 0, title: '', error: true };
       } finally {
         clearTimeout(t);
       }
     };
     const referer = `${siteOrigin.replace(/\/+$/, '')}/`;
-    const [signedRef, signedNoRef, unsignedRef] = await Promise.all([
+
+    // Klucz API (panel: stan kodowania, miniatury, upload).
+    let apiKeyOk: boolean | null = null;
+    try {
+      await this.call('GET', `/videos/${encodeURIComponent(videoId)}`);
+      apiKeyOk = true;
+    } catch (e) {
+      apiKeyOk = /\(401\)|\(403\)/.test((e as Error).message) ? false : null;
+    }
+
+    const [signedRef, signedNoRef, unsignedRef, badRef] = await Promise.all([
       probe(signed, referer),
       probe(signed),
       probe(unsigned, referer),
+      probe(badSigned, referer),
     ]);
-    let verdict: string;
+    const tokenAuthOn = unsignedRef.error && badRef.error; // bez podpisu / ze złym podpisem → błąd
+    const problems: string[] = [];
+    if (apiKeyOk === false) {
+      problems.push('BUNNY_STREAM_API_KEY jest nieprawidłowy (Bunny odpowiada 401) — wklej „API Key" z Bunny ▸ Stream ▸ biblioteka ▸ API. Bez niego panel nie widzi stanu kodowania ani nie wgra nowych filmów.');
+    }
     let ok = false;
-    if (signedRef === 200) {
-      ok = true;
-      verdict =
-        'Odtwarzanie działa (serwer otworzył film jak przeglądarka z Twojej strony). Jeśli kursant widzi 403: odśwież stronę kursu — link do filmu jest ważny 4 h — i sprawdź, czy strona jest otwarta pod ' +
-        referer.replace(/\/$/, '') + '.';
-    } else if (!c.tokenKey && unsignedRef !== 200) {
-      verdict =
-        'W bibliotece Bunny włączone jest zabezpieczenie linków (Embed view token authentication), a na Renderze brakuje BUNNY_STREAM_TOKEN_KEY. Wklej „Token authentication key" z Bunny ▸ Stream ▸ biblioteka ▸ Security do zmiennej BUNNY_STREAM_TOKEN_KEY i zrób Manual Deploy icpe-api.';
-    } else if (signedNoRef === 200 && signedRef !== 200) {
-      verdict =
-        `Bunny blokuje odtwarzanie ze strony ${referer} — lista „Allowed domains" w bibliotece (Security) nie obejmuje tej domeny. Wpisz tam samą nazwę bez https:// i ukośnika: icpemission.pl (ew. też www.icpemission.pl).`;
-    } else if (unsignedRef === 200 && signedRef !== 200) {
-      verdict =
-        'Film bez podpisu się otwiera, a z podpisem nie — sprawdź BUNNY_STREAM_TOKEN_KEY (musi być identyczny z „Token authentication key" w Security biblioteki).';
-    } else if (signedRef === 0) {
-      verdict = 'Serwer nie mógł połączyć się z Bunny (timeout). Spróbuj ponownie za chwilę.';
+    if (!signedRef.error) {
+      ok = apiKeyOk !== false;
+      problems.unshift(
+        tokenAuthOn
+          ? 'Odtwarzanie ze strony działa (podpisany link przechodzi, a celowo źle podpisany jest odrzucany — zabezpieczenie działa).'
+          : 'Odtwarzanie działa, ale zabezpieczenie linków jest WYŁĄCZONE (film otworzy się też bez podpisu). Włącz w Bunny ▸ Security „Embed view token authentication".',
+      );
+    } else if (!c.tokenKey) {
+      problems.unshift('Na Renderze brakuje BUNNY_STREAM_TOKEN_KEY, a Bunny wymaga podpisu. Wklej „Token authentication key" z Bunny ▸ Stream ▸ biblioteka ▸ Security i zrób Manual Deploy icpe-api.');
+    } else if (!signedNoRef.error) {
+      problems.unshift(`Podpis jest dobry, ale Bunny blokuje stronę ${referer} — popraw „Allowed domains" w Security biblioteki: sama nazwa bez https:// i ukośnika, np. icpemission.pl (ew. też www.icpemission.pl).`);
+    } else if (!unsignedRef.error) {
+      problems.unshift('Film bez podpisu się otwiera, a z naszym podpisem nie — BUNNY_STREAM_TOKEN_KEY nie pasuje do „Token authentication key" z Security biblioteki.');
+    } else if (signedRef.status === 0) {
+      problems.unshift('Serwer nie mógł połączyć się z Bunny (timeout). Spróbuj ponownie za chwilę.');
     } else {
-      verdict = c.tokenKey
-        ? 'Podpis linku jest odrzucany. Najczęstsza przyczyna: BUNNY_STREAM_TOKEN_KEY na Renderze to nie ten klucz (np. wklejony „API Key" zamiast „Token authentication key" z zakładki Security). Druga możliwość: domena icpemission.pl nie jest na liście „Allowed domains".'
-        : 'Bunny odrzuca odtwarzanie. Sprawdź w bibliotece Security: „Allowed domains" (icpemission.pl) i czy token authentication jest włączony — jeśli tak, ustaw BUNNY_STREAM_TOKEN_KEY na Renderze.';
+      problems.unshift(
+        `Bunny odrzuca podpisany link (odpowiedź: ${signedRef.title || signedRef.status}). Najczęściej BUNNY_STREAM_TOKEN_KEY to nie ten klucz (np. zamieniony z API Key) — musi być „Token authentication key" z zakładki Security. Jeśli klucz się zgadza: tymczasowo wyczyść „Allowed domains" i sprawdź ponownie.`,
+      );
     }
     return {
       ok,
-      verdict,
-      details: { tokenKeySet: !!c.tokenKey, signedWithReferer: signedRef, signedNoReferer: signedNoRef, unsignedWithReferer: unsignedRef, referer },
+      verdict: problems.join(' '),
+      details: {
+        apiKeyOk,
+        tokenKeySet: !!c.tokenKey,
+        signedWithReferer: signedRef,
+        signedNoReferer: signedNoRef,
+        unsignedWithReferer: unsignedRef,
+        badTokenWithReferer: badRef,
+        referer,
+      },
     };
   }
 

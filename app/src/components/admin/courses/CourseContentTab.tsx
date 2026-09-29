@@ -4,7 +4,7 @@ import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import {
   createVideoItem, deleteCourseItem, diagnoseVideo, formatBytes, formatDuration, refreshCourseItem, removeItemPdf, renewVideoUpload,
-  reorderCourseItems, setItemPdf, updateCourseItem, uploadPdfItem,
+  reorderCourseItems, setItemPdf, updateCourseItem, uploadPdfItem, isoToLocalInput, localInputToIso, fmtWhen,
   type CourseDetail, type CourseItem, type CoursesConfig, type PdfLang,
 } from '@/lib/courses'
 import type { UploadState } from './CourseEditor'
@@ -89,11 +89,12 @@ function ItemRow({
   onError: (m: string | null) => void
 }) {
   const [editing, setEditing] = useState(false)
-  const [diag, setDiag] = useState<{ ok: boolean; verdict: string } | 'loading' | null>(null)
+  const [diag, setDiag] = useState<{ ok: boolean; verdict: string; details?: Record<string, unknown> } | 'loading' | null>(null)
   const [pl, setPl] = useState(item.title.pl ?? '')
   const [en, setEn] = useState(item.title.en ?? '')
   const [descPl, setDescPl] = useState(item.description?.pl ?? '')
   const [descEn, setDescEn] = useState(item.description?.en ?? '')
+  const [pubAt, setPubAt] = useState(isoToLocalInput(item.publishAt))
   const [busy, setBusy] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const isVideo = item.kind === 'VIDEO'
@@ -119,7 +120,11 @@ function ItemRow({
     if (descPl.trim()) description.pl = descPl.trim()
     if (descEn.trim()) description.en = descEn.trim()
     await run(() =>
-      updateCourseItem(course.id, item.id, { title, description: Object.keys(description).length ? description : null }),
+      updateCourseItem(course.id, item.id, {
+        title,
+        description: Object.keys(description).length ? description : null,
+        publishAt: localInputToIso(pubAt),
+      }),
     )
     setEditing(false)
   }
@@ -184,6 +189,7 @@ function ItemRow({
               <span>PDF · {[item.fileId ? 'PL' : null, item.fileIdEn ? 'EN' : null].filter(Boolean).join(' + ') || 'brak pliku'}</span>
             )}
             {!item.published && <span>· ukryty</span>}
+            <ScheduleBadge item={item} courseStatus={course.status} />
           </div>
         </div>
         <div className="flex items-center gap-1 shrink-0">
@@ -275,7 +281,17 @@ function ItemRow({
             {diag === 'loading' ? (
               <Notice kind="info">Sprawdzam odtwarzanie w Bunny…</Notice>
             ) : (
-              <Notice kind={diag.ok ? 'ok' : 'err'}>{diag.verdict}</Notice>
+              <>
+                <Notice kind={diag.ok ? 'ok' : 'err'}>{diag.verdict}</Notice>
+                {diag.details && (
+                  <details className="mt-1">
+                    <summary className="text-xs cursor-pointer" style={{ color: 'var(--faint)' }}>Szczegóły techniczne (do przesłania, gdy problem nie znika)</summary>
+                    <pre className="text-[11px] mt-1 p-2 rounded-[8px] overflow-x-auto" style={{ background: 'var(--surface-2)', color: 'var(--muted)' }}>
+                      {JSON.stringify(diag.details, null, 2)}
+                    </pre>
+                  </details>
+                )}
+              </>
             )}
           </div>
           {diag !== 'loading' && (
@@ -299,6 +315,9 @@ function ItemRow({
           <Input label="Tytuł (EN)" value={en} onChange={(e) => setEn(e.target.value)} placeholder="np. Conference 1 — God's Love" />
           <Input label="Krótki opis (PL, opcjonalnie)" value={descPl} onChange={(e) => setDescPl(e.target.value)} />
           <Input label="Krótki opis (EN, opcjonalnie)" value={descEn} onChange={(e) => setDescEn(e.target.value)} />
+          <div className="md:col-span-2">
+            <PublishAtField value={pubAt} onChange={setPubAt} />
+          </div>
           <div className="flex gap-2 md:col-span-2">
             <Button size="sm" onClick={() => void save()} disabled={busy || !pl.trim()}>Zapisz</Button>
             <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>Anuluj</Button>
@@ -373,6 +392,7 @@ function AddVideo({ course, disabled, onStartUpload, onChanged }: {
 }) {
   const [title, setTitle] = useState('')
   const [titleEn, setTitleEn] = useState('')
+  const [pubAt, setPubAt] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -385,7 +405,8 @@ function AddVideo({ course, disabled, onStartUpload, onChanged }: {
     try {
       const t: Record<string, string> = { pl: title.trim() || file.name.replace(/\.[^.]+$/, '') }
       if (titleEn.trim()) t.en = titleEn.trim()
-      const r = await createVideoItem(course.id, t)
+      const r = await createVideoItem(course.id, t, localInputToIso(pubAt))
+      setPubAt('')
       onStartUpload(r.item.id, file, r.upload)
       setTitle('')
       setTitleEn('')
@@ -407,6 +428,7 @@ function AddVideo({ course, disabled, onStartUpload, onChanged }: {
         <>
           <Input label="Tytuł filmu (PL)" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="np. Konferencja 1 — Miłość Boga" />
           <Input label="Tytuł filmu (EN, opcjonalnie)" value={titleEn} onChange={(e) => setTitleEn(e.target.value)} placeholder="e.g. Conference 1 — God's Love" />
+          <PublishAtField value={pubAt} onChange={setPubAt} />
           <input
             ref={ref}
             type="file"
@@ -433,6 +455,7 @@ function AddVideo({ course, disabled, onStartUpload, onChanged }: {
 function AddPdf({ course, onChanged }: { course: CourseDetail; onChanged: Props['onChanged'] }) {
   const [title, setTitle] = useState('')
   const [titleEn, setTitleEn] = useState('')
+  const [pubAt, setPubAt] = useState('')
   const [filePl, setFilePl] = useState<File | null>(null)
   const [fileEn, setFileEn] = useState<File | null>(null)
   const [busy, setBusy] = useState(false)
@@ -454,10 +477,11 @@ function AddPdf({ course, onChanged }: { course: CourseDetail; onChanged: Props[
       if (title.trim()) t.pl = title.trim()
       if (titleEn.trim()) t.en = titleEn.trim()
       if (!t.pl && !t.en) t.pl = first.name.replace(/\.pdf$/i, '')
-      const { item } = await uploadPdfItem(course.id, first, t, filePl ? 'pl' : 'en')
+      const { item } = await uploadPdfItem(course.id, first, t, filePl ? 'pl' : 'en', localInputToIso(pubAt))
       if (filePl && fileEn) await setItemPdf(course.id, item.id, fileEn, 'en')
       setTitle('')
       setTitleEn('')
+      setPubAt('')
       setFilePl(null)
       setFileEn(null)
       if (refPl.current) refPl.current.value = ''
@@ -483,6 +507,7 @@ function AddPdf({ course, onChanged }: { course: CourseDetail; onChanged: Props[
     <Panel title="Dodaj PDF">
       <Input label="Tytuł materiału (PL)" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="np. Notatki do konferencji 1" />
       <Input label="Tytuł materiału (EN, opcjonalnie)" value={titleEn} onChange={(e) => setTitleEn(e.target.value)} placeholder="e.g. Notes for conference 1" />
+      <PublishAtField value={pubAt} onChange={setPubAt} />
       {fileInput('Plik PDF — wersja polska', refPl, filePl, setFilePl)}
       {fileInput('Plik PDF — wersja angielska (opcjonalnie)', refEn, fileEn, setFileEn)}
       {error && <Notice kind="err">{error}</Notice>}
@@ -493,5 +518,61 @@ function AddPdf({ course, onChanged }: { course: CourseDetail; onChanged: Props[
         Do 25 MB na plik. Kursant widzi wersję w swoim języku strony (PL/EN); gdy jej brak — tę drugą. Wersję EN możesz dodać też później przy materiale.
       </p>
     </Panel>
+  )
+}
+
+/** Pole „Data publikacji": puste = od razu; przyszła data = materiał pojawi się sam + mail do kursantów. */
+function PublishAtField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const future = value && new Date(value).getTime() > Date.now()
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="text-sm font-medium" style={{ color: 'var(--ink)' }}>Publikacja</span>
+      <div className="flex items-center gap-2 flex-wrap">
+        <input
+          type="datetime-local"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="rounded-[10px] border px-3 py-2 text-sm"
+          style={{ borderColor: 'var(--border)', background: 'var(--surface-2)', color: 'var(--ink)' }}
+        />
+        {value ? (
+          <button
+            type="button"
+            onClick={() => onChange('')}
+            className="text-xs"
+            style={{ color: 'var(--muted)', background: 'transparent', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
+          >
+            publikuj od razu
+          </button>
+        ) : (
+          <span className="text-xs" style={{ color: 'var(--faint)' }}>puste = widoczny od razu</span>
+        )}
+      </div>
+      {future && (
+        <span className="text-xs" style={{ color: 'var(--brand)' }}>
+          Kursanci zobaczą materiał {fmtWhen(new Date(value).toISOString())} i dostaną wtedy maila „Nowe materiały czekają na Ciebie".
+        </span>
+      )}
+    </div>
+  )
+}
+
+/** Status publikacji zaplanowanej na liście materiałów. */
+function ScheduleBadge({ item, courseStatus }: { item: CourseItem; courseStatus: string }) {
+  if (!item.publishAt) return null
+  const future = new Date(item.publishAt).getTime() > Date.now()
+  if (future) {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-semibold" style={{ background: 'var(--brand-soft)', color: 'var(--brand)' }}>
+        ⏱ Zaplanowany: {fmtWhen(item.publishAt)}
+        {courseStatus !== 'PUBLISHED' ? ' (kurs to szkic — maile tylko po publikacji kursu)' : ' · z mailem'}
+      </span>
+    )
+  }
+  return (
+    <span>
+      · opublikowany {fmtWhen(item.publishAt)}
+      {typeof item.releaseMails === 'number' ? ` · mail wysłany do ${item.releaseMails} ${item.releaseMails === 1 ? 'osoby' : 'osób'}` : ''}
+    </span>
   )
 }

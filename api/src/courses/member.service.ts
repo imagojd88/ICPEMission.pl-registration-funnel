@@ -7,6 +7,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { BunnyStreamService } from './bunny-stream.service';
 import { CourseAccessService } from './course-access.service';
 import { CourseTrackingService } from './course-tracking.service';
+import { CourseReleaseService } from './course-release.service';
 import type { MemberCtx } from './member-auth.guard';
 import { courseUrl, memberJwtSecret, normEmail, rateLimit, sha256hex, signedFilePath } from './course-utils';
 
@@ -24,7 +25,15 @@ export class MemberService {
     private readonly access: CourseAccessService,
     private readonly bunny: BunnyStreamService,
     private readonly tracking: CourseTrackingService,
+    private readonly release: CourseReleaseService,
   ) {}
+
+  /** Materiały widoczne dla kursanta: opublikowane i (bez daty albo data już minęła). */
+  private visibleWhere(courseId: string, admin?: boolean) {
+    return admin
+      ? { courseId, published: true }
+      : { courseId, published: true, OR: [{ publishAt: null }, { publishAt: { lte: new Date() } }] };
+  }
 
   /**
    * Podgląd kursu przez admina: token kursanta z flagą `adm` (30 dni — jak „Zapamiętaj mnie" w panelu) — działa w każdym kursie, także w szkicu,
@@ -175,8 +184,9 @@ export class MemberService {
       await this.prisma.courseEnrollment.update({ where: { id: enrollment.id }, data: { lastSeenAt: new Date() } });
     }
     if (!m.admin) await this.tracking.logCourseView(course.id, m.guestId).catch(() => undefined);
+    this.release.kick(); // przy okazji: zaległe maile „nowe materiały"
     const items = await this.prisma.courseItem.findMany({
-      where: { courseId: course.id, published: true },
+      where: this.visibleWhere(course.id, m.admin),
       orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
     });
     const guest = m.admin
@@ -196,8 +206,10 @@ export class MemberService {
         )
         .map((i: {
           id: string; kind: string; title: unknown; description: unknown; durationSec: number | null; thumbnailUrl: string | null;
-          fileId: string | null; fileIdEn: string | null; videoState: string | null;
+          fileId: string | null; fileIdEn: string | null; videoState: string | null; publishAt?: Date | null;
         }) => ({
+          // Podgląd admina: materiał zaplanowany (kursanci jeszcze go nie widzą).
+          ...(m.admin && i.publishAt && i.publishAt.getTime() > Date.now() ? { scheduledAt: i.publishAt } : {}),
           id: i.id, kind: i.kind, title: i.title, description: i.description, durationSec: i.durationSec, thumbnailUrl: i.thumbnailUrl,
           // PDF: dostępne wersje językowe — strona pokaże „tylko po polsku / English only".
           ...(i.kind === 'VIDEO' && i.videoState !== 'READY' ? { pending: true } : {}),
@@ -230,7 +242,7 @@ export class MemberService {
 
   private async requireItem(slug: string, itemId: string, m: MemberCtx) {
     const { course } = await this.requireAccess(slug, m);
-    const item = await this.prisma.courseItem.findFirst({ where: { id: itemId, courseId: course.id, published: true } });
+    const item = await this.prisma.courseItem.findFirst({ where: { id: itemId, ...this.visibleWhere(course.id, m.admin) } });
     if (!item) throw new NotFoundException('Nie znaleziono materiału');
     return item;
   }

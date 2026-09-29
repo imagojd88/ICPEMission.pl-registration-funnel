@@ -16,6 +16,8 @@ interface Item {
   langs?: Lang[];
   /** Film jeszcze się koduje — pokazujemy zaślepkę. */
   pending?: boolean;
+  /** Tylko podgląd admina: materiał zaplanowany, kursanci go jeszcze nie widzą. */
+  scheduledAt?: string;
 }
 interface CourseData {
   preview?: { status: string } | null;
@@ -58,6 +60,7 @@ function init(root: HTMLElement) {
       video: 'Wideo',
       onlyOther: 'dostępny tylko po angielsku',
       soon: 'Film będzie wkrótce dostępny',
+      scheduled: (d: string) => `Zaplanowane na ${d} — kursanci jeszcze tego nie widzą`,
       preview: 'Podgląd administratora — tak widzą kurs kursanci. Twoja aktywność nie jest zapisywana.',
       previewDraft: ' Kurs jest jeszcze szkicem — kursanci go nie widzą.',
       linkExpired: 'Ten link wygasł albo został już użyty. Wpisz e-mail w „Nie pamiętam hasła", a wyślemy nowy.',
@@ -80,6 +83,7 @@ function init(root: HTMLElement) {
       video: 'Video',
       onlyOther: 'available in Polish only',
       soon: 'Video will soon be available',
+      scheduled: (d: string) => `Scheduled for ${d} — participants cannot see it yet`,
       preview: 'Administrator preview — this is what participants see. Your activity is not recorded.',
       previewDraft: ' The course is still a draft — participants cannot see it.',
       linkExpired: 'This link has expired or was already used. Use "Forgot password" to get a new one.',
@@ -118,6 +122,8 @@ function init(root: HTMLElement) {
     if (text !== undefined) e.textContent = text;
     return e;
   }
+  const fmtDate = (iso: string) =>
+    new Date(iso).toLocaleString(lang === 'en' ? 'en-GB' : 'pl-PL', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
   const fmtDur = (s: number | null) => {
     if (!s) return '';
     const h = Math.floor(s / 3600);
@@ -237,6 +243,7 @@ function init(root: HTMLElement) {
         body.append(el('div', 'ca-item-title', pick(v.title)));
         const desc = pick(v.description);
         if (desc) body.append(el('p', 'ca-item-desc', desc));
+        if (v.scheduledAt) body.append(el('p', 'ca-item-desc ca-item-sched', tr().scheduled(fmtDate(v.scheduledAt))));
         card.append(thumb, body);
         vBox.append(card);
         continue;
@@ -251,6 +258,7 @@ function init(root: HTMLElement) {
       body.append(el('div', 'ca-item-title', pick(v.title)));
       const desc = pick(v.description);
       if (desc) body.append(el('p', 'ca-item-desc', desc));
+      if (v.scheduledAt) body.append(el('p', 'ca-item-desc ca-item-sched', tr().scheduled(fmtDate(v.scheduledAt))));
       card.append(thumb, body);
       card.addEventListener('click', () => void play(v));
       vBox.append(card);
@@ -263,6 +271,7 @@ function init(root: HTMLElement) {
       main.append(el('div', 'ca-item-title', pick(d.title)));
       const desc = pick(d.description);
       if (desc) main.append(el('p', 'ca-item-desc', desc));
+      if (d.scheduledAt) main.append(el('p', 'ca-item-desc ca-item-sched', tr().scheduled(fmtDate(d.scheduledAt))));
       // Plik tylko w drugim języku — uprzedzamy (API i tak poda dostępną wersję).
       if (d.langs && d.langs.length && !d.langs.includes(lang)) main.append(el('p', 'ca-item-desc ca-item-note', tr().onlyOther));
       const actions = el('div', 'ca-item-actions');

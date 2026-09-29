@@ -39,6 +39,10 @@ export interface CourseItem {
   fileIdEn: string | null
   file: PdfFileMeta | null
   fileEn: PdfFileMeta | null
+  /** Publikacja zaplanowana (ISO) — kursanci zobaczą materiał od tej chwili i dostaną maila. */
+  publishAt: string | null
+  releaseNotifiedAt: string | null
+  releaseMails: number | null
   /** Stan z Bunny dla filmów w toku (tylko w szczegółach kursu). */
   live?: { encodeProgress?: number | null; rawStatus?: number; error?: string } | null
   createdAt: string
@@ -124,14 +128,14 @@ export const updateCourse = (
 ) => apiFetch<CourseDetail>(`/admin/courses/${id}`, json('PATCH', body))
 export const deleteCourse = (id: string) => apiFetch<{ ok: true }>(`/admin/courses/${id}`, json('DELETE'))
 
-export const createVideoItem = (courseId: string, title: LangText) =>
-  apiFetch<{ item: CourseItem; upload: TusUploadInfo }>(`/admin/courses/${courseId}/items/video`, json('POST', { title }))
+export const createVideoItem = (courseId: string, title: LangText, publishAt?: string | null) =>
+  apiFetch<{ item: CourseItem; upload: TusUploadInfo }>(`/admin/courses/${courseId}/items/video`, json('POST', { title, publishAt: publishAt ?? null }))
 export const renewVideoUpload = (courseId: string, itemId: string) =>
   apiFetch<{ item: CourseItem; upload: TusUploadInfo }>(`/admin/courses/${courseId}/items/${itemId}/upload`, json('POST'))
 export const updateCourseItem = (
   courseId: string,
   itemId: string,
-  body: Partial<{ title: LangText; description: LangText | null; published: boolean }>,
+  body: Partial<{ title: LangText; description: LangText | null; published: boolean; publishAt: string | null }>,
 ) => apiFetch<CourseItem>(`/admin/courses/${courseId}/items/${itemId}`, json('PATCH', body))
 export const refreshCourseItem = (courseId: string, itemId: string) =>
   apiFetch<CourseItem>(`/admin/courses/${courseId}/items/${itemId}/refresh`, json('POST'))
@@ -164,11 +168,12 @@ async function postMultipart<T>(path: string, form: FormData): Promise<T> {
 }
 
 /** Nowy materiał PDF; `lang` = język wgrywanego pliku. */
-export function uploadPdfItem(courseId: string, file: File, title: LangText, lang: PdfLang = 'pl') {
+export function uploadPdfItem(courseId: string, file: File, title: LangText, lang: PdfLang = 'pl', publishAt?: string | null) {
   const form = new FormData()
   form.append('file', file)
   form.append('title', JSON.stringify(title))
   form.append('lang', lang)
+  if (publishAt) form.append('publishAt', publishAt)
   return postMultipart<{ item: CourseItem }>(`/admin/courses/${courseId}/items/pdf`, form)
 }
 
@@ -310,3 +315,20 @@ export function generatePassword(len = 10): string {
   crypto.getRandomValues(arr)
   return Array.from(arr, (n) => chars[n % chars.length]).join('')
 }
+
+// ── Publikacja zaplanowana: <input type="datetime-local"> ↔ ISO ──
+/** ISO → „YYYY-MM-DDTHH:mm" w strefie przeglądarki (dla pola datetime-local). */
+export function isoToLocalInput(iso: string | null | undefined): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`
+}
+/** „YYYY-MM-DDTHH:mm" (czas lokalny) → ISO; pusty → null. */
+export function localInputToIso(v: string): string | null {
+  if (!v) return null
+  const d = new Date(v)
+  return Number.isNaN(d.getTime()) ? null : d.toISOString()
+}
+export const fmtWhen = (iso: string) =>
+  new Date(iso).toLocaleString('pl-PL', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })

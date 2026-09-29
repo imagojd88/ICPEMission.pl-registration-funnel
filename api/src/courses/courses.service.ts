@@ -5,6 +5,7 @@ import { DeployHookService } from '../content/deploy-hook.service';
 import { BunnyStreamService } from './bunny-stream.service';
 import { CourseAccessService } from './course-access.service';
 import { CourseTrackingService } from './course-tracking.service';
+import { resumeUptimeMonitor } from '../integrations/uptime-keepalive';
 import { courseUrl, siteBase, isEmail, normEmail, normLangText, pickText, slugify, slugProblem } from './course-utils';
 
 export interface UploadedFileLike {
@@ -20,11 +21,26 @@ type ItemRow = {
   id: string; kind: string; title: unknown; description: unknown; order: number; published: boolean;
   videoId: string | null; videoState: string | null; durationSec: number | null; thumbnailUrl: string | null;
   fileId: string | null; fileIdEn: string | null; createdAt: Date;
+  publishAt?: Date | null; releaseNotifiedAt?: Date | null;
 };
 
 export type FileLang = 'pl' | 'en';
 const fileField = (lang: FileLang) => (lang === 'en' ? 'fileIdEn' : 'fileId');
 export const parseLang = (v: unknown): FileLang => (v === 'en' ? 'en' : 'pl');
+
+/**
+ * Data publikacji z body: pusta → null (od razu). Data przeszła → oznaczamy jako już „ogłoszoną"
+ * (bez maila), przyszła → mail „nowe materiały" wyjdzie w chwili publikacji.
+ */
+function publishFields(raw: unknown): { publishAt: Date | null; releaseNotifiedAt: Date | null; releaseMails: null } | undefined {
+  if (raw === undefined) return undefined;
+  if (raw === null || raw === '') return { publishAt: null, releaseNotifiedAt: null, releaseMails: null };
+  const d = new Date(String(raw));
+  if (Number.isNaN(d.getTime())) throw new BadRequestException('Nieprawidłowa data publikacji.');
+  // Zaplanowana publikacja → niech monitor UptimeRobot budzi API (mail wyjdzie o czasie).
+  if (d.getTime() > Date.now()) void resumeUptimeMonitor();
+  return { publishAt: d, releaseNotifiedAt: d.getTime() <= Date.now() ? new Date() : null, releaseMails: null };
+}
 
 /** Logika panelu admina „Formacja online" — kursy, pozycje (wideo/PDF), kursanci. */
 @Injectable()
@@ -242,13 +258,14 @@ export class CoursesService {
     return (last?.order ?? -1) + 1;
   }
 
-  async createVideo(courseId: string, body: { title?: unknown }) {
+  async createVideo(courseId: string, body: { title?: unknown; publishAt?: unknown }) {
     await this.mustGet(courseId);
+    const pub = publishFields(body.publishAt);
     const title = normLangText(body.title);
     if (!title) throw new BadRequestException('Podaj tytuł filmu.');
     const videoId = await this.bunny.createVideo(pickText(title, 'pl'));
     const item = await this.prisma.courseItem.create({
-      data: { courseId, kind: 'VIDEO', title, videoId, videoState: 'UPLOADING', order: await this.nextOrder(courseId) },
+      data: { courseId, kind: 'VIDEO', title, videoId, videoState: 'UPLOADING', order: await this.nextOrder(courseId), ...(pub ?? {}) },
     });
     return { item, upload: this.bunny.tusUpload(videoId) };
   }
@@ -274,14 +291,15 @@ export class CoursesService {
   }
 
   /** Nowy materiał PDF. `lang` = język wgrywanego pliku (druga wersja językowa: setItemFile). */
-  async createPdf(courseId: string, file: UploadedFileLike | undefined, rawTitle: unknown, rawLang?: unknown) {
+  async createPdf(courseId: string, file: UploadedFileLike | undefined, rawTitle: unknown, rawLang?: unknown, rawPublishAt?: unknown) {
     await this.mustGet(courseId);
+    const pub = publishFields(rawPublishAt || undefined);
     const lang = parseLang(rawLang);
     let title = normLangText(typeof rawTitle === 'string' && rawTitle.trim().startsWith('{') ? safeJson(rawTitle) : rawTitle);
     if (!title) title = { [lang]: (fixLatin1(file?.originalname ?? null) ?? 'Materiał').replace(/\.pdf$/i, '') };
     const fileId = await this.savePdf(file);
     const item = await this.prisma.courseItem.create({
-      data: { courseId, kind: 'PDF', title, [fileField(lang)]: fileId, order: await this.nextOrder(courseId) } as never,
+      data: { courseId, kind: 'PDF', title, [fileField(lang)]: fileId, order: await this.nextOrder(courseId), ...(pub ?? {}) } as never,
     });
     return { item };
   }
@@ -317,8 +335,8 @@ export class CoursesService {
     return item as ItemRow;
   }
 
-  async updateItem(courseId: string, itemId: string, body: { title?: unknown; description?: unknown; published?: boolean }) {
-    await this.mustGetItem(courseId, itemId);
+  async updateItem(courseId: string, itemId: string, body: { title?: unknown; description?: unknown; published?: boolean; publishAt?: unknown }) {
+    const current = await this.mustGetItem(courseId, itemId);
     const data: Record<string, unknown> = {};
     if (body.title !== undefined) {
       const t = normLangText(body.title);
@@ -327,6 +345,12 @@ export class CoursesService {
     }
     if (body.description !== undefined) data.description = normLangText(body.description) ?? null;
     if (body.published !== undefined) data.published = !!body.published;
+    const pub = publishFields(body.publishAt);
+    if (pub) {
+      const same = (current.publishAt?.getTime() ?? null) === (pub.publishAt?.getTime() ?? null);
+      // Bez zmiany daty nie ruszamy stanu powiadomienia (np. przy zmianie samego tytułu).
+      if (!same) Object.assign(data, pub);
+    }
     return this.prisma.courseItem.update({ where: { id: itemId }, data: data as never });
   }
 

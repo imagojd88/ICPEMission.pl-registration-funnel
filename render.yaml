@@ -85,3 +85,5 @@ services:
         sync: false
       - key: BUNNY_STREAM_WEBHOOK_KEY   # opcjonalnie: Read-only API key — weryfikacja podpisu webhooka
         sync: false
+      - key: CRON_SECRET               # opcjonalnie: wymagany ?key= dla GET /cron/course-releases (publikacja zaplanowanych materiałów)
+        sync: false

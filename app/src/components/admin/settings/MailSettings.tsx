@@ -20,6 +20,7 @@ const TYPE_LABEL: Record<string, string> = {
   COURSE_WELCOME: 'Kurs: powitanie (ustaw hasło)',
   COURSE_ACCESS: 'Kurs: nowy dostęp',
   MEMBER_PASSWORD_RESET: 'Kurs: reset hasła',
+  COURSE_NEW_MATERIALS: 'Kurs: nowe materiały',
   TEST: 'Test',
 }
 

@@ -59,7 +59,7 @@ export class CoursesAdminController {
   // ── Pozycje ──
   @Post(':id/items/video')
   @ApiOperation({ summary: 'Utwórz film w Bunny — zwraca dane do uploadu TUS z przeglądarki' })
-  createVideo(@Param('id') id: string, @Body() body: { title?: unknown }) {
+  createVideo(@Param('id') id: string, @Body() body: { title?: unknown; publishAt?: unknown }) {
     return this.courses.createVideo(id, body);
   }
 
@@ -72,8 +72,14 @@ export class CoursesAdminController {
   @Post(':id/items/pdf')
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 25 * 1024 * 1024 } }))
-  createPdf(@Param('id') id: string, @UploadedFile() file: UploadedFileLike, @Body('title') title?: string, @Body('lang') lang?: string) {
-    return this.courses.createPdf(id, file, title, lang);
+  createPdf(
+    @Param('id') id: string,
+    @UploadedFile() file: UploadedFileLike,
+    @Body('title') title?: string,
+    @Body('lang') lang?: string,
+    @Body('publishAt') publishAt?: string,
+  ) {
+    return this.courses.createPdf(id, file, title, lang, publishAt);
   }
 
   @Post(':id/items/:itemId/file')
@@ -96,7 +102,11 @@ export class CoursesAdminController {
   }
 
   @Patch(':id/items/:itemId')
-  updateItem(@Param('id') id: string, @Param('itemId') itemId: string, @Body() body: { title?: unknown; description?: unknown; published?: boolean }) {
+  updateItem(
+    @Param('id') id: string,
+    @Param('itemId') itemId: string,
+    @Body() body: { title?: unknown; description?: unknown; published?: boolean; publishAt?: unknown },
+  ) {
     return this.courses.updateItem(id, itemId, body);
   }
 

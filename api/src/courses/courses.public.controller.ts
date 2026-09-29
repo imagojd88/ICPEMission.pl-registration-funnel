@@ -5,6 +5,7 @@ import { CoursesService } from './courses.service';
 import { MemberService } from './member.service';
 import { MemberAuthGuard, type MemberRequest } from './member-auth.guard';
 import { BunnyStreamService } from './bunny-stream.service';
+import { CourseReleaseService } from './course-release.service';
 import { verifyFileSignature } from './course-utils';
 
 function clientIp(req: Request): string {
@@ -22,7 +23,20 @@ export class CoursesPublicController {
     private readonly courses: CoursesService,
     private readonly member: MemberService,
     private readonly bunny: BunnyStreamService,
+    private readonly release: CourseReleaseService,
   ) {}
+
+  /**
+   * Zewnętrzny wyzwalacz publikacji zaplanowanych materiałów (np. UptimeRobot co 5 min — przy okazji
+   * budzi uśpiony serwer). Idempotentny. Gdy ustawiono CRON_SECRET, wymaga ?key=.
+   */
+  @Get('cron/course-releases')
+  async cronReleases(@Query('key') key?: string) {
+    const secret = (process.env.CRON_SECRET ?? '').trim();
+    if (secret && key !== secret) throw new UnauthorizedException();
+    const r = await this.release.releaseDue();
+    return { ok: true, ...r };
+  }
 
   @Get('site/courses')
   @ApiOperation({ summary: 'Build strony: opublikowane kursy + przekierowania starych adresów' })

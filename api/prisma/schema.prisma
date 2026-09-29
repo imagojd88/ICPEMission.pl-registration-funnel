@@ -568,6 +568,9 @@ model CourseItem {
   description  Json?
   order        Int            @default(0)
   published    Boolean        @default(true)
+  publishAt         DateTime? // publikacja zaplanowana: materiał widoczny dla kursantów od tej chwili
+  releaseNotifiedAt DateTime? // kiedy wysłano maile „nowe materiały" (null + publishAt w przyszłości = czeka)
+  releaseMails      Int? // ilu kursantom wysłano mail przy publikacji (null = bez maila)
   videoId      String? // GUID w Bunny Stream
   videoState   String? // UPLOADING | PROCESSING | READY | FAILED
   durationSec  Int?
