@@ -44,6 +44,10 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — panel kursanta (kurs online)
 
+### FIX deployu: brak NotificationsModule w CoursesModule (2026-09-29)
+- Render: `Nest can't resolve dependencies of the CourseReleaseService (PrismaService, ?)` — nowa usługa publikacji wstrzykuje `NotificationsService`, a `CoursesModule` nie importował `NotificationsModule` (CourseAccessModule ma go u siebie, ale nie re-eksportuje). Fix: `imports: [AuthModule, ContentModule, NotificationsModule]` w `api/src/courses/courses.module.ts`. Baza zdążyła się zsynchronizować (db push OK) — nic więcej do naprawy.
+- **Lekcja / nowa weryfikacja:** testy logiki tworzyły serwisy ręcznie, więc nie łapały błędów DI. Od teraz przed oddaniem backendu: **smoke test DI** — złożenie całego `AppModule` przez `NestFactory.create` z zaślepionym `PrismaService.onModuleInit` (bez bazy). Sprawdzone: z fixem przechodzi, bez fixa wywala dokładnie ten błąd.
+
 ### Publikacja stopniowa („incremental publishing") + mail „Nowe materiały" (2026-09-29)
 - **Wymóg usera:** wgrywa materiały wcześniej, ustawia datę i godzinę — materiał sam pojawia się w panelu kursanta, a uczestnicy dostają wtedy maila „Nowe materiały czekają na Ciebie w panelu formacyjnym".
 - **Model:** `CourseItem.publishAt` (DateTime?), `releaseNotifiedAt` (DateTime?), `releaseMails` (Int? — ilu osobom wysłano). Nowe nullable kolumny → `db push`.
