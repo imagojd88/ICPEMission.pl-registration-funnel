@@ -1,8 +1,11 @@
 import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
-import { InvitationsService, type ConfirmPayload } from './invitations.service';
+import { InvitationsService, type ConfirmPayload, type HouseholdInput } from './invitations.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { GuestInvitesService, type GuestInput } from './guest-invites.service';
+
+/** Body podglądu maila: szkic pól gościa + (opcjonalnie) tryb „potwierdzony" ze składem. */
+type PreviewBody = Partial<Invitee> & { preconfirmed?: boolean; household?: HouseholdInput };
 
 interface Invitee {
   firstName: string;
@@ -43,16 +46,72 @@ export class InvitationsController {
   @ApiBearerAuth()
   @Post('admin/invitations/:invId/preview')
   @ApiOperation({ summary: 'Podgląd maila z zaproszeniem (body nadpisuje zapisane pola, bez zapisu)' })
-  previewExisting(@Param('invId') invId: string, @Body() draft?: Partial<Invitee>) {
-    return this.invites.preview({ invId, draft: draft ?? {} });
+  previewExisting(@Param('invId') invId: string, @Body() body?: PreviewBody) {
+    const { preconfirmed, household, ...draft } = body ?? {};
+    return this.invites.preview({ invId, draft, preconfirmed: preconfirmed === true, household });
   }
 
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @Post('admin/instances/:id/invitations/preview')
   @ApiOperation({ summary: 'Podgląd maila dla nowego gościa (przed dodaniem)' })
-  previewNew(@Param('id') id: string, @Body() draft?: Partial<Invitee>) {
-    return this.invites.preview({ instanceId: id, draft: draft ?? {} });
+  previewNew(@Param('id') id: string, @Body() body?: PreviewBody) {
+    const { preconfirmed, household, ...draft } = body ?? {};
+    return this.invites.preview({ instanceId: id, draft, preconfirmed: preconfirmed === true, household });
+  }
+
+  // ── Potwierdzeni przez organizatora (event INVITE) ──
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Post('admin/instances/:id/invitations/confirmed')
+  @ApiOperation({
+    summary:
+      'Dodaj od razu potwierdzone osoby/małżeństwa/rodziny (bez zaproszenia). Zwraca { items, conflicts, added, confirmedExisting, mail }',
+  })
+  createConfirmed(
+    @Param('id') id: string,
+    @Body()
+    dto: { households: HouseholdInput[]; sendEmails?: boolean; confirmExisting?: boolean; ignoreWarnings?: boolean },
+  ) {
+    return this.invites.createConfirmed(id, dto?.households ?? [], {
+      sendEmails: dto?.sendEmails !== false,
+      confirmExisting: dto?.confirmExisting === true,
+      ignoreWarnings: dto?.ignoreWarnings === true,
+    });
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Post('admin/invitations/:invId/confirm')
+  @ApiOperation({ summary: 'Potwierdź ręcznie (albo popraw skład i diety potwierdzonego). Zwraca { item, mail }' })
+  confirmByAdmin(@Param('invId') invId: string, @Body() dto: HouseholdInput & { sendEmail?: boolean }) {
+    const { sendEmail, ...household } = dto ?? {};
+    return this.invites.confirmByAdmin(invId, household, { sendEmail: typeof sendEmail === 'boolean' ? sendEmail : undefined });
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Post('admin/invitations/:invId/unconfirm')
+  @ApiOperation({ summary: 'Cofnij potwierdzenie / odmowę (z powrotem „czeka"); zgłoszenie → CANCELLED' })
+  unconfirm(@Param('invId') invId: string) {
+    return this.invites.unconfirm(invId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Post('admin/invitations/:invId/decline')
+  @ApiOperation({ summary: 'Oznacz odmowę udziału (np. po telefonie); zgłoszenie → CANCELLED' })
+  declineByAdmin(@Param('invId') invId: string) {
+    return this.invites.declineByAdmin(invId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Post('admin/instances/:id/invitations/diet-reminders')
+  @ApiOperation({ summary: 'Przypomnij o diecie potwierdzonym przez organizatora, którzy nie odpowiedzieli' })
+  dietReminders(@Param('id') id: string) {
+    return this.invites.sendDietReminders(id);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -105,6 +164,12 @@ export class InvitationsController {
   @ApiOperation({ summary: 'Publiczne: potwierdź (lub zmień) udział po linku' })
   confirm(@Param('token') token: string, @Body() dto?: ConfirmPayload) {
     return this.invites.confirmByToken(token, dto ?? {});
+  }
+
+  @Post('invite/:token/decline')
+  @ApiOperation({ summary: 'Publiczne: „Nie damy rady przyjść" — odmowa udziału po linku' })
+  decline(@Param('token') token: string) {
+    return this.invites.declineByToken(token);
   }
 
   @Post('r/:slug/invite-match')

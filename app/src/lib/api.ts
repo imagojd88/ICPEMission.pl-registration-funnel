@@ -591,8 +591,11 @@ export interface MailPreview {
   html: string
 }
 
+/** Szkic do podglądu maila: pola gościa + (opcjonalnie) tryb „potwierdzony przez organizatora" ze składem. */
+export type PreviewDraft = Partial<Invitee> & { preconfirmed?: boolean; household?: HouseholdInput }
+
 /** Podgląd maila zapisanego gościa; `draft` nadpisuje zapisane pola (bez zapisu). */
-export async function previewInvitation(invId: string, draft: Partial<Invitee>, token?: string): Promise<MailPreview> {
+export async function previewInvitation(invId: string, draft: PreviewDraft, token?: string): Promise<MailPreview> {
   return apiFetch(`/admin/invitations/${invId}/preview`, {
     method: 'POST',
     headers: authHeaders(token),
@@ -601,7 +604,7 @@ export async function previewInvitation(invId: string, draft: Partial<Invitee>, 
 }
 
 /** Podgląd maila dla gościa, który dopiero będzie dodany. */
-export async function previewNewInvitation(instanceId: string, draft: Partial<Invitee>, token?: string): Promise<MailPreview> {
+export async function previewNewInvitation(instanceId: string, draft: PreviewDraft, token?: string): Promise<MailPreview> {
   return apiFetch(`/admin/instances/${instanceId}/invitations/preview`, {
     method: 'POST',
     headers: authHeaders(token),
@@ -613,7 +616,45 @@ export async function previewNewInvitation(instanceId: string, draft: Partial<In
 export interface ChildEntry {
   firstName?: string
   age: number
+  /** Wymagania żywieniowe dziecka (opcjonalne). */
+  dietary?: string
 }
+
+/**
+ * Gospodarstwo domowe wpisywane przez admina (osoba główna + małżonek + dzieci).
+ * Przy edycji istniejącego: pole pominięte = bez zmian, `spouse: null` = bez małżonka.
+ */
+export interface HouseholdInput extends MailPersonalization {
+  firstName?: string
+  lastName?: string
+  email?: string
+  phone?: string
+  dietaryNotes?: string | null
+  spouse?: { firstName?: string; lastName?: string; dietaryNotes?: string | null } | null
+  children?: ChildEntry[]
+  adminNote?: string | null
+}
+
+export type InvitationStatus = 'PENDING' | 'CONFIRMED' | 'DECLINED'
+export type DietStatus = 'PROVIDED' | 'NONE' | 'UNKNOWN'
+
+export interface HouseholdConflict {
+  index: number
+  kind: 'SAME_PERSON_PENDING' | 'SAME_PERSON_CONFIRMED' | 'SPOUSE_ON_LIST' | 'PERSON_IS_SPOUSE'
+  existingId: string
+  label: string
+  blocking: boolean
+}
+
+export interface CreateConfirmedResult {
+  items: InvitationItem[]
+  conflicts: HouseholdConflict[]
+  added: number
+  confirmedExisting: number
+  mail: { sent: number; failed: number; logged: number; noEmail: number }
+}
+
+export type MailSendStatus = 'SENT' | 'FAILED' | 'LOGGED' | 'NO_EMAIL' | 'SKIPPED'
 
 /** Payload deklaracji przy potwierdzeniu udziału (link imienny lub dopasowanie po danych). */
 export interface ConfirmPayload {
@@ -647,6 +688,15 @@ export interface InvitationItem extends Omit<Invitee, 'phone'> {
   invitedByParticipant?: boolean
   /** Link „Zaproś gościa" tej osoby (/g/:token) — potwierdzeni, gdy ścieżka gości włączona. */
   guestInviteLink?: string | null
+  /** PENDING / CONFIRMED / DECLINED (starsze API: brak → wyliczyć z confirmedAt). */
+  status?: InvitationStatus
+  /** Kto potwierdził: GUEST (link/dopasowanie) albo ADMIN (panel). */
+  confirmedBy?: 'GUEST' | 'ADMIN' | null
+  guestRespondedAt?: string | null
+  declinedAt?: string | null
+  /** Status diety potwierdzonej rodziny: PROVIDED / NONE (potwierdzone „bez wymagań") / UNKNOWN. */
+  dietStatus?: DietStatus | null
+  adminNote?: string | null
 }
 
 export async function createInvitations(
@@ -677,6 +727,55 @@ export async function updateInvitation(
     method: 'PATCH',
     headers: authHeaders(token),
     body: JSON.stringify(patch),
+  })
+}
+
+/** Dodaje od razu potwierdzone osoby/małżeństwa/rodziny (event INVITE) — bez zaproszenia. */
+export async function createConfirmedInvitations(
+  instanceId: string,
+  households: HouseholdInput[],
+  opts: { sendEmails?: boolean; confirmExisting?: boolean; ignoreWarnings?: boolean } = {},
+  token?: string,
+): Promise<CreateConfirmedResult> {
+  return apiFetch(`/admin/instances/${instanceId}/invitations/confirmed`, {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: JSON.stringify({ households, ...opts }),
+  })
+}
+
+/** „Potwierdź ręcznie" albo „Edytuj skład i diety" (idempotentne). */
+export async function confirmInvitationByAdmin(
+  invId: string,
+  household: HouseholdInput,
+  sendEmail?: boolean,
+  token?: string,
+): Promise<{ item: InvitationItem; mail: MailSendStatus }> {
+  return apiFetch(`/admin/invitations/${invId}/confirm`, {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: JSON.stringify({ ...household, ...(sendEmail === undefined ? {} : { sendEmail }) }),
+  })
+}
+
+/** Cofnij potwierdzenie albo odmowę → z powrotem „czeka". */
+export async function unconfirmInvitation(invId: string, token?: string): Promise<InvitationItem> {
+  return apiFetch(`/admin/invitations/${invId}/unconfirm`, { method: 'POST', headers: authHeaders(token) })
+}
+
+/** Oznacz odmowę udziału (np. po telefonie). */
+export async function declineInvitationByAdmin(invId: string, token?: string): Promise<InvitationItem> {
+  return apiFetch(`/admin/invitations/${invId}/decline`, { method: 'POST', headers: authHeaders(token) })
+}
+
+/** Przypomnienie o diecie dla potwierdzonych przez organizatora, którzy nie odpowiedzieli. */
+export async function sendDietReminders(
+  instanceId: string,
+  token?: string,
+): Promise<{ sent: number; failed: number; logged: number; skipped: number }> {
+  return apiFetch(`/admin/instances/${instanceId}/invitations/diet-reminders`, {
+    method: 'POST',
+    headers: authHeaders(token),
   })
 }
 
@@ -762,6 +861,14 @@ export interface InvitationView {
   guestInvitesEnabled?: boolean
   maxGuests?: number
   confirmedAt: string | null
+  /** Kto potwierdził: ADMIN = organizator dodał jako potwierdzonego. */
+  confirmedBy?: 'GUEST' | 'ADMIN' | null
+  /** Kiedy gość ostatnio sam zapisał odpowiedź (null = jeszcze nie odpowiadał). */
+  guestRespondedAt?: string | null
+  /** Odmowa udziału („Nie damy rady przyjść"). */
+  declinedAt?: string | null
+  /** Wydarzenie już się zaczęło — odpowiedź tylko do odczytu. */
+  eventStarted?: boolean
   dietaryNotes: string | null
   spouseAttending: boolean | null
   spouseFirstName: string | null
@@ -799,11 +906,19 @@ export async function confirmInvitation(
   })
 }
 
-/** Publiczne: dopasuj dane do zaproszenia (bez linku) i potwierdź. Rzuca, gdy brak dopasowania. */
+/** Publiczne: „Nie damy rady przyjść" — odmowa udziału po linku. */
+export async function declineInvitation(inviteToken: string): Promise<{ ok: boolean }> {
+  return apiFetch(`/invite/${inviteToken}/decline`, { method: 'POST' })
+}
+
+/**
+ * Publiczne: dopasuj dane do zaproszenia (bez linku) i potwierdź. Rzuca, gdy brak dopasowania.
+ * `alreadyConfirmed` — udział potwierdził organizator; dane nie zostały zmienione, link poszedł mailem.
+ */
 export async function matchInvite(
   slug: string,
   data: Invitee & ConfirmPayload,
-): Promise<{ ok: boolean; firstName: string }> {
+): Promise<{ ok: boolean; firstName: string; alreadyConfirmed?: boolean }> {
   return apiFetch(`/r/${slug}/invite-match`, { method: 'POST', body: JSON.stringify(data) })
 }
 
@@ -832,7 +947,7 @@ export interface GuestInviteView {
   remaining: number
   canInvite: boolean
   blockedReason: GuestBlockedReason
-  guests: { id: string; firstName: string; lastName: string; email: string; status: 'CONFIRMED' | 'PENDING'; sentAt: string | null }[]
+  guests: { id: string; firstName: string; lastName: string; email: string; status: 'CONFIRMED' | 'PENDING' | 'DECLINED'; sentAt: string | null }[]
   added?: { id: string; mailStatus: 'SENT' | 'FAILED' | 'LOGGED' | 'NO_EMAIL' }
 }
 

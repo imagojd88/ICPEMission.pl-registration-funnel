@@ -37,7 +37,7 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 - `RegistrationPage.customFields` (JSON): `{ program: [{time,item}], specialGuest: {name, photoUrl, plural?, bio?} }` — `plural` przełącza etykietę „Gość specjalny"/„Goście specjalni", `bio` to mapa językowa (1–2 zdania o gościach).
 - `pricingConfig` (JSON): dodane `free?: boolean` (event bezpłatny).
 - `Registration`: `checkedInAt`, `roomLabel`, `roomNote`, `roomsJson`.
-- `Invitation` (model): `token @unique`, `confirmedAt`, `dietaryNotes`.
+- `Invitation` (model): `token @unique`, `confirmedAt`, `dietaryNotes`; gospodarstwo: `spouse*`, `childrenJson [{firstName?, age, dietary?}]`; `confirmedBy` ('GUEST'|'ADMIN'), `guestRespondedAt`, `declinedAt`, `adminNote`.
 - `Place` (model): zapisywane lokalizacje `{ id, label, createdAt }`.
 
 ---
@@ -264,6 +264,26 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — moduł rejestracji
 
+### WDROŻENIE: goście potwierdzeni przez organizatora + rodzina jednym rekordem + odmowy (2026-10-02) — kod gotowy, czeka na push
+**Decyzje usera (Q1–Q7, wiążące):** gość może zmienić skład; mail domyślnie z checkboxem rezygnacji; bez e-maila małżonka; przypomnienie o diecie ręcznym przyciskiem; po starcie eventu gość nie zmienia odpowiedzi; **odmowa „Nie damy rady przyjść” dla wszystkich zaproszonych**; masowe dodawanie w panelu i w kreatorze. Spec: `docs/14-plan-potwierdzeni-przez-admina.md` (sekcja 12 = decyzje).
+- **Prisma `Invitation`:** `confirmedBy` ('GUEST'|'ADMIN', null przy potwierdzonym = GUEST), `guestRespondedAt`, `declinedAt`, `adminNote` (wszystko nullable → db push). `childrenJson[].dietary` (bez migracji).
+- **Backend (`invitations.service.ts`):** helpery `invitationStatus`, `confirmedByOf`, `dietStatusOf` (PROVIDED/NONE/UNKNOWN), `eventStarted`, `householdData`/`householdError`, `composeDietaryNotes` (diety per osoba: „Jan: … | Anna: … | Ola: …”; sama dieta gościa = sam tekst jak dotąd). Nowe: `createConfirmed` (konflikty SAME_PERSON_PENDING/CONFIRMED, SPOUSE_ON_LIST, PERSON_IS_SPOUSE — także w obrębie jednej partii; flagi `confirmExisting`, `ignoreWarnings`), `confirmByAdmin` (Potwierdź ręcznie / Edytuj skład; mail tylko dla ADMIN), `unconfirm`, `declineByAdmin`, `declineByToken`, `sendDietReminders`. Zmiany: `confirmByToken` (blokada po starcie, `guestRespondedAt`, czyści odmowę, zachowuje ADMIN), `declarationData` (dieta małżonka bez zmiany składu), `matchBySlug` (ADMIN → bez nadpisania, ponowny mail z linkiem, `alreadyConfirmed`), `remove`/odmowa/cofnięcie → zgłoszenie **CANCELLED** (wcześniej usunięte zaproszenie zostawiało zgłoszenie w Zgłoszeniach/Obecności), `resendAll` pomija odmowy i potwierdzonych przez gościa, szablon maila wybierany z rekordu (`INVITE_PRECONFIRMED` dla ADMIN), podgląd z `preconfirmed`+`household`. `syncRegistration` publiczne + dieta dziecka do `Participant.dietary`. Guest-invites: status `DECLINED` na liście gości uczestnika.
+- **Endpointy:** `POST /admin/instances/:id/invitations/confirmed`, `POST /admin/invitations/:id/confirm|unconfirm|decline`, `POST /admin/instances/:id/invitations/diet-reminders`, `POST /invite/:token/decline`.
+- **Mail `INVITE_PRECONFIRMED`** (`notifications.service.ts`, `preconfirmedEmail` + `lat(n)`): warianty Ty/Wy/Państwo, „Jan i Anna,”, lista osób z wiekiem, notatka, przycisk „Podaj wymagania żywieniowe” (w mailu brak linków zmieniających dane — skanery poczty), sekcja „Zaproś gościa”, zdanie o danych + opcjonalny `PRIVACY_POLICY_URL` (nowy ENV, `sync:false` w `render.yaml`), wariant przypomnienia. MailSettings: etykieta.
+- **Strona `/i/:token` (`InviteConfirm.tsx`, przepisana):** stany: potwierdzony przez organizatora (karta „Jesteś/Jesteście na liście gości” + od razu otwarte pola diety przy każdej osobie, „Zapisz” / „Nikt z nas nie ma wymagań”), po odpowiedzi (podsumowanie diet, „Zmień wymagania”, „Coś się zmieniło w składzie?”), odmowa (karta + „Jednak przyjdę”), czeka (formularz + „Nie dam rady przyjść”), wydarzenie trwa (tylko odczyt). Dieta dziecka w formularzu (też w `InviteMatchScreen`, który obsługuje `alreadyConfirmed`). i18n pl/en/it: klucze `invite.pre_*`, `diet_*`, `decline_*`, `declined_*`, `started_*`, `guest.status_declined`.
+- **Panel (`InvitedGuestsSection.tsx` + nowe `HouseholdEditor.tsx`, `lib/households.ts`):** przełącznik „Zaproś (gość potwierdza) | Dodaj jako potwierdzonego” (pamiętany w sessionStorage), skład Osoba/Małżeństwo/Rodzina z podpowiedzią „= N posiłków”, „Zamień osobę główną z małżonkiem”, okno konfliktów (Potwierdź istniejące / Usuń osobny rekord i dodaj rodzinę / Dodaj mimo to), „Wklej listę” z podglądem i błędami wierszy; wiersz: badge Potwierdzony · organizator / Nie przyjdzie, diety per osoba, chip „dieta: czeka na odpowiedź” / „bez wymagań ✓”, notatka, akcje Potwierdź ręcznie / Edytuj skład i diety / Cofnij potwierdzenie|odmowę / Nie przyjdzie; baner „Diety nieznane: N” + „Przypomnij o diecie”; licznik „Nie przyjdzie: N”; treść WhatsApp/iMessage dla potwierdzonych. Kreator (`EventWizard.tsx`): pole „Uczestnicy od razu potwierdzeni” + checkbox maila; ekran sukcesu oznacza potwierdzonych i pominięte duplikaty.
+- **Handoff Personal OS:** `docs/15-prompt-personal-os-potwierdzeni.md`.
+- **Weryfikacja (kontener, kopia repo):** tsc api ✓ / app ✓, `prisma validate` ✓, `vite build` ✓; testy logiki na atrapie Prisma **24/24** (rodzina → zgłoszenie z 4 uczestnikami i dietami, konflikty, dieta bez zmiany składu, NONE/UNKNOWN, zmiana składu, odmowa↔potwierdzenie, blokada po starcie, dopasowanie bez nadpisania, Potwierdź ręcznie, CANCELLED przy usunięciu/cofnięciu/odmowie, wybór szablonu w „Wyślij niewysłane”, przypomnienia, podgląd, 6 wariantów maila + escapowanie); **smoke test DI** (cały AppModule) ✓; Chromium E2E na atrapie API z prawdziwą logiką serwisu: panel (11 scenariuszy) + strona gościa (telefon 390 px, bez poziomego scrolla, PL/EN, 7 scenariuszy) + stan „wydarzenie trwa” ✓.
+- **Po pushu:** **Manual Deploy `icpe-api`** (4 nowe kolumny). Opcjonalnie ustaw `PRIVACY_POLICY_URL` w Render ▸ icpe-api ▸ Environment. Polityka prywatności: dopisać, że organizator może wpisać dane uczestnika i rodziny (w tym wymagania żywieniowe). Test: dodaj siebie z rodziną jako potwierdzonego → mail → link → dieta → licznik i Zgłoszenia.
+- Nieprzetestowane na żywo: realna baza Render i wysyłka przez Resend.
+
+### PROJEKT: goście dodani przez admina jako od razu potwierdzeni (2026-10-02) — TYLKO PLAN, bez zmian w kodzie
+- Prośba usera: admin dodaje uczestników eventu INVITE bez zaproszenia, od razu potwierdzonych; dostają mail „udział potwierdzony, opcjonalnie podaj dietę”; po wejściu w link widzą, że są potwierdzeni; małżeństwo/rodzina jednym rekordem.
+- Spec: `docs/14-plan-potwierdzeni-przez-admina.md` (też w Projekcie: `plany/14-plan-potwierdzeni-przez-admina.md`).
+- Rdzeń: ten sam `Invitation` (już jest modelem gospodarstwa: małżonek + dzieci) + `confirmedBy` ('GUEST'|'ADMIN'), `guestRespondedAt` (status diety PROVIDED/NONE/UNKNOWN — odróżnia „brak wymagań” od „nie odpowiedział”), `adminNote`; dieta per dziecko w `childrenJson`. Nowe: `POST /admin/instances/:id/invitations/confirmed` (z raportem konfliktów, m.in. małżonek już na liście), `POST /admin/invitations/:id/confirm|unconfirm`, `POST …/diet-reminders`; mail `INVITE_PRECONFIRMED` (Ty/Wy/Państwo). Szablon wybierany z rekordu, więc „Wyślij niewysłane” nie wyśle potwierdzonym zaproszenia.
+- Znalezisko przy okazji: `remove()` zaproszenia zostawia `Registration` (rodzina wisi w Zgłoszeniach/Obecności) — w planie: CANCELLED przy usunięciu/cofnięciu.
+- Otwarte decyzje Q1–Q7 w sekcji 12 specu (m.in. czy gość może zmienić skład, czy mail domyślnie, drugi e-mail małżonka). Następny krok: akceptacja → E1 backend.
+
 ### Personalizacja maila z zaproszeniem (ważni goście) (2026-09-25)
 - Prośba usera: móc dopisać kilka zdań do maila dla ważnych osobistości.
 - Prisma `Invitation`: `mailSalutation`, `mailNote` (@db.Text), `mailSubject`, `mailFormal` (Boolean, default false). Wszystkie per osoba; puste = standardowy szablon.
@@ -489,6 +509,8 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 ---
 
 ## Powiązane dokumenty
+- `docs/14-plan-potwierdzeni-przez-admina.md` — spec: goście potwierdzeni przez admina, rodzina jednym rekordem, odmowy (wdrożone 2026-10-02).
+- `docs/15-prompt-personal-os-potwierdzeni.md` — handoff Personal OS do powyższego.
 - `docs/13-handoff-formacja-online.md` — **obowiązująca spec** Formacji online (`/formacja/<slug>`, wiele kursów).
 - `docs/12-plan-panel-kursanta.md` — pierwotny plan + research hostingu wideo i koszty (część o subdomenach nieaktualna).
 - `docs/HANDOFF-strona-ICPE-Mission-PL.md` — architektura publicznej strony ICPE Mission PL (headless CMS na API + Astro, statystyki Umami). Nowy kierunek prac (osobny od modułu rejestracji).

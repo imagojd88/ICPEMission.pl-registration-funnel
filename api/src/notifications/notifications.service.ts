@@ -84,6 +84,129 @@ function inviteEmail(d: Record<string, unknown>, guest: boolean): { subject: str
   return { subject, text, html };
 }
 
+/** „1 rok", „2 lata", „5 lat", „12 lat", „22 lata" — polska odmiana wieku. */
+export function lat(n: number): string {
+  const v = Math.abs(Math.round(n));
+  if (v === 1) return '1 rok';
+  const d = v % 10;
+  const dd = v % 100;
+  if (d >= 2 && d <= 4 && !(dd >= 12 && dd <= 14)) return `${v} lata`;
+  return `${v} lat`;
+}
+
+/**
+ * Mail „udział potwierdzony" dla osób/rodzin dodanych przez organizatora (INVITE_PRECONFIRMED).
+ * Trzy warianty gramatyczne: Ty (jedna osoba), Wy (małżeństwo/rodzina), Państwo (forma grzecznościowa).
+ * `reminder` — wariant „Przypomnij o diecie". Personalizacja z panelu jak w zaproszeniu.
+ * W mailu NIE ma linków zmieniających dane (skanery poczty klikają linki) — tylko link do strony /i/:token.
+ */
+function preconfirmedEmail(d: Record<string, unknown>): { subject: string; text: string; html: string } {
+  const title = String(d.eventTitle ?? 'wydarzenie');
+  const name = String(d.firstName ?? '').trim();
+  const spouseName = String(d.spouseFirstName ?? '').trim();
+  const when = String(d.when ?? '');
+  const where = String(d.location ?? '');
+  const formal = d.formal === true;
+  const household = d.household === true;
+  const reminder = d.reminder === true;
+  const salutation = String(d.salutation ?? '').trim();
+  const note = String(d.note ?? '').replace(/\r\n/g, '\n').trim();
+  const customSubject = String(d.subject ?? '').trim();
+  const guestLink = String(d.guestInviteLink ?? '').trim();
+  const maxGuests = Number(d.maxGuests ?? 0);
+  const privacyUrl = String(d.privacyUrl ?? '').trim();
+  const people = (Array.isArray(d.people) ? d.people : []) as Array<{ name?: string; age?: number }>;
+  // Forma: P = Państwo, W = Wy, T = Ty.
+  const f: 'P' | 'W' | 'T' = formal ? 'P' : household ? 'W' : 'T';
+  const pick = (t: string, w: string, p: string) => (f === 'P' ? p : f === 'W' ? w : t);
+
+  const greeting =
+    salutation ||
+    (f === 'P'
+      ? household
+        ? 'Szanowni Państwo,'
+        : 'Dzień dobry,'
+      : name
+        ? spouseName
+          ? `${name} i ${spouseName},`
+          : `${name},`
+        : 'Dzień dobry,');
+
+  const firstLine = reminder
+    ? pick(
+        `przypominamy, że Twój udział w: ${title} jest potwierdzony.`,
+        `przypominamy, że Wasz udział w: ${title} jest potwierdzony.`,
+        `uprzejmie przypominamy, że udział w: ${title} jest potwierdzony.`,
+      )
+    : pick(
+        `z radością potwierdzamy Twój udział w: ${title}.`,
+        `z radością potwierdzamy Wasz udział w: ${title}.`,
+        `mamy przyjemność potwierdzić Państwa udział w: ${title}.`,
+      );
+
+  const peopleLine = people
+    .map((p) => `${String(p.name ?? '').trim() || 'Gość'}${typeof p.age === 'number' ? ` (${lat(p.age)})` : ''}`)
+    .join(', ');
+
+  const ask = reminder
+    ? pick(
+        'Przygotowujemy posiłki i nie mamy jeszcze od Ciebie informacji o wymaganiach żywieniowych. Daj nam znać — także wtedy, gdy nie masz żadnych (to jedno kliknięcie):',
+        'Przygotowujemy posiłki i nie mamy jeszcze od Was informacji o wymaganiach żywieniowych. Dajcie nam znać — także wtedy, gdy nikt z Was ich nie ma (to jedno kliknięcie):',
+        'Przygotowujemy posiłki — uprzejmie prosimy o informację o ewentualnych wymaganiach żywieniowych lub alergiach (także o tym, że ich nie ma):',
+      )
+    : pick(
+        'Nie musisz niczego potwierdzać. Jeśli masz wymagania żywieniowe lub alergie, daj nam znać — zajmie to chwilę:',
+        'Nie musicie niczego potwierdzać. Jeśli ktoś z Was ma wymagania żywieniowe lub alergie, dajcie nam znać — zajmie to chwilę:',
+        'Nie trzeba niczego potwierdzać. Uprzejmie prosimy o informację o ewentualnych wymaganiach żywieniowych lub alergiach:',
+      );
+
+  const intro = [greeting, '', firstLine];
+  if (when) intro.push(`Termin: ${when}.`);
+  if (where) intro.push(`Miejsce: ${where}.`);
+  if (peopleLine) intro.push('', `Na liście gości zapisaliśmy: ${peopleLine}.`);
+  if (note) intro.push('', ...note.split('\n').map((l) => l.trim()));
+  intro.push('', ask);
+
+  const guestCount = maxGuests === 1 ? 'jedną osobę' : `do ${maxGuests} osób`;
+  const outro = [
+    pick(
+      'Pod tym samym linkiem sprawdzisz swoje zgłoszenie i dasz znać, jeśli coś się zmieni. Link jest przypisany do Ciebie — prosimy go nie przekazywać.',
+      'Pod tym samym linkiem sprawdzicie swoje zgłoszenie i dacie znać, jeśli coś się zmieni. Link jest przypisany do Was — prosimy go nie przekazywać.',
+      'Pod tym samym linkiem można sprawdzić zgłoszenie i poinformować nas o zmianach. Link jest imienny — prosimy go nie przekazywać.',
+    ),
+    ...(guestLink && maxGuests > 0
+      ? [
+          '',
+          pick(
+            `Możesz też zaprosić ${guestCount} — każda dostanie od nas imienne zaproszenie: ${guestLink}`,
+            `Możecie też zaprosić ${guestCount} — każda dostanie od nas imienne zaproszenie: ${guestLink}`,
+            `Istnieje też możliwość zaproszenia ${guestCount} — każda otrzyma imienne zaproszenie: ${guestLink}`,
+          ),
+        ]
+      : []),
+    '',
+    pick(
+      'Twoje dane wpisał organizator na potrzeby przygotowania wydarzenia (lista gości, posiłki). W sprawie swoich danych możesz się z nami skontaktować.',
+      'Wasze dane wpisał organizator na potrzeby przygotowania wydarzenia (lista gości, posiłki). W sprawie swoich danych możecie się z nami skontaktować.',
+      'Dane zostały wpisane przez organizatora na potrzeby przygotowania wydarzenia (lista gości, posiłki). W sprawie danych prosimy o kontakt z organizatorem.',
+    ) + (privacyUrl ? ` Szczegóły: ${privacyUrl}` : ''),
+    '',
+    ...SIGNATURE,
+  ];
+
+  const subject =
+    customSubject ||
+    (reminder
+      ? `Przypomnienie: wymagania żywieniowe — ${title}`
+      : pick(`Twój udział jest potwierdzony — ${title}`, `Wasz udział jest potwierdzony — ${title}`, `Potwierdzenie udziału — ${title}`));
+  const { text, html } = buttonMail(
+    intro.filter((l, i, arr) => l !== '' || arr[i - 1] !== ''),
+    { label: 'Podaj wymagania żywieniowe', href: String(d.link ?? '') },
+    outro,
+  );
+  return { subject, text, html };
+}
+
 /** Escapowanie treści wstawianej do HTML-a maila (tytuły eventów bywają z `&`, `<`). */
 const esc = (s: unknown) =>
   String(s ?? '')
@@ -250,6 +373,10 @@ export class NotificationsService {
 
     if (payload.type === 'INVITATION' || payload.type === 'GUEST_INVITATION') {
       return inviteEmail(d, payload.type === 'GUEST_INVITATION');
+    }
+
+    if (payload.type === 'INVITE_PRECONFIRMED') {
+      return preconfirmedEmail(d);
     }
 
     if (payload.type === 'INVITE_CONFIRMED') {

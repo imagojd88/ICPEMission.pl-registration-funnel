@@ -425,6 +425,17 @@ model Invitation {
   mailNote       String?  @db.Text
   mailSubject    String?
   mailFormal     Boolean  @default(false)
+  // Kto potwierdził udział: 'GUEST' (link / dopasowanie) | 'ADMIN' (panel — „Dodaj jako potwierdzonego"
+  // albo „Potwierdź ręcznie"). null = niepotwierdzone albo potwierdzone przed wprowadzeniem pola (= GUEST).
+  confirmedBy      String?
+  // Ostatni zapis odpowiedzi przez samego gościa (link /i/:token, dopasowanie, odmowa).
+  // Przy confirmedBy=ADMIN: null = gość jeszcze nie odpowiedział → dieta nieznana.
+  guestRespondedAt DateTime?
+  // Odmowa udziału („Nie damy rady przyjść") — przez gościa albo oznaczona przez admina.
+  // Wyklucza z potwierdzonych (confirmedAt = null); ponowne potwierdzenie ją czyści.
+  declinedAt       DateTime?
+  // Notatka wewnętrzna organizatora (np. „potwierdził telefonicznie 3.10") — nie trafia do gościa.
+  adminNote        String?
 
   @@index([instanceId])
 }

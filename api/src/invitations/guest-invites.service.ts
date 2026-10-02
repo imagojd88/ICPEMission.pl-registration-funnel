@@ -257,7 +257,7 @@ export class GuestInvitesService {
         firstName: g.firstName,
         lastName: g.lastName,
         email: g.email,
-        status: g.confirmedAt ? 'CONFIRMED' : 'PENDING',
+        status: g.confirmedAt ? 'CONFIRMED' : g.declinedAt ? 'DECLINED' : 'PENDING',
         sentAt: g.sentAt ? g.sentAt.toISOString() : null,
       })),
     };

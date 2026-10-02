@@ -12,11 +12,12 @@ interface ChildRow {
   key: string
   age: string
   firstName: string
+  dietary: string
 }
 
 let childKeyCounter = 0
 function newChildRow(): ChildRow {
-  return { key: `c-${++childKeyCounter}`, age: '', firstName: '' }
+  return { key: `c-${++childKeyCounter}`, age: '', firstName: '', dietary: '' }
 }
 
 export default function InviteMatchScreen({ event, slug, content }: { event: EventInstanceDto; slug: string; content?: EventContent | null }) {
@@ -33,6 +34,8 @@ export default function InviteMatchScreen({ event, slug, content }: { event: Eve
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [confirmedName, setConfirmedName] = useState<string | null>(null)
+  // Udział potwierdził organizator — serwer niczego nie zmienił, link poszedł mailem.
+  const [alreadyConfirmed, setAlreadyConfirmed] = useState(false)
 
   function addChild() {
     setChildren((prev) => [...prev, newChildRow()])
@@ -59,7 +62,11 @@ export default function InviteMatchScreen({ event, slug, content }: { event: Eve
     }
     const childrenPayload: ChildEntry[] = children
       .filter((c) => c.age.trim() !== '')
-      .map((c) => ({ age: Number(c.age), ...(c.firstName.trim() ? { firstName: c.firstName.trim() } : {}) }))
+      .map((c) => ({
+        age: Number(c.age),
+        ...(c.firstName.trim() ? { firstName: c.firstName.trim() } : {}),
+        ...(c.dietary.trim() ? { dietary: c.dietary.trim() } : {}),
+      }))
     setBusy(true)
     setError(null)
     try {
@@ -74,9 +81,11 @@ export default function InviteMatchScreen({ event, slug, content }: { event: Eve
         spouseDietaryNotes: spouseChoice === 'with' ? spouseDietary : undefined,
         children: childrenPayload,
       })
+      setAlreadyConfirmed(res.alreadyConfirmed === true)
       setConfirmedName(res.firstName)
-    } catch {
-      setError(t('invite.not_found'))
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : ''
+      setError(/rozpocz/i.test(msg) ? t('invite.started_pending') : t('invite.not_found'))
     } finally {
       setBusy(false)
     }
@@ -91,7 +100,9 @@ export default function InviteMatchScreen({ event, slug, content }: { event: Eve
           <Check size={30} style={{ color: 'var(--ok)' }} />
         </div>
         <h2 className="font-serif" style={{ fontSize: 24, color: 'var(--ink)' }}>{t('invite.confirmed_title')}</h2>
-        <p className="text-sm" style={{ color: 'var(--muted)' }}>{t('invite.confirmed_sub', { name: confirmedName })}</p>
+        <p className="text-sm" style={{ color: 'var(--muted)' }}>
+          {alreadyConfirmed ? t('invite.already_confirmed') : t('invite.confirmed_sub', { name: confirmedName })}
+        </p>
       </div>
     )
   }
@@ -184,7 +195,8 @@ export default function InviteMatchScreen({ event, slug, content }: { event: Eve
         <div className="flex flex-col gap-2">
           <label className="text-sm font-medium" style={{ color: 'var(--ink)' }}>{t('invite.children')}</label>
           {children.map((c) => (
-            <div key={c.key} className="flex items-center gap-2">
+            <div key={c.key} className="flex flex-col gap-1.5">
+            <div className="flex items-center gap-2">
               <input
                 inputMode="numeric"
                 value={c.age}
@@ -197,18 +209,26 @@ export default function InviteMatchScreen({ event, slug, content }: { event: Eve
                 value={c.firstName}
                 onChange={(e) => updateChild(c.key, { firstName: e.target.value })}
                 placeholder={t('invite.child_name')}
-                className="flex-1 rounded-[12px] px-3 py-[11px] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                className="flex-1 min-w-0 rounded-[12px] px-3 py-[11px] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
                 style={{ border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--ink)' }}
               />
               <button
                 type="button"
                 onClick={() => removeChild(c.key)}
-                aria-label={t('invite.child_add')}
+                aria-label={t('invite.cancel')}
                 className="p-2 rounded-[8px] transition-colors duration-150 hover:bg-[var(--err-soft)]"
                 style={{ color: 'var(--muted)', border: 'none', background: 'none', cursor: 'pointer' }}
               >
                 <Trash2 size={15} />
               </button>
+            </div>
+              <input
+                value={c.dietary}
+                onChange={(e) => updateChild(c.key, { dietary: e.target.value })}
+                placeholder={t('invite.child_dietary')}
+                className="w-full rounded-[12px] px-3 py-[11px] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                style={{ border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--ink)' }}
+              />
             </div>
           ))}
           <button

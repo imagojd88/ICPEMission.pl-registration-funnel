@@ -13,7 +13,9 @@ import {
   listPlaces,
   createPlace,
   createInvitations,
+  createConfirmedInvitations,
 } from '@/lib/api'
+import { describeHousehold, parseHouseholdLines } from '@/lib/households'
 import { SUPERTITLE_PRESETS, isPresetSupertitle } from '@/lib/supertitles'
 import { DEFAULT_PRICING } from '@icpe/shared'
 import type { PricingConfig, AgeBracket } from '@icpe/shared'
@@ -114,6 +116,10 @@ interface WizardState {
   langIT: boolean
   // typ „na zaproszenie" — lista zaproszonych (surowy tekst, 1 osoba/wiersz)
   invitees: string
+  // typ „na zaproszenie" — uczestnicy od razu potwierdzeni (rodzina w wierszu, format jak „Wklej listę" w panelu)
+  confirmedInvitees: string
+  // mail „udział potwierdzony, podaj dietę" do potwierdzonych (domyślnie tak)
+  confirmedSendMail: boolean
   // spotkanie bez noclegu (kilka godzin) → pomijamy Pokoje i Cennik, ukrywamy noclegi
   noAccommodation: boolean
   // program wydarzenia: godzina + punkt
@@ -492,6 +498,38 @@ function Step0Type({ state, update }: { state: WizardState; update: (p: Partial<
             className="w-full rounded-[12px] px-3 py-[11px] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
             style={{ border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--ink)', resize: 'vertical' }}
           />
+
+          <p className="text-sm font-semibold mt-2" style={{ color: 'var(--ink)' }}>Uczestnicy od razu potwierdzeni (bez zaproszenia)</p>
+          <p className="text-xs" style={{ color: 'var(--muted)' }}>
+            Np. organizatorzy, prowadzący, rodziny, które już potwierdziły. Jedna rodzina w wierszu:{' '}
+            <b>Imię Nazwisko, e-mail, telefon, małżonek, dzieci</b> — puste kolumny wolno pominąć, dzieci rozdziel średnikiem
+            (imię opcjonalne, liczba = wiek). Od razu liczą się do posiłków.
+          </p>
+          <textarea
+            value={state.confirmedInvitees}
+            onChange={(e) => update({ confirmedInvitees: e.target.value })}
+            rows={4}
+            placeholder={'Jan Kowalski, jan@example.com, +48600100200, Anna Kowalska, Ola 7; Staś 4\nEwa Nowak, ewa@example.com'}
+            className="w-full rounded-[12px] px-3 py-[11px] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+            style={{ border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--ink)', resize: 'vertical' }}
+          />
+          {state.confirmedInvitees.trim() && (
+            <ul className="flex flex-col gap-0.5">
+              {parseHouseholdLines(state.confirmedInvitees).map((p) => (
+                <li key={p.line} className="text-[11px]" style={{ color: p.error ? 'var(--err)' : 'var(--muted)' }}>
+                  {p.line}. {p.error ? `${p.raw} — ${p.error} (wiersz zostanie pominięty)` : describeHousehold(p.household)}
+                </li>
+              ))}
+            </ul>
+          )}
+          <label className="flex items-center gap-2 text-xs" style={{ color: 'var(--ink)' }}>
+            <input
+              type="checkbox"
+              checked={state.confirmedSendMail}
+              onChange={(e) => update({ confirmedSendMail: e.target.checked })}
+            />
+            Wyślij potwierdzonym mail „udział potwierdzony” z prośbą o dietę
+          </label>
         </div>
       )}
 
@@ -1357,7 +1395,18 @@ function Step4Page({ state, update }: { state: WizardState; update: (p: Partial<
 
 // ── Success screen ────────────────────────────────────────────────────────────
 
-function SuccessScreen({ slug, onClose, invites }: { slug: string; onClose: () => void; invites?: InvitationItem[] }) {
+function SuccessScreen({
+  slug,
+  onClose,
+  invites,
+  skippedConfirmed = 0,
+}: {
+  slug: string
+  onClose: () => void
+  invites?: InvitationItem[]
+  /** Ile rodzin z listy potwierdzonych pominięto jako możliwe duplikaty. */
+  skippedConfirmed?: number
+}) {
   const publicUrl = `${PUBLIC_BASE}/r/${slug}`
   const hasInvites = (invites?.length ?? 0) > 0
   return (
@@ -1385,13 +1434,22 @@ function SuccessScreen({ slug, onClose, invites }: { slug: string; onClose: () =
             Linki dla zaproszonych ({invites!.length})
           </p>
           <p className="text-xs" style={{ color: 'var(--muted)' }}>
-            Zaproszenia poszły mailem. Możesz też przekazać link bezpośrednio:
+            Zaproszenia (i potwierdzenia dla osób dodanych jako potwierdzone) poszły mailem. Możesz też przekazać link bezpośrednio:
           </p>
+          {skippedConfirmed > 0 && (
+            <p className="text-xs font-medium px-3 py-2 rounded-[8px]" style={{ background: 'var(--warn-soft)', color: 'var(--warn)' }}>
+              Pominięto {skippedConfirmed} {skippedConfirmed === 1 ? 'rodzinę' : 'rodzin(y)'} z listy potwierdzonych jako możliwe duplikaty
+              (np. małżonek wpisany też osobno). Dodasz je w „Edytuj event” ▸ Zaproszeni goście.
+            </p>
+          )}
           <div className="flex flex-col gap-2 max-h-72 overflow-y-auto">
             {invites!.map((inv) => {
               const link = inv.link || `${PUBLIC_BASE}/i/${inv.token}`
+              const preconfirmed = inv.confirmedBy === 'ADMIN'
               const waText = encodeURIComponent(
-                `${inv.firstName}, zapraszamy Cię na wydarzenie. Udział potwierdzisz swoim osobistym linkiem:\n${link}`,
+                preconfirmed
+                  ? `${inv.firstName}, Twój udział w wydarzeniu jest potwierdzony. Jeśli masz wymagania żywieniowe, podaj je tutaj:\n${link}`
+                  : `${inv.firstName}, zapraszamy Cię na wydarzenie. Udział potwierdzisz swoim osobistym linkiem:\n${link}`,
               )
               const waHref = `https://wa.me/${(inv.phone ?? '').replace(/\D/g, '')}?text=${waText}`
               return (
@@ -1403,6 +1461,9 @@ function SuccessScreen({ slug, onClose, invites }: { slug: string; onClose: () =
                   <div className="min-w-0">
                     <p className="text-sm font-medium truncate" style={{ color: 'var(--ink)' }}>
                       {inv.firstName} {inv.lastName}
+                      {preconfirmed && (
+                        <span className="ml-2 text-[11px] font-semibold" style={{ color: 'var(--ok)' }}>potwierdzony</span>
+                      )}
                     </p>
                     <p className="text-xs font-mono truncate" style={{ color: 'var(--faint)' }}>{link}</p>
                   </div>
@@ -1488,6 +1549,8 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
     langEN: false,
     langIT: false,
     invitees: '',
+    confirmedInvitees: '',
+    confirmedSendMail: true,
     noAccommodation: false,
     program: [],
     specialGuestName: '',
@@ -1499,6 +1562,7 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [createdSlug, setCreatedSlug] = useState<string | null>(null)
   const [createdInvites, setCreatedInvites] = useState<InvitationItem[]>([])
+  const [skippedConfirmed, setSkippedConfirmed] = useState(0)
   const [loadingEdit, setLoadingEdit] = useState(isEdit)
 
   useEffect(() => {
@@ -1657,6 +1721,17 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
           const created = await createInvitations(instanceId, parsed)
           setCreatedInvites(created)
         }
+        // Od razu potwierdzeni — osoba z listy zaproszonych zostaje potwierdzona (confirmExisting),
+        // możliwe duplikaty małżonków są pomijane i zgłaszane na ekranie sukcesu.
+        const households = parseHouseholdLines(state.confirmedInvitees).filter((p) => !p.error).map((p) => p.household)
+        if (households.length > 0) {
+          const res = await createConfirmedInvitations(instanceId, households, {
+            sendEmails: state.confirmedSendMail,
+            confirmExisting: true,
+          })
+          setCreatedInvites(res.items)
+          setSkippedConfirmed(new Set(res.conflicts.map((c) => c.index)).size)
+        }
       }
 
       setCreatedSlug(state.slug)
@@ -1689,7 +1764,7 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
           boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
         }}
       >
-        <SuccessScreen slug={createdSlug} onClose={onCancel} invites={createdInvites} />
+        <SuccessScreen slug={createdSlug} onClose={onCancel} invites={createdInvites} skippedConfirmed={skippedConfirmed} />
       </div>
     )
   }

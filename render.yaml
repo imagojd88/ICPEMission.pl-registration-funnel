@@ -73,6 +73,8 @@ services:
         generateValue: true
       - key: FILE_SIGNING_SECRET    # podpisy krótko żyjących linków do PDF
         generateValue: true
+      - key: PRIVACY_POLICY_URL     # opcjonalny link do polityki prywatności w mailu „udział potwierdzony"
+        sync: false
       - key: PUBLIC_SITE_URL        # linki w mailach: <PUBLIC_SITE_URL>/formacja/<slug>/
         value: https://icpemission.pl
       - key: BUNNY_STREAM_LIBRARY_ID    # Bunny ▸ Stream ▸ biblioteka ▸ API ▸ Video Library ID

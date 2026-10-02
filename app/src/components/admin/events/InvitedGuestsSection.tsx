@@ -1,9 +1,43 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Check, ChevronDown, Clock, Copy, Mail, MessageCircle, MessageSquare, PenLine, Plus, RefreshCw, Send, Trash2, UserPlus, Users } from 'lucide-react'
+import {
+  ArrowLeftRight,
+  Bell,
+  Check,
+  ChevronDown,
+  ClipboardList,
+  Clock,
+  Copy,
+  Mail,
+  MessageCircle,
+  MessageSquare,
+  PenLine,
+  Plus,
+  RefreshCw,
+  Send,
+  StickyNote,
+  Trash2,
+  Undo2,
+  UserCheck,
+  UserPlus,
+  Users,
+  UserX,
+  Utensils,
+} from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import { useAutoRefresh } from '@/hooks/useAutoRefresh'
 import InviteMailEditor, { isPersonalized } from '@/components/admin/events/InviteMailEditor'
+import HouseholdEditor from '@/components/admin/events/HouseholdEditor'
+import {
+  describeHousehold,
+  emptyHousehold,
+  hasSpouse,
+  householdDraftError,
+  householdFromItem,
+  householdToInput,
+  parseHouseholdLines,
+  type HouseholdDraft,
+} from '@/lib/households'
 import {
   createInvitations,
   deleteInvitation,
@@ -16,7 +50,15 @@ import {
   sendInvitation,
   sendGuestInviteLinks,
   syncInvitationRegistrations,
+  createConfirmedInvitations,
+  confirmInvitationByAdmin,
+  unconfirmInvitation,
+  declineInvitationByAdmin,
+  sendDietReminders,
+  type HouseholdConflict,
+  type HouseholdInput,
   type InvitationItem,
+  type InvitationStatus,
 } from '@/lib/api'
 
 /** Fallback bazy linków — API zwraca gotowy `link`, to tylko awaryjnie. */
@@ -31,6 +73,35 @@ function inviteLink(inv: InvitationItem): string {
   return inv.link || `${PUBLIC_BASE}/i/${inv.token}`
 }
 
+/** Status zaproszenia (starsze API bez `status` → wyliczony z dat). */
+function statusOf(inv: InvitationItem): InvitationStatus {
+  return inv.status ?? (inv.confirmedAt ? 'CONFIRMED' : inv.declinedAt ? 'DECLINED' : 'PENDING')
+}
+
+/** Potwierdzony przez organizatora (dostaje mail „udział potwierdzony, podaj dietę", nie zaproszenie). */
+function byAdmin(inv: InvitationItem): boolean {
+  return statusOf(inv) === 'CONFIRMED' && inv.confirmedBy === 'ADMIN'
+}
+
+/** Rodzina (więcej niż jedna osoba) — do form „Wasz/Wy" w wiadomościach. */
+function isHousehold(inv: InvitationItem): boolean {
+  return inv.spouseAttending === true || (inv.children?.length ?? 0) > 0
+}
+
+/** Krótki opis konfliktu przy dodawaniu potwierdzonych. */
+function conflictText(c: HouseholdConflict): string {
+  switch (c.kind) {
+    case 'SAME_PERSON_PENDING':
+      return `${c.label} — ta osoba już jest na liście.`
+    case 'SAME_PERSON_CONFIRMED':
+      return `${c.label} — już potwierdzona. Zmień jej skład przyciskiem „Edytuj skład” przy tej osobie.`
+    case 'SPOUSE_ON_LIST':
+      return `Małżonek jest już na liście: ${c.label}. Posiłki policzyłyby się podwójnie.`
+    case 'PERSON_IS_SPOUSE':
+      return `Ta osoba jest już małżonkiem w rodzinie: ${c.label}. Posiłki policzyłyby się podwójnie.`
+  }
+}
+
 /** Numer do wa.me: same cyfry. Puste → WhatsApp poprosi o wybór kontaktu. */
 function waNumber(phone?: string | null): string {
   return (phone ?? '').replace(/\D/g, '')
@@ -41,6 +112,20 @@ function waNumber(phone?: string | null): string {
  * `register` = zwykły event: gość rejestruje się w lejku (link ma wypełnione dane).
  */
 function inviteMessage(inv: InvitationItem, eventTitle: string, register = false): string {
+  if (byAdmin(inv)) {
+    // Potwierdzony przez organizatora — nie zapraszamy, tylko prosimy (opcjonalnie) o dietę.
+    const we = isHousehold(inv)
+    return [
+      we
+        ? `${inv.firstName}${inv.spouseFirstName ? ` i ${inv.spouseFirstName}` : ''}, Wasz udział w: ${eventTitle} jest potwierdzony.`
+        : `${inv.firstName}, Twój udział w: ${eventTitle} jest potwierdzony.`,
+      '',
+      we
+        ? 'Jeśli ktoś z Was ma wymagania żywieniowe lub alergie, podajcie je tutaj:'
+        : 'Jeśli masz wymagania żywieniowe lub alergie, podaj je tutaj:',
+      inviteLink(inv),
+    ].join('\n')
+  }
   return [
     `${inv.firstName}, zapraszamy Cię na: ${eventTitle}.`,
     '',
@@ -101,6 +186,30 @@ export default function InvitedGuestsSection({
   // Edycja treści maila istniejącego gościa (jeden wiersz naraz).
   const [editingMailId, setEditingMailId] = useState<string | null>(null)
   const [editMail, setEditMail] = useState<MailPersonalization>({})
+  // Tryb formularza „Dodaj gościa" (tylko event INVITE): zaproszenie albo od razu potwierdzony.
+  const [addMode, setAddMode] = useState<'invite' | 'confirmed'>(() => {
+    try {
+      return window.sessionStorage.getItem('icpe:addMode') === 'confirmed' ? 'confirmed' : 'invite'
+    } catch {
+      return 'invite'
+    }
+  })
+  const [household, setHousehold] = useState<HouseholdDraft>(() => emptyHousehold())
+  // „Wyślij mail z potwierdzeniem i prośbą o dietę" — domyślnie tak, odznaczenie = ciche dodanie.
+  const [sendConfirmMail, setSendConfirmMail] = useState(true)
+  // Konflikty z ostatniej próby dodania potwierdzonych + to, co trzeba ponowić po decyzji admina.
+  const [conflictState, setConflictState] = useState<{
+    conflicts: HouseholdConflict[]
+    households: HouseholdInput[]
+    clearForm: boolean
+  } | null>(null)
+  // Wklejana lista (masowe dodawanie potwierdzonych).
+  const [bulkOpen, setBulkOpen] = useState(false)
+  const [bulkText, setBulkText] = useState('')
+  // „Potwierdź ręcznie" / „Edytuj skład" — jeden wiersz naraz.
+  const [householdEditId, setHouseholdEditId] = useState<string | null>(null)
+  const [editHousehold, setEditHousehold] = useState<HouseholdDraft>(() => emptyHousehold())
+  const [editSendMail, setEditSendMail] = useState(true)
 
   const load = useCallback(async (silent = false) => {
     // `silent` — odświeżanie w tle (polling): bez spinnera, żeby lista nie mrugała.
@@ -123,7 +232,7 @@ export default function InvitedGuestsSection({
   // akcji na wierszu (wysyłka, usuwanie, synchronizacja), żeby nie podmienić danych pod ręką.
   const { lastUpdatedAt, refreshing, refreshNow } = useAutoRefresh(() => load(true), {
     intervalMs: 20000,
-    enabled: !busyId && !adding && !editingMailId,
+    enabled: !busyId && !adding && !editingMailId && !householdEditId,
   })
 
   /** `send=false` — dodaj bez maila (np. ważny gość: najpierw dopracować treść, potem wysłać). */
@@ -167,6 +276,215 @@ export default function InvitedGuestsSection({
     }
   }
 
+  function switchAddMode(mode: 'invite' | 'confirmed') {
+    setAddMode(mode)
+    setConflictState(null)
+    try {
+      window.sessionStorage.setItem('icpe:addMode', mode)
+    } catch {
+      /* prywatne okno — bez zapamiętywania */
+    }
+  }
+
+  /** Podsumowanie wysyłki maili po dodaniu potwierdzonych — uczciwie, gdy poczta nie działa. */
+  function mailSummary(m: { sent: number; failed: number; logged: number; noEmail: number }, send: boolean): string {
+    if (!send) return 'Bez maili (wysyłka odznaczona).'
+    const parts: string[] = []
+    if (m.sent) parts.push(`mail z potwierdzeniem poszedł do ${m.sent}`)
+    if (m.noEmail) parts.push(`${m.noEmail} bez e-maila — przekaż link ręcznie`)
+    if (m.failed) parts.push(`${m.failed} maili się nie wysłało`)
+    return parts.length ? parts.join(', ') + '.' : ''
+  }
+
+  /**
+   * Dodanie od razu potwierdzonych (jedna rodzina z formularza albo wklejona lista).
+   * Konflikty (duplikaty zawyżające catering) wracają do decyzji admina — patrz conflictState.
+   */
+  async function submitConfirmed(
+    households: HouseholdInput[],
+    opts: { confirmExisting?: boolean; ignoreWarnings?: boolean },
+    clearForm: boolean,
+  ) {
+    setAdding(true)
+    setError(null)
+    setInfo(null)
+    try {
+      const res = await createConfirmedInvitations(instanceId, households, { sendEmails: sendConfirmMail, ...opts })
+      setItems(res.items)
+      const done = res.added + res.confirmedExisting
+      const remaining = Array.from(new Set(res.conflicts.map((c) => c.index))).map((i) => households[i])
+      if (res.conflicts.length > 0) {
+        // Ponawiamy tylko gospodarstwa z konfliktem (reszta już dodana); indeksy przeliczamy na nową listę.
+        const order = Array.from(new Set(res.conflicts.map((c) => c.index)))
+        setConflictState({
+          conflicts: res.conflicts.map((c) => ({ ...c, index: order.indexOf(c.index) })),
+          households: remaining,
+          clearForm,
+        })
+      } else {
+        setConflictState(null)
+        if (clearForm) {
+          setDraft({ firstName: '', lastName: '', email: '', phone: '' })
+          setDraftMail({})
+          setShowDraftMail(false)
+          setHousehold(emptyHousehold(household.mode))
+        }
+      }
+      if (done > 0) {
+        if (res.mail.logged > 0 && res.mail.sent === 0) {
+          setError(`Dodano jako potwierdzonych: ${done}, ale ${MAIL_OFF_HINT.charAt(0).toLowerCase()}${MAIL_OFF_HINT.slice(1)}`)
+        } else {
+          setInfo(`Dodano jako potwierdzonych: ${done}${res.confirmedExisting ? ` (w tym potwierdzone istniejące zaproszenia: ${res.confirmedExisting})` : ''}. ${mailSummary(res.mail, sendConfirmMail)}`)
+        }
+      }
+      return res
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e))
+      return null
+    } finally {
+      setAdding(false)
+    }
+  }
+
+  async function handleAddConfirmed() {
+    if (!draft.firstName.trim() || !draft.lastName.trim()) {
+      setError('Podaj imię i nazwisko osoby głównej.')
+      return
+    }
+    const herr = householdDraftError(household)
+    if (herr) {
+      setError(herr)
+      return
+    }
+    const h: HouseholdInput = {
+      firstName: draft.firstName.trim(),
+      lastName: draft.lastName.trim(),
+      email: draft.email.trim(),
+      ...(draft.phone.trim() ? { phone: draft.phone.trim() } : {}),
+      ...householdToInput(household),
+      ...draftMail,
+    }
+    await submitConfirmed([h], {}, true)
+  }
+
+  /** Decyzja admina w sprawie konfliktów — ponowienie z flagą albo usunięcie zdublowanego rekordu. */
+  async function resolveConflicts(action: 'confirmExisting' | 'ignoreWarnings' | 'replaceSpouseRecords') {
+    if (!conflictState) return
+    const { households, clearForm, conflicts } = conflictState
+    if (action === 'replaceSpouseRecords') {
+      const ids = Array.from(new Set(conflicts.filter((c) => c.kind === 'SPOUSE_ON_LIST' || c.kind === 'PERSON_IS_SPOUSE').map((c) => c.existingId)))
+      if (!window.confirm(`Usunąć ${ids.length === 1 ? 'osobny rekord' : `${ids.length} osobne rekordy`} i dodać rodzinę jednym rekordem?`)) return
+      try {
+        for (const id of ids) await deleteInvitation(id)
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : String(e))
+        return
+      }
+      await submitConfirmed(households, { ignoreWarnings: true }, clearForm)
+      return
+    }
+    await submitConfirmed(
+      households,
+      action === 'confirmExisting' ? { confirmExisting: true, ignoreWarnings: false } : { ignoreWarnings: true },
+      clearForm,
+    )
+  }
+
+  const bulkParsed = parseHouseholdLines(bulkText)
+  const bulkValid = bulkParsed.filter((p) => !p.error)
+
+  async function handleBulkAdd() {
+    if (bulkValid.length === 0) return
+    const res = await submitConfirmed(bulkValid.map((p) => p.household), {}, false)
+    if (res && res.conflicts.length === 0) {
+      setBulkText('')
+      setBulkOpen(false)
+    }
+  }
+
+  function startHouseholdEdit(inv: InvitationItem) {
+    setEditingMailId(null)
+    setHouseholdEditId(inv.id)
+    setEditHousehold(householdFromItem(inv))
+    // Pierwsze potwierdzenie → domyślnie mail; edycja już potwierdzonego → bez maila.
+    setEditSendMail(statusOf(inv) !== 'CONFIRMED' && !!inv.email)
+  }
+
+  async function saveHousehold(inv: InvitationItem) {
+    const herr = householdDraftError(editHousehold)
+    if (herr) {
+      setError(herr)
+      return
+    }
+    setBusyId(inv.id)
+    setError(null)
+    setInfo(null)
+    try {
+      const wasConfirmed = statusOf(inv) === 'CONFIRMED'
+      const res = await confirmInvitationByAdmin(inv.id, householdToInput(editHousehold), editSendMail)
+      setItems((prev) => prev.map((x) => (x.id === inv.id ? res.item : x)))
+      setHouseholdEditId(null)
+      const who = `${inv.firstName} ${inv.lastName}`
+      if (res.mail === 'LOGGED') setError(`${wasConfirmed ? 'Zapisano skład' : 'Potwierdzono'}: ${who}, ale ${MAIL_OFF_HINT.charAt(0).toLowerCase()}${MAIL_OFF_HINT.slice(1)}`)
+      else if (res.mail === 'FAILED') setError(`${wasConfirmed ? 'Zapisano skład' : 'Potwierdzono'}: ${who}, ale mail się nie wysłał.`)
+      else setInfo(`${wasConfirmed ? 'Zapisano skład i diety' : 'Potwierdzono udział'}: ${who}.${res.mail === 'SENT' ? ` Mail z potwierdzeniem poszedł na ${inv.email}.` : ''}`)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  async function handleUnconfirm(inv: InvitationItem) {
+    const st = statusOf(inv)
+    const q =
+      st === 'DECLINED'
+        ? `Cofnąć odmowę: ${inv.firstName} ${inv.lastName}? Osoba wróci do „Czeka”.`
+        : `Cofnąć potwierdzenie: ${inv.firstName} ${inv.lastName}? Osoba wróci do „Czeka”, a jej zgłoszenie zostanie anulowane.`
+    if (!window.confirm(q)) return
+    setBusyId(inv.id)
+    setError(null)
+    try {
+      const updated = await unconfirmInvitation(inv.id)
+      setItems((prev) => prev.map((x) => (x.id === inv.id ? updated : x)))
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  async function handleDecline(inv: InvitationItem) {
+    if (!window.confirm(`Oznaczyć, że ${inv.firstName} ${inv.lastName} nie przyjdzie? Osoba zniknie z licznika posiłków.`)) return
+    setBusyId(inv.id)
+    setError(null)
+    try {
+      const updated = await declineInvitationByAdmin(inv.id)
+      setItems((prev) => prev.map((x) => (x.id === inv.id ? updated : x)))
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  async function handleDietReminders(count: number) {
+    if (!window.confirm(`Wysłać przypomnienie o wymaganiach żywieniowych do ${count} ${count === 1 ? 'osoby' : 'osób'}?`)) return
+    setBusyId('diet')
+    setError(null)
+    setInfo(null)
+    try {
+      const res = await sendDietReminders(instanceId)
+      if (res.logged > 0 && res.sent === 0) setError(MAIL_OFF_HINT)
+      else setInfo(`Przypomnienie wysłane: ${res.sent}${res.failed ? `, błędy: ${res.failed}` : ''}.`)
+      await load(true)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   async function handleCopy(inv: InvitationItem) {
     try {
       await navigator.clipboard.writeText(inviteLink(inv))
@@ -204,7 +522,7 @@ export default function InvitedGuestsSection({
     try {
       const res = await sendInvitation(inv.id)
       if (res.status === 'SENT') {
-        setInfo(`Zaproszenie wysłane na ${inv.email}.`)
+        setInfo(`${byAdmin(inv) ? 'Mail z potwierdzeniem' : 'Zaproszenie'} wysłane na ${inv.email}.`)
         await load()
       } else if (res.status === 'LOGGED') {
         setError(MAIL_OFF_HINT)
@@ -295,7 +613,7 @@ export default function InvitedGuestsSection({
       }
       const res = await sendInvitation(inv.id)
       if (res.status === 'SENT') {
-        setInfo(`Zapisano i wysłano zaproszenie na ${inv.email}.`)
+        setInfo(`Zapisano i wysłano ${byAdmin(inv) ? 'mail z potwierdzeniem' : 'zaproszenie'} na ${inv.email}.`)
         await load(true)
       } else if (res.status === 'LOGGED') setError(MAIL_OFF_HINT)
       else setError(`Treść zapisana, ale wysyłka na ${inv.email} nie powiodła się (status: ${res.status}).`)
@@ -322,7 +640,11 @@ export default function InvitedGuestsSection({
   }
 
   async function handleDelete(inv: InvitationItem) {
-    if (!window.confirm(`Usunąć zaproszenie dla: ${inv.firstName} ${inv.lastName}?`)) return
+    const q =
+      statusOf(inv) === 'CONFIRMED'
+        ? `Usunąć ${inv.firstName} ${inv.lastName} z listy gości? Potwierdzone zgłoszenie zostanie anulowane.`
+        : `Usunąć zaproszenie dla: ${inv.firstName} ${inv.lastName}?`
+    if (!window.confirm(q)) return
     setBusyId(inv.id)
     try {
       await deleteInvitation(inv.id)
@@ -334,10 +656,17 @@ export default function InvitedGuestsSection({
     }
   }
 
-  const confirmedItems = items.filter((i) => i.confirmedAt)
+  const confirmedItems = items.filter((i) => statusOf(i) === 'CONFIRMED')
   const confirmed = confirmedItems.length
-  const unsent = items.filter((i) => i.email && !i.sentAt).length
-  const notConfirmed = items.length - confirmed
+  const declinedCount = items.filter((i) => statusOf(i) === 'DECLINED').length
+  // „Wyślij niewysłane" — jak na serwerze: bez odmów i bez osób, które same potwierdziły.
+  const unsent = items.filter(
+    (i) => i.email && !i.sentAt && statusOf(i) !== 'DECLINED' && !(statusOf(i) === 'CONFIRMED' && !byAdmin(i)),
+  ).length
+  const notConfirmed = items.filter((i) => statusOf(i) === 'PENDING').length
+  // Potwierdzeni przez organizatora bez odpowiedzi o diecie — catering „nie wie".
+  const dietUnknown = confirmedItems.filter((i) => i.dietStatus === 'UNKNOWN')
+  const dietUnknownMailable = dietUnknown.filter((i) => i.email).length
   // Potwierdzeni, których jeszcze nie widać w module Zgłoszenia/Obecność (backfill nie klikany
   // albo synchronizacja przy potwierdzeniu akurat zawiodła).
   const unsynced = confirmedItems.filter((i) => !i.registrationId).length
@@ -366,12 +695,42 @@ export default function InvitedGuestsSection({
         <p className="text-sm font-semibold" style={{ color: 'var(--brand)' }}>
           Potwierdzeni: {adultsCount} dorosłych + {childrenCount} dzieci = {mealsCount} posiłków
         </p>
-        {notConfirmed > 0 && (
-          <p className="text-xs" style={{ color: 'var(--muted)' }}>
-            Jeszcze niepotwierdzeni: {notConfirmed}
-          </p>
-        )}
+        <div className="flex items-center gap-3 flex-wrap">
+          {notConfirmed > 0 && (
+            <p className="text-xs" style={{ color: 'var(--muted)' }}>
+              Jeszcze niepotwierdzeni: {notConfirmed}
+            </p>
+          )}
+          {declinedCount > 0 && (
+            <p className="text-xs" style={{ color: 'var(--muted)' }}>
+              Nie przyjdzie: {declinedCount}
+            </p>
+          )}
+        </div>
       </div>
+      )}
+
+      {isInvite && dietUnknown.length > 0 && (
+        <div
+          className="flex items-center justify-between gap-3 flex-wrap px-3 py-2 rounded-[10px]"
+          style={{ background: 'var(--warn-soft)', border: '1px solid var(--warn)' }}
+        >
+          <p className="flex items-center gap-1.5 text-xs font-medium" style={{ color: 'var(--warn)' }}>
+            <Utensils size={13} /> Diety nieznane: {dietUnknown.length}{' '}
+            {dietUnknown.length === 1 ? 'rodzina' : dietUnknown.length < 5 ? 'rodziny' : 'rodzin'} (potwierdzeni przez Ciebie, jeszcze bez odpowiedzi)
+          </p>
+          {dietUnknownMailable > 0 && (
+            <button
+              type="button"
+              onClick={() => { void handleDietReminders(dietUnknownMailable) }}
+              disabled={busyId === 'diet'}
+              className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-[8px]"
+              style={{ background: 'var(--surface)', color: 'var(--warn)', border: '1px solid var(--warn)', cursor: 'pointer' }}
+            >
+              <Bell size={13} /> {busyId === 'diet' ? 'Wysyłam…' : `Przypomnij o diecie (${dietUnknownMailable})`}
+            </button>
+          )}
+        </div>
       )}
 
       <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -460,7 +819,10 @@ export default function InvitedGuestsSection({
       ) : (
         <div className="flex flex-col gap-2">
           {items.map((inv) => {
-            const isConfirmed = !!inv.confirmedAt
+            const st = statusOf(inv)
+            const isConfirmed = st === 'CONFIRMED'
+            const isDeclined = st === 'DECLINED'
+            const admin = byAdmin(inv)
             return (
               <div
                 key={inv.id}
@@ -492,33 +854,73 @@ export default function InvitedGuestsSection({
                     style={
                       isConfirmed
                         ? { background: 'var(--ok-soft)', color: 'var(--ok)' }
-                        : { background: 'var(--surface)', color: 'var(--muted)', border: '1px solid var(--border)' }
+                        : isDeclined
+                          ? { background: 'var(--err-soft)', color: 'var(--err)' }
+                          : { background: 'var(--surface)', color: 'var(--muted)', border: '1px solid var(--border)' }
+                    }
+                    title={
+                      admin
+                        ? 'Dodany/potwierdzony przez organizatora — gość nie musiał nic klikać'
+                        : isDeclined && inv.declinedAt
+                          ? `Odmowa: ${new Date(inv.declinedAt).toLocaleString('pl-PL')}`
+                          : undefined
                     }
                   >
-                    {isConfirmed ? <Check size={12} /> : <Clock size={12} />}
-                    {isConfirmed ? (isInvite ? 'Potwierdził' : 'Zarejestrowany') : 'Czeka'}
+                    {isConfirmed ? admin ? <UserCheck size={12} /> : <Check size={12} /> : isDeclined ? <UserX size={12} /> : <Clock size={12} />}
+                    {isConfirmed
+                      ? isInvite
+                        ? admin
+                          ? 'Potwierdzony · organizator'
+                          : 'Potwierdził'
+                        : 'Zarejestrowany'
+                      : isDeclined
+                        ? 'Nie przyjdzie'
+                        : 'Czeka'}
                   </span>
                 </div>
 
-                {isConfirmed && (inv.spouseAttending || (inv.children?.length ?? 0) > 0 || inv.dietaryNotes || inv.spouseDietaryNotes) && (
+                {isConfirmed && (
                   <div className="flex flex-col gap-0.5">
                     {inv.spouseAttending && (
                       <p className="text-xs" style={{ color: 'var(--muted)' }}>
                         + małżonek: {[inv.spouseFirstName, inv.spouseLastName].filter(Boolean).join(' ') || '—'}
+                        {inv.spouseDietaryNotes ? ` · dieta: ${inv.spouseDietaryNotes}` : ''}
                       </p>
                     )}
                     {(inv.children?.length ?? 0) > 0 && (
                       <p className="text-xs" style={{ color: 'var(--muted)' }}>
-                        dzieci: {inv.children.length} ({inv.children.map((c) => `${c.firstName ? `${c.firstName} ` : ''}${c.age}`).join(', ')} lat)
+                        dzieci: {inv.children.length} (
+                        {inv.children
+                          .map((c) => `${c.firstName ? `${c.firstName} ` : ''}${c.age}${c.dietary ? ` — ${c.dietary}` : ''}`)
+                          .join(', ')}
+                        )
                       </p>
                     )}
                     {inv.dietaryNotes && (
-                      <p className="text-xs" style={{ color: 'var(--muted)' }}>dieta: {inv.dietaryNotes}</p>
+                      <p className="text-xs" style={{ color: 'var(--muted)' }}>dieta{isHousehold(inv) ? ` (${inv.firstName})` : ''}: {inv.dietaryNotes}</p>
                     )}
-                    {inv.spouseDietaryNotes && (
-                      <p className="text-xs" style={{ color: 'var(--muted)' }}>dieta małżonka: {inv.spouseDietaryNotes}</p>
+                    {isInvite && inv.dietStatus === 'UNKNOWN' && (
+                      <p className="self-start flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full mt-0.5" style={{ background: 'var(--warn-soft)', color: 'var(--warn)' }}>
+                        <Utensils size={11} /> dieta: czeka na odpowiedź
+                      </p>
+                    )}
+                    {isInvite && inv.dietStatus === 'NONE' && (
+                      <p className="self-start flex items-center gap-1 text-[11px] font-medium mt-0.5" style={{ color: 'var(--ok)' }}>
+                        <Utensils size={11} /> bez wymagań żywieniowych ✓
+                      </p>
+                    )}
+                    {admin && inv.guestRespondedAt && (
+                      <p className="text-[11px]" style={{ color: 'var(--faint)' }}>
+                        gość odpowiedział {new Date(inv.guestRespondedAt).toLocaleString('pl-PL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      </p>
                     )}
                   </div>
+                )}
+
+                {inv.adminNote && (
+                  <p className="flex items-center gap-1 text-[11px] italic" style={{ color: 'var(--muted)' }}>
+                    <StickyNote size={11} /> {inv.adminNote}
+                  </p>
                 )}
 
                 <p className="text-[11px] font-mono truncate" style={{ color: 'var(--faint)' }}>{inviteLink(inv)}</p>
@@ -576,7 +978,7 @@ export default function InvitedGuestsSection({
                     style={{ background: 'var(--surface)', color: 'var(--muted)', border: '1px solid var(--border)', cursor: 'pointer' }}
                     title={inv.sentAt ? `Ostatnia wysyłka: ${new Date(inv.sentAt).toLocaleString('pl-PL')}` : 'Mail jeszcze nie wysłany'}
                   >
-                    <Mail size={12} /> {inv.sentAt ? 'Wyślij ponownie' : 'Wyślij mail'}
+                    <Mail size={12} /> {admin ? (inv.sentAt ? 'Wyślij potwierdzenie ponownie' : 'Wyślij mail z potwierdzeniem') : inv.sentAt ? 'Wyślij ponownie' : 'Wyślij mail'}
                   </button>
                   <button
                     type="button"
@@ -587,6 +989,51 @@ export default function InvitedGuestsSection({
                   >
                     <PenLine size={12} /> Treść maila
                   </button>
+                  {isInvite && !inv.invitedByParticipant && !isConfirmed && (
+                    <button
+                      type="button"
+                      onClick={() => (householdEditId === inv.id ? setHouseholdEditId(null) : startHouseholdEdit(inv))}
+                      className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-[8px]"
+                      style={{ background: 'var(--ok-soft)', color: 'var(--ok)', border: '1px solid var(--ok)', cursor: 'pointer' }}
+                      title="Gość potwierdził poza linkiem (np. telefonicznie) — wpisz skład i potwierdź"
+                    >
+                      <UserCheck size={12} /> Potwierdź ręcznie
+                    </button>
+                  )}
+                  {isInvite && isConfirmed && (
+                    <button
+                      type="button"
+                      onClick={() => (householdEditId === inv.id ? setHouseholdEditId(null) : startHouseholdEdit(inv))}
+                      className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-[8px]"
+                      style={{ background: 'var(--surface)', color: 'var(--muted)', border: '1px solid var(--border)', cursor: 'pointer' }}
+                      title="Małżonek, dzieci, diety, notatka"
+                    >
+                      <ClipboardList size={12} /> Edytuj skład i diety
+                    </button>
+                  )}
+                  {isInvite && (isConfirmed || isDeclined) && (
+                    <button
+                      type="button"
+                      onClick={() => { void handleUnconfirm(inv) }}
+                      disabled={busyId === inv.id}
+                      className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-[8px]"
+                      style={{ background: 'var(--surface)', color: 'var(--muted)', border: '1px solid var(--border)', cursor: 'pointer' }}
+                    >
+                      <Undo2 size={12} /> {isDeclined ? 'Cofnij odmowę' : 'Cofnij potwierdzenie'}
+                    </button>
+                  )}
+                  {isInvite && !isDeclined && (
+                    <button
+                      type="button"
+                      onClick={() => { void handleDecline(inv) }}
+                      disabled={busyId === inv.id}
+                      className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-[8px]"
+                      style={{ background: 'var(--surface)', color: 'var(--muted)', border: '1px solid var(--border)', cursor: 'pointer' }}
+                      title="Gość dał znać, że nie przyjdzie"
+                    >
+                      <UserX size={12} /> Nie przyjdzie
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => { void handleDelete(inv) }}
@@ -621,6 +1068,36 @@ export default function InvitedGuestsSection({
                     </div>
                   </div>
                 )}
+
+                {householdEditId === inv.id && (
+                  <div className="flex flex-col gap-2.5 mt-1 px-3 py-3 rounded-[10px]" style={{ background: 'var(--surface-2)', border: '1px solid var(--ok)' }}>
+                    <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--faint)' }}>
+                      {isConfirmed ? 'Skład i diety' : 'Potwierdź ręcznie'} — {inv.firstName} {inv.lastName}
+                    </p>
+                    <HouseholdEditor value={editHousehold} onChange={setEditHousehold} mainLastName={inv.lastName} mainFirstName={inv.firstName} />
+                    {(!isConfirmed || admin) && (
+                      <label className="flex items-center gap-2 text-xs" style={{ color: inv.email ? 'var(--ink)' : 'var(--faint)' }}>
+                        <input type="checkbox" checked={editSendMail && !!inv.email} disabled={!inv.email} onChange={(e) => setEditSendMail(e.target.checked)} />
+                        {inv.email
+                          ? `Wyślij mail z potwierdzeniem i prośbą o dietę na ${inv.email}`
+                          : 'Brak e-maila — link przekażesz ręcznie (Kopiuj link / WhatsApp)'}
+                      </label>
+                    )}
+                    {isConfirmed && !admin && (
+                      <p className="text-[11px]" style={{ color: 'var(--faint)' }}>
+                        Ta osoba potwierdziła sama — zapiszesz korektę bez wysyłania maila.
+                      </p>
+                    )}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Button size="sm" onClick={() => { void saveHousehold(inv) }} disabled={busyId === inv.id}>
+                        <UserCheck size={14} /> {isConfirmed ? 'Zapisz' : 'Potwierdź udział'}
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setHouseholdEditId(null)}>
+                        Anuluj
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             )
           })}
@@ -631,12 +1108,47 @@ export default function InvitedGuestsSection({
         className="flex flex-col gap-2.5 px-3 py-3 rounded-[10px]"
         style={{ background: 'var(--surface-2)', border: '1px dashed var(--border)' }}
       >
-        <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--faint)' }}>
-          Dodaj gościa
-        </p>
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--faint)' }}>
+            Dodaj gościa
+          </p>
+          {isInvite && (
+            <div className="flex rounded-[10px] overflow-hidden p-0.5" style={{ background: 'var(--surface)' }} role="radiogroup" aria-label="Sposób dodania">
+              {([
+                ['invite', 'Zaproś (gość potwierdza)'],
+                ['confirmed', 'Dodaj jako potwierdzonego'],
+              ] as const).map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  role="radio"
+                  aria-checked={addMode === id}
+                  onClick={() => switchAddMode(id)}
+                  className="px-3 py-1.5 text-xs font-semibold rounded-[8px] transition-all duration-150"
+                  style={{
+                    background: addMode === id ? (id === 'confirmed' ? 'var(--ok-soft)' : 'var(--brand-soft)') : 'transparent',
+                    color: addMode === id ? (id === 'confirmed' ? 'var(--ok)' : 'var(--brand)') : 'var(--muted)',
+                    border: 'none',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {isInvite && addMode === 'confirmed' && (
+          <p className="text-[11px]" style={{ color: 'var(--muted)' }}>
+            Bez zaproszenia — osoba (albo cała rodzina jednym rekordem) od razu jest potwierdzona, liczy się do posiłków
+            i pojawia w Zgłoszeniach i Obecności. Dostaje mail „udział potwierdzony” z prośbą o dietę (opcjonalnie).
+          </p>
+        )}
+
         <div className="grid grid-cols-2 gap-2">
           <Input
-            placeholder="Imię"
+            placeholder={addMode === 'confirmed' && isInvite ? 'Imię (osoba z e-mailem)' : 'Imię'}
             value={draft.firstName}
             onChange={(e) => setDraft((d) => ({ ...d, firstName: e.target.value }))}
           />
@@ -656,6 +1168,37 @@ export default function InvitedGuestsSection({
             onChange={(e) => setDraft((d) => ({ ...d, phone: e.target.value }))}
           />
         </div>
+
+        {isInvite && addMode === 'confirmed' && (
+          <>
+            <HouseholdEditor value={household} onChange={setHousehold} mainLastName={draft.lastName.trim()} mainFirstName={draft.firstName.trim()} />
+            {hasSpouse(household) && (household.spouseFirstName.trim() || draft.firstName.trim()) && (
+              <button
+                type="button"
+                onClick={() => {
+                  // E-mail i telefon zostają w polach osoby głównej — zamieniamy tylko, kto nią jest.
+                  const main = { first: draft.firstName, last: draft.lastName }
+                  const sp = { first: household.spouseFirstName, last: household.spouseLastName.trim() || draft.lastName }
+                  setDraft((d) => ({ ...d, firstName: sp.first, lastName: sp.last }))
+                  setHousehold((h) => ({
+                    ...h,
+                    spouseFirstName: main.first,
+                    // To samo nazwisko → puste pole (domyślnie dziedziczy po osobie głównej).
+                    spouseLastName: main.last.trim() === sp.last.trim() ? '' : main.last,
+                    dietary: h.spouseDietary,
+                    spouseDietary: h.dietary,
+                  }))
+                }}
+                className="self-start flex items-center gap-1 text-[11px] font-semibold"
+                style={{ color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                title="Osoba główna to ta, do której należy e-mail i link"
+              >
+                <ArrowLeftRight size={12} /> Zamień osobę główną z małżonkiem
+              </button>
+            )}
+          </>
+        )}
+
         <button
           type="button"
           onClick={() => setShowDraftMail((v) => !v)}
@@ -672,24 +1215,128 @@ export default function InvitedGuestsSection({
             onPreview={() =>
               previewNewInvitation(instanceId, {
                 firstName: draft.firstName.trim(),
+                lastName: draft.lastName.trim(),
                 email: draft.email.trim(),
                 ...draftMail,
+                ...(isInvite && addMode === 'confirmed'
+                  ? { preconfirmed: true, household: householdToInput(household) }
+                  : {}),
               })
             }
           />
         )}
-        <p className="text-[11px]" style={{ color: 'var(--faint)' }}>
-          Po dodaniu zaproszenie z osobistym linkiem{register ? ' do rejestracji' : ''} idzie automatycznie
-          na e-mail. Telefon z numerem kierunkowym pozwala wysłać je jednym kliknięciem przez WhatsApp.
-        </p>
-        <div className="flex items-center gap-2 flex-wrap">
-          <Button onClick={() => { void handleAdd(true) }} size="sm" disabled={adding}>
-          <Plus size={14} /> {adding ? 'Dodaję…' : 'Dodaj i wyślij zaproszenie'}
-        </Button>
-          <Button onClick={() => { void handleAdd(false) }} size="sm" variant="outline" disabled={adding}>
-            Dodaj bez wysyłania
-          </Button>
-        </div>
+
+        {isInvite && addMode === 'confirmed' ? (
+          <>
+            <label className="flex items-center gap-2 text-xs" style={{ color: 'var(--ink)' }}>
+              <input type="checkbox" checked={sendConfirmMail} onChange={(e) => setSendConfirmMail(e.target.checked)} />
+              Wyślij mail z potwierdzeniem i prośbą o dietę
+              {!draft.email.trim() && sendConfirmMail && <span style={{ color: 'var(--faint)' }}>(bez e-maila — link przekażesz ręcznie)</span>}
+            </label>
+
+            {conflictState && (
+              <div className="flex flex-col gap-2 px-3 py-2.5 rounded-[10px]" style={{ background: 'var(--warn-soft)', border: '1px solid var(--warn)' }}>
+                <p className="text-xs font-semibold" style={{ color: 'var(--warn)' }}>
+                  {conflictState.households.length === 1
+                    ? 'Nie dodano — możliwy duplikat:'
+                    : `Nie dodano ${conflictState.households.length} rodzin — możliwe duplikaty:`}
+                </p>
+                <ul className="flex flex-col gap-1">
+                  {conflictState.conflicts.map((c, i) => (
+                    <li key={`${c.index}-${c.kind}-${i}`} className="text-xs" style={{ color: 'var(--ink)' }}>
+                      {conflictState.households.length > 1 && (
+                        <strong>{describeHousehold(conflictState.households[c.index])}: </strong>
+                      )}
+                      {conflictText(c)}
+                    </li>
+                  ))}
+                </ul>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {conflictState.conflicts.some((c) => c.kind === 'SAME_PERSON_PENDING') && (
+                    <Button size="sm" onClick={() => { void resolveConflicts('confirmExisting') }} disabled={adding}>
+                      <UserCheck size={14} /> Potwierdź istniejące zaproszenie
+                    </Button>
+                  )}
+                  {conflictState.conflicts.some((c) => c.kind === 'SPOUSE_ON_LIST' || c.kind === 'PERSON_IS_SPOUSE') &&
+                    !conflictState.conflicts.some((c) => c.blocking) && (
+                      <>
+                        <Button size="sm" onClick={() => { void resolveConflicts('replaceSpouseRecords') }} disabled={adding}>
+                          Usuń osobny rekord i dodaj rodzinę
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => { void resolveConflicts('ignoreWarnings') }} disabled={adding}>
+                          Dodaj mimo to
+                        </Button>
+                      </>
+                    )}
+                  <Button size="sm" variant="ghost" onClick={() => setConflictState(null)}>
+                    Anuluj
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button onClick={() => { void handleAddConfirmed() }} size="sm" disabled={adding}>
+                <UserCheck size={14} /> {adding ? 'Dodaję…' : 'Dodaj jako potwierdzonego'}
+              </Button>
+              <Button onClick={() => setBulkOpen((v) => !v)} size="sm" variant="outline">
+                <ClipboardList size={14} /> Wklej listę
+              </Button>
+            </div>
+
+            {bulkOpen && (
+              <div className="flex flex-col gap-2 px-3 py-3 rounded-[10px]" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+                <p className="text-xs" style={{ color: 'var(--muted)' }}>
+                  Jedna rodzina w wierszu: <code>Imię Nazwisko, e-mail, telefon, małżonek, dzieci</code> — puste kolumny wolno pominąć,
+                  dzieci rozdziel średnikiem (imię opcjonalne, liczba = wiek).
+                </p>
+                <textarea
+                  value={bulkText}
+                  onChange={(e) => setBulkText(e.target.value)}
+                  rows={5}
+                  placeholder={'Jan Kowalski, jan@example.com, +48600100200, Anna Kowalska, Ola 7; Staś 4\nEwa Nowak, ewa@example.com\nPiotr Lis,,, Maria'}
+                  className="w-full rounded-[12px] px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                  style={{ border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--ink)', resize: 'vertical' }}
+                />
+                {bulkParsed.length > 0 && (
+                  <ul className="flex flex-col gap-0.5 max-h-48 overflow-auto">
+                    {bulkParsed.map((p) => (
+                      <li key={p.line} className="text-[11px]" style={{ color: p.error ? 'var(--err)' : 'var(--muted)' }}>
+                        {p.line}. {p.error ? `${p.raw} — ${p.error}` : `${describeHousehold(p.household)}${p.household.email ? ` · ${p.household.email}` : ' · bez e-maila'}`}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Button size="sm" onClick={() => { void handleBulkAdd() }} disabled={adding || bulkValid.length === 0}>
+                    <UserCheck size={14} />{' '}
+                    {adding ? 'Dodaję…' : `Dodaj jako potwierdzone (${bulkValid.length})`}
+                  </Button>
+                  {bulkParsed.length > bulkValid.length && (
+                    <span className="text-[11px]" style={{ color: 'var(--err)' }}>
+                      Wiersze z błędem ({bulkParsed.length - bulkValid.length}) zostaną pominięte.
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <p className="text-[11px]" style={{ color: 'var(--faint)' }}>
+              Po dodaniu zaproszenie z osobistym linkiem{register ? ' do rejestracji' : ''} idzie automatycznie
+              na e-mail. Telefon z numerem kierunkowym pozwala wysłać je jednym kliknięciem przez WhatsApp.
+            </p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button onClick={() => { void handleAdd(true) }} size="sm" disabled={adding}>
+                <Plus size={14} /> {adding ? 'Dodaję…' : 'Dodaj i wyślij zaproszenie'}
+              </Button>
+              <Button onClick={() => { void handleAdd(false) }} size="sm" variant="outline" disabled={adding}>
+                Dodaj bez wysyłania
+              </Button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   )

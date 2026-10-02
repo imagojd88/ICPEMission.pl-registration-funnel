@@ -238,7 +238,11 @@ export default function GuestInvitePage() {
                         : { background: 'var(--surface)', color: 'var(--muted)', border: '1px solid var(--border)' }}
                     >
                       {confirmed ? <Check size={12} /> : <Clock size={12} />}
-                      {confirmed ? (register ? t('guest.status_registered') : t('guest.status_confirmed')) : t('guest.status_invited')}
+                      {confirmed
+                        ? (register ? t('guest.status_registered') : t('guest.status_confirmed'))
+                        : g.status === 'DECLINED'
+                          ? t('guest.status_declined')
+                          : t('guest.status_invited')}
                     </span>
                     {!confirmed && (
                       <button
