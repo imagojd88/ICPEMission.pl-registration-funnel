@@ -44,6 +44,11 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — panel kursanta (kurs online)
 
+### Publikacja stopniowa: jeden mail na paczkę materiałów (2026-10-03)
+- Pytanie usera: film + PDF ustawione na 12:00 — czy pójdzie jeden mail, czy dwa? **Stan sprawdzony testem:** przy TEJ SAMEJ godzinie już było dobrze — `releaseDue` grupuje wszystkie zaległe materiały kursu w jednym przebiegu → 1 mail na osobę z obiema pozycjami (także przy 3 równoległych wyzwalaczach i drugiej instancji API podczas deployu — chroni „zajęcie" `updateMany … releaseNotifiedAt: null`).
+- **Luka znaleziona i naprawiona:** materiały kilka minut od siebie (np. 12:00 i 12:05) dawały 2 maile. Teraz `course-release.service.ts`: jeśli w kursie kolejny materiał publikuje się w ciągu ≤ 10 min (`GROUP_WINDOW_MS`), mail czeka i wychodzi raz, z ostatnim materiałem paczki; limit opóźnienia 30 min (`MAX_HOLD_MS`) dla łańcuchów publikacji. Materiały i tak pojawiają się punktualnie (filtr przy odczycie) — opóźnia się tylko mail. Odległe godziny (12:00 i 18:00) → osobne maile bez opóźnień.
+- Testy (`batch`): ta sama godzina + 3 wyzwalacze + druga instancja → 1 mail/osobę ✓; 12:00 i 12:05 → 1 wspólny mail o 12:05 ✓; 12:00 i 18:00 → 2 maile ✓; łańcuch co 8 min → mail najpóźniej po 30 min ✓; poprzednie zestawy + smoke test DI ✓. Wymaga push + Manual Deploy `icpe-api` (bez zmian schematu).
+
 ### FIX deployu: brak NotificationsModule w CoursesModule (2026-09-29)
 - Render: `Nest can't resolve dependencies of the CourseReleaseService (PrismaService, ?)` — nowa usługa publikacji wstrzykuje `NotificationsService`, a `CoursesModule` nie importował `NotificationsModule` (CourseAccessModule ma go u siebie, ale nie re-eksportuje). Fix: `imports: [AuthModule, ContentModule, NotificationsModule]` w `api/src/courses/courses.module.ts`. Baza zdążyła się zsynchronizować (db push OK) — nic więcej do naprawy.
 - **Lekcja / nowa weryfikacja:** testy logiki tworzyły serwisy ręcznie, więc nie łapały błędów DI. Od teraz przed oddaniem backendu: **smoke test DI** — złożenie całego `AppModule` przez `NestFactory.create` z zaślepionym `PrismaService.onModuleInit` (bez bazy). Sprawdzone: z fixem przechodzi, bez fixa wywala dokładnie ten błąd.

@@ -5,10 +5,18 @@ import { courseUrl, pickText } from './course-utils';
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/** Materiały publikowane w odstępie do 10 min → jeden wspólny mail (wysłany z ostatnim z nich). */
+const GROUP_WINDOW_MS = 10 * 60 * 1000;
+/** Ale mail o materiale nie czeka dłużej niż 30 min (łańcuch publikacji co kilka minut). */
+const MAX_HOLD_MS = 30 * 60 * 1000;
+
 /**
  * Publikacja stopniowa („incremental publishing"): materiały z datą `publishAt` stają się widoczne
  * dla kursantów same w chwili publikacji (filtr przy odczycie — działa nawet, gdy serwer spał),
  * a ta usługa wysyła wtedy kursantom maila „Nowe materiały czekają na Ciebie".
+ *
+ * Grupowanie: materiały z tym samym czasem publikacji — zawsze jeden mail; odstęp do 10 min —
+ * też jeden mail (wysłany z ostatnim materiałem paczki, maks. 30 min opóźnienia).
  *
  * Wyzwalacze (idempotentne — `releaseNotifiedAt` zapobiega podwójnym mailom):
  *  - co minutę, gdy API działa,
@@ -56,7 +64,7 @@ export class CourseReleaseService implements OnModuleInit, OnModuleDestroy {
     const due = (await this.prisma.courseItem.findMany({
       where: { published: true, publishAt: { lte: now }, releaseNotifiedAt: null },
       orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
-    })) as Array<{ id: string; courseId: string; kind: string; title: unknown }>;
+    })) as Array<{ id: string; courseId: string; kind: string; title: unknown; publishAt: Date | null }>;
     const result = { courses: 0, items: 0, mails: 0 };
     if (!due.length) return result;
 
@@ -64,6 +72,22 @@ export class CourseReleaseService implements OnModuleInit, OnModuleDestroy {
     for (const it of due) byCourse.set(it.courseId, [...(byCourse.get(it.courseId) ?? []), it]);
 
     for (const [courseId, items] of byCourse) {
+      // Jeden mail na „paczkę": jeśli w tym kursie kolejny materiał publikuje się za chwilę
+      // (≤ GROUP_WINDOW), czekamy na niego i wysyłamy wspólny mail. Materiały i tak są już
+      // widoczne (filtr przy odczycie) — opóźnia się tylko mail, najwyżej o MAX_HOLD.
+      const oldest = Math.min(...items.map((i) => (i.publishAt ? new Date(i.publishAt).getTime() : now.getTime())));
+      if (now.getTime() - oldest < MAX_HOLD_MS) {
+        const soon = await this.prisma.courseItem.findFirst({
+          where: {
+            courseId,
+            published: true,
+            releaseNotifiedAt: null,
+            publishAt: { gt: now, lte: new Date(now.getTime() + GROUP_WINDOW_MS) },
+          },
+          select: { id: true },
+        });
+        if (soon) continue;
+      }
       // Najpierw „zajmujemy" pozycje — równoległy przebieg nie wyśle drugi raz.
       const claimed = await this.prisma.courseItem.updateMany({
         where: { id: { in: items.map((i) => i.id) }, releaseNotifiedAt: null },
