@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { resolveLang, saveLang, type Lang } from '../../lib/langPref'
 
 const LABELS: Record<string, string> = { pl: 'PL', en: 'EN', it: 'IT' }
 const ORDER = ['pl', 'en', 'it']
@@ -12,8 +13,8 @@ const ALWAYS = ['pl', 'en']
  * Pokazuje PL i EN zawsze (interfejs jest w nich w pełni przetłumaczony — gość anglojęzyczny
  * nie może zostać z polską stroną tylko dlatego, że w evencie zaznaczono sam PL), plus
  * ewentualne dodatkowe języki eventu (IT). Treść eventu bez tłumaczenia spada do PL.
- * Startowy język: wykrywany z przeglądarki (jeśli event go obsługuje),
- * w innym wypadku PL (gdy dostępny), inaczej pierwszy z listy.
+ * Startowy język: `resolveLang` (lib/langPref) — ?lang=, zapamiętany wybór gościa,
+ * potem język przeglądarki (PL → PL, IT → IT gdy event ma IT), w każdym innym wypadku EN.
  */
 export default function LanguageSwitch({ locales }: { locales?: string[] }) {
   const { i18n } = useTranslation()
@@ -23,29 +24,14 @@ export default function LanguageSwitch({ locales }: { locales?: string[] }) {
   const [current, setCurrent] = useState(i18n.language)
   const initialized = useRef(false)
 
-  // Wybiera język na podstawie ustawień przeglądarki, ograniczony do języków eventu.
-  function detectPreferred(available: string[]): string {
-    const navLangs =
-      typeof navigator !== 'undefined'
-        ? navigator.languages && navigator.languages.length
-          ? navigator.languages
-          : [navigator.language]
-        : []
-    for (const n of navLangs) {
-      const code = (n || '').toLowerCase().slice(0, 2)
-      if (available.includes(code)) return code
-    }
-    return available.includes('pl') ? 'pl' : available[0]
-  }
-
   useEffect(() => {
     // Czekamy na języki eventu (undefined = jeszcze się ładują) — inaczej wykrycie języka
     // przeglądarki odbyłoby się tylko wśród PL/EN i Włoch nie dostałby automatycznie IT.
     if (locales === undefined || langs.length === 0) return
-    // Pierwsze realne wczytanie (po dociągnięciu locales eventu) → wykryj język przeglądarki.
+    // Pierwsze realne wczytanie (po dociągnięciu locales eventu) → wybierz język gościa.
     if (!initialized.current) {
       initialized.current = true
-      const pref = detectPreferred(langs)
+      const pref = resolveLang(langs)
       if (pref && pref !== i18n.language) {
         void i18n.changeLanguage(pref)
         setCurrent(pref)
@@ -56,7 +42,7 @@ export default function LanguageSwitch({ locales }: { locales?: string[] }) {
     }
     // Później: jeśli aktywny język wypadł z listy (np. zmiana konfiguracji), dopasuj.
     if (!langs.includes(i18n.language)) {
-      const pref = detectPreferred(langs)
+      const pref = resolveLang(langs)
       void i18n.changeLanguage(pref)
       setCurrent(pref)
     }
@@ -66,6 +52,7 @@ export default function LanguageSwitch({ locales }: { locales?: string[] }) {
   if (langs.length <= 1) return null
 
   function pick(lng: string) {
+    saveLang(lng as Lang) // ręczny wybór wygrywa z językiem przeglądarki — także przy kolejnych wizytach
     void i18n.changeLanguage(lng)
     setCurrent(lng)
   }

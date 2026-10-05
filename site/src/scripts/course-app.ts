@@ -2,6 +2,8 @@
 // Widoki: loading → login | setpw (link z maila ?haslo=) | forgot → dashboard (filmy + PDF).
 // Treści z panelu admina wstawiamy WYŁĄCZNIE przez textContent (bez innerHTML).
 
+import { resolveLang, saveLang, getSavedLang } from './lang-pref';
+
 type Lang = 'pl' | 'en';
 type LangText = string | Record<string, string> | null | undefined;
 type View = 'loading' | 'login' | 'forgot' | 'setpw' | 'dashboard' | 'closed' | 'notfound' | 'list';
@@ -133,16 +135,17 @@ function init(root: HTMLElement) {
   };
 
   // ── Język ──
-  function setLang(l: Lang) {
+  /** `persist` = ręczny wybór gościa (zapamiętany na całej icpemission.pl, także w rejestracji). */
+  function setLang(l: Lang, persist = false) {
     lang = l;
+    if (persist) saveLang(l);
     root.setAttribute('data-lang', l);
     document.documentElement.lang = l;
-    store.set(LANG_KEY, l);
     if (course && current === 'dashboard') renderDashboard();
     renderHeader();
   }
   root.querySelectorAll<HTMLButtonElement>('[data-langbtn]').forEach((b) =>
-    b.addEventListener('click', () => setLang((b.dataset.langbtn as Lang) || 'pl')),
+    b.addEventListener('click', () => setLang((b.dataset.langbtn as Lang) || 'pl', true)),
   );
 
   // ── Widoki ──
@@ -560,8 +563,12 @@ function init(root: HTMLElement) {
 
   // ── Start ──
   async function start() {
-    const saved = store.get(LANG_KEY);
-    setLang(saved === 'en' ? 'en' : 'pl');
+    // Starszy, lokalny wybór z panelu formacji przenosimy do wspólnej pamięci języka.
+    const legacy = store.get(LANG_KEY);
+    if ((legacy === 'pl' || legacy === 'en') && !getSavedLang()) saveLang(legacy);
+    store.set(LANG_KEY, null);
+    // ?lang= → zapamiętany wybór → język przeglądarki (PL → PL, każdy inny → EN; IT tu jeszcze nie ma).
+    setLang(resolveLang(['pl', 'en']) === 'pl' ? 'pl' : 'en');
 
     if (!slug) {
       show('list');

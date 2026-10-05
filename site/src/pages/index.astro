@@ -25,6 +25,33 @@ if (!heroRotate) {
 
 <LandingLayout>
   <div data-lang="pl" id="site-root" style="background:#F4EEE3; color:#241E1A; min-height:100vh; font-family:'Bricolage Grotesque',sans-serif;">
+    <script is:inline>
+      // Język startowy — zanim wyrenderuje się treść (bez mignięcia PL). Reguła jak w
+      // src/scripts/lang-pref.ts: ?lang= → zapamiętany wybór (cookie icpe_lang, wspólne z rejestracją)
+      // → języki przeglądarki (pierwszy obsługiwany) → w każdym innym wypadku EN. Strona ma PL i EN.
+      (function () {
+        var av = ['pl', 'en'], r = document.getElementById('site-root');
+        var n = function (v) { var c = String(v || '').toLowerCase().slice(0, 2); return av.indexOf(c) > -1 ? c : null; };
+        var l = null;
+        try { l = n(new URLSearchParams(location.search).get('lang')); } catch (e) {}
+        // Zapis wyboru gościa: cookie na całą icpemission.pl (wspólne z rejestracja.icpemission.pl) + localStorage.
+        window.__icpeSaveLang = function (v) {
+          var d = /(^|\.)icpemission\.pl$/.test(location.hostname) ? '; domain=.icpemission.pl' : '';
+          try { document.cookie = 'icpe_lang=' + v + '; path=/; max-age=31536000; SameSite=Lax' + d; } catch (e) {}
+          try { localStorage.setItem('icpe_lang', v); } catch (e) {}
+        };
+        if (l) window.__icpeSaveLang(l);
+        if (!l) { try { var m = document.cookie.match(/(?:^|;\s*)icpe_lang=([a-z]{2})/); l = n(m && m[1]); } catch (e) {} }
+        if (!l) { try { l = n(localStorage.getItem('icpe_lang')); } catch (e) {} }
+        if (!l) {
+          var list = (navigator.languages && navigator.languages.length) ? navigator.languages : [navigator.language];
+          for (var i = 0; i < list.length && !l; i++) l = n(list[i]);
+        }
+        l = l || 'en';
+        r.setAttribute('data-lang', l);
+        document.documentElement.setAttribute('lang', l);
+      })();
+    </script>
     <div style="max-width:1320px; margin:0 auto; background:#F4EEE3; overflow:hidden;">
 
       <!-- NAV -->
@@ -396,6 +423,8 @@ if (!heroRotate) {
       if (root && lng) {
         root.setAttribute('data-lang', lng);
         document.documentElement.setAttribute('lang', lng);
+        // Ręczny wybór zapamiętany (także dla rejestracji i formacji).
+        if (window.__icpeSaveLang) window.__icpeSaveLang(lng);
       }
     });
   });

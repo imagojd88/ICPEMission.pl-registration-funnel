@@ -289,6 +289,17 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — moduł rejestracji
 
+### Wspólne rozpoznawanie języka gościa: PL → PL, IT → IT, każdy inny → EN (2026-10-06)
+- **Decyzja (Jacek):** przy każdym języku przeglądarki innym niż polski i włoski domyślny ma być angielski (wcześniej fallback był PL); automatyczny język także na stronie głównej i w formacji online.
+- **Reguła** (`app/src/lib/langPref.ts`, kopia `site/src/scripts/lang-pref.ts`, wersja inline w `site/src/pages/index.astro` — zmieniać wszystkie trzy): `?lang=xx` (zapisywane) → zapamiętany ręczny wybór → pierwszy obsługiwany język z `navigator.languages` → EN. Przykłady: `de` → EN, `it` → IT tylko gdzie jest wersja włoska (event z IT), inaczej EN; `de, pl` → PL; `en-US, pl` → EN.
+- **Pamięć wyboru:** cookie `icpe_lang` na `.icpemission.pl` (wspólne dla icpemission.pl i rejestracja.icpemission.pl, 1 rok) + localStorage. Ręczne kliknięcie PL/EN/IT gdziekolwiek obowiązuje też na pozostałych stronach. Wybór niedostępny na danej stronie (np. IT na stronie głównej) → reguła przeglądarki.
+- **Rejestracja (app):** `i18n.ts` startuje od razu z `resolveLang(['pl','en'])` (bez mignięcia PL; dotyczy też `/` — PublicHome); `LanguageSwitch` po wczytaniu języków eventu → `resolveLang(langs)`, klik → `saveLang`. Panel admina nie używa i18n — bez zmian.
+- **Strona główna:** skrypt inline zaraz po `#site-root` ustawia `data-lang` przed renderem treści (bez mignięcia), `window.__icpeSaveLang` zapisuje klik PL/EN.
+- **Formacja (`course-app.ts`):** start z `resolveLang(['pl','en'])`; stary klucz `icpe_course_lang` przeniesiony do wspólnej pamięci i usunięty; `setLang(l, persist)` — zapis tylko przy kliknięciu.
+- **Strona główna i formacja nie mają wersji IT** → Włoch widzi EN. Wersja IT wymagałaby przetłumaczenia całej treści strony (+ pola CMS).
+- Testy: tsc app ✓, vite build ✓, astro check 0 błędów ✓, astro build ✓; Chromium z podmienionym `navigator.languages`: strona główna i formacja (pl/de/it/es/„de,pl"/„en-US,pl") ✓, zaproszenie (event PL-only i z IT; pl/de/it/ko) ✓, ręczny wybór PL na stronie głównej → zaproszenie po PL → przełączenie na EN w zaproszeniu → strona główna i formacja EN ✓, `?lang=en` ✓.
+- Wdrożenie: push → auto-deploy `icpe-frontend` i `icpe-site`; backend bez zmian.
+
 ### Wersje językowe treści eventu w edytorze: zawsze PL+EN, miejsce i imiona gości tłumaczalne (2026-10-05)
 - **Zgłoszenie (Jacek, zrzut zaproszenia EN):** interfejs strony był po angielsku, ale program, opis gości i miejsce zostawały po polsku. **Przyczyna:** strony publiczne zawsze oferują PL i EN (`LanguageSwitch.ALWAYS`), a edytor pokazywał zakładki „Język treści” tylko gdy w „Języki strony” zaznaczono >1 język — przy evencie z samym PL nie było gdzie wpisać EN. Miejsce i imiona gości były w ogóle jednojęzyczne.
 - **Edytor (`EventEditForm.tsx`):** zakładki PL / EN zawsze (+ IT, gdy zaznaczony); PL i EN w „Języki strony” na stałe zaznaczone (zapisywane w `locales`). Pasek języka: licznik brakujących tłumaczeń na zakładce + lista „Do przetłumaczenia: …” (nazwa, opis, nadtytuł, program, opis gości, pokoje). W zakładce EN/IT puste pole pokazuje polski oryginał jako podpowiedź (`PL: …`). Nadtytuł w EN/IT = zwykłe pole tekstowe (gotowe nadtytuły są po polsku).
