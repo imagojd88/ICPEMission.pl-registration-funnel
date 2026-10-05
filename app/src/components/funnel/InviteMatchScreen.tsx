@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Calendar, MapPin, Check, Lock, Trash2 } from 'lucide-react'
 import type { EventInstanceDto } from '@icpe/shared'
 import { Input } from '../ui/Input'
-import { matchInvite, pickLang, type EventContent, type ChildEntry } from '../../lib/api'
+import { matchInvite, pickLang, eventLocation, type EventContent, type ChildEntry } from '../../lib/api'
 import { formatDateRange } from '../../lib/utils'
 import EventContentBlocks from './EventContentBlocks'
 
@@ -129,7 +129,7 @@ export default function InviteMatchScreen({ event, slug, content }: { event: Eve
         </div>
         {event.location && (
           <div className="flex items-center gap-2.5 text-sm" style={{ color: 'var(--ink)' }}>
-            <MapPin size={16} style={{ color: 'var(--brand)' }} /> {event.location}
+            <MapPin size={16} style={{ color: 'var(--brand)' }} /> {eventLocation(event.location, content, i18n.language)}
           </div>
         )}
       </div>

@@ -7,12 +7,13 @@ export default function EventContentBlocks({ content }: { content?: EventContent
   const program = content?.program ?? []
   const guest = content?.specialGuest
   const bio = pickLang(guest?.bio, i18n.language)
+  const guestName = pickLang(guest?.name, i18n.language)
 
-  if (!guest?.name && program.length === 0) return null
+  if (!guestName && program.length === 0) return null
 
   return (
     <div className="flex flex-col gap-4">
-      {guest?.name && (
+      {guest && guestName && (
         <div
           className={`flex gap-3 rounded-[15px] p-3 ${bio ? 'items-start' : 'items-center'}`}
           style={{ border: '1px solid var(--border)', background: 'var(--surface)' }}
@@ -26,7 +27,7 @@ export default function EventContentBlocks({ content }: { content?: EventContent
             <p className="text-xs uppercase tracking-wider" style={{ color: 'var(--faint)' }}>
               {t(guest.plural ? 'content.special_guests' : 'content.special_guest')}
             </p>
-            <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>{guest.name}</p>
+            <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>{guestName}</p>
             {bio && (
               <p className="text-sm leading-relaxed mt-1 whitespace-pre-line" style={{ color: 'var(--muted)' }}>{bio}</p>
             )}

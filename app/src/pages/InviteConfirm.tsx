@@ -7,6 +7,7 @@ import {
   confirmInvitation,
   declineInvitation,
   pickLang,
+  eventLocation,
   type InvitationView,
   type ChildEntry,
 } from '../lib/api'
@@ -603,7 +604,7 @@ export default function InviteConfirm() {
           </div>
           {inv.event.location && (
             <div className="flex items-center gap-2.5 text-sm" style={{ color: 'var(--ink)' }}>
-              <MapPin size={16} style={{ color: 'var(--brand)' }} /> {inv.event.location}
+              <MapPin size={16} style={{ color: 'var(--brand)' }} /> {eventLocation(inv.event.location, inv.event.customFields, i18n.language)}
             </div>
           )}
         </div>

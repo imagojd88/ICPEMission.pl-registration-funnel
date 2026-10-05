@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Calendar, MapPin, Clock, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { EventInstanceDto, PricingConfig } from '@icpe/shared'
-import { pickLang, type EventContent } from '../../lib/api'
+import { pickLang, eventLocation, type EventContent } from '../../lib/api'
 import { formatDateRange } from '../../lib/utils'
 
 interface Props {
@@ -143,7 +143,7 @@ export default function LandingScreen({ event, onRegister, pricingConfig, conten
           icon={Calendar}
           title={`${formatDateRange(event.startsAt, event.endsAt, lng)}${nights > 0 ? ` · ${t('landing.nights', { count: nights })}` : ''}`}
         />
-        <MetaRow icon={MapPin} title={event.location || t('landing.place_name')} />
+        <MetaRow icon={MapPin} title={eventLocation(event.location, content, lng) || t('landing.place_name')} />
       </div>
 
       {/* Description — opis eventu z bazy (gdy ustawiony) */}
@@ -233,7 +233,7 @@ export default function LandingScreen({ event, onRegister, pricingConfig, conten
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between px-5 py-3" style={{ borderBottom: '1px solid var(--border)' }}>
-              <p className="font-bold text-sm" style={{ color: 'var(--ink)' }}>Program</p>
+              <p className="font-bold text-sm" style={{ color: 'var(--ink)' }}>{t('content.program')}</p>
               <button
                 onClick={() => setShowProgram(false)}
                 className="p-1.5 rounded-[8px]"

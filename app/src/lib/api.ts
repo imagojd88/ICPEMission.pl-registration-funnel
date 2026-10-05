@@ -833,13 +833,42 @@ export type LangText = string | Record<string, string>
 export function pickLang(value: LangText | undefined | null, lng: string): string {
   if (value == null) return ''
   if (typeof value === 'string') return value
-  return value[lng] ?? value.pl ?? value.en ?? value.it ?? Object.values(value)[0] ?? ''
+  // Puste wersje traktujemy jak brak tłumaczenia (spadamy do kolejnego języka).
+  const has = (v: unknown): v is string => typeof v === 'string' && v.trim() !== ''
+  for (const k of [lng, 'pl', 'en', 'it']) if (has(value[k])) return value[k]
+  return Object.values(value).find(has) ?? ''
+}
+
+/**
+ * Tłumaczenia miejsca wydarzenia. Kanoniczne miejsce (PL) siedzi w `EventInstance.location`
+ * (z niego korzystają kalendarz .ics i maile); tu trzymamy wersje językowe razem z kopią PL,
+ * z której je zrobiono (`pl`). Gdy ktoś później zmieni miejsce po polsku, a tłumaczenia nie
+ * poprawi — stare tłumaczenie przestaje pasować i strona pokazuje aktualne miejsce po polsku,
+ * zamiast nieaktualnego adresu w innym języku.
+ */
+export type LocationI18n = { pl?: string; en?: string; it?: string }
+
+/** Miejsce wydarzenia w języku `lng` (fallback: kanoniczne miejsce PL). */
+export function eventLocation(
+  location: string | null | undefined,
+  content: EventContent | null | undefined,
+  lng: string,
+): string {
+  const base = (location ?? '').trim()
+  if (!base) return ''
+  const m = content?.locationI18n
+  if (!m || lng === 'pl') return base
+  const tr = (m as Record<string, string | undefined>)[lng]?.trim()
+  return tr && (m.pl ?? '').trim() === base ? tr : base
 }
 
 export interface EventContent {
   program?: { time: string; item: LangText }[]
+  /** Wersje językowe miejsca — patrz `LocationI18n`. */
+  locationI18n?: LocationI18n | null
   specialGuest?: {
-    name?: string
+    /** Imiona — string (starsze eventy) albo mapa językowa („Anna i Mario" / „Anna and Mario"). */
+    name?: LangText
     photoUrl?: string
     /** true → etykieta „Goście specjalni" (np. małżeństwo, duet prowadzących). */
     plural?: boolean

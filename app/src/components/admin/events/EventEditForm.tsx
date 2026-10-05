@@ -89,6 +89,10 @@ export default function EventEditForm({
   const [dateEnd, setDateEnd] = useState('')
   const [nights, setNights] = useState('1')
   const [location, setLocation] = useState('')
+  // Tłumaczenia miejsca (EN/IT). PL = `location` (kanoniczne — kalendarz, maile, mapa).
+  const [locI18n, setLocI18n] = useState<Record<string, string>>({})
+  // Wersja PL, z której zrobiono tłumaczenia miejsca — gdy PL się zmieni, ostrzegamy.
+  const [locTrSrc, setLocTrSrc] = useState('')
   const [capacity, setCapacity] = useState('')
   const [payOnline, setPayOnline] = useState(false)
   const [payTransfer, setPayTransfer] = useState(false)
@@ -115,7 +119,8 @@ export default function EventEditForm({
   // Ręcznie wybrana opcja „Inny…" — trzyma otwarte pole tekstowe, gdy jest jeszcze puste.
   const [superCustom, setSuperCustom] = useState(false)
   const [program, setProgram] = useState<{ id: string; time: string; item: Record<string, string> }[]>([])
-  const [specialGuestName, setSpecialGuestName] = useState('')
+  // Imiona gości per język („Anna i Mario" → „Anna and Mario"); pusty EN = jak PL.
+  const [guestNameMap, setGuestNameMap] = useState<Record<string, string>>({})
   const [specialGuestPhoto, setSpecialGuestPhoto] = useState('')
   // Kilka osób (np. małżeństwo) → etykieta „Goście specjalni" zamiast „Gość specjalny".
   const [specialGuestPlural, setSpecialGuestPlural] = useState(false)
@@ -166,16 +171,17 @@ export default function EventEditForm({
       setError(e instanceof Error ? e.message : String(e))
     }
   }
-  const [langPL, setLangPL] = useState(true)
-  const [langEN, setLangEN] = useState(false)
   const [langIT, setLangIT] = useState(false)
 
-  // Języki aktywne dla eventu (do zakładek edycji treści).
-  const activeLocales = [langPL && 'pl', langEN && 'en', langIT && 'it'].filter(Boolean) as string[]
+  // Zakładki języka treści. PL i EN są zawsze — strony publiczne (zapisy, zaproszenia)
+  // zawsze oferują gościom PL i EN (LanguageSwitch.ALWAYS), więc wersję EN trzeba móc wpisać
+  // niezależnie od ustawień. IT — gdy zaznaczony w „Języki strony".
+  const activeLocales = ['pl', 'en', ...(langIT ? ['it'] : [])]
+  const multi = activeLocales.length > 1
   useEffect(() => {
-    if (activeLocales.length > 0 && !activeLocales.includes(editLang)) setEditLang(activeLocales[0])
+    if (!activeLocales.includes(editLang)) setEditLang('pl')
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [langPL, langEN, langIT])
+  }, [langIT])
 
   /** Nadtytuł w aktualnie edytowanym języku. */
   const superTitle = superMap[editLang] ?? ''
@@ -183,6 +189,28 @@ export default function EventEditForm({
   useEffect(() => { setSuperCustom(false) }, [editLang])
 
   const LANG_LABEL: Record<string, string> = { pl: 'PL', en: 'EN', it: 'IT' }
+  const LANG_NAME: Record<string, string> = { pl: 'polsku', en: 'angielsku', it: 'włosku' }
+  /** Placeholder w zakładce obcego języka: pokazuje polski oryginał do przetłumaczenia. */
+  const srcPh = (pl: string | undefined, fallback: string) =>
+    editLang !== 'pl' && pl?.trim() ? `PL: ${pl.trim()}` : fallback
+  const hasLocTr = Object.values(locI18n).some((v) => v?.trim())
+  const locStale = hasLocTr && locTrSrc !== location.trim()
+  /** Czego brakuje w danym języku (pola wypełnione po polsku, puste w `l`). */
+  const missingIn = (l: string): string[] => {
+    if (l === 'pl') return []
+    const miss = (m: Record<string, string> | undefined) => !!m?.pl?.trim() && !m?.[l]?.trim()
+    const out: string[] = []
+    if (miss(nameMap)) out.push('nazwa')
+    if (miss(descMap)) out.push('opis')
+    if (miss(superMap)) out.push('nadtytuł')
+    const p = program.filter((r) => miss(r.item)).length
+    if (p) out.push(`program (${p})`)
+    if (miss(guestBioMap)) out.push('opis gości')
+    const rm = isFree ? 0 : rooms.filter((r) => miss(r.name)).length
+    if (rm) out.push(`pokoje (${rm})`)
+    if (locStale && locI18n[l]?.trim()) out.push('miejsce (sprawdź)')
+    return out
+  }
   const cleanMap = (m: Record<string, string>): Record<string, string> =>
     Object.fromEntries(Object.entries(m).map(([k, v]) => [k, (v ?? '').trim()]).filter(([, v]) => v))
 
@@ -200,6 +228,13 @@ export default function EventEditForm({
         setDateEnd(cfg.endsAt ? cfg.endsAt.slice(0, 10) : '')
         setNights(String(cfg.nights ?? 1))
         setLocation(cfg.location ?? '')
+        {
+          // Tłumaczenie miejsca bierzemy tylko, jeśli powstało z obecnej wersji PL.
+          const li = cfg.customFields?.locationI18n
+          const fresh = li && (li.pl ?? '').trim() === (cfg.location ?? '').trim()
+          setLocI18n(fresh ? { en: li.en ?? '', it: li.it ?? '' } : {})
+          setLocTrSrc((cfg.location ?? '').trim())
+        }
         setCapacity(cfg.capacity != null ? String(cfg.capacity) : '')
         const pm = cfg.paymentMethods ?? []
         setPayOnline(pm.includes('ONLINE'))
@@ -251,7 +286,8 @@ export default function EventEditForm({
             item: typeof p.item === 'string' ? (p.item ? { pl: p.item } : {}) : (p.item ?? {}),
           })),
         )
-        setSpecialGuestName(cfg.customFields?.specialGuest?.name ?? '')
+        const gn = cfg.customFields?.specialGuest?.name
+        setGuestNameMap(typeof gn === 'string' ? (gn ? { pl: gn } : {}) : (gn ?? {}))
         setSpecialGuestPhoto(cfg.customFields?.specialGuest?.photoUrl ?? '')
         setSpecialGuestPlural(!!cfg.customFields?.specialGuest?.plural)
         const gb = cfg.customFields?.specialGuest?.bio
@@ -259,8 +295,7 @@ export default function EventEditForm({
         setGuestInvitesEnabled(cfg.customFields?.guestInvites?.enabled === true)
         setGuestInvitesMax(String(cfg.customFields?.guestInvites?.maxPerInviter ?? 2))
         const loc = cfg.locales ?? ['pl']
-        setLangPL(loc.includes('pl'))
-        setLangEN(loc.includes('en'))
+        // PL i EN zawsze aktywne (patrz activeLocales); IT według ustawień.
         setLangIT(loc.includes('it'))
       })
       .catch((e: unknown) => { if (!cancelled) setError(e instanceof Error ? e.message : String(e)) })
@@ -342,11 +377,14 @@ export default function EventEditForm({
         pricingConfig: buildPricing(),
       })
 
-      const locales: string[] = []
-      if (langPL) locales.push('pl')
-      if (langEN) locales.push('en')
-      if (langIT) locales.push('it')
-      if (locales.length === 0) locales.push('pl')
+      const locales = [...activeLocales]
+      const guestNameClean = cleanMap(guestNameMap)
+      const locTr = cleanMap({ en: locI18n.en ?? '', it: locI18n.it ?? '' })
+      // `pl` = wersja, z której zrobiono tłumaczenie. Niepotwierdzone po zmianie PL → strona
+      // pokaże aktualne miejsce po polsku (eventLocation porównuje `pl` z location).
+      const locationI18n = location.trim() && Object.keys(locTr).length
+        ? { pl: locTrSrc || location.trim(), ...locTr }
+        : null
       const theme: Record<string, unknown> = { primaryColor }
       if (heroImageUrl) theme.heroImageUrl = heroImageUrl
       if (titleColor) theme.titleColor = titleColor
@@ -362,10 +400,11 @@ export default function EventEditForm({
           program: program
             .filter((r) => r.time.trim() || Object.keys(cleanMap(r.item)).length)
             .map((r) => ({ time: r.time.trim(), item: cleanMap(r.item) })),
+          locationI18n,
           specialGuest:
-            specialGuestName.trim() || specialGuestPhoto
+            Object.keys(guestNameClean).length || specialGuestPhoto
               ? {
-                  name: specialGuestName.trim(),
+                  name: guestNameClean,
                   photoUrl: specialGuestPhoto,
                   plural: specialGuestPlural,
                   bio: cleanMap(guestBioMap),
@@ -412,44 +451,67 @@ export default function EventEditForm({
         </div>
       )}
 
-      {activeLocales.length > 1 && (
-        <div
-          className="flex items-center gap-2 rounded-[12px] px-3 py-2 sticky top-2 z-10"
-          style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}
-        >
-          <span className="text-xs font-semibold uppercase tracking-wider mr-1" style={{ color: 'var(--faint)' }}>Język treści</span>
-          {activeLocales.map((l) => {
-            const active = editLang === l
-            return (
-              <button
-                key={l}
-                onClick={() => setEditLang(l)}
-                className="text-xs font-semibold rounded-full px-3 py-1.5 transition-colors"
-                style={{
-                  background: active ? 'var(--brand)' : 'transparent',
-                  color: active ? '#fff' : 'var(--muted)',
-                  border: `1px solid ${active ? 'var(--brand)' : 'var(--border)'}`,
-                  cursor: 'pointer',
-                }}
-              >
-                {LANG_LABEL[l]}
-              </button>
-            )
-          })}
-          <span className="text-xs ml-auto" style={{ color: 'var(--faint)' }}>edytujesz: {LANG_LABEL[editLang]}</span>
-        </div>
-      )}
+      {multi && (() => {
+        const missingHere = missingIn(editLang)
+        return (
+          <div
+            className="flex flex-col gap-1.5 rounded-[12px] px-3 py-2 sticky top-2 z-10"
+            style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}
+          >
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-semibold uppercase tracking-wider mr-1" style={{ color: 'var(--faint)' }}>Język treści</span>
+              {activeLocales.map((l) => {
+                const active = editLang === l
+                const missing = missingIn(l).length
+                return (
+                  <button
+                    key={l}
+                    type="button"
+                    onClick={() => setEditLang(l)}
+                    title={missing ? `Brakuje tłumaczeń: ${missingIn(l).join(', ')}` : undefined}
+                    className="flex items-center gap-1.5 text-xs font-semibold rounded-full px-3 py-1.5 transition-colors"
+                    style={{
+                      background: active ? 'var(--brand)' : 'transparent',
+                      color: active ? '#fff' : 'var(--muted)',
+                      border: `1px solid ${active ? 'var(--brand)' : 'var(--border)'}`,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {LANG_LABEL[l]}
+                    {missing > 0 && (
+                      <span
+                        className="rounded-full px-1.5 text-[10px] leading-4"
+                        style={{ background: 'var(--warn-soft)', color: 'var(--warn)' }}
+                      >
+                        {missing}
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
+              <span className="text-xs ml-auto" style={{ color: 'var(--faint)' }}>edytujesz: {LANG_LABEL[editLang]}</span>
+            </div>
+            <p className="text-xs" style={{ color: editLang !== 'pl' && missingHere.length ? 'var(--warn)' : 'var(--faint)' }}>
+              {editLang === 'pl'
+                ? 'Wersja podstawowa. Po wpisaniu treści przełącz na EN i przetłumacz — goście wybierają język na stronie.'
+                : missingHere.length
+                  ? `Do przetłumaczenia: ${missingHere.join(', ')}. Puste pola goście zobaczą po polsku; polski oryginał widać w podpowiedzi pola.`
+                  : `Wszystko przetłumaczone na ${LANG_NAME[editLang]}. Pola, których nie wypełnisz (np. imiona), pokażą się jak po polsku.`}
+            </p>
+          </div>
+        )
+      })()}
 
       <Section title="Szczegóły">
-        <Field label={`Nazwa eventu${activeLocales.length > 1 ? ` (${LANG_LABEL[editLang]})` : ''}`}>
-          <Input value={nameMap[editLang] ?? ''} onChange={(e) => setNameMap((m) => ({ ...m, [editLang]: e.target.value }))} placeholder="np. Dzień Formacji Wspólnoty" />
+        <Field label={`Nazwa eventu${multi ? ` (${LANG_LABEL[editLang]})` : ''}`}>
+          <Input value={nameMap[editLang] ?? ''} onChange={(e) => setNameMap((m) => ({ ...m, [editLang]: e.target.value }))} placeholder={srcPh(nameMap.pl, 'np. Dzień Formacji Wspólnoty')} />
         </Field>
-        <Field label={`Opis (pokazywany na stronie zapisów)${activeLocales.length > 1 ? ` — ${LANG_LABEL[editLang]}` : ''}`}>
+        <Field label={`Opis (pokazywany na stronie zapisów)${multi ? ` — ${LANG_LABEL[editLang]}` : ''}`}>
           <textarea
             value={descMap[editLang] ?? ''}
             onChange={(e) => setDescMap((m) => ({ ...m, [editLang]: e.target.value }))}
             rows={4}
-            placeholder="Krótki opis wydarzenia — np. zaproszenie, program, miejsce…"
+            placeholder={srcPh(descMap.pl, 'Krótki opis wydarzenia — np. zaproszenie, program, miejsce…')}
             className={inputCls}
             style={{ ...inputStyle, resize: 'vertical' }}
           />
@@ -470,7 +532,36 @@ export default function EventEditForm({
             <Input value={capacity} onChange={(e) => setCapacity(e.target.value)} inputMode="numeric" placeholder="—" />
           </Field>
         </div>
-        <Field label="Lokalizacja">
+        <Field label={`Lokalizacja${multi ? ` — ${LANG_LABEL[editLang]}` : ''}`}>
+          {editLang !== 'pl' ? (
+            <div className="flex flex-col gap-1.5">
+              <Input
+                value={locI18n[editLang] ?? ''}
+                onChange={(e) => {
+                  setLocI18n((m) => ({ ...m, [editLang]: e.target.value }))
+                  setLocTrSrc(location.trim())
+                }}
+                placeholder={srcPh(location, 'np. Education and Formation Centre, ul. …, city')}
+              />
+              {locStale ? (
+                <div className="flex items-center gap-2 flex-wrap text-xs" style={{ color: 'var(--warn)' }}>
+                  <span>Miejsce po polsku zmieniło się po przetłumaczeniu — sprawdź tę wersję.</span>
+                  <button
+                    type="button"
+                    onClick={() => setLocTrSrc(location.trim())}
+                    className="underline"
+                    style={{ color: 'var(--warn)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                  >
+                    Tłumaczenie jest aktualne
+                  </button>
+                </div>
+              ) : (
+                <p className="text-xs" style={{ color: 'var(--faint)' }}>
+                  Puste = goście zobaczą adres po polsku. Kalendarz (.ics) i maile używają wersji PL.
+                </p>
+              )}
+            </div>
+          ) : (
           <div className="flex flex-col gap-2">
             <Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Centrum…, ul. …, miasto" />
             <div className="flex items-center gap-2 flex-wrap">
@@ -492,6 +583,7 @@ export default function EventEditForm({
               </Button>
             </div>
           </div>
+          )}
         </Field>
       </Section>
 
@@ -536,7 +628,7 @@ export default function EventEditForm({
           <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--faint)' }}>Pokoje</span>
           {rooms.map((r) => (
             <div key={r.id} className="flex items-center gap-2">
-              <Input value={r.name[editLang] ?? ''} onChange={(e) => setRooms((p) => p.map((x) => x.id === r.id ? { ...x, name: { ...x.name, [editLang]: e.target.value } } : x))} placeholder={activeLocales.length > 1 ? `Nazwa (${LANG_LABEL[editLang]})` : 'Nazwa'} />
+              <Input value={r.name[editLang] ?? ''} onChange={(e) => setRooms((p) => p.map((x) => x.id === r.id ? { ...x, name: { ...x.name, [editLang]: e.target.value } } : x))} placeholder={srcPh(r.name.pl, multi ? `Nazwa (${LANG_LABEL[editLang]})` : 'Nazwa')} />
               <input value={r.capacity} onChange={(e) => setRooms((p) => p.map((x) => x.id === r.id ? { ...x, capacity: e.target.value } : x))} placeholder="os." inputMode="numeric" className={inputCls} style={{ ...inputStyle, width: 70 }} />
               <input value={r.price} onChange={(e) => setRooms((p) => p.map((x) => x.id === r.id ? { ...x, price: e.target.value } : x))} placeholder="zł/os" inputMode="numeric" className={inputCls} style={{ ...inputStyle, width: 90 }} />
               <button onClick={() => setRooms((p) => p.filter((x) => x.id !== r.id))} className="p-2 rounded-[8px]" style={{ color: 'var(--err)' }}><Trash2 size={15} /></button>
@@ -592,7 +684,15 @@ export default function EventEditForm({
             <option value="ICPE Mission Warszawa">ICPE Mission Warszawa</option>
           </select>
         </Field>
-        <Field label={`Nadtytuł (nad nazwą eventu)${activeLocales.length > 1 ? ` — ${LANG_LABEL[editLang]}` : ''}`}>
+        <Field label={`Nadtytuł (nad nazwą eventu)${multi ? ` — ${LANG_LABEL[editLang]}` : ''}`}>
+          {editLang !== 'pl' ? (
+            // Gotowe nadtytuły są po polsku — w innych językach wpisujemy tłumaczenie wprost.
+            <Input
+              value={superTitle}
+              onChange={(e) => setSuperMap((m) => ({ ...m, [editLang]: e.target.value }))}
+              placeholder={srcPh(superMap.pl, 'np. Community celebration')}
+            />
+          ) : (
           <div className="flex flex-col gap-2">
             <select
               value={isPresetSupertitle(superTitle) ? superTitle : superTitle ? '__custom' : ''}
@@ -620,6 +720,7 @@ export default function EventEditForm({
               />
             )}
           </div>
+          )}
         </Field>
         <Field label="Kolor główny">
           <div className="flex items-center gap-2">
@@ -657,10 +758,15 @@ export default function EventEditForm({
           </Field>
         </div>
         <Field label="Języki strony">
-          <div className="flex items-center gap-4 text-sm" style={{ color: 'var(--ink)' }}>
-            <label className="flex items-center gap-1.5"><input type="checkbox" checked={langPL} onChange={(e) => setLangPL(e.target.checked)} className="accent-[var(--brand)] w-4 h-4" /> PL</label>
-            <label className="flex items-center gap-1.5"><input type="checkbox" checked={langEN} onChange={(e) => setLangEN(e.target.checked)} className="accent-[var(--brand)] w-4 h-4" /> EN</label>
-            <label className="flex items-center gap-1.5"><input type="checkbox" checked={langIT} onChange={(e) => setLangIT(e.target.checked)} className="accent-[var(--brand)] w-4 h-4" /> IT</label>
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center gap-4 text-sm" style={{ color: 'var(--ink)' }}>
+              <label className="flex items-center gap-1.5" title="Zawsze dostępny"><input type="checkbox" checked disabled className="accent-[var(--brand)] w-4 h-4" /> PL</label>
+              <label className="flex items-center gap-1.5" title="Zawsze dostępny"><input type="checkbox" checked disabled className="accent-[var(--brand)] w-4 h-4" /> EN</label>
+              <label className="flex items-center gap-1.5"><input type="checkbox" checked={langIT} onChange={(e) => setLangIT(e.target.checked)} className="accent-[var(--brand)] w-4 h-4" /> IT</label>
+            </div>
+            <p className="text-xs" style={{ color: 'var(--faint)' }}>
+              PL i EN są zawsze dostępne dla gości (interfejs jest w nich przetłumaczony). Zaznacz IT, żeby dodać wersję włoską — pojawi się zakładka IT w „Język treści" u góry.
+            </p>
           </div>
         </Field>
       </Section>
@@ -709,12 +815,12 @@ export default function EventEditForm({
       )}
 
       <Section title="Program i gość specjalny">
-        <Field label={`Program (godzina + punkt)${activeLocales.length > 1 ? ` — treść: ${LANG_LABEL[editLang]}` : ''}`}>
+        <Field label={`Program (godzina + punkt)${multi ? ` — treść: ${LANG_LABEL[editLang]}` : ''}`}>
           <div className="flex flex-col gap-2">
             {program.map((row) => (
               <div key={row.id} className="flex items-center gap-2">
                 <input value={row.time} onChange={(e) => setProgramTime(row.id, e.target.value)} placeholder="18:00" className={inputCls} style={{ ...inputStyle, width: 90 }} />
-                <input value={row.item[editLang] ?? ''} onChange={(e) => setProgramItem(row.id, e.target.value)} placeholder="Punkt programu" className={inputCls} style={{ ...inputStyle, flex: 1 }} />
+                <input value={row.item[editLang] ?? ''} onChange={(e) => setProgramItem(row.id, e.target.value)}  placeholder={srcPh(row.item.pl, 'Punkt programu')} className={inputCls} style={{ ...inputStyle, flex: 1 }} />
                 <button onClick={() => removeProgramRow(row.id)} className="p-2 rounded-[8px]" style={{ color: 'var(--err)' }}><Trash2 size={15} /></button>
               </div>
             ))}
@@ -724,7 +830,7 @@ export default function EventEditForm({
         <p className="text-xs" style={{ color: 'var(--faint)' }}>
           Godzina jest wspólna dla wszystkich języków; tłumaczysz tylko opis punktu.
         </p>
-        <Field label={`${specialGuestPlural ? 'Goście specjalni' : 'Gość specjalny'} (imiona i portret)`}>
+        <Field label={`${specialGuestPlural ? 'Goście specjalni' : 'Gość specjalny'} (imiona i portret)${multi ? ` — ${LANG_LABEL[editLang]}` : ''}`}>
           <div className="flex items-center gap-3">
             {specialGuestPhoto ? (
               <img src={specialGuestPhoto} alt="" className="rounded-full object-cover shrink-0" style={{ width: 44, height: 44 }} />
@@ -732,15 +838,23 @@ export default function EventEditForm({
               <div className="rounded-full shrink-0" style={{ width: 44, height: 44, background: 'var(--surface-2)', border: '1px solid var(--border)' }} />
             )}
             <Input
-              value={specialGuestName}
-              onChange={(e) => setSpecialGuestName(e.target.value)}
-              placeholder={specialGuestPlural ? 'np. Anna i Mario Cappello' : 'Imię i nazwisko'}
+              value={guestNameMap[editLang] ?? ''}
+              onChange={(e) => setGuestNameMap((m) => ({ ...m, [editLang]: e.target.value }))}
+              placeholder={srcPh(
+                guestNameMap.pl,
+                specialGuestPlural ? 'np. Anna i Mario Cappello' : 'Imię i nazwisko',
+              )}
             />
             <label className="flex items-center gap-1 px-3 py-2 rounded-[10px] text-sm cursor-pointer shrink-0" style={{ background: 'var(--surface-2)', color: 'var(--muted)', border: '1px solid var(--border)' }}>
               {uploadingGuest ? '…' : 'Portret'}
               <input type="file" accept="image/*" className="hidden" onChange={handleGuestPhoto} />
             </label>
           </div>
+          {editLang !== 'pl' && (
+            <span className="text-xs" style={{ color: 'var(--faint)' }}>
+              Puste = jak po polsku. Wpisz, jeśli coś się tłumaczy (np. „Anna and Mario Cappello”).
+            </span>
+          )}
         </Field>
         <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: 'var(--ink)' }}>
           <input
@@ -751,12 +865,12 @@ export default function EventEditForm({
           />
           To więcej niż jedna osoba (np. małżeństwo) — pokaż „Goście specjalni"
         </label>
-        <Field label={`Kim są — 1–2 zdania${activeLocales.length > 1 ? ` — treść: ${LANG_LABEL[editLang]}` : ''}`}>
+        <Field label={`Kim są — 1–2 zdania${multi ? ` — treść: ${LANG_LABEL[editLang]}` : ''}`}>
           <textarea
             value={guestBioMap[editLang] ?? ''}
             onChange={(e) => setGuestBioMap((m) => ({ ...m, [editLang]: e.target.value }))}
             rows={3}
-            placeholder="np. Anna i Mario prowadzą wspólnotę ICPE Mission na Malcie i od 20 lat głoszą rekolekcje w całej Europie."
+            placeholder={srcPh(guestBioMap.pl, 'np. Anna i Mario prowadzą wspólnotę ICPE Mission na Malcie i od 20 lat głoszą rekolekcje w całej Europie.')}
             className={inputCls}
             style={{ ...inputStyle, resize: 'vertical' }}
           />
