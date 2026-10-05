@@ -1,5 +1,5 @@
 ---
-// /promyk-swiatla — strona książki „Promyk światła. Historia Misji ICPE" (Anna Cappello Fava).
+// /promyk-swiatla — strona książki „Promyk Światła. Historia ICPE Mission" (Anna Cappello Fava).
 // Strona statyczna (nie z CMS) — wygrywa z [slug].astro. Wszystkie dane do uzupełnienia
 // są w dwóch obiektach poniżej: BOOK i PREMIERE. Puste pole = element się nie pokazuje
 // albo pokazuje wersję „wkrótce".
@@ -7,9 +7,11 @@ import LandingLayout from '../layouts/LandingLayout.astro';
 import PremiereBanner from '../components/PremiereBanner.astro';
 
 const BOOK = {
-  title: 'Promyk światła',
-  subtitle: 'Historia Misji ICPE',
+  title: 'Promyk Światła',
+  subtitle: 'Historia ICPE Mission',
   author: 'Anna Cappello Fava',
+  /** Pełny tytuł polskiego wydania (sekcja „Polskie wydanie”). */
+  fullTitle: 'Promyk Światła. Historia ICPE Mission', // = `${title}. ${subtitle}`
   originalTitle: 'A Cast of Light. The Story of the ICPE Mission',
   /** Zdjęcie okładki PL (np. '/uploads/promyk-okladka.jpg', proporcja ~2:3). Puste → okładka rysowana w CSS. */
   coverImage: '',
@@ -21,6 +23,10 @@ const BOOK = {
   isbn: '',
   /** Link do zakupu / przedsprzedaży polskiego wydania. Puste → komunikat „wkrótce". */
   buyUrl: '',
+  /** Zdjęcie w sekcji „O książce” (lewa kolumna pod nagłówkiem). Puste → bez zdjęcia. */
+  aboutImage: '/uploads/promyk-jan-pawel-ii.jpg',
+  aboutImageAlt: 'Anna i Mario Cappello ze świętym Janem Pawłem II',
+  aboutImageCaption: 'Anna i Mario Cappello ze świętym Janem Pawłem II',
   englishEditionUrl: 'https://www.amazon.com/Cast-Light-Story-ICPE-Mission/dp/1505135958/',
 };
 
@@ -48,7 +54,7 @@ const signupHref = PREMIERE.lumaUrl || '#premiera';
 const signupExt = PREMIERE.lumaUrl ? { target: '_blank', rel: 'noopener' } : {};
 
 const editionRows = [
-  ['Tytuł', `${BOOK.title}. ${BOOK.subtitle}`],
+  ['Tytuł', BOOK.fullTitle],
   ['Autorka', BOOK.author],
   ['Tytuł oryginału', BOOK.originalTitle],
   ['Wydawca', BOOK.publisher],
@@ -83,7 +89,7 @@ const QUOTES = [
   },
 ];
 
-const description = '„Promyk światła. Historia Misji ICPE” — książka Anny Cappello Favy, współzałożycielki ICPE Mission. Premiera polskiej edycji: 16 października 2026, Kraków.';
+const description = '„Promyk Światła. Historia ICPE Mission” — książka Anny Cappello Favy, współzałożycielki ICPE Mission. Premiera polskiej edycji: 16 października 2026, Kraków.';
 ---
 
 <LandingLayout title={`${BOOK.title}. ${BOOK.subtitle} — Anna Cappello Fava`} description={description} ogImage={BOOK.coverImage || undefined}>
@@ -133,9 +139,9 @@ const description = '„Promyk światła. Historia Misji ICPE” — książka A
           <p class="kicker">Nowa książka współzałożycielki ICPE Mission</p>
           <h1 class="title">
             <span class="t1">Promyk</span>
-            <span class="t2">światła</span>
+            <span class="t2">Światła</span>
           </h1>
-          <p class="subtitle">Historia Misji ICPE</p>
+          <p class="subtitle">Historia ICPE Mission</p>
           <p class="byline">{BOOK.author}</p>
           <p class="lede">Opowieść o małej wspólnocie z Malty, która uwierzyła, że Ewangelia może dotrzeć na krańce ziemi, i wyruszyła w drogę.</p>
           <div class="hero-cta">
@@ -154,13 +160,13 @@ const description = '„Promyk światła. Historia Misji ICPE” — książka A
                 <div class="cover" role="img" aria-label={`Okładka: ${BOOK.title}. ${BOOK.subtitle}. ${BOOK.author}`}>
                   <span class="cover-rays"></span>
                   <span class="cover-author">{BOOK.author}</span>
-                  <span class="cover-title"><em>Promyk</em><em>światła</em></span>
-                  <span class="cover-sub">historia misji icpe</span>
+                  <span class="cover-title"><em>Promyk</em><em>Światła</em></span>
+                  <span class="cover-sub">historia icpe mission</span>
                 </div>
               )}
               <span class="book-sheen" aria-hidden="true"></span>
             </div>
-            <div class="book-spine" aria-hidden="true"><span>Promyk światła</span></div>
+            <div class="book-spine" aria-hidden="true"><span>Promyk Światła</span></div>
             <div class="book-pages" aria-hidden="true"></div>
           </div>
           <div class="book-shadow" aria-hidden="true"></div>
@@ -183,10 +189,18 @@ const description = '„Promyk światła. Historia Misji ICPE” — książka A
     <!-- O KSIĄŻCE -->
     <section class="about" id="o-ksiazce">
       <div class="wrap about-grid">
-        <h2 class="h2">Z małej wyspy<br />aż po krańce ziemi</h2>
+        <div class="about-side">
+          <h2 class="h2">Z małej wyspy<br />aż po krańce ziemi</h2>
+          {BOOK.aboutImage && (
+            <figure class="about-photo">
+              <img src={BOOK.aboutImage} alt={BOOK.aboutImageAlt} width="1416" height="1111" loading="lazy" />
+              {BOOK.aboutImageCaption && <figcaption>{BOOK.aboutImageCaption}</figcaption>}
+            </figure>
+          )}
+        </div>
         <div class="about-body">
           <p class="drop">Na początku lat 80. na małej śródziemnomorskiej wyspie katolickie małżeństwo zgromadziło wokół siebie ludzi, którzy chcieli żyć tak jak pierwsi chrześcijanie: we wspólnocie otwartej dla każdego i prowadzonej przez Ducha Świętego. Kiedy ich życie zmieniło się nie do poznania, postanowili podzielić się tym, czego doświadczyli.</p>
-          <p>„Promyk światła” to opowieść o tym, jak ta decyzja stała się Misją ICPE, spisana przez kobietę, która jest w niej od pierwszego dnia. To historia ludzi, którzy zostawili to, co znane, żeby nieść Ewangelię tam, gdzie była najbardziej potrzebna.</p>
+          <p>„Promyk Światła” to opowieść o tym, jak ta decyzja stała się Misją ICPE, spisana przez kobietę, która jest w niej od pierwszego dnia. To historia ludzi, którzy zostawili to, co znane, żeby nieść Ewangelię tam, gdzie była najbardziej potrzebna.</p>
           <div class="inside">
             <h3 class="h3">Co znajdziesz w książce</h3>
             <ul>
@@ -272,7 +286,7 @@ const description = '„Promyk światła. Historia Misji ICPE” — książka A
             <div><dt>Miejsce</dt><dd>{PREMIERE.venue || 'podamy wkrótce'}</dd></div>
             <div><dt>Godzina</dt><dd>{PREMIERE.time || 'podamy wkrótce'}</dd></div>
           </dl>
-          <p class="premiere-text">Zapraszamy na pierwsze spotkanie z polskim wydaniem „Promyka światła”. Zapisz się, a prześlemy Ci szczegóły i przypomnienie przed wydarzeniem.</p>
+          <p class="premiere-text">Zapraszamy na pierwsze spotkanie z polskim wydaniem „Promyka Światła”. Zapisz się, a prześlemy Ci szczegóły i przypomnienie przed wydarzeniem.</p>
 
           <div class="countdown" data-countdown aria-live="polite">
             <div><span data-cd="d">–</span><small data-cdl="d">dni</small></div>
@@ -480,18 +494,24 @@ const description = '„Promyk światła. Historia Misji ICPE” — książka A
   .cover-sub { position: relative; margin-top: 14px; margin-bottom: 18%; font-family: var(--serif); font-style: italic; font-size: clamp(12px, 1.1vw, 15px); letter-spacing: 0.06em; opacity: 0.85; }
 
   /* ── OBIETNICA ───────────────────────────────────────────────────────── */
-  .promise { background: var(--night); color: var(--day); padding: 120px 0 140px; }
+  .promise { background: var(--night); color: var(--day); padding: 120px 0 72px; }
   .promise-in { max-width: 1100px; margin: 0 auto; padding: 0 40px; }
   .promise-lead { font-size: 16px; color: rgba(245, 241, 226, 0.6); margin-bottom: 26px; }
   .promise-text { font-family: var(--serif); font-weight: 300; font-size: clamp(36px, 5.4vw, 76px); line-height: 1.08; letter-spacing: -0.01em; }
   .promise-text .w { color: rgba(245, 241, 226, 0.16); transition: color 0.5s ease, text-shadow 0.8s ease; }
   .promise-text .w.lit { color: var(--beam-hi); text-shadow: 0 0 34px rgba(242, 212, 138, 0.35); }
 
-  .dawn { height: 220px; background: linear-gradient(180deg, var(--night) 0%, #2f4a35 32%, #b9b58f 70%, var(--day) 100%); }
+  /* Ostra granica noc/dzień: cienka linia światła zamiast gradientu */
+  .dawn { position: relative; height: 1px; background: linear-gradient(90deg, transparent 0%, rgba(242, 212, 138, 0.55) 30%, var(--beam) 50%, rgba(242, 212, 138, 0.55) 70%, transparent 100%); }
+  .dawn::after { content: ''; position: absolute; left: 20%; right: 20%; top: 1px; height: 28px; background: radial-gradient(50% 100% at 50% 0%, rgba(242, 212, 138, 0.16), transparent 100%); pointer-events: none; }
 
   /* ── O KSIĄŻCE ───────────────────────────────────────────────────────── */
-  .about { padding: 40px 0 120px; }
+  .about { padding: 64px 0 120px; }
   .about-grid { display: grid; grid-template-columns: 0.9fr 1.1fr; gap: 64px; align-items: start; }
+  .about-side { position: sticky; top: 110px; }
+  .about-photo { margin-top: 48px; }
+  .about-photo img { width: 100%; height: auto; display: block; border-radius: 4px; box-shadow: 0 0 0 8px var(--day), 0 0 0 9px var(--line), 0 24px 50px -24px rgba(22, 36, 28, 0.35); }
+  .about-photo figcaption { margin-top: 20px; font-size: 14px; line-height: 1.5; color: var(--ink-soft); }
   .about-body { font-family: var(--serif); font-size: 22px; line-height: 1.55; color: var(--ink); max-width: 36em; }
   .about-body p + p { margin-top: 1em; }
   .drop::first-letter { float: left; font-size: 4.1em; line-height: 0.78; padding: 0.08em 0.1em 0 0; color: var(--ember); font-weight: 400; }
@@ -517,9 +537,9 @@ const description = '„Promyk światła. Historia Misji ICPE” — książka A
   /* ── AUTORKA ─────────────────────────────────────────────────────────── */
   .author { padding: 130px 0; }
   .author-grid { display: grid; grid-template-columns: 0.8fr 1.2fr; gap: 80px; align-items: center; }
-  .arch { aspect-ratio: 4 / 5; border-radius: 999px 999px 10px 10px; overflow: hidden; background: var(--day-2); box-shadow: 0 0 0 10px var(--day), 0 0 0 11px var(--line); }
+  .arch { aspect-ratio: 1 / 1; border-radius: 4px; overflow: hidden; background: var(--day-2); box-shadow: 0 0 0 8px var(--day), 0 0 0 9px var(--line), 0 24px 50px -24px rgba(22, 36, 28, 0.35); }
   .arch img { width: 100%; height: 100%; object-fit: cover; object-position: 38% 30%; }
-  .author-photo figcaption { margin-top: 22px; font-size: 14px; color: var(--ink-soft); text-align: center; }
+  .author-photo figcaption { margin-top: 20px; font-size: 14px; line-height: 1.5; color: var(--ink-soft); }
   .author-body { max-width: 34em; }
   .author-lead { font-family: var(--serif); font-size: 27px; line-height: 1.35; margin: 26px 0 22px; }
   .author-body p:not(.author-lead) { font-size: 17px; line-height: 1.65; color: var(--ink-soft); }
@@ -594,6 +614,8 @@ const description = '„Promyk światła. Historia Misji ICPE” — książka A
     .step { padding-top: 0; }
     .step-dot { left: -36px; top: 8px; }
     .author-photo { max-width: 380px; }
+    .about-side { position: static; }
+    .about-photo { margin-top: 32px; max-width: 560px; }
     .foot-in { grid-template-columns: 1fr; gap: 20px; }
   }
   @media (max-width: 640px) {
@@ -607,7 +629,8 @@ const description = '„Promyk światła. Historia Misji ICPE” — książka A
     .lede { font-size: 17px; }
     .hero-book { margin-left: 34px; }
     .ray { width: 70vw; right: -10%; }
-    .promise { padding: 90px 0 100px; }
+    .promise { padding: 84px 0 52px; }
+    .about { padding: 44px 0 84px; }
     .about-body { font-size: 20px; }
     .path, .author, .voices, .premiere, .edition { padding: 84px 0; }
     .countdown div { min-width: 0; flex: 1; }
@@ -783,8 +806,8 @@ const description = '„Promyk światła. Historia Misji ICPE” — książka A
         var venue = sec.getAttribute('data-venue');
         var city = sec.getAttribute('data-city');
         var url = sec.getAttribute('data-url') || (location.origin + location.pathname);
-        lines.push('SUMMARY:Premiera książki „Promyk światła”', 'LOCATION:' + (venue ? venue + '\\, ' : '') + city,
-          'DESCRIPTION:Premiera polskiej edycji książki Anny Cappello Favy „Promyk światła. Historia Misji ICPE”. ' + url,
+        lines.push('SUMMARY:Premiera książki „Promyk Światła”', 'LOCATION:' + (venue ? venue + '\\, ' : '') + city,
+          'DESCRIPTION:Premiera polskiej edycji książki Anny Cappello Favy „Promyk Światła. Historia ICPE Mission”. ' + url,
           'URL:' + url, 'END:VEVENT', 'END:VCALENDAR');
         var blob = new Blob([lines.join('\r\n')], { type: 'text/calendar;charset=utf-8' });
         var a = document.createElement('a');

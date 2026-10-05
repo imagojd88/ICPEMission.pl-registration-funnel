@@ -20,11 +20,11 @@ const link = href || '/promyk-swiatla#premiera';
 const external = /^https?:\/\//.test(link);
 ---
 
-<aside class="pb" data-premiere-banner data-until={date} aria-label="Premiera polskiej edycji książki Promyk światła">
+<aside class="pb" data-premiere-banner data-until={date} aria-label="Premiera polskiej edycji książki Promyk Światła">
   <a class="pb-in" href={link} {...(external ? { target: '_blank', rel: 'noopener' } : {})}>
     <span class="pb-spark" aria-hidden="true"></span>
     <span class="pb-text">
-      <strong>Premiera polskiej edycji „Promyka światła”</strong>
+      <strong>Premiera polskiej edycji „Promyka Światła”</strong>
       <span class="pb-when"><time datetime={date}>{dateLabel}</time>, {city}</span>
     </span>
     <span class="pb-cta">{href ? 'Zapisz się' : 'Szczegóły'}</span>
