@@ -14,7 +14,7 @@ const BOOK = {
   fullTitle: 'Promyk Światła. Historia ICPE Mission', // = `${title}. ${subtitle}`
   originalTitle: 'A Cast of Light. The Story of the ICPE Mission',
   /** Zdjęcie okładki PL (np. '/uploads/promyk-okladka.jpg', proporcja ~2:3). Puste → okładka rysowana w CSS. */
-  coverImage: '',
+  coverImage: '/uploads/promyk-okladka.jpg', // tymczasowo okładka oryginału (A Cast of Light) — PL będzie 1:1 z polskimi napisami
   /** Dane wydania — pokazują się tylko wypełnione. */
   publisher: '',
   translator: '',
@@ -33,13 +33,15 @@ const BOOK = {
 const PREMIERE = {
   date: '2026-10-16', // YYYY-MM-DD, czas polski
   /** Godzina rozpoczęcia 'HH:MM' — puste → „godzinę podamy wkrótce", kalendarz jako wydarzenie całodniowe. */
-  time: '',
+  time: '18:30',
   durationMin: 120,
   city: 'Kraków',
   /** Miejsce (np. 'Kościół …, ul. …'). Puste → „miejsce podamy wkrótce". */
-  venue: '',
+  venue: 'ul. Dwernickiego 5',
+  /** Gospodarz spotkania. Puste → pole ukryte. */
+  host: 'Lokalna wspólnota ICPE Mission – Eden',
   /** Link do wydarzenia w Lumie. Puste → przyciski prowadzą do sekcji premiery. */
-  lumaUrl: '',
+  lumaUrl: 'https://luma.com/u9vluazp',
 };
 
 // ── pochodne ────────────────────────────────────────────────────────────
@@ -51,6 +53,13 @@ const dateLong = `${pd} ${MONTHS[pm - 1]} ${py}`;
 const dd = String(pd).padStart(2, '0');
 const mm = String(pm).padStart(2, '0');
 const signupHref = PREMIERE.lumaUrl || '#premiera';
+const endTime = (() => {
+  if (!PREMIERE.time) return '';
+  const [h, mi] = PREMIERE.time.split(':').map(Number);
+  const t = h * 60 + mi + PREMIERE.durationMin;
+  return `${String(Math.floor(t / 60) % 24).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
+})();
+const timeLabel = PREMIERE.time ? `${PREMIERE.time}–${endTime}` : '';
 const signupExt = PREMIERE.lumaUrl ? { target: '_blank', rel: 'noopener' } : {};
 
 const editionRows = [
@@ -72,7 +81,7 @@ const PATH = [
   { year: 'Początek lat 80.', place: 'Malta', text: 'Anna i Mario gromadzą wokół siebie ludzi, którzy chcą żyć jak pierwsi chrześcijanie: we wspólnocie otwartej dla każdego i prowadzonej przez Ducha Świętego.' },
   { year: '1985', place: 'Malta', text: 'Powstaje Instytut Ewangelizacji Świata – ICPE Mission. Wspólnota zaczyna formować świeckich i posyłać ich w świat.' },
   { year: 'Kolejne dekady', place: 'Wszystkie kontynenty', text: 'Misjonarze docierają do miejsc, gdzie światło Chrystusa bywa jedynym promykiem nadziei. Rodzi się też HopeXchange, humanitarne ramię misji.' },
-  { year: '2025', place: 'Cały Kościół', text: 'Czterdziesta rocznica założenia ICPE Mission.' },
+  { year: '2025', place: 'Cały Kościół', text: 'Czterdziesta rocznica założenia ICPE Mission. Książka ukazuje się po angielsku.' },
   { year: '2026', place: 'Kraków', text: 'Historia trafia do polskich czytelników. Premiera polskiej edycji 16 października.' },
 ];
 
@@ -148,7 +157,7 @@ const description = '„Promyk Światła. Historia ICPE Mission” — książka
             <a class="btn btn-beam" href={signupHref} {...signupExt}>Zapisz się na premierę</a>
             <a class="btn btn-ghost" href="#o-ksiazce">Poznaj książkę</a>
           </div>
-          <p class="hero-date"><time datetime={PREMIERE.date}>{weekday}, {dateLong}</time>, {PREMIERE.city}</p>
+          <p class="hero-date"><time datetime={PREMIERE.date}>{weekday}, {dateLong}</time>{PREMIERE.time && `, godz. ${PREMIERE.time}`}, {PREMIERE.city}</p>
         </div>
 
         <div class="hero-book" data-tilt>
@@ -283,8 +292,9 @@ const description = '„Promyk Światła. Historia ICPE Mission” — książka
           <h2 class="h2">Premiera polskiej edycji</h2>
           <p class="premiere-when"><time datetime={PREMIERE.date}>{weekday}, {dateLong}</time>, {PREMIERE.city}</p>
           <dl class="premiere-facts">
-            <div><dt>Miejsce</dt><dd>{PREMIERE.venue || 'podamy wkrótce'}</dd></div>
-            <div><dt>Godzina</dt><dd>{PREMIERE.time || 'podamy wkrótce'}</dd></div>
+            <div><dt>Miejsce</dt><dd>{PREMIERE.venue ? `${PREMIERE.venue}, ${PREMIERE.city}` : 'podamy wkrótce'}</dd></div>
+            <div><dt>Godzina</dt><dd>{timeLabel || 'podamy wkrótce'}</dd></div>
+            {PREMIERE.host && <div class="pf-wide"><dt>Gospodarz spotkania</dt><dd>{PREMIERE.host}</dd></div>}
           </dl>
           <p class="premiere-text">Zapraszamy na pierwsze spotkanie z polskim wydaniem „Promyka Światła”. Zapisz się, a prześlemy Ci szczegóły i przypomnienie przed wydarzeniem.</p>
 
@@ -570,6 +580,7 @@ const description = '„Promyk Światła. Historia ICPE Mission” — książka
   .premiere-facts { margin-top: 26px; display: grid; grid-template-columns: 1fr 1fr; gap: 18px; padding: 20px 0; border-top: 1px solid rgba(245, 241, 226, 0.14); border-bottom: 1px solid rgba(245, 241, 226, 0.14); }
   .premiere-facts dt { font-size: 13.5px; color: rgba(245, 241, 226, 0.55); }
   .premiere-facts dd { margin-top: 4px; font-size: 16.5px; }
+  .premiere-facts .pf-wide { grid-column: 1 / -1; }
   .premiere-text { margin-top: 24px; font-size: 17px; line-height: 1.6; color: rgba(245, 241, 226, 0.78); max-width: 46ch; }
   .countdown { display: flex; gap: 12px; margin-top: 30px; }
   .countdown div { min-width: 92px; padding: 14px 16px 12px; border-radius: 14px; background: rgba(245, 241, 226, 0.05); border: 1px solid rgba(242, 212, 138, 0.2); }
@@ -807,7 +818,7 @@ const description = '„Promyk Światła. Historia ICPE Mission” — książka
         var city = sec.getAttribute('data-city');
         var url = sec.getAttribute('data-url') || (location.origin + location.pathname);
         lines.push('SUMMARY:Premiera książki „Promyk Światła”', 'LOCATION:' + (venue ? venue + '\\, ' : '') + city,
-          'DESCRIPTION:Premiera polskiej edycji książki Anny Cappello Favy „Promyk Światła. Historia ICPE Mission”. ' + url,
+          'DESCRIPTION:Premiera polskiej edycji książki Anny Cappello Favy „Promyk Światła. Historia ICPE Mission”. Gospodarz: lokalna wspólnota ICPE Mission – Eden. ' + url,
           'URL:' + url, 'END:VEVENT', 'END:VCALENDAR');
         var blob = new Blob([lines.join('\r\n')], { type: 'text/calendar;charset=utf-8' });
         var a = document.createElement('a');
