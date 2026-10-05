@@ -5,10 +5,12 @@ interface Props {
   title?: string;
   description?: string;
   noindex?: boolean;
+  ogImage?: string;
 }
 const {
   title = 'ICPE Mission Warszawa',
   noindex = false,
+  ogImage,
   description = 'Warszawska wspólnota ICPE Mission — międzynarodowa katolicka wspólnota misyjna ludzi świeckich. Formacja, ewangelizacja, uwielbienie.',
 } = Astro.props;
 const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site).toString() : Astro.url.pathname;
@@ -28,6 +30,7 @@ const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site).toString(
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonical} />
+    {ogImage && <meta property="og:image" content={new URL(ogImage, Astro.site || Astro.url).toString()} />}
     <meta name="twitter:card" content="summary_large_image" />
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -37,6 +40,7 @@ const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site).toString(
       rel="stylesheet"
     />
     <!-- Umami (Faza 4): tracker tutaj, gdy będzie gotowy. -->
+    <slot name="head" />
   </head>
   <body>
     <slot />

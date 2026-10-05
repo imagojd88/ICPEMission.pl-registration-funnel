@@ -42,6 +42,19 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ---
 
+## Dziennik prac — strona książki „Promyk światła"
+
+### Strona /promyk-swiatla + baner premiery (2026-10-05)
+- **Cel (Jacek):** jedna dynamiczna strona premium o książce Anny Cappello Favy „Promyk światła. Historia Misji ICPE" (wersja międzynarodowa icpebook.org/pl jest słaba: tłumaczenie maszynowe — np. „Obsada światła", „Sosna szparagowa" zamiast Pino Scafuro) + baner „Premiera polskiej edycji — 16.10.2026 Kraków" z linkiem do Lumy (link później).
+- **Pliki:** `site/src/pages/promyk-swiatla.astro` (strona statyczna, wygrywa z `[slug].astro`), `site/src/components/PremiereBanner.astro` (samodzielny baner, sam znika po 16.10; można wstawić też na stronę główną: `<PremiereBanner href="…luma…" />`), `site/src/layouts/LandingLayout.astro` (nowy `<slot name="head" />` i prop `ogImage` — zmiany wstecznie zgodne).
+- **Dane do uzupełnienia** — na górze `promyk-swiatla.astro` w obiektach `BOOK` (okładka PL `coverImage`, wydawca, przekład, strony, format, ISBN, `buyUrl`) i `PREMIERE` (`time`, `venue`, `lumaUrl`). Puste pole = „podamy wkrótce" / element ukryty; po wpisaniu `lumaUrl` wszystkie przyciski „Zapisz się na premierę" (baner, nav, hero, sekcja premiery) prowadzą do Lumy.
+- **Treść:** opis i bio przepisane na poprawną polszczyznę na podstawie icpebook.org; rekomendacje — **tylko dwie, verbatim od Jacka** (ks. Sławomir Pawłowski SAC, Mary Healy). Oś czasu: lata 80. Malta → 1985 ICPE → kolejne dekady/HopeXchange → 2025 40-lecie → 2026 Kraków. Zdjęcie: `/uploads/462623…_n.jpg` (Anna i Mario) — do podmiany na portret Anny, jeśli będzie.
+- **Design:** paleta z okładki (nocna zieleń #0c1a14, światło #f2d48a, jasny papier #f5f1e2), Cormorant Garamond (display, ładowany przez slot head) + Bricolage Grotesque. Dynamika: snop światła + drobinki kurzu (canvas) w hero, książka 3D reagująca na kursor, zdanie-obietnica „zapalające się" przy przewijaniu, wypełniająca się oś czasu, odliczanie do premiery (po dniu premiery → podziękowanie), „Dodaj do kalendarza" (.ics generowany w przeglądarce; całodniowe, dopóki brak godziny). Okładka rysowana w CSS do czasu wgrania prawdziwej. `prefers-reduced-motion` respektowane.
+- **Weryfikacja:** `astro check` 0 błędów, `astro build` ✓; Playwright (Chromium) desktop 1440 i mobile 390 — brak poziomego scrolla, zrzuty sekcji OK. Podgląd: artifact „Promyk światła" (claude.ai).
+- **Stan:** kod w repo, czeka na push (auto-deploy `icpe-site`). Adres: `https://icpemission.pl/promyk-swiatla`. W folderze został `.site-bundle.tgz` (paczka robocza, dodana do .gitignore — można usunąć).
+
+---
+
 ## Dziennik prac — panel kursanta (kurs online)
 
 ### Publikacja stopniowa: jeden mail na paczkę materiałów (2026-10-03)

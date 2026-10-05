@@ -14,3 +14,5 @@ api/prisma/*.db
 
 # paczka weryfikacyjna sesji Claude (można usunąć)
 .verify-bundle.tgz
+
+.site-bundle.tgz
