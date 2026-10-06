@@ -1173,6 +1173,8 @@ export async function setAccommodation(
 }
 
 export interface UpdateInstancePayload {
+  /** OPEN = otwarty; CLOSED = zamknięty (Personal OS → „Poprzednie"). */
+  status?: 'DRAFT' | 'OPEN' | 'CLOSED' | 'ARCHIVED'
   title?: { pl: string; en?: string; it?: string }
   description?: { pl?: string; en?: string; it?: string } | null
   startsAt?: string

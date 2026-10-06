@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
-import { ExternalLink, Pencil } from 'lucide-react'
+import { ExternalLink, Pencil, Archive, RotateCcw } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import EventWizard from './EventWizard'
 import EventEditForm from './EventEditForm'
-import { getAdminInstances } from '@/lib/api'
+import { getAdminInstances, updateEventInstance } from '@/lib/api'
 import type { EventInstanceDto } from '@icpe/shared'
 
 type FilterTab = 'all' | 'one_time' | 'evergreen' | 'standalone' | 'invite'
@@ -83,6 +83,29 @@ export default function EventsScreen({ onOpenWizard, showWizard, onCloseWizard }
   useEffect(() => {
     loadInstances()
   }, [loadInstances])
+
+  const [statusBusy, setStatusBusy] = useState<string | null>(null)
+
+  /** Ręczne zamknięcie / ponowne otwarcie eventu. Zamknięte eventy trafiają do „Poprzednich"
+   *  w Personal OS; automat zamyka je też sam 7 dni po zakończeniu. */
+  async function toggleClosed(ev: EventInstanceDto) {
+    const closing = ev.status === 'OPEN'
+    const name = resolveTitle(ev.title)
+    const msg = closing
+      ? `Zamknąć event „${name}"?\n\nZapisy zostaną wyłączone, a event przejdzie do „Poprzednich". Można go później otworzyć ponownie.`
+      : `Otworzyć ponownie event „${name}"?\n\nStrona zapisów znów będzie przyjmować zgłoszenia, a event wróci do aktualnych.`
+    if (!window.confirm(msg)) return
+    setStatusBusy(ev.id)
+    setError(null)
+    try {
+      await updateEventInstance(ev.id, { status: closing ? 'CLOSED' : 'OPEN' })
+      loadInstances()
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setStatusBusy(null)
+    }
+  }
 
   const filtered = instances.filter((inst) => {
     const t = instanceTypeLabel(inst.type ?? 'ONE_TIME')
@@ -280,6 +303,19 @@ export default function EventsScreen({ onOpenWizard, showWizard, onCloseWizard }
                               <Pencil size={12} /> Edytuj
                             </button>
                           )}
+                          <button
+                            onClick={() => { void toggleClosed(ev) }}
+                            disabled={statusBusy === ev.id}
+                            className="flex items-center gap-1 text-xs font-medium transition-colors hover:text-[var(--brand)] disabled:opacity-50"
+                            style={{ color: 'var(--muted)' }}
+                            title={ev.status === 'OPEN'
+                              ? 'Zamknij zapisy i przenieś event do „Poprzednich"'
+                              : 'Otwórz event ponownie'}
+                          >
+                            {ev.status === 'OPEN'
+                              ? <><Archive size={12} /> Zamknij</>
+                              : <><RotateCcw size={12} /> Otwórz ponownie</>}
+                          </button>
                           {slug && (
                             <a
                               href={`https://rejestracja.icpemission.pl/r/${slug}`}

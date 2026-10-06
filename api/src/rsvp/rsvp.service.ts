@@ -54,6 +54,9 @@ export class RsvpService {
       include: { series: true },
     })) as (InstanceLite & { series: { type: string } }) | null;
     if (!instance) throw new NotFoundException('Instance not found');
+    if ((instance as { status?: string }).status !== 'OPEN') {
+      throw new ForbiddenException('Zapisy na to wydarzenie są już zamknięte.');
+    }
     if (instance.series.type !== 'STANDALONE') {
       throw new ForbiddenException('RSVP dostępne tylko dla eventów typu STANDALONE');
     }

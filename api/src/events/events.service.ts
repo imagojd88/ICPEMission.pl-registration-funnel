@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   toLocalized,
@@ -9,9 +9,61 @@ import {
 } from '../admin/personal-os.mapper';
 import { resumeUptimeMonitor } from '../integrations/uptime-keepalive';
 
+/** Po ilu dniach od końca eventu automat przełącza go na CLOSED (→ zakładka „Poprzednie"). */
+export const AUTO_CLOSE_DAYS = 7;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const INSTANCE_STATUSES = ['DRAFT', 'OPEN', 'CLOSED', 'ARCHIVED'];
+
 @Injectable()
-export class EventsService {
+export class EventsService implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger('EventsAutoClose');
+  private timer: NodeJS.Timeout | null = null;
+  private lastAutoClose = 0;
+
   constructor(private readonly prisma: PrismaService) {}
+
+  onModuleInit() {
+    if (process.env.NODE_ENV === 'test') return;
+    // Co godzinę, gdy API działa + krótko po starcie (Render po uśpieniu startuje od nowa).
+    this.timer = setInterval(() => void this.closeExpired().catch(() => undefined), 60 * 60 * 1000);
+    setTimeout(() => void this.closeExpired().catch(() => undefined), 20_000);
+  }
+
+  onModuleDestroy() {
+    if (this.timer) clearInterval(this.timer);
+  }
+
+  /**
+   * Automatyczne zamykanie: event OPEN, którego koniec (`endsAt`) minął ponad AUTO_CLOSE_DAYS dni temu,
+   * dostaje status CLOSED (Personal OS pokazuje go w „Poprzednich", znika ze strony głównej).
+   * Wyjątek: event ręcznie otwarty ponownie po tym terminie (`reopenedAt`) — zostaje otwarty.
+   * Idempotentne i tanie; wołane też przy pobieraniu list eventów (najwyżej raz na 5 min),
+   * żeby działało nawet wtedy, gdy serwer spał w chwili upływu terminu.
+   */
+  async closeExpired(now = new Date()): Promise<number> {
+    this.lastAutoClose = Date.now();
+    const cutoff = new Date(now.getTime() - AUTO_CLOSE_DAYS * DAY_MS);
+    const candidates = (await this.prisma.eventInstance.findMany({
+      where: { status: 'OPEN', endsAt: { lt: cutoff } },
+      select: { id: true, endsAt: true, reopenedAt: true },
+    })) as Array<{ id: string; endsAt: Date; reopenedAt: Date | null }>;
+    const ids = candidates
+      .filter((c) => !c.reopenedAt || c.reopenedAt.getTime() < c.endsAt.getTime() + AUTO_CLOSE_DAYS * DAY_MS)
+      .map((c) => c.id);
+    if (!ids.length) return 0;
+    const res = await this.prisma.eventInstance.updateMany({
+      where: { id: { in: ids }, status: 'OPEN' },
+      data: { status: 'CLOSED' },
+    });
+    this.logger.log(`Zamknięto automatycznie ${res.count} event(ów) (> ${AUTO_CLOSE_DAYS} dni po końcu)`);
+    return res.count;
+  }
+
+  /** Lekkie „szturchnięcie" automatu przy odczycie list (najwyżej raz na 5 min). */
+  private async maybeCloseExpired() {
+    if (Date.now() - this.lastAutoClose < 5 * 60 * 1000) return;
+    await this.closeExpired().catch((e: Error) => this.logger.warn(`closeExpired: ${e.message}`));
+  }
 
   /** Agregaty per instancja: liczba zgłoszeń, potwierdzonych, przychód (wpłacone). */
   private async instanceAggregates(instanceId: string) {
@@ -79,8 +131,17 @@ export class EventsService {
       },
     });
     if (!page) throw new NotFoundException('Page not found');
-    const raw = page.series.instances[0];
-    if (!raw) throw new NotFoundException('No open instance');
+    // Brak otwartej instancji (event zamknięty / szkic) → zwracamy ostatnią instancję z jej
+    // prawdziwym statusem. Publiczny lejek pokazuje wtedy ekran „Zapisy zamknięte" (zamiast
+    // 404 → mockowego eventu), a edytor eventu w panelu dalej może go wczytać.
+    const raw =
+      page.series.instances[0] ??
+      (await this.prisma.eventInstance.findFirst({
+        where: { seriesId: page.seriesId },
+        orderBy: { startsAt: 'desc' },
+        include: { roomTypes: true },
+      }));
+    if (!raw) throw new NotFoundException('No instance');
     // WAŻNE: typ eventu (ONE_TIME/STANDALONE/INVITE) siedzi na serii, a publiczny front
     // czyta go z instancji (`event.type`). Bez tego gałęzie STANDALONE/INVITE nigdy się
     // nie uruchamiały i event „na zaproszenie" pokazywał zwykły lejek rejestracji.
@@ -97,6 +158,7 @@ export class EventsService {
     const seriesType = (page.series as { type?: string }).type ?? 'ONE_TIME';
     return {
       instanceId: instance.id,
+      status: instance.status,
       locale,
       type: seriesType,
       isStandalone: seriesType === 'STANDALONE',
@@ -171,6 +233,7 @@ export class EventsService {
 
   /** GET /admin/instances?status=OPEN|CLOSED|ALL — lista wg kontraktu. */
   async listInstances(status?: string) {
+    await this.maybeCloseExpired();
     let where: { status?: unknown } | undefined;
     if (status && status.toUpperCase() !== 'ALL') {
       const s = status.toUpperCase();
@@ -193,6 +256,7 @@ export class EventsService {
 
   /** Publiczna lista aktywnych eventów (OPEN, z opublikowaną stroną) — do strony głównej. */
   async listPublicActive() {
+    await this.maybeCloseExpired();
     const instances = await this.prisma.eventInstance.findMany({
       where: { status: 'OPEN' },
       orderBy: { startsAt: 'asc' },
@@ -372,7 +436,17 @@ export class EventsService {
     if (dto.pricingConfig !== undefined) data.pricingConfig = dto.pricingConfig as any;
     if (dto.registrationOpensAt !== undefined) data.registrationOpensAt = new Date(dto.registrationOpensAt);
     if (dto.registrationClosesAt !== undefined) data.registrationClosesAt = new Date(dto.registrationClosesAt);
-    if (dto.status !== undefined) data.status = dto.status as any;
+    if (dto.status !== undefined) {
+      if (!INSTANCE_STATUSES.includes(dto.status)) throw new BadRequestException('Nieprawidłowy status eventu');
+      data.status = dto.status as any;
+      const current = await this.prisma.eventInstance.findUnique({ where: { id: instanceId }, select: { status: true } });
+      if (!current) throw new NotFoundException('Event not found');
+      // Ręczne ponowne otwarcie → zapamiętujemy, żeby automat nie zamknął eventu z powrotem.
+      if (dto.status === 'OPEN' && current.status !== 'OPEN') {
+        data.reopenedAt = new Date();
+        void resumeUptimeMonitor();
+      }
+    }
     await this.prisma.eventInstance.update({ where: { id: instanceId }, data });
     return this.getInstanceContract(instanceId);
   }

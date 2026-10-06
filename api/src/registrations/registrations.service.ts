@@ -34,6 +34,9 @@ export class RegistrationsService {
       include: { series: { include: { page: true } } },
     });
     if (!instance) throw new NotFoundException('Event instance not found');
+    if (instance.status !== 'OPEN') {
+      throw new ForbiddenException('Zapisy na to wydarzenie są już zamknięte.');
+    }
 
     // Event „na zaproszenie": udział potwierdza się wyłącznie zaproszeniem (link /i/:token
     // albo dopasowanie danych do listy gości). Zwykła rejestracja jest zabroniona także

@@ -289,6 +289,17 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — moduł rejestracji
 
+### Zamykanie eventów: automat 7 dni po końcu + przycisk „Zamknij / Otwórz ponownie" (2026-10-06)
+- **Problem (Jacek):** event sprzed miesiąca wisiał jako otwarty i nie dało się go przenieść do „Poprzednich" w Personal OS. Przyczyna: status instancji zmieniał się tylko przy tworzeniu (OPEN/DRAFT) — nic go nie zamykało, a panel nie miał przycisku. `endsAt` / `registrationClosesAt` nie zmieniają statusu.
+- **Decyzja (Jacek):** automatyczne zamykanie z buforem **7 dni** po `endsAt`.
+- **Backend (`api/src/events/events.service.ts`):** `closeExpired()` — OPEN z `endsAt` < teraz − 7 dni → `CLOSED`. Uruchamiane 20 s po starcie, co godzinę oraz „szturchnięciem" przy `GET /admin/instances` i `GET /events` (max raz na 5 min — działa też po uśpieniu Rendera). Stała `AUTO_CLOSE_DAYS`.
+- **Ręczne otwarcie:** `PATCH /admin/instances/:id` z `status: 'OPEN'` dla zamkniętego eventu ustawia nowe pole `EventInstance.reopenedAt` (Prisma, nullable → `db push`) i wznawia UptimeRobota; automat nie zamyka eventu ponownie, jeśli otwarto go po upływie terminu. Walidacja statusu (DRAFT/OPEN/CLOSED/ARCHIVED).
+- **`findBySlug` fallback:** brak instancji OPEN → zwraca ostatnią instancję serii z prawdziwym statusem (wcześniej 404 → front pokazywał MOCK_INSTANCE, a edytor eventu nie mógł wczytać zamkniętego eventu). Publiczny lejek pokazuje ekran „zapisy zamknięte" (`LandingScreen` już to obsługiwał). `/r/:slug/config` zwraca też `status`.
+- **Blokady API:** `POST /registrations` i `POST /rsvp` odrzucają instancję ≠ OPEN (403 „Zapisy na to wydarzenie są już zamknięte.").
+- **Panel (`EventsScreen.tsx`):** w wierszu eventu przycisk „Zamknij" (OPEN) / „Otwórz ponownie" (pozostałe) z potwierdzeniem; `UpdateInstancePayload.status`.
+- **Weryfikacja:** `app` tsc + vite build OK; `api` nest build OK poza znanym błędem wynikającym z braku wygenerowanego klienta Prisma (sandbox blokuje pobranie silnika Prismy — 403). Zapytania z `reopenedAt` sprawdzi dopiero build na Renderze.
+- **Po pushu: Manual Deploy `icpe-api`** (nowa kolumna `reopenedAt`) + auto-deploy frontu. Stary otwarty event zamknie się sam ~20 s po starcie API.
+
 ### Wspólne rozpoznawanie języka gościa: PL → PL, IT → IT, każdy inny → EN (2026-10-06)
 - **Decyzja (Jacek):** przy każdym języku przeglądarki innym niż polski i włoski domyślny ma być angielski (wcześniej fallback był PL); automatyczny język także na stronie głównej i w formacji online.
 - **Reguła** (`app/src/lib/langPref.ts`, kopia `site/src/scripts/lang-pref.ts`, wersja inline w `site/src/pages/index.astro` — zmieniać wszystkie trzy): `?lang=xx` (zapisywane) → zapamiętany ręczny wybór → pierwszy obsługiwany język z `navigator.languages` → EN. Przykłady: `de` → EN, `it` → IT tylko gdzie jest wersja włoska (event z IT), inaczej EN; `de, pl` → PL; `en-US, pl` → EN.

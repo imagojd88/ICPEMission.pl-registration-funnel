@@ -177,6 +177,9 @@ model EventInstance {
   nights               Int             @default(0)
   capacity             Int?
   status               InstanceStatus  @default(DRAFT)
+  // Kiedy admin ręcznie otworzył ponownie zamknięty event — automat (EventsService.closeExpired)
+  // nie zamyka wtedy eventu drugi raz, nawet jeśli minęło 7 dni od końca.
+  reopenedAt           DateTime?
   registrationOpensAt  DateTime
   registrationClosesAt DateTime
   paymentMethods       PaymentMethod[]
