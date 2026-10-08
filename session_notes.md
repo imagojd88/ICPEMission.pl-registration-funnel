@@ -42,6 +42,26 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ---
 
+## Dziennik prac — nowa strona icpebook.org („A Cast of Light")
+
+### WDROŻENIE v1: nowy projekt `book/` (Astro, 5 języków) — kod gotowy, czeka na push + Render (2026-10-08)
+- **Decyzje (Jacek):** statyczna strona jak icpemission.pl; wszystkie 5 języków na start; KO i IT z istniejących tekstów.
+- **Struktura:** `book/` = osobny projekt Astro (nie workspace npm), bez API. Teksty: `book/src/i18n/{en,pl,it,es,ko}.ts`; dane (linki, wydania, wydarzenia, galeria, PDF, newsletter): `book/src/config.ts`; szablon + JS: `book/src/components/BookPage.astro`. Adresy `/`, `/pl/`, `/it/`, `/es/`, `/ko/` + hreflang; przekierowania starych adresów Wix (`/endorsements`, `/gallery`, `/copy-of-…`) na sekcje.
+- **Treści:** EN z oryginału (9 rekomendacji, Grech skrócony z „[…]”); PL z naszych tekstów, rekomendacje tylko 2 (jak na /promyk-swiatla); IT z icpebook.org/it (ludzkie tłumaczenie); ES z icpebook.org/es (poprawki); KO z icpebook.org/ko z ujednoliconym tytułem 『한줄기 빛』 i poprawką błędów maszynowych — **KO i części interfejsu IT/ES do sprawdzenia przez native speakerów**. Wydania: EN dostępne, PL premiera (link /promyk-swiatla), IT i KO „wkrótce”; ES bez wydania (tylko język strony).
+- **Materiały z Wixa** (pobrane przez przeglądarkę za zgodą Jacka): 38 zdjęć galerii (community 7, outreach 24, events 7), portret Anny, PDF z cytatami → `book/public/img/gallery/` (pełne 1400 px + thumb 640 px), `book/public/img/anna.jpg`, `book/public/files/a-cast-of-light-quotes.pdf`. Oryginały: `book-src-assets/` (gitignored). „Extracts” i „Prayers” — brak plików, karty pokazują „wkrótce”.
+- **Newsletter:** `NEWSLETTER_ACTION` puste → przycisk mailto book@icpe.org; po założeniu formularza w Brevo wkleić action.
+- **Weryfikacja:** astro check 0 błędów, build 18 stron (5 języków + przekierowania); Playwright: desktop 1440 (EN/PL/KO), mobile 390 (EN/IT) — brak poziomego scrolla, zakładki galerii i lightbox działają. Naprawione w trakcie: `.gal[hidden]` (wszystkie panele galerii były widoczne). Podgląd: artifact „A Cast of Light” (5 języków).
+- **Po stronie Jacka:** push → Render ▸ New Static Site `icpe-book` (build `cd book && npm install && npm run build`, publish `book/dist`, env SITE_URL) → domena icpebook.org (instrukcja w `book/README.md`), eksport subskrybentów z Wixa przed rezygnacją.
+- Uwaga: w Pobranych zostały ukryte pliki tymczasowe `.Q6L2SF6YDW.com.anthropic.claudefordesktop.*` (pobrania z panelu przeglądarki) — można usunąć.
+
+### Koncepcja + wizualizacja (2026-10-08) — TYLKO PROJEKT, bez kodu w repo
+- **Prośba (Jacek):** odświeżona wersja https://www.icpebook.org/ w stylistyce strony /promyk-swiatla; najpierw koncepcja i wizualizacja, potem wdrożenie.
+- **Audyt obecnej strony (Wix):** języki EN/ES/IT/KO/PL (maszynowe tłumaczenia), menu: Home/Downloads/About/Contact prowadzą w to samo miejsce; „Extracts" linkuje do Amazona zamiast PDF, „Prayers" bez linku, „Quotes" = PDF; galerie Community/Outreach/Special events (~9 zdjęć archiwalnych każda, adresy copy-of-…); newsletter Wix; w stopce `info@mysite.com`; 9 rekomendacji (pełne teksty EN pobrane).
+- **Wizualizacja:** artifact Design „A Cast of Light — nowa strona" (desktop 1440, mobile 390, plansza systemu). Jedna długa strona: pasek premiery PL → hero z okładką 3D → obietnica → o książce (zdjęcie z JPII) → wydania językowe (EN/PL/IT/KO/ES) → droga 1980–2026 → autorka → 9 rekomendacji (przełączane) → galeria z zakładkami → darmowe materiały + newsletter → wydarzenia (Kraków, Luma) → stopka.
+- **Otwarte:** gdzie hostować (zostaje Wix vs własny static/Astro), status wydań IT/KO/ES i tytuły, pliki PDF (Extracts/Prayers), zdjęcia galerii w pełnej rozdzielczości, dostawca newslettera, kto tłumaczy wersje językowe.
+
+---
+
 ## Dziennik prac — strona książki „Promyk światła"
 
 ### Strona /promyk-swiatla + baner premiery (2026-10-05)

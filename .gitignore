@@ -16,3 +16,5 @@ api/prisma/*.db
 .verify-bundle.tgz
 
 .site-bundle.tgz
+.book-public.tgz
+book-src-assets/

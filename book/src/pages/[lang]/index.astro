@@ -1,0 +1,10 @@
+---
+import BookPage from '../../components/BookPage.astro';
+import { LANGS, DEFAULT_LANG, type Lang } from '../../config';
+
+export function getStaticPaths() {
+  return LANGS.filter((l) => l !== DEFAULT_LANG).map((lang) => ({ params: { lang } }));
+}
+const lang = Astro.params.lang as Lang;
+---
+<BookPage lang={lang} />
