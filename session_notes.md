@@ -44,6 +44,9 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — nowa strona icpebook.org („A Cast of Light")
 
+### Poprawka „Inside the book” (2026-10-11)
+- Jacek podał nowe 4 punkty EN (`book/src/i18n/en.ts` → `book.inside`); PL/IT/ES/KO przetłumaczone tak, by znaczyły to samo. Build ✓. Czeka na push (auto-deploy `icpe-book`).
+
 ### WDROŻENIE v1: nowy projekt `book/` (Astro, 5 języków) — kod gotowy, czeka na push + Render (2026-10-08)
 - **Decyzje (Jacek):** statyczna strona jak icpemission.pl; wszystkie 5 języków na start; KO i IT z istniejących tekstów.
 - **Struktura:** `book/` = osobny projekt Astro (nie workspace npm), bez API. Teksty: `book/src/i18n/{en,pl,it,es,ko}.ts`; dane (linki, wydania, wydarzenia, galeria, PDF, newsletter): `book/src/config.ts`; szablon + JS: `book/src/components/BookPage.astro`. Adresy `/`, `/pl/`, `/it/`, `/es/`, `/ko/` + hreflang; przekierowania starych adresów Wix (`/endorsements`, `/gallery`, `/copy-of-…`) na sekcje.

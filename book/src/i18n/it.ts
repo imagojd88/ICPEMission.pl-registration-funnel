@@ -29,10 +29,10 @@ const it: Dict = {
     p2: 'Questa è la loro straordinaria storia: la storia dell’ICPE Mission, raccontata da chi ne fa parte fin dal primo giorno.',
     insideH: 'Nel libro',
     inside: [
-      'Come dalla preghiera di poche persone a Malta sia nata una comunità missionaria internazionale.',
-      'Storie dai luoghi in cui i missionari laici sono stati inviati a portare la luce di Cristo.',
+      'Come un piccolo gruppo unito nella preghiera a Malta sia diventato una comunità missionaria internazionale.',
+      'Storie che ispirano, dai luoghi in cui i missionari laici sono stati inviati a condividere la Luce di Cristo.',
       'Che cosa significa essere discepoli missionari e come formare altri all’evangelizzazione.',
-      'Quarant’anni alla guida di una comunità che vive per la missione.',
+      'Il cammino alla guida di una comunità impegnata a portare Cristo nel mondo.',
     ],
     photoCaption: 'Anna e Mario Cappello con San Giovanni Paolo II',
     photoAlt: 'Anna e Mario Cappello con San Giovanni Paolo II',
