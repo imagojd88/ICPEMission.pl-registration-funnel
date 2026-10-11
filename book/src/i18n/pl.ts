@@ -54,7 +54,7 @@ const pl: Dict = {
       { year: '1985', place: 'Malta', text: 'Powstaje Instytut Ewangelizacji Świata – ICPE Mission. Wspólnota zaczyna formować świeckich i posyłać ich w świat.' },
       { year: 'Kolejne dekady', place: 'Wszystkie kontynenty', text: 'Misjonarze docierają do najtrudniejszych miejsc świata. Rodzi się HopeXchange, humanitarne ramię misji.' },
       { year: '2025', place: 'Cały Kościół', text: 'Czterdziesta rocznica założenia ICPE Mission. Książka ukazuje się po angielsku.' },
-      { year: '2026', place: 'Nowe języki', text: 'Premiera polskiej edycji w Krakowie; w przygotowaniu wydania włoskie i koreańskie.' },
+      { year: '2026', place: 'Nowe języki', text: 'Premiera polskiej edycji w Krakowie; w przygotowaniu wydania włoskie i hiszpańskie.' },
     ],
   },
   author: {

@@ -44,6 +44,11 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — nowa strona icpebook.org („A Cast of Light")
 
+### Wydanie hiszpańskie zamiast koreańskiego (2026-10-11)
+- Jacek: wydania koreańskiego nie będzie, będzie hiszpańskie. `EDITIONS`: KO usunięte, dodane ES „Un destello de luz. La historia de la misión ICPE” (status „wkrótce”). Wzmianki „Italian and Korean” → „Italian and Spanish” we wszystkich językach (hero note + oś czasu 2026).
+- Tytuł ES z okładki: „Un destello de luz” / „La historia de la misión ICPE” (było „Un rayo de luz” — podmienione też w rekomendacjach ES). Okładka ES wycięta z rozkładówki obwoluty → `book/public/img/cover-es.jpg` (624×946); nowa mapa `COVERS` w config.ts (okładka per język, reszta = EN), grzbiet książki 3D pokazuje tytuł w języku strony, og:image per język.
+- Wersja językowa KO strony zostaje (nie wiąże się z wydaniem) — do decyzji Jacka. Build ✓.
+
 ### Poprawka „Inside the book” (2026-10-11)
 - Jacek podał nowe 4 punkty EN (`book/src/i18n/en.ts` → `book.inside`); PL/IT/ES/KO przetłumaczone tak, by znaczyły to samo. Build ✓. Czeka na push (auto-deploy `icpe-book`).
 

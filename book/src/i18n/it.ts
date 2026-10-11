@@ -55,7 +55,7 @@ const it: Dict = {
       { year: '1985', place: 'Malta', text: 'Nasce l’Institute for World Evangelisation – ICPE Mission, che inizia a formare e inviare missionari laici.' },
       { year: 'I decenni seguenti', place: 'Tutti i continenti', text: 'I missionari raggiungono alcuni dei luoghi più difficili del mondo; nasce HopeXchange, l’iniziativa umanitaria della missione.' },
       { year: '2025', place: 'Tutta la Chiesa', text: 'Il 40° anniversario dell’ICPE Mission e la pubblicazione del libro in inglese.' },
-      { year: '2026', place: 'Nuove lingue', text: 'L’edizione polacca viene presentata a Cracovia; seguono le edizioni italiana e coreana.' },
+      { year: '2026', place: 'Nuove lingue', text: 'L’edizione polacca viene presentata a Cracovia; seguono le edizioni italiana e spagnola.' },
     ],
   },
   author: {

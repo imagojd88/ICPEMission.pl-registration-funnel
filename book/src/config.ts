@@ -36,7 +36,7 @@ export const EDITIONS: { lang: Lang; native: string; title: string; status: 'ava
   { lang: 'en', native: 'English', title: 'A Cast of Light. The Story of the ICPE Mission', status: 'available', href: LINKS.amazon },
   { lang: 'pl', native: 'Polski', title: 'Promyk Światła. Historia ICPE Mission', status: 'launch', href: LINKS.polishEdition },
   { lang: 'it', native: 'Italiano', title: 'Un raggio di luce. La storia dell’ICPE Mission', status: 'soon' },
-  { lang: 'ko', native: '한국어', title: '한줄기 빛. ICPE 미션 이야기', status: 'soon' },
+  { lang: 'es', native: 'Español', title: 'Un destello de luz. La historia de la misión ICPE', status: 'soon' },
 ];
 
 /** Premiera / wydarzenia. Po dniu `date` sekcja i pasek znikają (sprawdzane też w przeglądarce). */
@@ -67,6 +67,12 @@ export const GALLERY: Record<'community' | 'outreach' | 'events', { file: string
     ['events-07.jpg', 951, 1400],
   ].map(([file, w, h]) => ({ file: file as string, w: w as number, h: h as number })),
 };
+
+/** Okładka per język (public/img). Brak wpisu → okładka angielska. */
+export const COVERS: Partial<Record<Lang, { src: string; w: number; h: number }>> = {
+  es: { src: '/img/cover-es.jpg', w: 624, h: 946 },
+};
+export const DEFAULT_COVER = { src: '/img/cover.jpg', w: 986, h: 1500 };
 
 export function langPath(lang: Lang): string {
   return lang === DEFAULT_LANG ? '/' : `/${lang}/`;

@@ -18,7 +18,7 @@ const en: Dict = {
     primary: 'Order on Amazon',
     primaryHref: 'amazon',
     secondary: 'Discover the book',
-    note: 'Available in English. Polish edition from October 2026; Italian and Korean editions coming soon.',
+    note: 'Available in English. Polish edition from October 2026; Italian and Spanish editions coming soon.',
   },
   promise: { lead: 'One audacious promise', text: 'They would start where they were, but not stop until they had criss-crossed the world.' },
   book: {
@@ -53,7 +53,7 @@ const en: Dict = {
       { year: '1985', place: 'Malta', text: 'The Institute for World Evangelisation – ICPE Mission is founded and begins forming and sending lay missionaries.' },
       { year: 'The decades that follow', place: 'Every continent', text: 'Missionaries reach some of the world’s toughest places, and HopeXchange, the humanitarian arm of the mission, is born.' },
       { year: '2025', place: 'The whole Church', text: 'The 40th anniversary of the ICPE Mission, and A Cast of Light is published in English.' },
-      { year: '2026', place: 'New languages', text: 'The Polish edition launches in Kraków; Italian and Korean editions follow.' },
+      { year: '2026', place: 'New languages', text: 'The Polish edition launches in Kraków; Italian and Spanish editions follow.' },
     ],
   },
   author: {
