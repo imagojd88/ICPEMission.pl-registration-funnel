@@ -1,6 +1,7 @@
 ---
 import { DICTS } from '../i18n';
 import Analytics from './Analytics.astro';
+import GAHead from './GAHead.astro';
 import { LANGS, LINKS, EDITIONS, EVENTS, GALLERY, RESOURCES, NEWSLETTER_ACTION, COVERS, DEFAULT_COVER, GA_ID, langPath, type Lang } from '../config';
 
 interface Props { lang: Lang }
@@ -49,6 +50,7 @@ const longQuote = (s: string) => s.length > 520;
   <meta property="og:locale" content={t.htmlLang} />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="theme-color" content="#0c1a14" />
+  <GAHead />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href={`https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&display=swap`} rel="stylesheet" />

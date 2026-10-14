@@ -44,6 +44,10 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — nowa strona icpebook.org („A Cast of Light")
 
+### GA4: tag w <head> + Consent Mode v2 (2026-10-14)
+- Jacek: tag GA4 musi być w `<head>` (GA nie wykrywał tagu, bo ładował się dopiero po zgodzie). Nowy `components/GAHead.astro` w `<head>` obu stron: gtag.js `G-GXFTQF41HN` + `gtag('consent','default', …denied)`; `analytics_storage` = granted od razu, jeśli zgoda zapisana w localStorage. Baner (`Analytics.astro`) wysyła `gtag('consent','update')`. Bez zgody GA nie zapisuje cookies (pingi bez cookies — tryb zaawansowany Consent Mode).
+- Test: tag i config w head na / i /extracts/, consent default denied → update granted po kliknięciu, po odświeżeniu granted od startu i bez banera ✓.
+
 ### Wycofana wersja koreańska strony (2026-10-14)
 - Jacek: tłumaczenia koreańskiego nie robimy. `LANGS` = en/pl/it/es, usunięty `book/src/i18n/ko.ts` i style/fonty KO; `/ko`, `/ko/endorsements`, `/ko/gallery`, `/ko/extracts` przekierowują na EN. Wydanie hiszpańskie oznaczone jako eBook (`EDITIONS.format`), status „wkrótce” — tytuł ES do potwierdzenia przez Jacka (teraz „Un destello de luz” z okładki).
 

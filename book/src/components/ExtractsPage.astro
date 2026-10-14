@@ -2,6 +2,7 @@
 // Podstrona „Extracts”: fragmenty książki (src/extracts.ts) w języku interfejsu strony.
 import { DICTS } from '../i18n';
 import Analytics from './Analytics.astro';
+import GAHead from './GAHead.astro';
 import { LANGS, LINKS, COVERS, DEFAULT_COVER, GA_ID, langPath, type Lang } from '../config';
 import { EXTRACTS, EXTRACT_SOURCE } from '../extracts';
 
@@ -32,6 +33,7 @@ const primaryHref = t.hero.primaryHref === 'polish' ? LINKS.polishEdition : LINK
   <meta property="og:image" content={new URL(cover.src, site).toString()} />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="theme-color" content="#0c1a14" />
+  <GAHead />
   <script is:inline>document.documentElement.classList.add('js');</script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

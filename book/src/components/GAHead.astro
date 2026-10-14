@@ -1,0 +1,24 @@
+---
+// Tag Google (gtag.js) w <head> — wymagany przez GA4 do wykrycia tagu.
+// Consent Mode v2: domyślnie wszystko „denied” (bez cookies); po kliknięciu „Akceptuję”
+// w banerze (Analytics.astro) zgoda zmienia się na „granted”. Wybór pamiętany w localStorage.
+import { GA_ID } from '../config';
+const snippet = GA_ID ? `
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  var acolConsent = null; try { acolConsent = localStorage.getItem('acol-consent'); } catch (e) {}
+  gtag('consent', 'default', {
+    ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied',
+    analytics_storage: acolConsent === 'granted' ? 'granted' : 'denied',
+    wait_for_update: 500
+  });
+  gtag('js', new Date());
+  gtag('config', '${GA_ID}');
+` : '';
+---
+{GA_ID && (
+  <>
+    <script is:inline async src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`}></script>
+    <script is:inline set:html={snippet}></script>
+  </>
+)}

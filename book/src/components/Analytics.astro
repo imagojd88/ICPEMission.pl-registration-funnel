@@ -16,30 +16,17 @@ const { t } = Astro.props;
   </div>
 )}
 {GA_ID && (
-  <script is:inline define:vars={{ GA_ID }}>
+  <script is:inline>
     (function () {
       var KEY = 'acol-consent';
       var box = document.querySelector('[data-consent]');
-      var loaded = false;
       function read() { try { return localStorage.getItem(KEY); } catch (e) { return null; } }
       function save(v) { try { localStorage.setItem(KEY, v); } catch (e) {} }
-      function load() {
-        if (loaded) return; loaded = true;
-        window.dataLayer = window.dataLayer || [];
-        window.gtag = function () { dataLayer.push(arguments); };
-        gtag('js', new Date());
-        gtag('config', GA_ID);
-        var s = document.createElement('script'); s.async = true;
-        s.src = 'https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(GA_ID);
-        document.head.appendChild(s);
-      }
-      var c = read();
-      if (c === 'granted') load(); else if (!c && box) box.hidden = false;
+      function setConsent(v) { if (window.gtag) gtag('consent', 'update', { analytics_storage: v }); }
+      if (!read() && box) box.hidden = false;
       document.querySelectorAll('[data-consent-choice]').forEach(function (b) {
         b.addEventListener('click', function () {
-          var v = b.getAttribute('data-consent-choice'); save(v); box.hidden = true;
-          if (v === 'granted') load();
-          else if (loaded) { location.reload(); }
+          var v = b.getAttribute('data-consent-choice'); save(v); box.hidden = true; setConsent(v);
         });
       });
       document.querySelectorAll('[data-consent-open]').forEach(function (b) { b.addEventListener('click', function () { box.hidden = false; }); });
