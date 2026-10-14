@@ -1,7 +1,7 @@
 // Dane wspólne dla wszystkich języków: linki, wydania, galeria, premiera.
 // Teksty są w src/i18n/<lang>.ts.
 
-export const LANGS = ['en', 'pl', 'it', 'es', 'ko'] as const;
+export const LANGS = ['en', 'pl', 'it', 'es'] as const;
 export type Lang = (typeof LANGS)[number];
 export const DEFAULT_LANG: Lang = 'en';
 
@@ -38,11 +38,11 @@ export const RESOURCES: { key: 'extracts' | 'quotes' | 'prayers'; file: string; 
 ];
 
 /** Wydania. `status`: available | launch | soon. Język strony nie musi mieć wydania. */
-export const EDITIONS: { lang: Lang; native: string; title: string; status: 'available' | 'launch' | 'soon'; href?: string }[] = [
+export const EDITIONS: { lang: Lang; native: string; title: string; status: 'available' | 'launch' | 'soon'; href?: string; format?: string }[] = [
   { lang: 'en', native: 'English', title: 'A Cast of Light. The Story of the ICPE Mission', status: 'available', href: LINKS.amazon },
   { lang: 'pl', native: 'Polski', title: 'Promyk Światła. Historia ICPE Mission', status: 'launch', href: LINKS.polishEdition },
   { lang: 'it', native: 'Italiano', title: 'Un raggio di luce. La storia dell’ICPE Mission', status: 'soon' },
-  { lang: 'es', native: 'Español', title: 'Un destello de luz. La historia de la misión ICPE', status: 'soon' },
+  { lang: 'es', native: 'Español', title: 'Un destello de luz. La historia de la misión ICPE', status: 'soon', format: 'eBook' },
 ];
 
 /** Premiera / wydarzenia. Po dniu `date` sekcja i pasek znikają (sprawdzane też w przeglądarce). */

@@ -13,7 +13,6 @@ const path = `${langPath(lang)}extracts/`;
 const canonical = new URL(path, site).toString();
 const cover = COVERS[lang] ?? DEFAULT_COVER;
 const primaryHref = t.hero.primaryHref === 'polish' ? LINKS.polishEdition : LINKS.amazon;
-const ko = lang === 'ko';
 ---
 
 <!doctype html>
@@ -36,9 +35,9 @@ const ko = lang === 'ko';
   <script is:inline>document.documentElement.classList.add('js');</script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href={`https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600${ko ? '&family=Noto+Sans+KR:wght@400;500;700' : ''}&display=swap`} rel="stylesheet" />
+  <link href={`https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600&display=swap`} rel="stylesheet" />
 </head>
-<body class={ko ? 'is-ko' : ''}>
+<body>
   <header class="x-nav">
     <a class="x-brand" href={langPath(lang)}>
       <img src="/img/logo-cream.png" alt="" width="32" height="32" />
@@ -112,7 +111,6 @@ const ko = lang === 'ko';
 <style is:global>
   :root { --night: #0c1a14; --moss: #17301f; --beam: #f2d48a; --beam-hi: #fff3cf; --day: #f5f1e2; --day-2: #ebe5cf; --ink: #16241c;
     --serif: 'Cormorant Garamond', 'Times New Roman', serif; --sans: 'Bricolage Grotesque', system-ui, sans-serif; }
-  .is-ko { --sans: 'Noto Sans KR', 'Bricolage Grotesque', sans-serif; }
   *, *::before, *::after { box-sizing: border-box; }
   html { -webkit-font-smoothing: antialiased; }
   body { margin: 0; background: var(--night); color: var(--day); font-family: var(--sans); line-height: 1.6; }
@@ -125,7 +123,6 @@ const ko = lang === 'ko';
   .x-nav { position: sticky; top: 0; z-index: 50; display: flex; align-items: center; gap: 16px; padding: 14px 40px; background: rgba(12, 26, 20, .88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); box-shadow: 0 1px 0 rgba(242, 212, 138, .14); }
   .x-brand { display: inline-flex; align-items: center; gap: 11px; text-decoration: none; margin-right: auto; }
   .x-brand span { font-family: var(--serif); font-style: italic; font-size: 22px; line-height: 1; }
-  .is-ko .x-brand span { font-style: normal; }
   .x-back { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 14px; border-radius: 100px; text-decoration: none; font-size: 14.5px; color: rgba(245, 241, 226, .85); }
   .x-back:hover { color: var(--beam); }
   .x-langs { position: relative; }
@@ -141,7 +138,6 @@ const ko = lang === 'ko';
   .x-beam span + span { right: 28%; width: 16vw; opacity: .6; animation-duration: 23s; }
   @keyframes x-sway { from { transform: rotate(24deg); } to { transform: rotate(32deg); } }
   .x-kicker { font-family: var(--serif); font-style: italic; font-size: 22px; color: var(--beam); }
-  .is-ko .x-kicker { font-style: normal; font-size: 18px; }
   .x-hero h1 { font-family: var(--serif); font-weight: 300; font-size: clamp(64px, 10vw, 128px); line-height: .95; letter-spacing: -.02em; margin-top: 6px; color: var(--beam-hi); text-shadow: 0 0 60px rgba(242, 212, 138, .3); }
   .x-lead { margin-top: 24px; font-size: 19px; line-height: 1.55; max-width: 40ch; color: rgba(245, 241, 226, .82); }
   .x-note { margin-top: 12px; font-size: 14px; color: rgba(245, 241, 226, .55); }

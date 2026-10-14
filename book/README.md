@@ -1,18 +1,18 @@
 # icpebook.org — strona książki „A Cast of Light” (Astro)
 
-Statyczna strona książki Anny Cappello Favy w 5 językach. Ten sam stos co `site/` (icpemission.pl),
+Statyczna strona książki Anny Cappello Favy w 4 językach. Ten sam stos co `site/` (icpemission.pl),
 ale osobny projekt: bez API, cała treść w plikach.
 
 ## Gdzie co jest
 
 | Co | Plik |
 |---|---|
-| Teksty (każdy język osobno) | `src/i18n/en.ts`, `pl.ts`, `it.ts`, `es.ts`, `ko.ts` |
+| Teksty (każdy język osobno) | `src/i18n/en.ts`, `pl.ts`, `it.ts`, `es.ts` |
 | Linki, wydania, wydarzenia, galeria, PDF-y, newsletter | `src/config.ts` |
 | Wygląd i zachowanie strony | `src/components/BookPage.astro` |
 | Zdjęcia, okładka, PDF | `public/img/…`, `public/files/…` |
 
-Adresy: `/` (EN), `/pl/`, `/it/`, `/es/`, `/ko/`. Stare adresy z Wixa (`/endorsements`, `/gallery`,
+Adresy: `/` (EN), `/pl/`, `/it/`, `/es/` (+ `/extracts/` w każdym języku). Dawne `/ko/…` przekierowują na wersję EN. Stare adresy z Wixa (`/endorsements`, `/gallery`,
 `/copy-of-…`, `/<lang>/endorsements`) przekierowują na sekcje (astro.config.mjs → `redirects`).
 
 ### Typowe zmiany

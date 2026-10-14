@@ -44,6 +44,9 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — nowa strona icpebook.org („A Cast of Light")
 
+### Wycofana wersja koreańska strony (2026-10-14)
+- Jacek: tłumaczenia koreańskiego nie robimy. `LANGS` = en/pl/it/es, usunięty `book/src/i18n/ko.ts` i style/fonty KO; `/ko`, `/ko/endorsements`, `/ko/gallery`, `/ko/extracts` przekierowują na EN. Wydanie hiszpańskie oznaczone jako eBook (`EDITIONS.format`), status „wkrótce” — tytuł ES do potwierdzenia przez Jacka (teraz „Un destello de luz” z okładki).
+
 ### Podstrona Extracts + GA włączone (2026-10-14)
 - Podstrona `/extracts/` (+ `/pl|it|es|ko/extracts/`): 7 fragmentów z Quotes.docx od Jacka (`book/src/extracts.ts`, oryginał EN z podziałem na wersy; w innych językach interfejs przetłumaczony + dopisek, że fragmenty są z wydania angielskiego). Komponent `ExtractsPage.astro`: hero ze światłem, wersy „zapalają się” przy przewijaniu, przyciski Kopiuj (schowek, z podpisem źródła) i Udostępnij (Web Share, tylko gdy przeglądarka wspiera), CTA z okładką. Karta „Extracts” w sekcji materiałów prowadzi teraz na podstronę (`RESOURCES` → `page`).
 - GA wydzielone do `components/Analytics.astro` (wspólne dla obu stron). `GA_ID = 'G-GXFTQF41HN'` (od Jacka). Nowe zdarzenia: `resource_open`, `extract_copy`, `extract_share`.

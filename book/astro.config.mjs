@@ -14,10 +14,13 @@ export default defineConfig({
     '/pl/endorsements': '/pl/#endorsements',
     '/it/endorsements': '/it/#endorsements',
     '/es/endorsements': '/es/#endorsements',
-    '/ko/endorsements': '/ko/#endorsements',
     '/pl/gallery': '/pl/#gallery',
     '/it/gallery': '/it/#gallery',
     '/es/gallery': '/es/#gallery',
-    '/ko/gallery': '/ko/#gallery',
+    // Wersja koreańska wycofana (2026-10-14)
+    '/ko': '/',
+    '/ko/endorsements': '/#endorsements',
+    '/ko/gallery': '/#gallery',
+    '/ko/extracts': '/extracts/',
   },
 });
