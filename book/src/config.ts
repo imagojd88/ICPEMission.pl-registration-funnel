@@ -24,9 +24,15 @@ export const LINKS = {
  */
 export const NEWSLETTER_ACTION = '';
 
-/** Darmowe materiały. Puste `file` → karta pokazuje „wkrótce”. Pliki w public/files/. */
-export const RESOURCES: { key: 'extracts' | 'quotes' | 'prayers'; file: string }[] = [
-  { key: 'extracts', file: '' },
+/**
+ * Google Analytics 4 — identyfikator strumienia danych (Admin ▸ Strumienie danych ▸ G-XXXXXXXXXX).
+ * Puste → GA i baner zgody się nie pokazują. GA ładuje się dopiero po kliknięciu „Akceptuję”.
+ */
+export const GA_ID = 'G-GXFTQF41HN';
+
+/** Darmowe materiały. `file` = PDF w public/files/, `page` = podstrona (np. 'extracts'). Oba puste → „wkrótce”. */
+export const RESOURCES: { key: 'extracts' | 'quotes' | 'prayers'; file: string; page?: string }[] = [
+  { key: 'extracts', file: '', page: 'extracts' },
   { key: 'quotes', file: '/files/a-cast-of-light-quotes.pdf' },
   { key: 'prayers', file: '' },
 ];

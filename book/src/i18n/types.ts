@@ -24,9 +24,11 @@ export interface Dict {
   resources: {
     h2: string; lead: string;
     items: { extracts: { title: string; text: string }; quotes: { title: string; text: string }; prayers: { title: string; text: string } };
-    download: string; soon: string;
+    download: string; soon: string; read: string;
     newsletter: { h: string; firstName: string; email: string; submit: string; gdpr: string; fallback: string };
   };
   events: { h2: string; lead: string; title: string; cta: string; timeWord: string };
   footer: { about: string; contact: string; follow: string };
+  consent: { text: string; accept: string; decline: string; settings: string };
+  extracts: { title: string; lead: string; note: string; copy: string; copied: string; share: string; back: string; ctaH: string; cta: string; description: string };
 }

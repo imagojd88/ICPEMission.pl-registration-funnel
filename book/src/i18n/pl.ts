@@ -77,11 +77,12 @@ const pl: Dict = {
     h2: 'Materiały do pobrania',
     lead: 'Przeczytaj kilka stron, módl się razem ze wspólnotą, podziel się cytatem. Zapisz się do listy mailowej, a nowe materiały dostaniesz jako pierwszy.',
     items: {
-      extracts: { title: 'Fragmenty', text: 'Kilka stron z książki do przeczytania przed zakupem.' },
+      extracts: { title: 'Fragmenty', text: 'Siedem fragmentów książki do lektury i udostępniania.' },
       quotes: { title: 'Cytaty', text: 'Fragmenty książki gotowe do udostępnienia (po angielsku).' },
       prayers: { title: 'Modlitwy', text: 'Modlitwy do osobistej refleksji i dla grup.' },
     },
     download: 'Pobierz PDF',
+    read: 'Czytaj online',
     soon: 'Wkrótce',
     newsletter: {
       h: 'Dołącz do listy mailowej',
@@ -98,6 +99,8 @@ const pl: Dict = {
     contact: 'Kontakt',
     follow: 'Obserwuj',
   },
+  consent: { text: 'Chcielibyśmy używać plików cookie Google Analytics, żeby wiedzieć, jak odwiedzający korzystają ze strony. Wybór możesz zmienić w każdej chwili.', accept: 'Akceptuję', decline: 'Odrzucam', settings: 'Ustawienia cookie' },
+  extracts: { title: 'Fragmenty', lead: 'Siedem fragmentów książki do powolnej lektury, modlitwy i dzielenia się z innymi.', note: 'Fragmenty pochodzą z oryginalnego wydania angielskiego.', copy: 'Kopiuj', copied: 'Skopiowano', share: 'Udostępnij', back: 'Wróć do książki', ctaH: 'Przeczytaj całą historię', cta: 'Polskie wydanie i premiera', description: 'Siedem fragmentów książki Anny Cappello Favy „Promyk Światła” do lektury, modlitwy i udostępniania.' },
 };
 
 export default pl;

@@ -44,6 +44,16 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — nowa strona icpebook.org („A Cast of Light")
 
+### Podstrona Extracts + GA włączone (2026-10-14)
+- Podstrona `/extracts/` (+ `/pl|it|es|ko/extracts/`): 7 fragmentów z Quotes.docx od Jacka (`book/src/extracts.ts`, oryginał EN z podziałem na wersy; w innych językach interfejs przetłumaczony + dopisek, że fragmenty są z wydania angielskiego). Komponent `ExtractsPage.astro`: hero ze światłem, wersy „zapalają się” przy przewijaniu, przyciski Kopiuj (schowek, z podpisem źródła) i Udostępnij (Web Share, tylko gdy przeglądarka wspiera), CTA z okładką. Karta „Extracts” w sekcji materiałów prowadzi teraz na podstronę (`RESOURCES` → `page`).
+- GA wydzielone do `components/Analytics.astro` (wspólne dla obu stron). `GA_ID = 'G-GXFTQF41HN'` (od Jacka). Nowe zdarzenia: `resource_open`, `extract_copy`, `extract_share`.
+- Build ✓ (25 stron), zrzuty desktop/mobile ✓.
+
+### Google Analytics 4 + baner zgody (2026-10-14)
+- `book/src/config.ts` → `GA_ID` (G-XXXXXXXXXX). Puste = brak GA i banera. Tryb „basic”: gtag.js ładuje się dopiero po „Akceptuję” (zgoda w localStorage `acol-consent`); „Odrzucam” = nic nie jest ładowane. Baner w 5 językach (`consent` w słownikach), w stopce link „Ustawienia cookie” otwiera go ponownie.
+- Zdarzenia (atrybuty `data-ga`): `order_click` (nav/menu/hero/edition_en), `edition_click` (pl), `luma_click` (pasek/sekcja wydarzeń), `resource_download` (quotes…), `newsletter_click`, `language_switch`; parametry `label`, `link_url`, `page_language`. Do tego Enhanced Measurement GA (odsłony, przewijanie, kliknięcia wychodzące, pobrania).
+- Test Playwright z G-TEST: baner widoczny, przed zgodą 0 żądań do googletagmanager, po zgodzie gtag ładowany, zdarzenie order_click trafia do dataLayer, po odświeżeniu bez banera. Czeka na prawdziwy ID od Jacka + push.
+
 ### Wydanie hiszpańskie zamiast koreańskiego (2026-10-11)
 - Jacek: wydania koreańskiego nie będzie, będzie hiszpańskie. `EDITIONS`: KO usunięte, dodane ES „Un destello de luz. La historia de la misión ICPE” (status „wkrótce”). Wzmianki „Italian and Korean” → „Italian and Spanish” we wszystkich językach (hero note + oś czasu 2026).
 - Tytuł ES z okładki: „Un destello de luz” / „La historia de la misión ICPE” (było „Un rayo de luz” — podmienione też w rekomendacjach ES). Okładka ES wycięta z rozkładówki obwoluty → `book/public/img/cover-es.jpg` (624×946); nowa mapa `COVERS` w config.ts (okładka per język, reszta = EN), grzbiet książki 3D pokazuje tytuł w języku strony, og:image per język.

@@ -85,11 +85,12 @@ const es: Dict = {
     h2: 'Recursos gratuitos',
     lead: 'Lee algunas páginas, reza con la comunidad, comparte una cita. Suscríbete para recibir primero los nuevos recursos.',
     items: {
-      extracts: { title: 'Extractos', text: 'Algunas páginas del libro para leer antes de comprarlo.' },
+      extracts: { title: 'Extractos', text: 'Siete pasajes del libro para leer y compartir.' },
       quotes: { title: 'Citas', text: 'Pasajes del libro listos para compartir (en inglés).' },
       prayers: { title: 'Oraciones', text: 'Oraciones para la reflexión personal y en grupo.' },
     },
     download: 'Descargar PDF',
+    read: 'Leer en línea',
     soon: 'Próximamente',
     newsletter: {
       h: 'Suscríbete al boletín',
@@ -106,6 +107,8 @@ const es: Dict = {
     contact: 'Contacto',
     follow: 'Síguenos',
   },
+  consent: { text: 'Nos gustaría usar cookies de Google Analytics para entender cómo los visitantes usan este sitio. Puedes cambiar tu elección en cualquier momento.', accept: 'Acepto', decline: 'Rechazo', settings: 'Configuración de cookies' },
+  extracts: { title: 'Extractos', lead: 'Siete pasajes del libro para leer despacio, rezar y compartir.', note: 'Los extractos proceden de la edición original en inglés.', copy: 'Copiar', copied: 'Copiado', share: 'Compartir', back: 'Volver al libro', ctaH: 'Lee toda la historia', cta: 'Pide la edición en inglés', description: 'Siete pasajes de «Un destello de luz» de Anna Cappello Fava para leer, rezar y compartir.' },
 };
 
 export default es;

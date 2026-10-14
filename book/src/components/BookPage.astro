@@ -1,6 +1,7 @@
 ---
 import { DICTS } from '../i18n';
-import { LANGS, LINKS, EDITIONS, EVENTS, GALLERY, RESOURCES, NEWSLETTER_ACTION, COVERS, DEFAULT_COVER, langPath, type Lang } from '../config';
+import Analytics from './Analytics.astro';
+import { LANGS, LINKS, EDITIONS, EVENTS, GALLERY, RESOURCES, NEWSLETTER_ACTION, COVERS, DEFAULT_COVER, GA_ID, langPath, type Lang } from '../config';
 
 interface Props { lang: Lang }
 const { lang } = Astro.props;
@@ -62,7 +63,7 @@ const longQuote = (s: string) => s.length > 520;
 <div class="acl" id="top">
 
   {launch && (
-    <a class="bar" href={launch.href} target="_blank" rel="noopener" data-until={launch.date}>
+    <a class="bar" href={launch.href} target="_blank" rel="noopener" data-until={launch.date} data-ga="luma_click" data-ga-label="launch_bar">
       <span class="bar-spark" aria-hidden="true"></span>
       <span class="bar-text"><strong>{t.launchBar.label}</strong> <span class="bar-when">{fmtShort(launch.date)}, {launch.city}</span></span>
       <span class="bar-cta">{t.launchBar.cta}</span>
@@ -88,11 +89,11 @@ const longQuote = (s: string) => s.length > 520;
         <summary aria-label={t.nav.language}>{lang.toUpperCase()}<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg></summary>
         <ul>
           {LANGS.map((l) => (
-            <li><a href={langPath(l)} hreflang={DICTS[l].htmlLang} lang={DICTS[l].htmlLang} aria-current={l === lang ? 'page' : undefined}>{DICTS[l].nativeName}</a></li>
+            <li><a href={langPath(l)} hreflang={DICTS[l].htmlLang} lang={DICTS[l].htmlLang} data-ga="language_switch" data-ga-label={l} aria-current={l === lang ? 'page' : undefined}>{DICTS[l].nativeName}</a></li>
           ))}
         </ul>
       </details>
-      <a class="btn btn-beam btn-sm nav-cta" href={primaryHref} target="_blank" rel="noopener">{t.nav.order}</a>
+      <a class="btn btn-beam btn-sm nav-cta" href={primaryHref} target="_blank" rel="noopener" data-ga="order_click" data-ga-label="nav">{t.nav.order}</a>
       <details class="menu">
         <summary aria-label={t.nav.menu}><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg></summary>
         <nav aria-label={t.nav.menu}>
@@ -102,7 +103,7 @@ const longQuote = (s: string) => s.length > 520;
           <a href="#endorsements">{t.nav.endorsements}</a>
           <a href="#gallery">{t.nav.gallery}</a>
           <a href="#resources">{t.nav.resources}</a>
-          <a class="btn btn-beam" href={primaryHref} target="_blank" rel="noopener">{t.nav.order}</a>
+          <a class="btn btn-beam" href={primaryHref} target="_blank" rel="noopener" data-ga="order_click" data-ga-label="menu">{t.nav.order}</a>
         </nav>
       </details>
     </div>
@@ -118,7 +119,7 @@ const longQuote = (s: string) => s.length > 520;
         <p class="byline">Anna Cappello Fava <span>{t.coauthor}</span></p>
         <p class="lede">{t.hero.lede}</p>
         <div class="hero-cta">
-          <a class="btn btn-beam" href={primaryHref} target="_blank" rel="noopener">{t.hero.primary}</a>
+          <a class="btn btn-beam" href={primaryHref} target="_blank" rel="noopener" data-ga="order_click" data-ga-label="hero">{t.hero.primary}</a>
           <a class="btn btn-ghost" href="#book">{t.hero.secondary}</a>
         </div>
         <p class="hero-note">{t.hero.note}</p>
@@ -180,8 +181,8 @@ const longQuote = (s: string) => s.length > 520;
               </p>
             </div>
             <span lang={t.htmlLang}>
-              {e.status === 'available' && <a class="btn btn-ink" href={e.href} target="_blank" rel="noopener">{t.editions.order}</a>}
-              {e.status === 'launch' && <a class="btn btn-ink" href={e.href} target="_blank" rel="noopener">{t.editions.polish}</a>}
+              {e.status === 'available' && <a class="btn btn-ink" href={e.href} target="_blank" rel="noopener" data-ga="order_click" data-ga-label={`edition_${e.lang}`}>{t.editions.order}</a>}
+              {e.status === 'launch' && <a class="btn btn-ink" href={e.href} target="_blank" rel="noopener" data-ga="edition_click" data-ga-label={e.lang}>{t.editions.polish}</a>}
               {e.status === 'soon' && <a class="link" href="#newsletter">{t.editions.notify}</a>}
             </span>
           </li>
@@ -286,8 +287,14 @@ const longQuote = (s: string) => s.length > 520;
       <div class="res">
         {RESOURCES.map((r) => {
           const it = t.resources.items[r.key];
-          return r.file ? (
-            <a class="res-card" href={r.file} download>
+          return r.page ? (
+            <a class="res-card" href={`${langPath(lang)}${r.page}/`} data-ga="resource_open" data-ga-label={r.key}>
+              <span class="res-title">{it.title}</span>
+              <span class="res-text">{it.text}</span>
+              <span class="res-cta">{t.resources.read}</span>
+            </a>
+          ) : r.file ? (
+            <a class="res-card" href={r.file} download data-ga="resource_download" data-ga-label={r.key}>
               <span class="res-title">{it.title}</span>
               <span class="res-text">{it.text}</span>
               <span class="res-cta">{t.resources.download}</span>
@@ -311,7 +318,7 @@ const longQuote = (s: string) => s.length > 520;
             <p class="fine">{t.resources.newsletter.gdpr}</p>
           </form>
         ) : (
-          <p><a class="btn btn-beam" href={`mailto:${LINKS.email}?subject=${encodeURIComponent(t.resources.newsletter.h)}`}>{t.resources.newsletter.fallback}</a></p>
+          <p><a class="btn btn-beam" href={`mailto:${LINKS.email}?subject=${encodeURIComponent(t.resources.newsletter.h)}`} data-ga="newsletter_click" data-ga-label="mailto">{t.resources.newsletter.fallback}</a></p>
         )}
       </div>
     </div>
@@ -324,7 +331,7 @@ const longQuote = (s: string) => s.length > 520;
           <h2 class="h2">{t.events.h2}</h2>
           <p class="lead">{t.events.lead}</p>
         </div>
-        <a class="event" href={launch.href} target="_blank" rel="noopener">
+        <a class="event" href={launch.href} target="_blank" rel="noopener" data-ga="luma_click" data-ga-label="events_section">
           <span class="ev-date">{dm(launch.date)}</span>
           <span class="ev-body">
             <span class="ev-title">{t.events.title}</span>
@@ -357,7 +364,7 @@ const longQuote = (s: string) => s.length > 520;
         <a href={LINKS.icpe} target="_blank" rel="noopener">icpe.org</a>
       </div>
     </div>
-    <p class="wrap copy">© {new Date().getFullYear()} ICPE Mission</p>
+    <p class="wrap copy">© {new Date().getFullYear()} ICPE Mission{GA_ID && <> · <button type="button" class="cookie-link" data-consent-open>{t.consent.settings}</button></>}</p>
   </footer>
 </div>
 
@@ -786,5 +793,6 @@ const longQuote = (s: string) => s.length > 520;
     }
   })();
 </script>
+<Analytics t={t} />
 </body>
 </html>

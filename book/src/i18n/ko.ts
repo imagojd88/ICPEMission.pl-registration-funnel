@@ -86,11 +86,12 @@ const ko: Dict = {
     h2: '무료 자료',
     lead: '책의 일부를 읽고, 공동체와 함께 기도하고, 인용구를 나누세요. 이메일 커뮤니티에 가입하시면 새로운 자료를 가장 먼저 받아보실 수 있습니다.',
     items: {
-      extracts: { title: '발췌', text: '구입 전에 읽어볼 수 있는 책의 일부.' },
+      extracts: { title: '발췌', text: '천천히 읽고 나눌 수 있는 책 속 일곱 구절.' },
       quotes: { title: '인용구', text: '나누기 좋은 책 속 구절 (영어).' },
       prayers: { title: '기도', text: '개인 묵상과 그룹을 위한 기도.' },
     },
     download: 'PDF 다운로드',
+    read: '온라인으로 읽기',
     soon: '준비 중',
     newsletter: {
       h: '이메일 커뮤니티 가입',
@@ -107,6 +108,8 @@ const ko: Dict = {
     contact: '연락처',
     follow: '팔로우',
   },
+  consent: { text: '방문자가 사이트를 어떻게 이용하는지 파악하기 위해 Google 애널리틱스 쿠키를 사용하고자 합니다. 선택은 언제든지 변경할 수 있습니다.', accept: '동의', decline: '거부', settings: '쿠키 설정' },
+  extracts: { title: '발췌', lead: '천천히 읽고, 기도하고, 나눌 수 있는 책 속 일곱 구절.', note: '발췌문은 영어 원서에서 가져온 것입니다.', copy: '복사', copied: '복사됨', share: '공유', back: '책 소개로 돌아가기', ctaH: '전체 이야기 읽기', cta: '영어판 주문하기', description: '안나 카펠로 파바의 책 속 일곱 구절 — 천천히 읽고, 기도하고, 나누세요.' },
 };
 
 export default ko;

@@ -1,0 +1,224 @@
+---
+// Podstrona „Extracts”: fragmenty książki (src/extracts.ts) w języku interfejsu strony.
+import { DICTS } from '../i18n';
+import Analytics from './Analytics.astro';
+import { LANGS, LINKS, COVERS, DEFAULT_COVER, GA_ID, langPath, type Lang } from '../config';
+import { EXTRACTS, EXTRACT_SOURCE } from '../extracts';
+
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const t = DICTS[lang];
+const site = Astro.site ?? new URL('https://www.icpebook.org');
+const path = `${langPath(lang)}extracts/`;
+const canonical = new URL(path, site).toString();
+const cover = COVERS[lang] ?? DEFAULT_COVER;
+const primaryHref = t.hero.primaryHref === 'polish' ? LINKS.polishEdition : LINKS.amazon;
+const ko = lang === 'ko';
+---
+
+<!doctype html>
+<html lang={t.htmlLang}>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{t.extracts.title} — {t.title}</title>
+  <meta name="description" content={t.extracts.description} />
+  <link rel="canonical" href={canonical} />
+  {LANGS.map((l) => <link rel="alternate" hreflang={DICTS[l].htmlLang} href={new URL(`${langPath(l)}extracts/`, site).toString()} />)}
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <meta property="og:type" content="article" />
+  <meta property="og:title" content={`${t.extracts.title} — ${t.title}`} />
+  <meta property="og:description" content={t.extracts.description} />
+  <meta property="og:url" content={canonical} />
+  <meta property="og:image" content={new URL(cover.src, site).toString()} />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="theme-color" content="#0c1a14" />
+  <script is:inline>document.documentElement.classList.add('js');</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href={`https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600${ko ? '&family=Noto+Sans+KR:wght@400;500;700' : ''}&display=swap`} rel="stylesheet" />
+</head>
+<body class={ko ? 'is-ko' : ''}>
+  <header class="x-nav">
+    <a class="x-brand" href={langPath(lang)}>
+      <img src="/img/logo-cream.png" alt="" width="32" height="32" />
+      <span>{t.title}</span>
+    </a>
+    <a class="x-back" href={langPath(lang)}>
+      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M15 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>
+      {t.extracts.back}
+    </a>
+    <details class="x-langs">
+      <summary aria-label={t.nav.language}>{lang.toUpperCase()}</summary>
+      <ul>{LANGS.map((l) => <li><a href={`${langPath(l)}extracts/`} lang={DICTS[l].htmlLang} aria-current={l === lang ? 'page' : undefined} data-ga="language_switch" data-ga-label={l}>{DICTS[l].nativeName}</a></li>)}</ul>
+    </details>
+  </header>
+
+  <main>
+    <section class="x-hero">
+      <div class="x-beam" aria-hidden="true"><span></span><span></span></div>
+      <div class="x-wrap">
+        <p class="x-kicker">{t.title}</p>
+        <h1>{t.extracts.title}</h1>
+        <p class="x-lead">{t.extracts.lead}</p>
+        {t.extracts.note && <p class="x-note">{t.extracts.note}</p>}
+      </div>
+    </section>
+
+    <ol class="x-list">
+      {EXTRACTS.map((lines, i) => (
+        <li class="x-item" data-extract>
+          <figure>
+            <svg class="x-mark" viewBox="0 0 40 40" aria-hidden="true"><g stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M20 3v8M20 29v8M3 20h8M29 20h8M8 8l5.5 5.5M26.5 26.5L32 32M32 8l-5.5 5.5M13.5 26.5L8 32" /></g><circle cx="20" cy="20" r="4" fill="currentColor" /></svg>
+            <blockquote lang="en" id={`extract-${i + 1}`}>
+              {lines.map((line) => <span class="x-line">{line}</span>)}
+            </blockquote>
+            <figcaption>
+              <span class="x-src">Anna Cappello Fava, <i lang="en">A Cast of Light</i></span>
+              <span class="x-actions">
+                <button type="button" class="x-btn" data-copy={`${lines.join('\n')}\n— ${EXTRACT_SOURCE}`} data-copied={t.extracts.copied} data-ga="extract_copy" data-ga-label={String(i + 1)}>{t.extracts.copy}</button>
+                <button type="button" class="x-btn" data-share={`${lines.join('\n')}\n— ${EXTRACT_SOURCE}`} data-ga="extract_share" data-ga-label={String(i + 1)} hidden>{t.extracts.share}</button>
+              </span>
+            </figcaption>
+          </figure>
+        </li>
+      ))}
+    </ol>
+
+    <section class="x-cta">
+      <div class="x-wrap x-cta-in">
+        <img src={cover.src} alt={t.book.coverAlt} width={cover.w} height={cover.h} loading="lazy" />
+        <div>
+          <h2>{t.extracts.ctaH}</h2>
+          <p>{t.title}. {t.subtitle}</p>
+          <div class="x-cta-btns">
+            <a class="x-btn-main" href={primaryHref} target="_blank" rel="noopener" data-ga="order_click" data-ga-label="extracts">{t.extracts.cta}</a>
+            <a class="x-btn-ghost" href={`${langPath(lang)}#resources`}>{t.nav.resources}</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="x-foot">
+    <div class="x-wrap">
+      <span>© {new Date().getFullYear()} ICPE Mission · <a href={`mailto:${LINKS.email}`}>{LINKS.email}</a></span>
+      {GA_ID && <button type="button" class="cookie-link" data-consent-open>{t.consent.settings}</button>}
+    </div>
+  </footer>
+
+  <Analytics t={t} />
+
+<style is:global>
+  :root { --night: #0c1a14; --moss: #17301f; --beam: #f2d48a; --beam-hi: #fff3cf; --day: #f5f1e2; --day-2: #ebe5cf; --ink: #16241c;
+    --serif: 'Cormorant Garamond', 'Times New Roman', serif; --sans: 'Bricolage Grotesque', system-ui, sans-serif; }
+  .is-ko { --sans: 'Noto Sans KR', 'Bricolage Grotesque', sans-serif; }
+  *, *::before, *::after { box-sizing: border-box; }
+  html { -webkit-font-smoothing: antialiased; }
+  body { margin: 0; background: var(--night); color: var(--day); font-family: var(--sans); line-height: 1.6; }
+  :where(h1, h2, p, ol, figure, blockquote) { margin: 0; }
+  img { max-width: 100%; height: auto; display: block; }
+  a { color: inherit; }
+  :focus-visible { outline: 2px solid var(--beam); outline-offset: 3px; border-radius: 4px; }
+  .x-wrap { max-width: 960px; margin: 0 auto; padding: 0 40px; }
+
+  .x-nav { position: sticky; top: 0; z-index: 50; display: flex; align-items: center; gap: 16px; padding: 14px 40px; background: rgba(12, 26, 20, .88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); box-shadow: 0 1px 0 rgba(242, 212, 138, .14); }
+  .x-brand { display: inline-flex; align-items: center; gap: 11px; text-decoration: none; margin-right: auto; }
+  .x-brand span { font-family: var(--serif); font-style: italic; font-size: 22px; line-height: 1; }
+  .is-ko .x-brand span { font-style: normal; }
+  .x-back { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 14px; border-radius: 100px; text-decoration: none; font-size: 14.5px; color: rgba(245, 241, 226, .85); }
+  .x-back:hover { color: var(--beam); }
+  .x-langs { position: relative; }
+  .x-langs summary { list-style: none; cursor: pointer; min-width: 44px; min-height: 40px; display: inline-flex; align-items: center; justify-content: center; padding: 0 12px; border-radius: 100px; border: 1px solid rgba(245, 241, 226, .3); font: 600 13px var(--sans); }
+  .x-langs summary::-webkit-details-marker { display: none; }
+  .x-langs ul { position: absolute; right: 0; top: calc(100% + 8px); list-style: none; margin: 0; padding: 6px; min-width: 160px; border-radius: 14px; background: var(--day); color: var(--ink); box-shadow: 0 20px 40px -20px rgba(0, 0, 0, .6); }
+  .x-langs a { display: block; padding: 10px 14px; border-radius: 10px; text-decoration: none; }
+  .x-langs a:hover, .x-langs a[aria-current] { background: var(--day-2); }
+
+  .x-hero { position: relative; isolation: isolate; overflow: hidden; padding: 110px 0 70px; background: radial-gradient(110% 80% at 80% 0%, #24452f, transparent 60%), var(--night); }
+  .x-beam { position: absolute; inset: 0; z-index: -1; filter: blur(22px); mix-blend-mode: screen; pointer-events: none; }
+  .x-beam span { position: absolute; top: -20%; right: 14%; width: 30vw; height: 150%; transform-origin: 50% 0; transform: rotate(28deg); background: linear-gradient(180deg, rgba(255, 240, 196, .4), rgba(242, 212, 138, .12) 45%, transparent 85%); clip-path: polygon(46% 0, 54% 0, 100% 100%, 0 100%); animation: x-sway 18s ease-in-out infinite alternate; }
+  .x-beam span + span { right: 28%; width: 16vw; opacity: .6; animation-duration: 23s; }
+  @keyframes x-sway { from { transform: rotate(24deg); } to { transform: rotate(32deg); } }
+  .x-kicker { font-family: var(--serif); font-style: italic; font-size: 22px; color: var(--beam); }
+  .is-ko .x-kicker { font-style: normal; font-size: 18px; }
+  .x-hero h1 { font-family: var(--serif); font-weight: 300; font-size: clamp(64px, 10vw, 128px); line-height: .95; letter-spacing: -.02em; margin-top: 6px; color: var(--beam-hi); text-shadow: 0 0 60px rgba(242, 212, 138, .3); }
+  .x-lead { margin-top: 24px; font-size: 19px; line-height: 1.55; max-width: 40ch; color: rgba(245, 241, 226, .82); }
+  .x-note { margin-top: 12px; font-size: 14px; color: rgba(245, 241, 226, .55); }
+
+  .x-list { list-style: none; padding: 0; max-width: 960px; margin: 0 auto; }
+  .x-item { padding: 90px 40px; border-top: 1px solid rgba(242, 212, 138, .12); }
+  .x-item:first-child { border-top: 0; padding-top: 50px; }
+  .x-mark { width: 30px; height: 30px; color: var(--beam); margin-bottom: 28px; filter: drop-shadow(0 0 10px rgba(242, 212, 138, .45)); }
+  .x-item blockquote { margin: 0; font-family: 'Cormorant Garamond', serif; font-style: italic; font-weight: 300; font-size: clamp(30px, 4vw, 48px); line-height: 1.25; }
+  .x-line { display: block; color: var(--beam-hi); text-shadow: 0 0 30px rgba(242, 212, 138, .25); transition: color .9s ease, text-shadow 1.2s ease; transition-delay: calc(var(--i, 0) * 90ms); }
+  .js .x-item:not(.is-lit) .x-line { color: rgba(245, 241, 226, .22); text-shadow: none; }
+  .x-item figcaption { margin-top: 32px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; }
+  .x-src { font-size: 14.5px; color: rgba(245, 241, 226, .62); }
+  .x-actions { display: flex; gap: 8px; }
+  .x-btn { min-height: 40px; padding: 0 16px; border-radius: 100px; border: 1px solid rgba(245, 241, 226, .28); background: none; color: var(--day); font: 600 13.5px var(--sans); cursor: pointer; transition: border-color .2s, color .2s; }
+  .x-btn:hover { border-color: var(--beam); color: var(--beam); }
+  .x-btn.is-done { border-color: var(--beam); color: var(--beam); }
+
+  .x-cta { background: var(--day); color: var(--ink); padding: 90px 0; }
+  .x-cta-in { display: grid; grid-template-columns: 200px 1fr; gap: 48px; align-items: center; }
+  .x-cta img { border-radius: 2px 6px 6px 2px; box-shadow: 0 30px 50px -24px rgba(12, 26, 20, .55); }
+  .x-cta h2 { font-family: var(--serif); font-weight: 400; font-size: clamp(34px, 4.5vw, 52px); line-height: 1.05; }
+  .x-cta p { margin-top: 10px; font-family: var(--serif); font-style: italic; font-size: 21px; color: #46554b; }
+  .x-cta-btns { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 26px; }
+  .x-btn-main, .x-btn-ghost { display: inline-flex; align-items: center; min-height: 50px; padding: 0 26px; border-radius: 100px; font: 600 15.5px var(--sans); text-decoration: none; }
+  .x-btn-main { background: var(--ink); color: var(--day); }
+  .x-btn-main:hover { background: var(--moss); }
+  .x-btn-ghost { border: 1px solid rgba(22, 36, 28, .25); }
+  .x-btn-ghost:hover { border-color: var(--ink); }
+
+  .x-foot { padding: 32px 0; font-size: 13.5px; color: rgba(245, 241, 226, .55); }
+  .x-foot .x-wrap { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; }
+  .x-foot a { text-decoration: none; } .x-foot a:hover { color: var(--beam); }
+
+  @media (max-width: 640px) {
+    .x-wrap { padding: 0 20px; }
+    .x-nav { padding: 10px 16px; gap: 8px; }
+    .x-brand span { display: none; }
+    .x-hero { padding: 72px 0 40px; }
+    .x-item { padding: 64px 20px; }
+    .x-cta-in { grid-template-columns: 1fr; gap: 28px; }
+    .x-cta img { width: 160px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .x-beam span { animation: none; }
+    .x-line { transition: none; color: var(--beam-hi); }
+  }
+</style>
+
+<script is:inline>
+  (function () {
+    var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // Wersy „zapalają się”, gdy fragment wchodzi w środek ekranu.
+    var items = document.querySelectorAll('[data-extract]');
+    items.forEach(function (it) { it.querySelectorAll('.x-line').forEach(function (l, i) { l.style.setProperty('--i', i); }); });
+    if (reduce || !('IntersectionObserver' in window)) { items.forEach(function (it) { it.classList.add('is-lit'); }); }
+    else {
+      var io = new IntersectionObserver(function (es) { es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('is-lit'); io.unobserve(e.target); } }); }, { rootMargin: '0px 0px -20% 0px', threshold: 0.2 });
+      items.forEach(function (it) { io.observe(it); });
+    }
+    // Kopiuj / Udostępnij
+    document.querySelectorAll('[data-copy]').forEach(function (b) {
+      var label = b.textContent;
+      b.addEventListener('click', function () {
+        var txt = b.getAttribute('data-copy');
+        var done = function () { b.textContent = b.getAttribute('data-copied'); b.classList.add('is-done'); setTimeout(function () { b.textContent = label; b.classList.remove('is-done'); }, 1800); };
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done, function () {});
+      });
+    });
+    if (navigator.share) {
+      document.querySelectorAll('[data-share]').forEach(function (b) {
+        b.hidden = false;
+        b.addEventListener('click', function () { navigator.share({ text: b.getAttribute('data-share'), url: location.href }).catch(function () {}); });
+      });
+    }
+    document.addEventListener('click', function (e) { document.querySelectorAll('details.x-langs[open]').forEach(function (d) { if (!d.contains(e.target) || e.target.closest('a')) d.removeAttribute('open'); }); });
+  })();
+</script>
+</body>
+</html>

@@ -83,11 +83,12 @@ const en: Dict = {
     h2: 'Free resources',
     lead: 'Read a few pages, pray with the community, share a quote. Join the email community to be the first to receive new resources.',
     items: {
-      extracts: { title: 'Extracts', text: 'A few pages from the book to read before you buy.' },
+      extracts: { title: 'Extracts', text: 'Seven passages from the book to read slowly and share.' },
       quotes: { title: 'Quotes', text: 'Passages from the book, ready to share.' },
       prayers: { title: 'Prayers', text: 'Prayers for personal reflection and for groups.' },
     },
     download: 'Download PDF',
+    read: 'Read online',
     soon: 'Coming soon',
     newsletter: {
       h: 'Join the email community',
@@ -104,6 +105,8 @@ const en: Dict = {
     contact: 'Contact',
     follow: 'Follow',
   },
+  consent: { text: 'We would like to use Google Analytics cookies to understand how visitors use this site. You can change your choice at any time.', accept: 'Accept', decline: 'Decline', settings: 'Cookie settings' },
+  extracts: { title: 'Extracts', lead: 'Seven passages from A Cast of Light to read slowly, pray with and share.', note: '', copy: 'Copy', copied: 'Copied', share: 'Share', back: 'Back to the book', ctaH: 'Read the whole story', cta: 'Order on Amazon', description: 'Seven passages from A Cast of Light by Anna Cappello Fava, to read slowly, pray with and share.' },
 };
 
 export default en;

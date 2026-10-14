@@ -1,0 +1,64 @@
+---
+// Google Analytics 4 (tryb podstawowy: ładowany dopiero po zgodzie) + baner zgody.
+// Używane na wszystkich stronach. GA_ID w src/config.ts.
+import { GA_ID } from '../config';
+import type { Dict } from '../i18n/types';
+interface Props { t: Dict }
+const { t } = Astro.props;
+---
+{GA_ID && (
+  <div class="consent" data-consent hidden role="region" aria-label={t.consent.settings}>
+    <p>{t.consent.text}</p>
+    <div class="consent-btns">
+      <button type="button" class="btn btn-ghost btn-sm" data-consent-choice="denied">{t.consent.decline}</button>
+      <button type="button" class="btn btn-beam btn-sm" data-consent-choice="granted">{t.consent.accept}</button>
+    </div>
+  </div>
+)}
+{GA_ID && (
+  <script is:inline define:vars={{ GA_ID }}>
+    (function () {
+      var KEY = 'acol-consent';
+      var box = document.querySelector('[data-consent]');
+      var loaded = false;
+      function read() { try { return localStorage.getItem(KEY); } catch (e) { return null; } }
+      function save(v) { try { localStorage.setItem(KEY, v); } catch (e) {} }
+      function load() {
+        if (loaded) return; loaded = true;
+        window.dataLayer = window.dataLayer || [];
+        window.gtag = function () { dataLayer.push(arguments); };
+        gtag('js', new Date());
+        gtag('config', GA_ID);
+        var s = document.createElement('script'); s.async = true;
+        s.src = 'https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(GA_ID);
+        document.head.appendChild(s);
+      }
+      var c = read();
+      if (c === 'granted') load(); else if (!c && box) box.hidden = false;
+      document.querySelectorAll('[data-consent-choice]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var v = b.getAttribute('data-consent-choice'); save(v); box.hidden = true;
+          if (v === 'granted') load();
+          else if (loaded) { location.reload(); }
+        });
+      });
+      document.querySelectorAll('[data-consent-open]').forEach(function (b) { b.addEventListener('click', function () { box.hidden = false; }); });
+      // Zdarzenia: kliknięcia oznaczone data-ga (zamówienia, wydania, Luma, PDF, newsletter, język).
+      document.addEventListener('click', function (e) {
+        var el = e.target.closest && e.target.closest('[data-ga]');
+        if (!el || !window.gtag) return;
+        gtag('event', el.getAttribute('data-ga'), { label: el.getAttribute('data-ga-label') || '', link_url: el.href || '', page_language: document.documentElement.lang });
+      });
+    })();
+  </script>
+)}
+
+<style is:global>
+  /* Baner zgody (GA) */
+  .consent { position: fixed; left: 16px; right: 16px; bottom: 16px; z-index: 80; max-width: 620px; margin: 0 auto; padding: 18px 20px; border-radius: 16px; background: #10231a; color: var(--day); box-shadow: 0 24px 60px -20px rgba(0, 0, 0, .6), 0 0 0 1px rgba(242, 212, 138, .25); display: flex; flex-wrap: wrap; gap: 14px 18px; align-items: center; font-size: 14.5px; line-height: 1.5; }
+  .consent[hidden] { display: none; }
+  .consent p { flex: 1 1 300px; margin: 0; }
+  .consent-btns { display: flex; gap: 10px; flex-wrap: wrap; }
+  .cookie-link { background: none; border: 0; padding: 0; font: inherit; color: inherit; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+  .cookie-link:hover { color: var(--beam); }
+</style>

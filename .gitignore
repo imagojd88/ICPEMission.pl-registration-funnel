@@ -18,3 +18,4 @@ api/prisma/*.db
 .site-bundle.tgz
 .book-public.tgz
 book-src-assets/
+.book-src.tgz

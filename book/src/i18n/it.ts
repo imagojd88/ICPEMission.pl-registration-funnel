@@ -85,11 +85,12 @@ const it: Dict = {
     h2: 'Risorse gratuite',
     lead: 'Leggi qualche pagina, prega con la comunità, condividi una citazione. Iscriviti alla newsletter per ricevere per primo le nuove risorse.',
     items: {
-      extracts: { title: 'Estratti', text: 'Alcune pagine del libro da leggere prima dell’acquisto.' },
+      extracts: { title: 'Estratti', text: 'Sette passi del libro da leggere e condividere.' },
       quotes: { title: 'Citazioni', text: 'Passi del libro pronti da condividere (in inglese).' },
       prayers: { title: 'Preghiere', text: 'Preghiere per la riflessione personale e per i gruppi.' },
     },
     download: 'Scarica il PDF',
+    read: 'Leggi online',
     soon: 'Prossimamente',
     newsletter: {
       h: 'Iscriviti alla newsletter',
@@ -106,6 +107,8 @@ const it: Dict = {
     contact: 'Contatti',
     follow: 'Seguici',
   },
+  consent: { text: 'Vorremmo usare i cookie di Google Analytics per capire come i visitatori utilizzano il sito. Puoi cambiare la tua scelta in qualsiasi momento.', accept: 'Accetto', decline: 'Rifiuto', settings: 'Impostazioni cookie' },
+  extracts: { title: 'Estratti', lead: 'Sette passi del libro da leggere lentamente, pregare e condividere.', note: 'Gli estratti provengono dall’edizione originale inglese.', copy: 'Copia', copied: 'Copiato', share: 'Condividi', back: 'Torna al libro', ctaH: 'Leggi tutta la storia', cta: 'Ordina l’edizione inglese', description: 'Sette passi di “Un raggio di luce” di Anna Cappello Fava da leggere, pregare e condividere.' },
 };
 
 export default it;
