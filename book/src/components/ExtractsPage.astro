@@ -91,7 +91,7 @@ const primaryHref = t.hero.primaryHref === 'polish' ? LINKS.polishEdition : LINK
         <img src={cover.src} alt={t.book.coverAlt} width={cover.w} height={cover.h} loading="lazy" />
         <div>
           <h2>{t.extracts.ctaH}</h2>
-          <p>{t.title}. {t.subtitle}</p>
+          <p>{t.title}{t.titleSep ?? '. '}{t.subtitle}</p>
           <div class="x-cta-btns">
             <a class="x-btn-main" href={primaryHref} target="_blank" rel="noopener" data-ga="order_click" data-ga-label="extracts">{t.extracts.cta}</a>
             <a class="x-btn-ghost" href={`${langPath(lang)}#resources`}>{t.nav.resources}</a>

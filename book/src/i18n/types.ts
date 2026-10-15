@@ -9,6 +9,8 @@ export interface Dict {
   nativeName: string;
   title: string;
   subtitle: string;
+  /** Separator tytułu i podtytułu w jednej linii (domyślnie '. '). */
+  titleSep?: string;
   coauthor: string;
   meta: { title: string; description: string };
   nav: { book: string; editions: string; author: string; endorsements: string; gallery: string; resources: string; order: string; language: string; menu: string };

@@ -41,7 +41,7 @@ export const RESOURCES: { key: 'extracts' | 'quotes' | 'prayers'; file: string; 
 export const EDITIONS: { lang: Lang; native: string; title: string; status: 'available' | 'launch' | 'soon'; href?: string; format?: string }[] = [
   { lang: 'en', native: 'English', title: 'A Cast of Light. The Story of the ICPE Mission', status: 'available', href: LINKS.amazon },
   { lang: 'pl', native: 'Polski', title: 'Promyk Światła. Historia ICPE Mission', status: 'launch', href: LINKS.polishEdition },
-  { lang: 'it', native: 'Italiano', title: 'Un raggio di luce. La storia dell’ICPE Mission', status: 'soon' },
+  { lang: 'it', native: 'Italiano', title: 'Un raggio di luce La storia dell’ICPE Mission', status: 'soon' },
   { lang: 'es', native: 'Español', title: 'Un destello de luz. La historia de la misión ICPE', status: 'soon', format: 'eBook' },
 ];
 

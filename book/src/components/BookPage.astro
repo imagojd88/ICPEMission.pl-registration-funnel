@@ -55,7 +55,7 @@ const longQuote = (s: string) => s.length > 520;
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href={`https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&display=swap`} rel="stylesheet" />
   <script type="application/ld+json" set:html={JSON.stringify({
-    '@context': 'https://schema.org', '@type': 'Book', name: `${t.title}. ${t.subtitle}`, inLanguage: t.htmlLang,
+    '@context': 'https://schema.org', '@type': 'Book', name: `${t.title}${t.titleSep ?? '. '}${t.subtitle}`, inLanguage: t.htmlLang,
     author: [{ '@type': 'Person', name: 'Anna Cappello Fava' }, { '@type': 'Person', name: 'A.G. Harmon' }],
     image: ogImage, url: canonical, publisher: { '@type': 'Organization', name: 'ICPE Mission', url: LINKS.icpe },
   })} />

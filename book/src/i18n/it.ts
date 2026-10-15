@@ -7,9 +7,11 @@ const it: Dict = {
   nativeName: 'Italiano',
   title: 'Un raggio di luce',
   subtitle: 'La storia dell’ICPE Mission',
+  /** Tytuł i podtytuł łączone bez kropki (decyzja Jacka). */
+  titleSep: ' ',
   coauthor: 'con A.G. Harmon',
   meta: {
-    title: 'Un raggio di luce. La storia dell’ICPE Mission — Anna Cappello Fava',
+    title: 'Un raggio di luce La storia dell’ICPE Mission — Anna Cappello Fava',
     description: 'Una coppia cattolica su una piccola isola del Mediterraneo riunì un gruppo di persone per vivere come i primi cristiani. La storia dell’ICPE Mission raccontata dalla sua co-fondatrice, Anna Cappello Fava.',
   },
   nav: { book: 'Il libro', editions: 'Edizioni', author: 'L’autrice', endorsements: 'Recensioni', gallery: 'Galleria', resources: 'Risorse gratuite', order: 'Ordina il libro', language: 'Lingua', menu: 'Menu' },

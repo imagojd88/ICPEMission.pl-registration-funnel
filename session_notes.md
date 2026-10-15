@@ -42,7 +42,17 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ---
 
+## Pliki publiczne na stronie icpemission.pl
+
+### Broszurka mszalna pod /r/ (2026-10-15)
+- PDF od Jacka (Uroczysta Eucharystia z okazji Celebracji Przymierza, 17.10.2026, 18 stron, 1,9 MB) → `site/public/r/broszurka-mszalna.pdf` → adres `https://icpemission.pl/r/broszurka-mszalna.pdf`. Commit `4c79290` wypchnięty z sesji w chmurze (auto-deploy `icpe-site`).
+- Wzorzec na przyszłość: publiczne pliki do pobrania = `site/public/<katalog>/<plik>` + push; panel nie ma uploadu plików publicznych. `/r/` na icpemission.pl nie koliduje z lejkiem (`/r/:slug` działa na rejestracja.icpemission.pl).
+- Lokalna kopia repo jest 1 commit za origin → przed kolejną pracą `git pull`.
+
 ## Dziennik prac — nowa strona icpebook.org („A Cast of Light")
+
+### Tytuł włoski bez kropki (2026-10-14)
+- „Un raggio di luce La storia dell’ICPE Mission” (lista wydań, tytuł karty IT, dane strukturalne, CTA na /it/extracts/). Nowe opcjonalne pole słownika `titleSep` (IT = spacja, reszta domyślnie „. ”). Build ✓.
 
 ### GA4: tag w <head> + Consent Mode v2 (2026-10-14)
 - Jacek: tag GA4 musi być w `<head>` (GA nie wykrywał tagu, bo ładował się dopiero po zgodzie). Nowy `components/GAHead.astro` w `<head>` obu stron: gtag.js `G-GXFTQF41HN` + `gtag('consent','default', …denied)`; `analytics_storage` = granted od razu, jeśli zgoda zapisana w localStorage. Baner (`Analytics.astro`) wysyła `gtag('consent','update')`. Bez zgody GA nie zapisuje cookies (pingi bez cookies — tryb zaawansowany Consent Mode).
