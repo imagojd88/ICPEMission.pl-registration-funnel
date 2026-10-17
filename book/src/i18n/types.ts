@@ -13,12 +13,11 @@ export interface Dict {
   titleSep?: string;
   coauthor: string;
   meta: { title: string; description: string };
-  nav: { book: string; editions: string; author: string; endorsements: string; gallery: string; resources: string; order: string; language: string; menu: string };
-  launchBar: { label: string; cta: string };
+  nav: { book: string; editions: string; author: string; endorsements: string; gallery: string; events: string; resources: string; order: string; language: string; menu: string };
   hero: { kicker: string; lede: string; primary: string; primaryHref: 'amazon' | 'polish'; secondary: string; note: string };
   promise: { lead: string; text: string };
   book: { h2: string; p1: string; p2: string; insideH: string; inside: string[]; photoCaption: string; photoAlt: string; coverAlt: string };
-  editions: { h2: string; lead: string; available: string; launch: string; soon: string; order: string; polish: string; notify: string };
+  editions: { h2: string; lead: string; available: string; soon: string; order: string; polish: string; notify: string };
   journey: { h2: string; steps: { year: string; place: string; text: string }[] };
   author: { lead: string; p1: string; p2: string; caption: string; alt: string };
   endorsements: { h2: string; count: string; items: Endorsement[] };
@@ -29,7 +28,8 @@ export interface Dict {
     download: string; soon: string; read: string;
     newsletter: { h: string; firstName: string; email: string; submit: string; gdpr: string; fallback: string };
   };
-  events: { h2: string; lead: string; title: string; cta: string; timeWord: string };
+  /** Sekcja „Book events”: relacje z wydarzeń. `paras` mogą zawierać <em>. */
+  events: { h2: string; lead: string; place: string; title: string; paras: string[]; closing: string; cta: string; ctaAlt: string; photos: string[] };
   footer: { about: string; contact: string; follow: string };
   consent: { text: string; accept: string; decline: string; settings: string };
   extracts: { title: string; lead: string; note: string; copy: string; copied: string; share: string; back: string; ctaH: string; cta: string; description: string };

@@ -2,7 +2,7 @@
 import { DICTS } from '../i18n';
 import Analytics from './Analytics.astro';
 import GAHead from './GAHead.astro';
-import { LANGS, LINKS, EDITIONS, EVENTS, GALLERY, RESOURCES, NEWSLETTER_ACTION, COVERS, DEFAULT_COVER, GA_ID, langPath, type Lang } from '../config';
+import { LANGS, LINKS, EDITIONS, NEWS, GALLERY, RESOURCES, NEWSLETTER_ACTION, COVERS, DEFAULT_COVER, GA_ID, langPath, type Lang } from '../config';
 
 interface Props { lang: Lang }
 const { lang } = Astro.props;
@@ -19,13 +19,9 @@ const cut = Math.ceil(tw.length / 2);
 const titleA = tw.slice(0, cut).join(' ');
 const titleB = tw.slice(cut).join(' ');
 
-// Wydarzenia: tylko przyszłe (build) — przeglądarka i tak ukrywa po dacie.
-const today = new Date().toISOString().slice(0, 10);
-const events = EVENTS.filter((e) => e.date >= today);
-const launch = events[0];
-const fmtDate = (iso: string) => new Intl.DateTimeFormat(t.htmlLang, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(iso + 'T12:00:00Z'));
-const fmtShort = (iso: string) => new Intl.DateTimeFormat(t.htmlLang, { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(iso + 'T12:00:00Z'));
-const dm = (iso: string) => { const [, m, d] = iso.split('-'); return `${d}.${m}`; };
+const fmtShort = (iso: string) => new Intl.DateTimeFormat(t.htmlLang === 'en' ? 'en-GB' : t.htmlLang, { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(iso + 'T12:00:00Z'));
+// Book events: drugi przycisk prowadzi do „drugiego” wydania (PL ↔ EN).
+const altHref = lang === 'pl' ? LINKS.amazon : LINKS.polishEdition;
 
 const galleryTabs = (['community', 'outreach', 'events'] as const).map((k) => ({ key: k, label: t.gallery.tabs[k], photos: GALLERY[k] }));
 const longQuote = (s: string) => s.length > 520;
@@ -63,14 +59,6 @@ const longQuote = (s: string) => s.length > 520;
 <body>
 <div class="acl" id="top">
 
-  {launch && (
-    <a class="bar" href={launch.href} target="_blank" rel="noopener" data-until={launch.date} data-ga="luma_click" data-ga-label="launch_bar">
-      <span class="bar-spark" aria-hidden="true"></span>
-      <span class="bar-text"><strong>{t.launchBar.label}</strong> <span class="bar-when">{fmtShort(launch.date)}, {launch.city}</span></span>
-      <span class="bar-cta">{t.launchBar.cta}</span>
-    </a>
-  )}
-
   <header class="nav" data-nav>
     <div class="nav-in">
       <a class="brand" href={langPath(lang)}>
@@ -83,6 +71,7 @@ const longQuote = (s: string) => s.length > 520;
         <a href="#editions">{t.nav.editions}</a>
         <a href="#author">{t.nav.author}</a>
         <a href="#endorsements">{t.nav.endorsements}</a>
+        <a href="#events">{t.nav.events}</a>
         <a href="#gallery">{t.nav.gallery}</a>
         <a href="#resources">{t.nav.resources}</a>
       </nav>
@@ -102,6 +91,7 @@ const longQuote = (s: string) => s.length > 520;
           <a href="#editions">{t.nav.editions}</a>
           <a href="#author">{t.nav.author}</a>
           <a href="#endorsements">{t.nav.endorsements}</a>
+          <a href="#events">{t.nav.events}</a>
           <a href="#gallery">{t.nav.gallery}</a>
           <a href="#resources">{t.nav.resources}</a>
           <a class="btn btn-beam" href={primaryHref} target="_blank" rel="noopener" data-ga="order_click" data-ga-label="menu">{t.nav.order}</a>
@@ -176,15 +166,12 @@ const longQuote = (s: string) => s.length > 520;
               <p class="ed-title">{e.title}</p>
               <p class={`ed-status st-${e.status}`} lang={t.htmlLang}>
                 {e.status === 'available' && t.editions.available}
-                {e.status === 'launch' && launch && `${t.editions.launch}: ${fmtShort(launch.date)}, ${launch.city}`}
-                {e.status === 'launch' && !launch && t.editions.available}
                 {e.status === 'soon' && t.editions.soon}
                 {e.format && ` · ${e.format}`}
               </p>
             </div>
             <span lang={t.htmlLang}>
-              {e.status === 'available' && <a class="btn btn-ink" href={e.href} target="_blank" rel="noopener" data-ga="order_click" data-ga-label={`edition_${e.lang}`}>{t.editions.order}</a>}
-              {e.status === 'launch' && <a class="btn btn-ink" href={e.href} target="_blank" rel="noopener" data-ga="edition_click" data-ga-label={e.lang}>{t.editions.polish}</a>}
+              {e.status === 'available' && <a class="btn btn-ink" href={e.href} target="_blank" rel="noopener" data-ga="order_click" data-ga-label={`edition_${e.lang}`}>{e.href === LINKS.amazon ? t.editions.order : t.editions.polish}</a>}
               {e.status === 'soon' && <a class="link" href="#newsletter">{t.editions.notify}</a>}
             </span>
           </li>
@@ -250,6 +237,34 @@ const longQuote = (s: string) => s.length > 520;
           </div>
         )}
       </div>
+    </div>
+  </section>
+
+  <section class="sec tint" id="events">
+    <div class="wrap">
+      <div class="nw-head">
+        <h2 class="h2">{t.events.h2}</h2>
+        <p class="lead">{t.events.lead}</p>
+      </div>
+      <article class="nw">
+        <div class="nw-photos">
+          {NEWS.photos.map((p, i) => (
+            <a class={`nw-ph${i === 0 ? ' is-wide' : ''}`} href={`/img/events/${p.file}`} data-full={`/img/events/${p.file}`}>
+              <img src={`/img/events/thumb-${p.file}`} alt={t.events.photos[i] ?? ''} width={p.w} height={p.h} loading="lazy" />
+            </a>
+          ))}
+        </div>
+        <div class="nw-body">
+          <p class="nw-meta"><time datetime={NEWS.date}>{fmtShort(NEWS.date)}</time><span aria-hidden="true">·</span>{t.events.place}</p>
+          <h3 class="nw-title">{t.events.title}</h3>
+          {t.events.paras.map((para, i) => <p class={i === 3 ? 'nw-pull' : undefined} set:html={para} />)}
+          <p class="nw-closing">{t.events.closing}</p>
+          <p class="nw-cta">
+            <a class="btn btn-ink" href={primaryHref} target="_blank" rel="noopener" data-ga="order_click" data-ga-label="events">{t.events.cta}</a>
+            <a class="link" href={altHref} target="_blank" rel="noopener" data-ga="edition_click" data-ga-label="events_alt">{t.events.ctaAlt}</a>
+          </p>
+        </div>
+      </article>
     </div>
   </section>
 
@@ -326,26 +341,6 @@ const longQuote = (s: string) => s.length > 520;
     </div>
   </section>
 
-  {launch && (
-    <section class="sec" data-until={launch.date}>
-      <div class="wrap two center">
-        <div>
-          <h2 class="h2">{t.events.h2}</h2>
-          <p class="lead">{t.events.lead}</p>
-        </div>
-        <a class="event" href={launch.href} target="_blank" rel="noopener" data-ga="luma_click" data-ga-label="events_section">
-          <span class="ev-date">{dm(launch.date)}</span>
-          <span class="ev-body">
-            <span class="ev-title">{t.events.title}</span>
-            <span class="ev-meta">{fmtDate(launch.date)}{t.events.timeWord ? `, ${t.events.timeWord} ${launch.time}` : ` ${launch.time}`}</span>
-            <span class="ev-meta">{launch.venue}, {launch.city}</span>
-            <span class="ev-cta">{t.events.cta}</span>
-          </span>
-        </a>
-      </div>
-    </section>
-  )}
-
   <footer class="foot">
     <div class="wrap foot-grid">
       <div>
@@ -401,12 +396,6 @@ const longQuote = (s: string) => s.length > 520;
   .link { font-weight: 600; text-underline-offset: 5px; text-decoration-color: var(--ember); }
 
   /* Pasek premiery */
-  .bar { position: relative; z-index: 60; display: flex; justify-content: center; align-items: center; gap: 14px; padding: 11px 24px; background: #10231a; color: var(--day); text-decoration: none; font-size: 14.5px; line-height: 1.35; border-bottom: 1px solid rgba(242, 212, 138, .22); }
-  .bar strong { font-weight: 600; }
-  .bar-when { color: var(--beam); }
-  .bar-spark { flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%; background: var(--beam); animation: glow 2.8s ease-out infinite; }
-  .bar-cta { flex: 0 0 auto; padding: 6px 14px; border-radius: 100px; border: 1px solid rgba(242, 212, 138, .55); color: var(--beam); font-weight: 600; font-size: 13.5px; }
-  .bar:hover .bar-cta { background: var(--beam); color: var(--night); }
   @keyframes glow { 0% { box-shadow: 0 0 0 0 rgba(242, 212, 138, .55); } 70% { box-shadow: 0 0 0 10px rgba(242, 212, 138, 0); } 100% { box-shadow: 0 0 0 0 rgba(242, 212, 138, 0); } }
 
   /* Nawigacja */
@@ -507,7 +496,6 @@ const longQuote = (s: string) => s.length > 520;
   .ed-lang { font-family: var(--serif); font-size: 32px; line-height: 1.1; padding-left: 4px; }
   .ed-title { font-family: var(--serif); font-size: 23px; font-style: italic; line-height: 1.3; }
   .ed-status { margin-top: 4px; font-size: 14.5px; color: var(--ink-soft); }
-  .st-launch { color: var(--ember); font-weight: 600; }
 
   /* Droga */
   .track { position: relative; margin-top: 60px; }
@@ -593,13 +581,21 @@ const longQuote = (s: string) => s.length > 520;
   .fine { flex-basis: 100%; font-size: 13px; color: rgba(245, 241, 226, .55); }
 
   /* Wydarzenie */
-  .event { display: grid; grid-template-columns: auto 1fr; gap: 28px; align-items: center; padding: 30px; border-radius: 14px; background: var(--night); color: var(--day); text-decoration: none; transition: box-shadow .3s; }
-  .event:hover { box-shadow: 0 0 0 1px var(--beam), 0 30px 60px -30px rgba(12, 26, 20, .6); }
-  .ev-date { font-family: 'Cormorant Garamond', serif; font-weight: 300; font-size: 92px; line-height: .85; color: var(--beam-hi); }
-  .ev-body { display: grid; gap: 6px; }
-  .ev-title { font-weight: 600; font-size: 17px; }
-  .ev-meta { font-size: 15px; color: rgba(245, 241, 226, .72); }
-  .ev-cta { color: var(--beam); font-weight: 600; font-size: 14.5px; margin-top: 6px; }
+  .nw-head { max-width: 760px; }
+  .nw { margin-top: 48px; display: grid; grid-template-columns: 1fr 1.05fr; gap: 64px; align-items: start; }
+  .nw-photos { position: sticky; top: 96px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .nw-ph { display: block; overflow: hidden; border-radius: 4px; background: var(--day); aspect-ratio: 2 / 3; }
+  .nw-ph.is-wide { grid-column: 1 / -1; aspect-ratio: 16 / 9; }
+  .nw-ph img { width: 100%; height: 100%; object-fit: cover; transition: transform .6s cubic-bezier(.2, .7, .2, 1); }
+  .nw-ph:hover img { transform: scale(1.04); }
+  .nw-meta { display: flex; flex-wrap: wrap; gap: 10px; font-size: 13.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--ember); }
+  .nw-title { margin: 14px 0 26px; font-family: var(--serif); font-weight: 400; font-size: clamp(30px, 3.4vw, 42px); line-height: 1.1; }
+  .nw-body > :where(p:not(.nw-meta):not(.nw-cta)) { font-size: 17.5px; line-height: 1.7; color: var(--ink-soft); max-width: 62ch; }
+  .nw-body > p + p { margin-top: 16px; }
+  .nw-body em { font-style: italic; color: var(--ink); }
+  .nw-body > p.nw-pull { margin: 30px 0; padding-left: 22px; border-left: 2px solid var(--ember); font-family: var(--serif); font-style: italic; font-size: 26px; line-height: 1.35; color: var(--ink); }
+  .nw-body > p.nw-closing { margin-top: 30px; padding-top: 26px; border-top: 1px solid var(--line); font-weight: 600; color: var(--ink); }
+  .nw-cta { margin-top: 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 22px; }
 
   /* Stopka */
   .foot { background: var(--night); color: rgba(245, 241, 226, .75); padding: 64px 0 40px; font-size: 14.5px; }
@@ -616,6 +612,8 @@ const longQuote = (s: string) => s.length > 520;
 
   @media (max-width: 1100px) { .nav-links { display: none; } .nav-in { justify-content: flex-end; } .brand { margin-right: auto; } .menu { display: block; } }
   @media (max-width: 1000px) {
+    .nw { grid-template-columns: 1fr; gap: 40px; }
+    .nw-photos { position: static; }
     .hero-in { grid-template-columns: 1fr; gap: 56px; }
     .hero-book { justify-self: start; margin-left: 40px; }
     .two, .two.center, .author, .voices-grid { grid-template-columns: 1fr; gap: 44px; }
@@ -636,8 +634,6 @@ const longQuote = (s: string) => s.length > 520;
     .nav-in { padding-top: 12px; padding-bottom: 12px; gap: 8px; }
     .brand span { font-size: 20px; }
     .nav-cta { display: none; }
-    .bar { justify-content: space-between; padding: 10px 16px; font-size: 13.5px; }
-    .bar-spark { display: none; }
     .hero { padding: 110px 0 72px; margin-top: -64px; }
     .title { font-size: 84px; }
     .lede { font-size: 17px; }
@@ -646,14 +642,12 @@ const longQuote = (s: string) => s.length > 520;
     .promise { padding: 84px 0 52px; }
     .sec { padding: 80px 0; } #book { padding-top: 44px; }
     .prose { font-size: 20px; }
-    .event { grid-template-columns: 1fr; gap: 10px; }
-    .ev-date { font-size: 64px; }
     .gal { grid-auto-rows: 130px; gap: 10px; }
     .lb-prev, .lb-next { top: auto; bottom: 20px; }
   }
   @media (prefers-reduced-motion: reduce) {
-    .ray, .hero-copy > *, .hero-book, .bar-spark { animation: none !important; }
-    .book, .gal-item img { transition: none; }
+    .ray, .hero-copy > *, .hero-book { animation: none !important; }
+    .book, .gal-item img, .nw-ph img { transition: none; }
     .promise-text .w { color: var(--beam-hi); }
     html { scroll-behavior: auto; }
   }
@@ -664,12 +658,6 @@ const longQuote = (s: string) => s.length > 520;
     document.documentElement.classList.add('js');
     document.body.classList.add('js');
     var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-    // Po dacie wydarzenia znikają pasek i sekcja (bez przebudowy strony).
-    document.querySelectorAll('[data-until]').forEach(function (el) {
-      var end = new Date(el.getAttribute('data-until') + 'T23:59:59+02:00');
-      if (Date.now() > end.getTime()) el.remove();
-    });
 
     // Nawigacja: stan zależny od tła pod spodem.
     var nav = document.querySelector('[data-nav]');
@@ -770,10 +758,11 @@ const longQuote = (s: string) => s.length > 520;
       });
       var lb = gal.querySelector('[data-lightbox]'), lbImg = gal.querySelector('[data-lb-img]'), list = [], idx = 0;
       function openAt(i) { idx = (i + list.length) % list.length; var a = list[idx]; lbImg.src = a.getAttribute('data-full'); lbImg.alt = a.querySelector('img').alt; if (!lb.open) lb.showModal(); }
-      gal.querySelectorAll('.gal-item').forEach(function (a) {
+      // Podgląd działa też dla zdjęć z sekcji Book events (.nw-ph).
+      document.querySelectorAll('.gal-item, .nw-ph').forEach(function (a) {
         a.addEventListener('click', function (e) {
           if (!lb || !lb.showModal) return; e.preventDefault();
-          list = Array.prototype.slice.call(a.parentElement.querySelectorAll('.gal-item')); openAt(list.indexOf(a));
+          list = Array.prototype.slice.call(a.parentElement.querySelectorAll('.gal-item, .nw-ph')); openAt(list.indexOf(a));
         });
       });
       if (lb) {

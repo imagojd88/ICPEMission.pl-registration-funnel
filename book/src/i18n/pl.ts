@@ -11,15 +11,14 @@ const pl: Dict = {
     title: 'Promyk Światła. Historia ICPE Mission — Anna Cappello Fava',
     description: 'Jak katolickie małżeństwo z małej śródziemnomorskiej wyspy postanowiło żyć jak pierwsi chrześcijanie i podzielić się tym z całym światem. Historia ICPE Mission opowiedziana przez współzałożycielkę, Annę Cappello Fava.',
   },
-  nav: { book: 'O książce', editions: 'Wydania', author: 'Autorka', endorsements: 'Rekomendacje', gallery: 'Galeria', resources: 'Materiały', order: 'Polskie wydanie', language: 'Język', menu: 'Menu' },
-  launchBar: { label: 'Premiera polskiej edycji', cta: 'Zapisz się' },
+  nav: { book: 'O książce', editions: 'Wydania', author: 'Autorka', endorsements: 'Rekomendacje', gallery: 'Galeria', events: 'Wydarzenia', resources: 'Materiały', order: 'Polskie wydanie', language: 'Język', menu: 'Menu' },
   hero: {
     kicker: 'Historia ICPE Mission',
     lede: 'Na początku lat 80. katolickie małżeństwo z małej śródziemnomorskiej wyspy zgromadziło ludzi, którzy chcieli żyć jak pierwsi chrześcijanie. Ich obietnica: zacząć tam, gdzie są, i nie zatrzymać się, dopóki nie obejdą całego świata.',
-    primary: 'Polskie wydanie i premiera',
+    primary: 'Zamów polskie wydanie',
     primaryHref: 'polish',
     secondary: 'Poznaj książkę',
-    note: 'Polska edycja: premiera 16 października 2026 w Krakowie. Wydanie angielskie jest już dostępne.',
+    note: 'Polskie wydanie jest już dostępne, podobnie jak angielski oryginał. Wkrótce wydania włoskie i hiszpańskie.',
   },
   promise: { lead: 'Na początku była jedna śmiała obietnica', text: 'Zaczną tam, gdzie są, i nie zatrzymają się, dopóki nie obejdą całego świata.' },
   book: {
@@ -41,7 +40,6 @@ const pl: Dict = {
     h2: 'Jedna historia, wiele języków',
     lead: 'Książka wędruje tak, jak wędrowała misja. Wybierz swoje wydanie.',
     available: 'Dostępne',
-    launch: 'Premiera',
     soon: 'Wkrótce',
     order: 'Zamów na Amazonie',
     polish: 'Polskie wydanie',
@@ -54,7 +52,7 @@ const pl: Dict = {
       { year: '1985', place: 'Malta', text: 'Powstaje Instytut Ewangelizacji Świata – ICPE Mission. Wspólnota zaczyna formować świeckich i posyłać ich w świat.' },
       { year: 'Kolejne dekady', place: 'Wszystkie kontynenty', text: 'Misjonarze docierają do najtrudniejszych miejsc świata. Rodzi się HopeXchange, humanitarne ramię misji.' },
       { year: '2025', place: 'Cały Kościół', text: 'Czterdziesta rocznica założenia ICPE Mission. Książka ukazuje się po angielsku.' },
-      { year: '2026', place: 'Nowe języki', text: 'Premiera polskiej edycji w Krakowie; w przygotowaniu wydania włoskie i hiszpańskie.' },
+      { year: '2026', place: 'Nowe języki', text: 'Polska edycja ma premierę w Krakowie; w przygotowaniu wydania włoskie i hiszpańskie.' },
     ],
   },
   author: {
@@ -93,14 +91,28 @@ const pl: Dict = {
       fallback: 'Napisz do nas, aby dołączyć',
     },
   },
-  events: { h2: 'Spotkania z książką', lead: 'Poznaj wspólnotę, o której opowiada książka, na spotkaniu w Twojej okolicy.', title: 'Premiera polskiej edycji', cta: 'Zapisz się w Lumie', timeWord: 'godz.' },
+  events: {
+    h2: "Spotkania z książką", lead: "Relacje z premier i spotkań wokół książki.", place: "Kraków", title: "„Promyk Światła” – premiera książki w Krakowie",
+    paras: [
+      "16 października 2026 roku Anna Cappello zaprezentowała w Krakowie polskie wydanie swojej książki „Promyk Światła”. Na język polski przełożyli ją Jacek Dudzic, ks. Sławomir Pawłowski i Agata Woźniak.",
+      "Był to piękny wieczór pełen inspirujących refleksji, szczerych świadectw i serdecznej wspólnoty.",
+      "Wprowadzając w lekturę, ks. Sławomir przypomniał otwierającą książkę historię misjonarzy posługujących w dżunglach Borneo. Pewnego dnia z lasu wyszła rodzina z niemowlęciem pokrytym pęcherzami, rozpaczliwie szukając pomocy. W tej chwili potrzeby misjonarze stali się promykiem światła, który przyniósł nadzieję w ich ciemność.",
+      "Na wiele sposobów i my szukamy tego samego światła w naszym życiu.",
+      "Jacek zaprosił następnie wszystkich nie tylko do przeczytania dwunastu rozdziałów książki, ale także do <em>przeżycia jej nienapisanego, trzynastego rozdziału</em>. Ten rozdział należy do dzisiejszych misjonarzy, którzy swoim życiem, wiarą i świadectwem wciąż dopisują dalszy ciąg historii ICPE Mission.",
+      "Anna podzieliła się nadzieją, że książka zainspiruje zarówno misjonarzy ICPE, jak i czytelników z najróżniejszych środowisk, by odważnie wyjść z łodzi, zaufać Jezusowi i każdego dnia za Nim iść.",
+      "Ta historia nie kończy się na ostatniej stronie. Wszyscy jesteśmy zaproszeni, by stać się częścią jej kolejnego rozdziału – pozwolić, by prowadził nas Duch Święty i uczynił nas promykiem światła w życiu innych.",
+    ],
+    closing: "Daj się zainspirować. Stań się częścią tej historii. Zamów swój egzemplarz „Promyka Światła” i odkryj, jak i Ty możesz napisać jej kolejny rozdział!",
+    cta: "Zamów polskie wydanie", ctaAlt: "Wydanie angielskie",
+    photos: ["Prelegent przemawia do gości obok drewnianego krzyża", "Prelegent przy pulpicie z polskim wydaniem książki w dłoni", "Dzielenie się z gośćmi podczas wieczoru", "Podpisywanie książek po premierze"],
+  },
   footer: {
     about: 'Instytut Ewangelizacji Świata – ICPE Mission to międzynarodowa wspólnota katolicka, która formuje uczniów-misjonarzy i przemienia życie radością Ewangelii.',
     contact: 'Kontakt',
     follow: 'Obserwuj',
   },
   consent: { text: 'Chcielibyśmy używać plików cookie Google Analytics, żeby wiedzieć, jak odwiedzający korzystają ze strony. Wybór możesz zmienić w każdej chwili.', accept: 'Akceptuję', decline: 'Odrzucam', settings: 'Ustawienia cookie' },
-  extracts: { title: 'Fragmenty', lead: 'Siedem fragmentów książki do powolnej lektury, modlitwy i dzielenia się z innymi.', note: 'Fragmenty pochodzą z oryginalnego wydania angielskiego.', copy: 'Kopiuj', copied: 'Skopiowano', share: 'Udostępnij', back: 'Wróć do książki', ctaH: 'Przeczytaj całą historię', cta: 'Polskie wydanie i premiera', description: 'Siedem fragmentów książki Anny Cappello Favy „Promyk Światła” do lektury, modlitwy i udostępniania.' },
+  extracts: { title: 'Fragmenty', lead: 'Siedem fragmentów książki do powolnej lektury, modlitwy i dzielenia się z innymi.', note: 'Fragmenty pochodzą z oryginalnego wydania angielskiego.', copy: 'Kopiuj', copied: 'Skopiowano', share: 'Udostępnij', back: 'Wróć do książki', ctaH: 'Przeczytaj całą historię', cta: 'Zamów polskie wydanie', description: 'Siedem fragmentów książki Anny Cappello Favy „Promyk Światła” do lektury, modlitwy i udostępniania.' },
 };
 
 export default pl;

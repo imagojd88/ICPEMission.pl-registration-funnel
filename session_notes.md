@@ -51,6 +51,13 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — nowa strona icpebook.org („A Cast of Light")
 
+### Book events zamiast promocji polskiej premiery (2026-10-17)
+- Premiera PL odbyła się 16.10.2026 → z icpebook.org usunięte: pasek „Polish edition launch”, sekcja rejestracji Luma, status „Launch” w Wydaniach, `EVENTS` i skrypt `data-until`, klucze `launchBar` i `editions.launch`.
+- PL edycja w `EDITIONS` ma status `available` (przycisk „Polish edition” → icpemission.pl/promyk-swiatla). Teksty hero/journey we wszystkich 4 językach zaktualizowane (PL dostępne). PL CTA: „Zamów polskie wydanie”.
+- Nowa sekcja `#events` („Book events”, między Rekomendacjami a Galerią, link w nawigacji): relacja z premiery w Krakowie — tekst EN verbatim od Jacka (kursywa: „live out its unwritten thirteenth chapter”), tłumaczenia PL/IT/ES moje. Dane: `NEWS` w config.ts (data + zdjęcia), teksty `events.*` w i18n (`paras` mogą mieć `<em>`; akapit nr 4 to wyróżniony cytat).
+- Zdjęcia: `book/public/img/events/krakow-01..04.jpg` (+ thumb-), otwierają się w lightboksie galerii. Podpisy/alt bez nazwisk.
+- icpemission.pl (site/) nieruszone: PremiereBanner sam się ukrywa po dacie, promyk-swiatla pokazuje „Premiera odbyła się”.
+
 ### Tytuł włoski bez kropki (2026-10-14)
 - „Un raggio di luce La storia dell’ICPE Mission” (lista wydań, tytuł karty IT, dane strukturalne, CTA na /it/extracts/). Nowe opcjonalne pole słownika `titleSep` (IT = spacja, reszta domyślnie „. ”). Build ✓.
 

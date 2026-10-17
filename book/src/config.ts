@@ -37,18 +37,27 @@ export const RESOURCES: { key: 'extracts' | 'quotes' | 'prayers'; file: string; 
   { key: 'prayers', file: '' },
 ];
 
-/** Wydania. `status`: available | launch | soon. Język strony nie musi mieć wydania. */
-export const EDITIONS: { lang: Lang; native: string; title: string; status: 'available' | 'launch' | 'soon'; href?: string; format?: string }[] = [
+/** Wydania. `status`: available | soon. Język strony nie musi mieć wydania. */
+export const EDITIONS: { lang: Lang; native: string; title: string; status: 'available' | 'soon'; href?: string; format?: string }[] = [
   { lang: 'en', native: 'English', title: 'A Cast of Light. The Story of the ICPE Mission', status: 'available', href: LINKS.amazon },
-  { lang: 'pl', native: 'Polski', title: 'Promyk Światła. Historia ICPE Mission', status: 'launch', href: LINKS.polishEdition },
+  { lang: 'pl', native: 'Polski', title: 'Promyk Światła. Historia ICPE Mission', status: 'available', href: LINKS.polishEdition },
   { lang: 'it', native: 'Italiano', title: 'Un raggio di luce La storia dell’ICPE Mission', status: 'soon' },
   { lang: 'es', native: 'Español', title: 'Un destello de luz. La historia de la misión ICPE', status: 'soon', format: 'eBook' },
 ];
 
-/** Premiera / wydarzenia. Po dniu `date` sekcja i pasek znikają (sprawdzane też w przeglądarce). */
-export const EVENTS = [
-  { id: 'krakow-2026', date: '2026-10-16', time: '18:30', city: 'Kraków', venue: 'ul. Dwernickiego 5', href: 'https://luma.com/u9vluazp' },
-];
+/**
+ * Sekcja „Book events”: relacja z wydarzenia (teksty w i18n → events).
+ * Zdjęcia w public/img/events/ (pełne + thumb-…), kolejność = podpisy `events.photos`. Pierwsze (poziome) jest szerokie.
+ */
+export const NEWS = {
+  date: '2026-10-16',
+  photos: [
+    { file: 'krakow-01.jpg', w: 1600, h: 900 },
+    { file: 'krakow-02.jpg', w: 1105, h: 1600 },
+    { file: 'krakow-03.jpg', w: 900, h: 1600 },
+    { file: 'krakow-04.jpg', w: 901, h: 1600 },
+  ],
+};
 
 /** Galeria: pliki w public/img/gallery/ (pełne + thumb-…). Wymiary pełnych plików. */
 export const GALLERY: Record<'community' | 'outreach' | 'events', { file: string; w: number; h: number }[]> = {
