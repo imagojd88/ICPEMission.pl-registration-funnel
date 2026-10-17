@@ -47,15 +47,16 @@ export const EDITIONS: { lang: Lang; native: string; title: string; status: 'ava
 
 /**
  * Sekcja „Book events”: relacja z wydarzenia (teksty w i18n → events).
- * Zdjęcia w public/img/events/ (pełne + thumb-…), kolejność = podpisy `events.photos`. Pierwsze (poziome) jest szerokie.
+ * Zdjęcia w public/img/events/ (pełne + thumb-…), kolejność = podpisy `events.photos`. Poziome zdjęcia (w > h) zajmują całą szerokość.
  */
 export const NEWS = {
   date: '2026-10-16',
   photos: [
-    { file: 'krakow-01.jpg', w: 1600, h: 900 },
+    { file: 'krakow-05.jpg', w: 1600, h: 1086 },
     { file: 'krakow-02.jpg', w: 1105, h: 1600 },
     { file: 'krakow-03.jpg', w: 900, h: 1600 },
     { file: 'krakow-04.jpg', w: 901, h: 1600 },
+    { file: 'krakow-01.jpg', w: 1600, h: 900 },
   ],
 };
 

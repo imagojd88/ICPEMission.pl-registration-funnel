@@ -56,6 +56,7 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 - PL edycja w `EDITIONS` ma status `available` (przycisk „Polish edition” → icpemission.pl/promyk-swiatla). Teksty hero/journey we wszystkich 4 językach zaktualizowane (PL dostępne). PL CTA: „Zamów polskie wydanie”.
 - Nowa sekcja `#events` („Book events”, między Rekomendacjami a Galerią, link w nawigacji): relacja z premiery w Krakowie — tekst EN verbatim od Jacka (kursywa: „live out its unwritten thirteenth chapter”), tłumaczenia PL/IT/ES moje. Dane: `NEWS` w config.ts (data + zdjęcia), teksty `events.*` w i18n (`paras` mogą mieć `<em>`; akapit nr 4 to wyróżniony cytat).
 - Zdjęcia: `book/public/img/events/krakow-01..04.jpg` (+ thumb-), otwierają się w lightboksie galerii. Podpisy/alt bez nazwisk.
+- Poprawka: na górze zdjęcie ze spotkania z kardynałem (`krakow-05.jpg`), poziome zdjęcie prelegenta przy krzyżu (`krakow-01.jpg`) przeniesione na dół. Poziome zdjęcia (w > h) automatycznie zajmują całą szerokość.
 - icpemission.pl (site/) nieruszone: PremiereBanner sam się ukrywa po dacie, promyk-swiatla pokazuje „Premiera odbyła się”.
 
 ### Tytuł włoski bez kropki (2026-10-14)

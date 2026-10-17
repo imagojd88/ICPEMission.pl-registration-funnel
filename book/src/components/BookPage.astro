@@ -249,7 +249,7 @@ const longQuote = (s: string) => s.length > 520;
       <article class="nw">
         <div class="nw-photos">
           {NEWS.photos.map((p, i) => (
-            <a class={`nw-ph${i === 0 ? ' is-wide' : ''}`} href={`/img/events/${p.file}`} data-full={`/img/events/${p.file}`}>
+            <a class={`nw-ph${p.w > p.h ? ' is-wide' : ''}`} href={`/img/events/${p.file}`} data-full={`/img/events/${p.file}`}>
               <img src={`/img/events/thumb-${p.file}`} alt={t.events.photos[i] ?? ''} width={p.w} height={p.h} loading="lazy" />
             </a>
           ))}
