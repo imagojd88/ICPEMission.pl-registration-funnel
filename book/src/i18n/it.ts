@@ -114,7 +114,7 @@ const it: Dict = {
     ],
     closing: "Lasciati ispirare. Diventa parte della storia. Ordina la tua copia di “A Cast of Light” e scopri come anche tu puoi contribuire a scriverne il prossimo capitolo!",
     cta: "Ordina la tua copia", ctaAlt: "Edizione polacca",
-    photos: ["L’edizione polacca del libro presentata durante l’incontro con il cardinale", "Un relatore al leggio con l’edizione polacca del libro", "Condivisione con gli ospiti durante la serata", "Firma delle copie dopo la presentazione", "Un relatore parla agli ospiti accanto a una croce di legno"],
+    photos: ["L’edizione polacca presentata agli ospiti", "Firma delle copie dopo la presentazione", "L’edizione polacca del libro presentata durante l’incontro con il cardinale", "Foto di gruppo con l’edizione polacca dopo la presentazione", "Un relatore al leggio con l’edizione polacca del libro", "Un relatore parla agli ospiti accanto a una croce di legno"],
   },
   footer: {
     about: 'L’Institute for World Evangelisation – ICPE Mission è una comunità cattolica internazionale impegnata a formare discepoli missionari e a trasformare le vite attraverso la gioia del Vangelo.',

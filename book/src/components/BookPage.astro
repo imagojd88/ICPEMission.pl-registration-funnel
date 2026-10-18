@@ -22,6 +22,13 @@ const titleB = tw.slice(cut).join(' ');
 const fmtShort = (iso: string) => new Intl.DateTimeFormat(t.htmlLang === 'en' ? 'en-GB' : t.htmlLang, { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(iso + 'T12:00:00Z'));
 // Book events: drugi przycisk prowadzi do „drugiego” wydania (PL ↔ EN).
 const altHref = lang === 'pl' ? LINKS.amazon : LINKS.polishEdition;
+// Book events: rzędy zdjęć — poziome osobno, pozostałe parami (wspólna wysokość w rzędzie).
+const newsRows: { p: (typeof NEWS.photos)[number]; i: number }[][] = [];
+NEWS.photos.forEach((p, i) => {
+  const last = newsRows[newsRows.length - 1];
+  if (p.w / p.h > 1.3 || !last || last.length > 1 || last[0].p.w / last[0].p.h > 1.3) newsRows.push([{ p, i }]);
+  else last.push({ p, i });
+});
 
 const galleryTabs = (['community', 'outreach', 'events'] as const).map((k) => ({ key: k, label: t.gallery.tabs[k], photos: GALLERY[k] }));
 const longQuote = (s: string) => s.length > 520;
@@ -248,10 +255,14 @@ const longQuote = (s: string) => s.length > 520;
       </div>
       <article class="nw">
         <div class="nw-photos">
-          {NEWS.photos.map((p, i) => (
-            <a class={`nw-ph${p.w > p.h ? ' is-wide' : ''}`} href={`/img/events/${p.file}`} data-full={`/img/events/${p.file}`}>
-              <img src={`/img/events/thumb-${p.file}`} alt={t.events.photos[i] ?? ''} width={p.w} height={p.h} loading="lazy" />
-            </a>
+          {newsRows.map((row) => (
+            <div class="nw-row">
+              {row.map(({ p, i }) => (
+                <a class="nw-ph" href={`/img/events/${p.file}`} data-full={`/img/events/${p.file}`} style={`--r:${(p.w / p.h).toFixed(4)}`}>
+                  <img src={`/img/events/thumb-${p.file}`} alt={t.events.photos[i] ?? ''} width={p.w} height={p.h} loading="lazy" />
+                </a>
+              ))}
+            </div>
           ))}
         </div>
         <div class="nw-body">
@@ -583,9 +594,9 @@ const longQuote = (s: string) => s.length > 520;
   /* Wydarzenie */
   .nw-head { max-width: 760px; }
   .nw { margin-top: 48px; display: grid; grid-template-columns: 1fr 1.05fr; gap: 64px; align-items: start; }
-  .nw-photos { position: sticky; top: 96px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-  .nw-ph { display: block; overflow: hidden; border-radius: 4px; background: var(--day); aspect-ratio: 2 / 3; }
-  .nw-ph.is-wide { grid-column: 1 / -1; aspect-ratio: 16 / 9; }
+  .nw-photos { position: sticky; top: 96px; display: grid; gap: 12px; }
+  .nw-row { display: flex; gap: 12px; }
+  .nw-ph { flex: var(--r) 1 0; min-width: 0; aspect-ratio: var(--r); display: block; overflow: hidden; border-radius: 4px; background: var(--day); }
   .nw-ph img { width: 100%; height: 100%; object-fit: cover; transition: transform .6s cubic-bezier(.2, .7, .2, 1); }
   .nw-ph:hover img { transform: scale(1.04); }
   .nw-meta { display: flex; flex-wrap: wrap; gap: 10px; font-size: 13.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--ember); }
@@ -762,7 +773,7 @@ const longQuote = (s: string) => s.length > 520;
       document.querySelectorAll('.gal-item, .nw-ph').forEach(function (a) {
         a.addEventListener('click', function (e) {
           if (!lb || !lb.showModal) return; e.preventDefault();
-          list = Array.prototype.slice.call(a.parentElement.querySelectorAll('.gal-item, .nw-ph')); openAt(list.indexOf(a));
+          list = Array.prototype.slice.call(a.closest('.gal, .nw-photos').querySelectorAll('.gal-item, .nw-ph')); openAt(list.indexOf(a));
         });
       });
       if (lb) {

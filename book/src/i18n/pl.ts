@@ -104,7 +104,7 @@ const pl: Dict = {
     ],
     closing: "Daj się zainspirować. Stań się częścią tej historii. Zamów swój egzemplarz „Promyka Światła” i odkryj, jak i Ty możesz napisać jej kolejny rozdział!",
     cta: "Zamów polskie wydanie", ctaAlt: "Wydanie angielskie",
-    photos: ["Polskie wydanie książki wręczone podczas spotkania z kardynałem", "Prelegent przy pulpicie z polskim wydaniem książki w dłoni", "Dzielenie się z gośćmi podczas wieczoru", "Podpisywanie książek po premierze", "Prelegent przemawia do gości obok drewnianego krzyża"],
+    photos: ["Prezentacja polskiego wydania gościom", "Podpisywanie książek po premierze", "Polskie wydanie książki wręczone podczas spotkania z kardynałem", "Wspólne zdjęcie z polskim wydaniem po premierze", "Prelegent przy pulpicie z polskim wydaniem książki w dłoni", "Prelegent przemawia do gości obok drewnianego krzyża"],
   },
   footer: {
     about: 'Instytut Ewangelizacji Świata – ICPE Mission to międzynarodowa wspólnota katolicka, która formuje uczniów-misjonarzy i przemienia życie radością Ewangelii.',

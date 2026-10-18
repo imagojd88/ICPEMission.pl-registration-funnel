@@ -31,8 +31,8 @@ const en: Dict = {
       'What it means to be a missionary disciple and how to form others for evangelisation.',
       'The journey of leading a community committed to bringing Christ to the world.',
     ],
-    photoCaption: 'Anna and Mario Cappello with Saint John Paul II',
-    photoAlt: 'Anna and Mario Cappello with Saint John Paul II',
+    photoCaption: 'Anna and Mario Cappello with St. John Paul II',
+    photoAlt: 'Anna and Mario Cappello with St. John Paul II',
     coverAlt: 'Cover of the book A Cast of Light',
   },
   editions: {
@@ -110,7 +110,7 @@ const en: Dict = {
     ],
     closing: "Be inspired. Be part of the story. Order your copy of “A Cast of Light” and discover how you, too, can help write its next chapter!",
     cta: "Order your copy", ctaAlt: "Polish edition",
-    photos: ["Presenting the Polish edition of the book at a meeting with the Cardinal", "A speaker at the lectern holding the Polish edition of the book", "Sharing with the guests during the evening", "Signing books after the launch", "A speaker addressing the guests beside a wooden cross"],
+    photos: ["Presenting the Polish edition to the guests", "Signing books after the launch", "Presenting the Polish edition of the book at a meeting with the Cardinal", "Group photo with the Polish edition after the launch", "A speaker at the lectern holding the Polish edition of the book", "A speaker addressing the guests beside a wooden cross"],
   },
   footer: {
     about: 'The Institute for World Evangelisation – ICPE Mission is an international Catholic community committed to forming missionary disciples and transforming lives through the joy of the Gospel.',

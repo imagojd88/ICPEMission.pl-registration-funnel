@@ -57,6 +57,7 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 - Nowa sekcja `#events` („Book events”, między Rekomendacjami a Galerią, link w nawigacji): relacja z premiery w Krakowie — tekst EN verbatim od Jacka (kursywa: „live out its unwritten thirteenth chapter”), tłumaczenia PL/IT/ES moje. Dane: `NEWS` w config.ts (data + zdjęcia), teksty `events.*` w i18n (`paras` mogą mieć `<em>`; akapit nr 4 to wyróżniony cytat).
 - Zdjęcia: `book/public/img/events/krakow-01..04.jpg` (+ thumb-), otwierają się w lightboksie galerii. Podpisy/alt bez nazwisk.
 - Poprawka: na górze zdjęcie ze spotkania z kardynałem (`krakow-05.jpg`), poziome zdjęcie prelegenta przy krzyżu (`krakow-01.jpg`) przeniesione na dół. Poziome zdjęcia (w > h) automatycznie zajmują całą szerokość.
+- 2026-10-18: nowy komplet 6 zdjęć (`krakow-01..06.jpg`, kolejność od Jacka). Układ „justified rows”: zdjęcie poziome w osobnym rzędzie, reszta parami, wspólna wysokość w rzędzie, bez kadrowania (`newsRows` w BookPage). Lightbox przechodzi przez wszystkie 6. Podpis EN przy zdjęciu z JPII: „St. John Paul II” (zamiast „Saint”).
 - icpemission.pl (site/) nieruszone: PremiereBanner sam się ukrywa po dacie, promyk-swiatla pokazuje „Premiera odbyła się”.
 
 ### Tytuł włoski bez kropki (2026-10-14)
