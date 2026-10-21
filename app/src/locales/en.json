@@ -108,12 +108,15 @@
     "started_note": "The event has already started — your answer can no longer be changed.",
     "started_pending": "The event has already started — confirmations are closed.",
     "already_confirmed": "Your attendance has already been confirmed by the organisers. We've emailed you your personal link — you can add dietary requirements there.",
-    "save_error": "Could not save. Please try again in a moment."
+    "save_error": "Could not save. Please try again in a moment.",
+    "spouse_first_ph": "Anne",
+    "spouse_last_ph": "Smith"
   },
   "content": {
     "special_guest": "Special guest",
     "special_guests": "Special guests",
-    "program": "Programme"
+    "program": "Programme",
+    "see_program": "See the programme"
   },
   "stepper": {
     "step0": "Contact details",
@@ -131,7 +134,11 @@
     "email": "Email address",
     "email_hint": "✓ Address looks correct",
     "phone": "Phone",
-    "address": "Home address"
+    "address": "Home address",
+    "address_ph": "e.g. 1 Example Street, 00-001 Warsaw",
+    "first_ph": "John",
+    "last_ph": "Smith",
+    "email_ph": "john@example.com"
   },
   "participants": {
     "title": "Participants and children",
@@ -146,7 +153,11 @@
     "diet": "Diet / allergies",
     "remove": "Remove",
     "add": "+ Add person",
-    "child_note": "−30% · child 3–12 years"
+    "child_note": "−30% · child 3–12 years",
+    "fill_mine": "Use my details ({{name}})",
+    "diet_ph": "e.g. vegetarian, gluten-free",
+    "age_child_ph": "child’s age",
+    "optional": "optional"
   },
   "prefs": {
     "title": "Preferences and allergies",
@@ -167,7 +178,21 @@
     "title": "Room selection",
     "capacity": "Capacity: {{n}} persons",
     "per_person_night": "/ person / night",
-    "per_night": "/ night"
+    "per_night": "/ night",
+    "assign_hint": "Choose who sleeps in which room. Everyone must be assigned to a room before you can continue.",
+    "unassigned": "Not yet assigned:",
+    "remove": "Remove room",
+    "type": "Room type",
+    "max_n": "max {{n}} people",
+    "people": "People in this room",
+    "other_room": "another room",
+    "add": "Add a room",
+    "err_no_room": "Add a room and assign participants to it before continuing.",
+    "err_empty": "Room “{{name}}” has no one assigned.",
+    "err_over": "Room “{{name}}” fits max {{cap}} people, {{count}} assigned.",
+    "err_check": "Please check the room assignments.",
+    "err_unassigned_one": "Assign all participants to rooms — {{count}} person is still unassigned.",
+    "err_unassigned_other": "Assign all participants to rooms — {{count}} people are still unassigned."
   },
   "options": {
     "title": "Options and consents",
@@ -181,7 +206,9 @@
     "discount_ok": "✓ Discount −{{pct}}% applied",
     "discount_err": "Invalid code",
     "rodo": "I consent to the processing of my personal data for the purpose of organising the formation retreat (GDPR).",
-    "regulamin": "I have read and accept the terms and conditions."
+    "regulamin": "I have read and accept the terms and conditions.",
+    "rodo_link": "GDPR",
+    "terms_link": "terms"
   },
   "payment_method": {
     "title": "Choose payment method",
@@ -189,7 +216,10 @@
     "online_tags": "BLIK · Visa · Mastercard",
     "transfer": "Bank transfer",
     "transfer_tags": "Bank transfer",
-    "cta": "Proceed to summary →"
+    "cta": "Proceed to summary →",
+    "selected": "Selected",
+    "cash": "Cash on site",
+    "cash_tags": "Pay in cash on the day you arrive"
   },
   "summary": {
     "supertitle": "Final step",
@@ -216,7 +246,27 @@
     "download_ics": "Download .ics",
     "manage_title": "Manage your registration",
     "manage_desc": "Create an account to edit your registration details, check payment status and manage participants at any time.",
-    "manage_cta": "Create account"
+    "manage_cta": "Create account",
+    "line_formation": "Formation",
+    "line_accommodation": "Accommodation",
+    "line_meals": "Meals",
+    "room_n": "Room {{n}}",
+    "formation_fee": "Formation fee",
+    "meals": "Meals",
+    "free_title": "Free event",
+    "free_desc": "There are no fees.",
+    "free_short": "Free",
+    "submit_error": "Your registration could not be saved: {{error}}. Please try again.",
+    "sending": "Sending…",
+    "submit_free": "Submit registration →",
+    "cash_title": "Cash payment on site",
+    "cash_desc_1": "You will pay",
+    "cash_desc_2": "in cash when you check in on site. No online prepayment is required.",
+    "submit_cash": "Submit with cash payment →",
+    "ref_value": "Registration number (you will receive it after submitting and by email)",
+    "abbr_formation": "form.",
+    "abbr_accommodation": "accom.",
+    "abbr_meals": "meals"
   },
   "success": {
     "paid_title": "Thank you!",
@@ -229,7 +279,17 @@
     "status_pending": "Awaiting payment",
     "amount": "Amount",
     "email_sent": "Confirmation sent to {{email}}",
-    "back": "Back to home page"
+    "back": "Back to home page",
+    "guest_q": "Would you like to bring someone along?",
+    "guest_desc": "Invite a guest — they will receive an email from us with a personal registration link.",
+    "guest_cta": "Invite a guest",
+    "acct_done": "Account created — check your email to set up access.",
+    "acct_loading": "Creating account…",
+    "acct_cta": "Create account",
+    "acct_error": "Could not create the account. Please try again later.",
+    "acct_desc": "An account lets you manage your registration and sign up faster next time.",
+    "cash_msg": "Your registration has been received. You will pay in cash on site.",
+    "status_cash": "Pay on site"
   },
   "admin": {
     "dashboard": "Dashboard",
@@ -256,7 +316,14 @@
     "back": "Back",
     "next": "Next",
     "publish": "Publish page ✓",
-    "published": "✓ Published"
+    "published": "✓ Published",
+    "tab_registration": "Registration",
+    "load_error": "Could not load the event details.",
+    "theme_light_on": "Switch to light theme",
+    "theme_dark_on": "Switch to dark theme",
+    "theme_light": "Light theme",
+    "theme_dark": "Dark theme",
+    "language": "Language"
   },
   "draft": {
     "title": "You have an unfinished registration",
@@ -293,5 +360,34 @@
     "blocked_CLOSED": "Registration for this event is closed.",
     "blocked_LIMIT": "You've reached the guest limit ({{max}}). You can withdraw an unconfirmed invitation to free up a place.",
     "status_declined": "Declined"
+  },
+  "home": {
+    "tab_title": "Registrations",
+    "title": "Event registrations",
+    "subtitle": "Choose the event you would like to register for.",
+    "empty_title": "No open registrations",
+    "empty_desc": "There are no active events at the moment. Please check back later.",
+    "cta": "Register"
+  },
+  "rsvp": {
+    "event_fallback": "Event",
+    "thanks_yes": "Thank you, we have recorded your attendance!",
+    "thanks_no": "Thank you for your reply",
+    "see_you": "See you at: {{title}}.",
+    "maybe_next": "Maybe next time — you are always welcome.",
+    "add_gcal": "Add to Google Calendar",
+    "download_ics": "Download .ics",
+    "back": "Back",
+    "free_entry": "Free entry",
+    "open_event": "Open event",
+    "question": "WILL YOU COME?",
+    "yes": "I’ll be there",
+    "no": "I can’t come",
+    "name": "Full name",
+    "name_ph": "e.g. John Smith",
+    "email": "Email (optional)",
+    "email_ph": "e.g. john@example.com",
+    "sending": "Sending…",
+    "confirm": "Confirm"
   }
 }

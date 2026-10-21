@@ -10,6 +10,8 @@ interface Props {
   onExtraNotesChange: (value: string) => void
 }
 
+// Wartości zapisywane w zgłoszeniu zostają po polsku (czyta je organizator);
+// gość widzi etykiety w swoim języku (`prefs.diets` — ta sama kolejność).
 const DIET_OPTIONS = [
   'Wegetariańska',
   'Wegańska',
@@ -28,6 +30,9 @@ export default function Step2Prefs({
   onExtraNotesChange,
 }: Props) {
   const { t } = useTranslation()
+  const dietLabels = t('prefs.diets', { returnObjects: true }) as unknown
+  const labelFor = (i: number, fallback: string) =>
+    Array.isArray(dietLabels) && typeof dietLabels[i] === 'string' ? (dietLabels[i] as string) : fallback
 
   const toggleTag = (tag: string) => {
     if (dietaryTags.includes(tag)) {
@@ -45,7 +50,7 @@ export default function Step2Prefs({
 
       {/* Diet chips */}
       <div className="flex flex-wrap gap-2">
-        {DIET_OPTIONS.map((option) => {
+        {DIET_OPTIONS.map((option, i) => {
           const isSelected = dietaryTags.includes(option)
           return (
             <button
@@ -61,7 +66,7 @@ export default function Step2Prefs({
                 cursor: 'pointer',
               }}
             >
-              {option}
+              {labelFor(i, option)}
             </button>
           )
         })}

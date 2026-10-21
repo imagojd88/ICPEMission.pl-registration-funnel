@@ -110,12 +110,15 @@
     "started_note": "L'evento è già iniziato — la risposta non può più essere modificata.",
     "started_pending": "L'evento è già iniziato — le conferme sono chiuse.",
     "already_confirmed": "La tua partecipazione è già stata confermata dall'organizzatore. Ti abbiamo inviato via e-mail il link personale — lì potrai indicare le esigenze alimentari.",
-    "save_error": "Salvataggio non riuscito. Riprova tra poco."
+    "save_error": "Salvataggio non riuscito. Riprova tra poco.",
+    "spouse_first_ph": "Anna",
+    "spouse_last_ph": "Rossi"
   },
   "content": {
     "special_guest": "Ospite speciale",
     "special_guests": "Ospiti speciali",
-    "program": "Programma"
+    "program": "Programma",
+    "see_program": "Vedi il programma"
   },
   "stepper": {
     "step0": "Dati del richiedente",
@@ -133,7 +136,11 @@
     "email": "Indirizzo e-mail",
     "email_hint": "✓ L'indirizzo sembra corretto",
     "phone": "Telefono",
-    "address": "Indirizzo di residenza"
+    "address": "Indirizzo di residenza",
+    "address_ph": "es. Via Esempio 1, 00100 Roma",
+    "first_ph": "Mario",
+    "last_ph": "Rossi",
+    "email_ph": "mario@example.com"
   },
   "participants": {
     "title": "Partecipanti e bambini",
@@ -148,7 +155,11 @@
     "diet": "Dieta / allergie",
     "remove": "Rimuovi",
     "add": "+ Aggiungi persona",
-    "child_note": "−30% · bambino 3–12 anni"
+    "child_note": "−30% · bambino 3–12 anni",
+    "fill_mine": "Usa i miei dati ({{name}})",
+    "diet_ph": "es. vegetariana, senza glutine",
+    "age_child_ph": "età del bambino",
+    "optional": "facoltativo"
   },
   "prefs": {
     "title": "Preferenze e allergie",
@@ -169,7 +180,22 @@
     "title": "Scelta della camera",
     "capacity": "Capienza: {{n}} persone",
     "per_person_night": "/ persona / notte",
-    "per_night": "/ notte"
+    "per_night": "/ notte",
+    "assign_hint": "Indica chi dorme in quale camera. Ogni persona deve essere assegnata a una camera prima di proseguire.",
+    "unassigned": "Persone non assegnate:",
+    "remove": "Rimuovi camera",
+    "type": "Tipo di camera",
+    "max_n": "max {{n}} persone",
+    "people": "Persone nella camera",
+    "other_room": "altra camera",
+    "add": "Aggiungi camera",
+    "err_no_room": "Aggiungi una camera e assegnale i partecipanti prima di proseguire.",
+    "err_empty": "La camera «{{name}}» non ha persone assegnate.",
+    "err_over": "La camera «{{name}}» ospita max {{cap}} persone, assegnate {{count}}.",
+    "err_check": "Controlla l’assegnazione delle camere.",
+    "err_unassigned_one": "Assegna tutti i partecipanti alle camere — manca {{count}} persona.",
+    "err_unassigned_many": "Assegna tutti i partecipanti alle camere — mancano {{count}} persone.",
+    "err_unassigned_other": "Assegna tutti i partecipanti alle camere — mancano {{count}} persone."
   },
   "options": {
     "title": "Opzioni e consensi",
@@ -183,7 +209,9 @@
     "discount_ok": "✓ Sconto −{{pct}}% applicato",
     "discount_err": "Codice non valido",
     "rodo": "Acconsento al trattamento dei miei dati personali ai fini dell'organizzazione del ritiro formativo (GDPR).",
-    "regulamin": "Ho letto e accetto i termini e le condizioni."
+    "regulamin": "Ho letto e accetto i termini e le condizioni.",
+    "rodo_link": "GDPR",
+    "terms_link": "regolamento"
   },
   "payment_method": {
     "title": "Scegli il metodo di pagamento",
@@ -191,7 +219,10 @@
     "online_tags": "BLIK · Visa · Mastercard",
     "transfer": "Bonifico bancario",
     "transfer_tags": "Bonifico bancario",
-    "cta": "Vai al riepilogo →"
+    "cta": "Vai al riepilogo →",
+    "selected": "Selezionato",
+    "cash": "Contanti sul posto",
+    "cash_tags": "Paga in contanti il giorno dell’arrivo"
   },
   "summary": {
     "supertitle": "Ultimo passo",
@@ -218,7 +249,27 @@
     "download_ics": "Scarica .ics",
     "manage_title": "Gestisci la tua iscrizione",
     "manage_desc": "Crea un account per poter modificare i dati dell'iscrizione, controllare lo stato del pagamento e gestire i partecipanti in qualsiasi momento.",
-    "manage_cta": "Crea account"
+    "manage_cta": "Crea account",
+    "line_formation": "Formazione",
+    "line_accommodation": "Alloggio",
+    "line_meals": "Pasti",
+    "room_n": "Camera {{n}}",
+    "formation_fee": "Quota di formazione",
+    "meals": "Pasti",
+    "free_title": "Evento gratuito",
+    "free_desc": "Non è previsto alcun pagamento.",
+    "free_short": "Gratuito",
+    "submit_error": "Non è stato possibile salvare l’iscrizione: {{error}}. Riprova.",
+    "sending": "Invio…",
+    "submit_free": "Invia l’iscrizione →",
+    "cash_title": "Pagamento in contanti sul posto",
+    "cash_desc_1": "L’importo di",
+    "cash_desc_2": "verrà pagato in contanti al momento della registrazione sul posto. Non è richiesto alcun pagamento anticipato online.",
+    "submit_cash": "Iscrizione con pagamento in contanti →",
+    "ref_value": "Numero di iscrizione (lo riceverai dopo l’invio e via e-mail)",
+    "abbr_formation": "form.",
+    "abbr_accommodation": "alloggio",
+    "abbr_meals": "pasti"
   },
   "success": {
     "paid_title": "Grazie!",
@@ -231,7 +282,17 @@
     "status_pending": "In attesa di pagamento",
     "amount": "Importo",
     "email_sent": "Conferma inviata a {{email}}",
-    "back": "Torna alla pagina principale"
+    "back": "Torna alla pagina principale",
+    "guest_q": "Vuoi portare qualcuno con te?",
+    "guest_desc": "Invita un ospite — riceverà da noi un’e-mail con un link personale per l’iscrizione.",
+    "guest_cta": "Invita un ospite",
+    "acct_done": "Account creato — controlla la tua e-mail per impostare l’accesso.",
+    "acct_loading": "Creazione account…",
+    "acct_cta": "Crea account",
+    "acct_error": "Impossibile creare l’account. Riprova più tardi.",
+    "acct_desc": "Un account ti permette di gestire l’iscrizione e di iscriverti più velocemente la prossima volta.",
+    "cash_msg": "La tua iscrizione è stata ricevuta. Pagherai in contanti sul posto.",
+    "status_cash": "Pagamento sul posto"
   },
   "admin": {
     "dashboard": "Dashboard",
@@ -258,7 +319,14 @@
     "back": "Indietro",
     "next": "Avanti",
     "publish": "Pubblica pagina ✓",
-    "published": "✓ Pubblicato"
+    "published": "✓ Pubblicato",
+    "tab_registration": "Iscrizione",
+    "load_error": "Impossibile caricare i dati dell’evento.",
+    "theme_light_on": "Passa al tema chiaro",
+    "theme_dark_on": "Passa al tema scuro",
+    "theme_light": "Tema chiaro",
+    "theme_dark": "Tema scuro",
+    "language": "Lingua"
   },
   "draft": {
     "title": "Hai un'iscrizione non completata",
@@ -295,5 +363,34 @@
     "blocked_CLOSED": "Le iscrizioni a questo evento sono chiuse.",
     "blocked_LIMIT": "Hai raggiunto il limite di ospiti ({{max}}). Puoi ritirare un invito non confermato per liberare un posto.",
     "status_declined": "Non partecipa"
+  },
+  "home": {
+    "tab_title": "Iscrizioni",
+    "title": "Iscrizioni agli eventi",
+    "subtitle": "Scegli l’evento a cui vuoi iscriverti.",
+    "empty_title": "Nessuna iscrizione aperta",
+    "empty_desc": "Al momento non ci sono eventi attivi. Torna a trovarci più tardi.",
+    "cta": "Iscriviti"
+  },
+  "rsvp": {
+    "event_fallback": "Evento",
+    "thanks_yes": "Grazie, abbiamo registrato la tua presenza!",
+    "thanks_no": "Grazie per la risposta",
+    "see_you": "Ci vediamo a: {{title}}.",
+    "maybe_next": "Magari la prossima volta — sei sempre il benvenuto.",
+    "add_gcal": "Aggiungi a Google Calendar",
+    "download_ics": "Scarica .ics",
+    "back": "Indietro",
+    "free_entry": "Ingresso libero",
+    "open_event": "Evento aperto",
+    "question": "CI SARAI?",
+    "yes": "Ci sarò",
+    "no": "Non ci sarò",
+    "name": "Nome e cognome",
+    "name_ph": "es. Mario Rossi",
+    "email": "E-mail (facoltativa)",
+    "email_ph": "es. mario@example.com",
+    "sending": "Invio…",
+    "confirm": "Conferma"
   }
 }

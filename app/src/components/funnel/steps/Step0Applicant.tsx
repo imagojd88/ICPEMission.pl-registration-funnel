@@ -29,14 +29,14 @@ export default function Step0Applicant({ value, onChange }: Props) {
           value={value.firstName}
           onChange={set('firstName')}
           autoComplete="given-name"
-          placeholder="Jan"
+          placeholder={t('applicant.first_ph')}
         />
         <Input
           label={t('applicant.lastName')}
           value={value.lastName}
           onChange={set('lastName')}
           autoComplete="family-name"
-          placeholder="Kowalski"
+          placeholder={t('applicant.last_ph')}
         />
       </div>
 
@@ -47,7 +47,7 @@ export default function Step0Applicant({ value, onChange }: Props) {
         value={value.email}
         onChange={set('email')}
         autoComplete="email"
-        placeholder="jan@example.com"
+        placeholder={t('applicant.email_ph')}
         hint={emailLooksValid ? t('applicant.email_hint') : undefined}
       />
 
@@ -67,7 +67,7 @@ export default function Step0Applicant({ value, onChange }: Props) {
         value={value.address}
         onChange={set('address')}
         autoComplete="street-address"
-        placeholder="ul. Przykładowa 1, 00-001 Warszawa"
+        placeholder={t('applicant.address_ph')}
       />
     </div>
   )

@@ -51,6 +51,17 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — panel admina (kreator eventów)
 
+### Strona zapisów: tytuł karty, „Zobacz program” i pozostałe polskie napisy w EN/IT (2026-10-21)
+- **Zgłoszenie (Jacek):** po zmianie języka tytuł karty przeglądarki zostawał polski („Dzień ICPE — Rejestracja”), przycisk „Zobacz program” też.
+- **Przyczyna:** `document.title` ustawiany raz przy wczytaniu, z wersji PL i z dopiskiem na sztywno; w publicznych ekranach ~80 napisów wpisanych po polsku zamiast przez `t()`.
+- **Tytuł karty:** `PublicFunnel` (efekt na `[event, lng]`, dopisek `common.tab_registration`), `InviteConfirm`, `GuestInvitePage`, `PublicHome` — odświeża się przy przełączeniu języka.
+- **Przetłumaczone ekrany (klucze PL/EN/IT w `app/src/locales/*.json`):** LandingScreen (`content.see_program`), RsvpScreen (cały ekran — sekcja `rsvp`; do tego miejsce z `locationI18n` i opis z mapy językowej — wcześniej zawsze PL; RSVP zapisuje teraz `locale` gościa), SummaryScreen (też poprawka: przy tytule-mapie pokazywał „Dzień Formacji 2026” z mocka — teraz `pickLang`), SuccessScreen, PaymentMethodScreen („Wybrano”, brakujące klucze gotówki `payment_method.cash/cash_tags`), StickyPriceBar, Step0–4 (placeholdery, „Wstaw moje dane”, linki RODO/regulamin), Step3Room, PublicFunnel (błąd ładowania, walidacja pokoi — z liczbą mnogą `room.err_unassigned_*`), PublicHome (sekcja `home`), InviteMatchScreen/InviteConfirm (placeholdery), ThemeToggle, Spinner, LanguageSwitch (aria).
+- **Diety (Step2Prefs):** wartości zapisywane w zgłoszeniu zostają po polsku (czyta organizator), gość widzi etykiety z `prefs.diets` w swoim języku.
+- **Walidacja pokoi:** komunikaty silnika `validateRoomCapacity` (@icpe/shared, wspólny z API) są po polsku — nie ruszane; front buduje własne, przetłumaczone (`room.err_empty/err_over/err_check`). Przy okazji błąd pojemności przypisywany jest do konkretnego pokoju (po `uid`), a nie do wszystkich pokoi tego samego typu.
+- **Ekran sukcesu przy gotówce:** zamiast „prosimy o dokonanie przelewu” — `success.cash_msg` / status „Płatność na miejscu”.
+- **Weryfikacja:** `tsc` ✓ (komputer Jacka + chmura); skan AST publicznych plików — zostały tylko celowe polskie stałe (wartości diet, klucz modelu „noc”); Playwright z zamockowanym API, EN i IT: landing → przełączenie PL↔EN/IT (tytuł karty i przycisk programu się zmieniają) → kroki 0–4 → płatność gotówką → podsumowanie → sukces, plus RSVP i strona główna — 0 polskich napisów, 0 błędów JS.
+- Stan: do pushu przez Jacka (auto-deploy `icpe-frontend`). Backend bez zmian.
+
 ### Przełącznik języków PL / EN / IT w kreatorze nowego eventu (2026-10-21)
 - **Problem (Jacek):** przy tworzeniu eventu jednorazowego nie było pól na wersje językowe — tytuł i opis zawsze po polsku; tłumaczenia dało się wpisać dopiero w „Edytuj event” po utworzeniu (niewygodne).
 - **Zmiana:** `app/src/components/admin/events/EventWizard.tsx` — pasek „Język treści” (PL / EN zawsze, „+ IT” dokłada włoski i zaznacza IT w językach strony), przyklejony u góry przy przewijaniu, z licznikiem braków tłumaczeń na każdej zakładce (jak w edycji). Widoczny w krokach Szczegóły, Pokoje (gdy są pokoje) i Strona (tam pokazuje też braki z wcześniejszych kroków).

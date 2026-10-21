@@ -23,6 +23,8 @@ export default function SuccessScreen({ paymentMethod, email, total, currency, r
   const [acct, setAcct] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
 
   const isPaid = status ? status === 'CONFIRMED' : paymentMethod === 'online'
+  // Gotówka na miejscu — nie prosimy o przelew.
+  const isCash = paymentMethod === 'cash'
   const displayReg = regNumber ?? '—'
 
   async function handleAccount() {
@@ -71,7 +73,7 @@ export default function SuccessScreen({ paymentMethod, email, total, currency, r
 
       {/* Message */}
       <p className="text-sm text-center leading-relaxed" style={{ color: 'var(--muted)' }}>
-        {isPaid ? t('success.paid_msg') : t('success.transfer_msg')}
+        {isPaid ? t('success.paid_msg') : isCash ? t('success.cash_msg') : t('success.transfer_msg')}
       </p>
 
       {/* Registration card */}
@@ -105,7 +107,7 @@ export default function SuccessScreen({ paymentMethod, email, total, currency, r
                 : { background: 'var(--warn-soft)', color: 'var(--warn)' }
             }
           >
-            {isPaid ? t('success.status_paid') : t('success.status_pending')}
+            {isPaid ? t('success.status_paid') : isCash ? t('success.status_cash') : t('success.status_pending')}
           </span>
         </div>
 
@@ -128,16 +130,16 @@ export default function SuccessScreen({ paymentMethod, email, total, currency, r
       {/* Zaproś gościa — ten sam link jest też w mailu z potwierdzeniem */}
       {guestInviteHref && (
         <div className="w-full flex flex-col items-center gap-2 rounded-[15px] px-4 py-4" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
-          <p className="text-sm font-semibold text-center" style={{ color: 'var(--ink)' }}>Chcesz zabrać kogoś ze sobą?</p>
+          <p className="text-sm font-semibold text-center" style={{ color: 'var(--ink)' }}>{t('success.guest_q')}</p>
           <p className="text-xs text-center" style={{ color: 'var(--muted)' }}>
-            Zaproś gościa — dostanie od nas maila z osobistym linkiem do rejestracji.
+            {t('success.guest_desc')}
           </p>
           <Link
             to={guestInviteHref}
             className="w-full flex items-center justify-center gap-2 text-sm font-semibold rounded-[12px] py-3 no-underline"
             style={{ background: 'var(--brand-soft)', color: 'var(--brand)', border: '1px solid var(--brand)' }}
           >
-            <Users size={16} /> Zaproś gościa
+            <Users size={16} /> {t('success.guest_cta')}
           </Link>
         </div>
       )}
@@ -147,7 +149,7 @@ export default function SuccessScreen({ paymentMethod, email, total, currency, r
         <div className="w-full flex flex-col items-center gap-2 mt-1">
           {acct === 'done' ? (
             <p className="text-sm text-center font-medium" style={{ color: 'var(--ok)' }}>
-              Konto założone — sprawdź e-mail, aby ustawić dostęp.
+              {t('success.acct_done')}
             </p>
           ) : (
             <button
@@ -156,16 +158,16 @@ export default function SuccessScreen({ paymentMethod, email, total, currency, r
               className="w-full text-white text-sm font-semibold rounded-[12px] py-3 transition-all duration-150 active:scale-[0.98] hover:opacity-90 flex items-center justify-center gap-2"
               style={{ background: 'var(--brand)', border: 'none', cursor: 'pointer' }}
             >
-              <UserPlus size={16} /> {acct === 'loading' ? 'Zakładam konto…' : 'Załóż konto'}
+              <UserPlus size={16} /> {acct === 'loading' ? t('success.acct_loading') : t('success.acct_cta')}
             </button>
           )}
           {acct === 'error' && (
             <p className="text-xs text-center" style={{ color: 'var(--err)' }}>
-              Nie udało się założyć konta. Spróbuj później.
+              {t('success.acct_error')}
             </p>
           )}
           <p className="text-xs text-center" style={{ color: 'var(--faint)' }}>
-            Konto pozwoli zarządzać zgłoszeniem i szybciej zapisać się następnym razem.
+            {t('success.acct_desc')}
           </p>
         </div>
       )}

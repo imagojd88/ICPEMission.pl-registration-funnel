@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { EventInstanceDto } from '@icpe/shared'
 import { buildIcs, googleCalendarUrl } from '@icpe/shared'
-import { createRsvp, pickLang } from '../../lib/api'
+import { createRsvp, pickLang, eventLocation, type EventContent } from '../../lib/api'
 import { bcp47 } from '../../lib/utils'
 
 type Response = 'YES' | 'NO'
@@ -20,18 +20,21 @@ function formatRange(startsAt: string, endsAt: string, lng: string): string {
 export default function RsvpScreen({
   event,
   onBack,
+  content,
 }: {
   event: EventInstanceDto
   onBack: () => void
+  content?: EventContent | null
 }) {
   const [response, setResponse] = useState<Response | null>(null)
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [done, setDone] = useState<Response | null>(null)
-  const { i18n } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const lng = i18n.language
 
-  const title = pickLang(event.title as string | Record<string, string>, i18n.language) || 'Wydarzenie'
+  const title = pickLang(event.title as string | Record<string, string>, lng) || t('rsvp.event_fallback')
 
   const submit = async () => {
     if (!response || !name.trim()) return
@@ -42,7 +45,7 @@ export default function RsvpScreen({
         name: name.trim(),
         email: email.trim() || undefined,
         response,
-        locale: 'pl',
+        locale: lng,
       })
       setDone(response)
     } finally {
@@ -91,12 +94,12 @@ export default function RsvpScreen({
             </span>
           </div>
           <h2 className="font-serif" style={{ fontSize: 25, fontWeight: 500, color: 'var(--ink)' }}>
-            {done === 'YES' ? 'Dziękujemy, zapisaliśmy Twoją obecność!' : 'Dziękujemy za odpowiedź'}
+            {done === 'YES' ? t('rsvp.thanks_yes') : t('rsvp.thanks_no')}
           </h2>
           <p className="text-sm" style={{ color: 'var(--muted)' }}>
             {done === 'YES'
-              ? `Do zobaczenia na: ${title}.`
-              : 'Może innym razem — zawsze jesteś mile widziany.'}
+              ? t('rsvp.see_you', { title })
+              : t('rsvp.maybe_next')}
           </p>
 
           {done === 'YES' && (
@@ -108,14 +111,14 @@ export default function RsvpScreen({
                 className="w-full text-center text-sm font-semibold py-3 rounded-[14px]"
                 style={{ background: 'var(--surface)', color: 'var(--ink)', border: '1px solid var(--border)' }}
               >
-                📆 Dodaj do Google Calendar
+                📆 {t('rsvp.add_gcal')}
               </a>
               <button
                 onClick={downloadIcs}
                 className="w-full text-sm font-semibold py-3 rounded-[14px]"
                 style={{ background: 'var(--surface)', color: 'var(--ink)', border: '1px solid var(--border)', cursor: 'pointer' }}
               >
-                ⬇ Pobierz .ics
+                ⬇ {t('rsvp.download_ics')}
               </button>
             </div>
           )}
@@ -125,7 +128,7 @@ export default function RsvpScreen({
             className="text-sm font-semibold mt-2"
             style={{ color: 'var(--brand)', background: 'none', border: 'none', cursor: 'pointer' }}
           >
-            ← Wróć
+            ← {t('rsvp.back')}
           </button>
         </div>
       </div>
@@ -144,11 +147,11 @@ export default function RsvpScreen({
           className="absolute top-4 left-[22px] text-white text-xs font-semibold px-3 py-1.5"
           style={{ background: 'var(--accent)', borderRadius: 99 }}
         >
-          Wstęp wolny
+          {t('rsvp.free_entry')}
         </span>
         <div className="pb-5">
           <p className="text-xs font-medium mb-1" style={{ color: 'rgba(255,255,255,0.85)' }}>
-            Wydarzenie otwarte
+            {t('rsvp.open_event')}
           </p>
           <h1 className="font-serif" style={{ fontSize: 30, fontWeight: 500, color: 'var(--hero-title)', lineHeight: 1.1 }}>
             {title}
@@ -164,20 +167,20 @@ export default function RsvpScreen({
           </p>
           {event.location && (
             <p className="text-sm" style={{ color: 'var(--muted)' }}>
-              {event.location}
+              {eventLocation(event.location, content, lng)}
             </p>
           )}
         </div>
 
         {event.description && (
           <p className="text-sm" style={{ color: 'var(--muted)' }}>
-            {typeof event.description === 'string' ? event.description : event.description.pl}
+            {pickLang(event.description as string | Record<string, string>, lng)}
           </p>
         )}
 
         {/* RSVP buttons */}
         <p className="text-xs font-semibold mt-1" style={{ color: 'var(--faint)' }}>
-          CZY BĘDZIESZ?
+          {t('rsvp.question')}
         </p>
         <div className="grid grid-cols-2 gap-3">
           {(['YES', 'NO'] as Response[]).map((r) => {
@@ -194,7 +197,7 @@ export default function RsvpScreen({
                   cursor: 'pointer',
                 }}
               >
-                {r === 'YES' ? '✓ Będę' : '✕ Nie będę'}
+                {r === 'YES' ? `✓ ${t('rsvp.yes')}` : `✕ ${t('rsvp.no')}`}
               </button>
             )
           })}
@@ -202,21 +205,21 @@ export default function RsvpScreen({
 
         {/* Minimal data */}
         <label className="flex flex-col gap-1.5">
-          <span className="text-xs font-semibold" style={{ color: 'var(--muted)' }}>Imię i nazwisko</span>
+          <span className="text-xs font-semibold" style={{ color: 'var(--muted)' }}>{t('rsvp.name')}</span>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="np. Jan Kowalski"
+            placeholder={t('rsvp.name_ph')}
             className="px-3 py-3 rounded-[12px] text-sm"
             style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--ink)' }}
           />
         </label>
         <label className="flex flex-col gap-1.5">
-          <span className="text-xs font-semibold" style={{ color: 'var(--muted)' }}>E-mail (opcjonalnie)</span>
+          <span className="text-xs font-semibold" style={{ color: 'var(--muted)' }}>{t('rsvp.email')}</span>
           <input
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="np. jan@example.com"
+            placeholder={t('rsvp.email_ph')}
             className="px-3 py-3 rounded-[12px] text-sm"
             style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--ink)' }}
           />
@@ -234,7 +237,7 @@ export default function RsvpScreen({
             boxShadow: !response || !name.trim() ? 'none' : '0 6px 18px rgba(197,106,58,.32)',
           }}
         >
-          {submitting ? 'Wysyłanie…' : 'Potwierdź'}
+          {submitting ? t('rsvp.sending') : t('rsvp.confirm')}
         </button>
 
         <button
@@ -242,7 +245,7 @@ export default function RsvpScreen({
           className="text-sm font-semibold"
           style={{ color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer' }}
         >
-          ← Wróć
+          ← {t('rsvp.back')}
         </button>
       </div>
     </div>

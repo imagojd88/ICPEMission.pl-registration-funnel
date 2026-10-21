@@ -20,6 +20,7 @@ interface CardProps {
 }
 
 function PaymentCard({ icon: Icon, title, tags, selected, onSelect }: CardProps) {
+  const { t } = useTranslation()
   return (
     <button
       onClick={onSelect}
@@ -73,7 +74,7 @@ function PaymentCard({ icon: Icon, title, tags, selected, onSelect }: CardProps)
             </svg>
           </div>
           <span className="text-xs font-medium" style={{ color: 'var(--brand)' }}>
-            Wybrano
+            {t('payment_method.selected')}
           </span>
         </div>
       )}

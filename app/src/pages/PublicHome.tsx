@@ -8,11 +8,15 @@ import Spinner from '../components/ui/Spinner'
 import ThemeToggle from '../components/ui/ThemeToggle'
 
 export default function PublicHome() {
-  const { i18n } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [events, setEvents] = useState<PublicEventTile[] | null>(null)
 
+  // Tytuł karty w języku gościa (odświeża się po zmianie języka).
   useEffect(() => {
-    document.title = 'ICPE Mission — Rejestracje'
+    document.title = `ICPE Mission — ${t('home.tab_title')}`
+  }, [t, i18n.language])
+
+  useEffect(() => {
     getPublicActiveEvents().then(setEvents).catch(() => setEvents([]))
   }, [])
 
@@ -35,13 +39,13 @@ export default function PublicHome() {
       <div className="mx-auto px-5 py-12" style={{ maxWidth: 980 }}>
         <header className="text-center mb-10">
           <p className="text-sm font-semibold tracking-wide" style={{ color: 'var(--brand)' }}>
-            ICPE Mission Polska
+            {t('landing.pill')}
           </p>
           <h1 className="text-3xl md:text-4xl font-bold font-serif mt-1" style={{ color: 'var(--ink)' }}>
-            Rejestracje na wydarzenia
+            {t('home.title')}
           </h1>
           <p className="text-sm mt-2" style={{ color: 'var(--muted)' }}>
-            Wybierz wydarzenie, na które chcesz się zapisać.
+            {t('home.subtitle')}
           </p>
         </header>
 
@@ -51,10 +55,10 @@ export default function PublicHome() {
             style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
           >
             <p className="text-base font-medium" style={{ color: 'var(--ink)' }}>
-              Brak otwartych zapisów
+              {t('home.empty_title')}
             </p>
             <p className="text-sm mt-1" style={{ color: 'var(--muted)' }}>
-              Obecnie nie ma aktywnych wydarzeń. Zajrzyj później.
+              {t('home.empty_desc')}
             </p>
           </div>
         ) : (
@@ -90,7 +94,7 @@ export default function PublicHome() {
                     className="mt-auto inline-flex items-center gap-1 text-sm font-semibold pt-2"
                     style={{ color: 'var(--brand)' }}
                   >
-                    Zapisz się <ArrowRight size={15} className="transition-transform group-hover:translate-x-0.5" />
+                    {t('home.cta')} <ArrowRight size={15} className="transition-transform group-hover:translate-x-0.5" />
                   </span>
                 </div>
               </Link>

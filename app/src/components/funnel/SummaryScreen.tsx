@@ -4,6 +4,7 @@ import { computePrice, formatMoney, roomLabel, buildIcs, googleCalendarUrl } fro
 import type { EventInstanceDto, PricingConfig, PriceLine } from '@icpe/shared'
 import type { StepperState } from '../../pages/PublicFunnel'
 import { bcp47 } from '../../lib/utils'
+import { pickLang } from '../../lib/api'
 
 interface Props {
   state: StepperState
@@ -46,6 +47,8 @@ function CopyButton({ text }: { text: string }) {
 export default function SummaryScreen({ state, event, pricingConfig, onSubmit, onEdit, onBack, submitting, submitError, bankInfo }: Props) {
   const { t, i18n } = useTranslation()
   const money = (n: number) => formatMoney(n, pricingConfig.currency, i18n.language)
+  // Tytuł eventu w języku strony (mapa {pl,en,it} albo zwykły tekst).
+  const eventTitle = pickLang(event.title as string | Record<string, string>, i18n.language)
   const free = !!pricingConfig.free
   const transferDeadline = (() => {
     try {
@@ -93,7 +96,7 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
   // Calendar helpers
   const calInput = {
     uid: `dzien-formacji-2026@icpe.pl`,
-    title: typeof event.title === 'string' ? event.title : 'Dzień Formacji 2026',
+    title: eventTitle,
     startsAt: new Date(event.startsAt),
     endsAt: new Date(event.endsAt),
     location: event.location,
@@ -144,7 +147,7 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
           style={{ background: 'var(--brand-soft)', border: '1px solid var(--brand)' }}
         >
           <span className="text-sm font-medium" style={{ color: 'var(--brand)' }}>
-            {typeof event.title === 'string' ? event.title : 'Dzień Formacji 2026'}
+            {eventTitle}
           </span>
         </div>
 
@@ -155,7 +158,7 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
         >
           <div className="flex items-center justify-between px-4 py-3" style={{ background: 'var(--surface-2)' }}>
             <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--muted)' }}>
-              Uczestnicy
+              {t('stepper.step1')}
             </span>
             <button
               onClick={() => onEdit(1)}
@@ -176,10 +179,10 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
                 <div className="flex items-center justify-between">
                   <div className="flex flex-col gap-0.5">
                     <span className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
-                      {p.name || (p.type === 'adult' ? 'Dorosły' : 'Dziecko')}
+                      {p.name || (p.type === 'adult' ? t('participants.adult') : t('participants.child'))}
                     </span>
                     <span className="text-xs" style={{ color: 'var(--muted)' }}>
-                      {p.type === 'adult' ? 'Dorosły' : `Dziecko · ${p.age} lat`}
+                      {p.type === 'adult' ? t('participants.adult') : `${t('participants.child')} · ${p.age} ${t('participants.age_suffix')}`}
                     </span>
                   </div>
                   <span className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
@@ -190,13 +193,13 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
                 {line && line.total > 0 && (
                   <div className="flex gap-3 mt-1.5 flex-wrap">
                     <span className="text-xs" style={{ color: 'var(--muted)' }}>
-                      Formacja: {money(line.formation)}
+                      {t('summary.line_formation')}: {money(line.formation)}
                     </span>
                     <span className="text-xs" style={{ color: 'var(--muted)' }}>
-                      Nocleg: {money(line.accommodation)}
+                      {t('summary.line_accommodation')}: {money(line.accommodation)}
                     </span>
                     <span className="text-xs" style={{ color: 'var(--muted)' }}>
-                      Wyżywienie: {money(line.meals)}
+                      {t('summary.line_meals')}: {money(line.meals)}
                     </span>
                   </div>
                 )}
@@ -229,7 +232,7 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
                 .filter((idx) => idx >= 0 && idx < state.participants.length)
                 .map((idx) => {
                   const p = state.participants[idx]
-                  return p.name.trim() || (p.type === 'adult' ? 'Dorosły' : 'Dziecko')
+                  return p.name.trim() || (p.type === 'adult' ? t('participants.adult') : t('participants.child'))
                 })
               return (
                 <div
@@ -239,10 +242,10 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
-                      Pokój {ri + 1}: {roomType ? roomLabel(roomType.name, i18n.language) : room.roomId}
+                      {t('summary.room_n', { n: ri + 1 })}: {roomType ? roomLabel(roomType.name, i18n.language) : room.roomId}
                     </span>
                     <span className="text-sm font-semibold" style={{ color: 'var(--muted)' }}>
-                      {roomType ? `${money(roomType.perPerson)}/os/noc` : ''}
+                      {roomType ? `${money(roomType.perPerson)} ${t('room.per_person_night')}` : ''}
                     </span>
                   </div>
                   {assignedNames.length > 0 && (
@@ -266,7 +269,7 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
             {/* Formation */}
             <div className="flex justify-between items-center px-4 py-3">
               <span className="text-sm" style={{ color: 'var(--muted)' }}>
-                Opłata formacyjna
+                {t('summary.formation_fee')}
               </span>
               <span className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
                 {money(price.formation)}
@@ -286,7 +289,7 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
             {/* Meals */}
             <div className="flex justify-between items-center px-4 py-3">
               <span className="text-sm" style={{ color: 'var(--muted)' }}>
-                Wyżywienie
+                {t('summary.meals')}
               </span>
               <span className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
                 {money(price.meals)}
@@ -344,8 +347,8 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
             className="rounded-[15px] px-4 py-4 text-center"
             style={{ border: '1px solid var(--ok)', background: 'var(--ok-soft)' }}
           >
-            <p className="text-sm font-semibold" style={{ color: 'var(--ok)' }}>Wydarzenie bezpłatne</p>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>Nie pobieramy żadnych opłat.</p>
+            <p className="text-sm font-semibold" style={{ color: 'var(--ok)' }}>{t('summary.free_title')}</p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>{t('summary.free_desc')}</p>
           </div>
         )}
 
@@ -355,7 +358,7 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
             className="px-4 py-3 rounded-[12px] text-sm"
             style={{ background: 'var(--err-soft)', color: 'var(--err)', border: '1px solid var(--err)' }}
           >
-            Nie udało się zapisać zgłoszenia: {submitError}. Spróbuj ponownie.
+            {t('summary.submit_error', { error: submitError })}
           </div>
         )}
 
@@ -367,7 +370,7 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
             className="w-full text-white text-sm font-semibold rounded-[16px] py-4 transition-all duration-150 active:scale-[0.98] hover:opacity-90"
             style={{ background: 'var(--accent)', border: 'none', cursor: 'pointer' }}
           >
-            {submitting ? 'Wysyłanie…' : 'Wyślij zgłoszenie →'}
+            {submitting ? t('summary.sending') : t('summary.submit_free')}
           </button>
         ) : isOnline ? (
           <div className="flex flex-col gap-3">
@@ -396,10 +399,10 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
               style={{ border: '1px solid var(--border)', background: 'var(--surface)' }}
             >
               <h3 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-                Płatność gotówką na miejscu
+                {t('summary.cash_title')}
               </h3>
               <p className="text-sm leading-relaxed" style={{ color: 'var(--muted)' }}>
-                Kwotę <span className="font-semibold" style={{ color: 'var(--ink)' }}>{money(price.total)}</span> zapłacisz gotówką przy rejestracji na miejscu. Nie jest wymagana żadna przedpłata online.
+                {t('summary.cash_desc_1')} <span className="font-semibold" style={{ color: 'var(--ink)' }}>{money(price.total)}</span> {t('summary.cash_desc_2')}
               </p>
             </div>
 
@@ -409,7 +412,7 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
               className="w-full text-white text-sm font-semibold rounded-[16px] py-4 transition-all duration-150 active:scale-[0.98] hover:opacity-90"
               style={{ background: 'var(--accent)', border: 'none', cursor: 'pointer' }}
             >
-              Zgłoszenie z płatnością gotówką →
+              {t('summary.submit_cash')}
             </button>
           </div>
         ) : (
@@ -449,7 +452,7 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
                   {t('summary.ref_title')}
                 </span>
                 <span className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
-                  Numer zgłoszenia (otrzymasz po wysłaniu i w e-mailu)
+                  {t('summary.ref_value')}
                 </span>
               </div>
 

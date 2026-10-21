@@ -142,10 +142,10 @@ export default function InviteMatchScreen({ event, slug, content }: { event: Eve
         <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>{t('invite.confirm_title')}</p>
         <p className="text-xs" style={{ color: 'var(--muted)' }}>{t('invite.confirm_hint')}</p>
         <div className="grid grid-cols-2 gap-2">
-          <Input label={t('invite.first_name')} value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Jan" />
-          <Input label={t('invite.last_name')} value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Kowalski" />
+          <Input label={t('invite.first_name')} value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder={t('applicant.first_ph')} />
+          <Input label={t('invite.last_name')} value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder={t('applicant.last_ph')} />
         </div>
-        <Input label={t('invite.email')} value={email} onChange={(e) => setEmail(e.target.value)} placeholder="jan@example.com" />
+        <Input label={t('invite.email')} value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t('applicant.email_ph')} />
 
         {/* Sam/z małżonkiem — kluczowe dla liczby posiłków, dlatego bez domyślnego zaznaczenia. */}
         <div className="flex flex-col gap-1.5">

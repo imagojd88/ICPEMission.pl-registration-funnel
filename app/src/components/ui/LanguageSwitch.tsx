@@ -17,7 +17,7 @@ const ALWAYS = ['pl', 'en']
  * potem język przeglądarki (PL → PL, IT → IT gdy event ma IT), w każdym innym wypadku EN.
  */
 export default function LanguageSwitch({ locales }: { locales?: string[] }) {
-  const { i18n } = useTranslation()
+  const { t, i18n } = useTranslation()
 
   // Uporządkuj i odfiltruj do znanych kodów.
   const langs = ORDER.filter((l) => ALWAYS.includes(l) || (locales ?? []).includes(l))
@@ -75,7 +75,7 @@ export default function LanguageSwitch({ locales }: { locales?: string[] }) {
           <button
             key={l}
             onClick={() => pick(l)}
-            aria-label={`Język: ${LABELS[l]}`}
+            aria-label={`${t('common.language')}: ${LABELS[l]}`}
             aria-pressed={active}
             className="flex items-center justify-center text-xs font-semibold transition-colors"
             style={{

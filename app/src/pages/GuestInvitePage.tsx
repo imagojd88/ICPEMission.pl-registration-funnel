@@ -47,11 +47,16 @@ export default function GuestInvitePage() {
     getGuestInvites(token)
       .then((v) => {
         setView(v)
-        document.title = `${t('guest.page_title')} — ${pickLang(v.event.title as string | Record<string, string>, i18n.language)}`
       })
       .catch((e: unknown) => setLoadError(e instanceof Error ? e.message : String(e)))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token])
+
+  // Tytuł karty w języku strony — odświeża się po zmianie języka.
+  useEffect(() => {
+    if (!view) return
+    document.title = `${t('guest.page_title')} — ${pickLang(view.event.title as string | Record<string, string>, i18n.language)}`
+  }, [view, t, i18n.language])
 
   function validate(): string | null {
     if (!form.firstName.trim() || !form.lastName.trim()) return t('guest.err_name')

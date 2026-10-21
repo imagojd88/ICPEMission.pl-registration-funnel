@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 
 interface SpinnerProps {
@@ -12,10 +13,11 @@ const sizeMap = {
 }
 
 export function Spinner({ size = 'default', className }: SpinnerProps) {
+  const { t } = useTranslation()
   return (
     <div
       role="status"
-      aria-label="Ładowanie"
+      aria-label={t('common.loading')}
       className={cn(
         'rounded-full border-[var(--border-2)] border-t-[var(--brand)] animate-spin',
         sizeMap[size],

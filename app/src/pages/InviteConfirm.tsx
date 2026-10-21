@@ -94,10 +94,15 @@ export default function InviteConfirm() {
             dietary: c.dietary ?? '',
           })),
         )
-        document.title = `${t('invite.title_prefix')} — ${pickLang(v.event.title as string | Record<string, string>, i18n.language)}`
       })
       .catch(() => setError(true))
   }, [token])
+
+  // Tytuł karty w języku strony — odświeża się po zmianie języka.
+  useEffect(() => {
+    if (!inv) return
+    document.title = `${t('invite.title_prefix')} — ${pickLang(inv.event.title as string | Record<string, string>, i18n.language)}`
+  }, [inv, t, i18n.language])
 
   /**
    * Pełny formularz (skład + diety). Organizator mógł wpisać małżonka bez nazwiska — wtedy
@@ -481,11 +486,11 @@ export default function InviteConfirm() {
             <div className="grid grid-cols-2 gap-2">
               <div className="flex flex-col gap-1.5">
                 <label className="text-sm font-medium" style={{ color: 'var(--ink)' }}>{t('invite.spouse_first_name')}</label>
-                <input value={spouseFirstName} onChange={(e) => setSpouseFirstName(e.target.value)} placeholder="Anna" className={inputCls} style={{ border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--ink)' }} />
+                <input value={spouseFirstName} onChange={(e) => setSpouseFirstName(e.target.value)} placeholder={t('invite.spouse_first_ph')} className={inputCls} style={{ border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--ink)' }} />
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-sm font-medium" style={{ color: 'var(--ink)' }}>{t('invite.spouse_last_name')}</label>
-                <input value={spouseLastName} onChange={(e) => setSpouseLastName(e.target.value)} placeholder="Kowalska" className={inputCls} style={{ border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--ink)' }} />
+                <input value={spouseLastName} onChange={(e) => setSpouseLastName(e.target.value)} placeholder={t('invite.spouse_last_ph')} className={inputCls} style={{ border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--ink)' }} />
               </div>
             </div>
             <div className="flex flex-col gap-1">

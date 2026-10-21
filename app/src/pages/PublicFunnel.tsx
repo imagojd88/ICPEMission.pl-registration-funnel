@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useSearchParams } from 'react-router-dom'
 import type { EventInstanceDto, CreateRegistrationDto, RegistrationStatus, PaymentMethod } from '@icpe/shared'
-import { computePrice, DEFAULT_PRICING, validateRoomCapacity } from '@icpe/shared'
+import { computePrice, DEFAULT_PRICING, validateRoomCapacity, roomLabel } from '@icpe/shared'
 import type { PricingConfig } from '@icpe/shared'
 import { getEventBySlug, getEventConfig, createRegistration, registerGuest, getInvitation, pickLang, type EventConfig } from '../lib/api'
 import { clearDraft, loadDraft, pruneExpiredDrafts, saveDraft, type ResumableScreen } from '../lib/funnelDraft'
@@ -157,20 +157,21 @@ function FunnelSkeleton() {
 // ─── Error state ─────────────────────────────────────────────────────────────
 
 function FunnelError({ onRetry }: { onRetry: () => void }) {
+  const { t } = useTranslation()
   return (
     <div
       className="flex flex-col items-center justify-center min-h-screen gap-4"
       style={{ background: 'var(--bg)', color: 'var(--ink)' }}
     >
       <p className="text-sm" style={{ color: 'var(--muted)' }}>
-        Nie udało się załadować danych eventu.
+        {t('common.load_error')}
       </p>
       <button
         onClick={onRetry}
         className="text-sm font-semibold px-4 py-2 rounded-[12px]"
         style={{ background: 'var(--brand)', color: 'white', border: 'none', cursor: 'pointer' }}
       >
-        Spróbuj ponownie
+        {t('common.retry')}
       </button>
     </div>
   )
@@ -419,10 +420,6 @@ export default function PublicFunnel() {
         setEvent(e)
         setEventConfig(cfg)
         setPricingConfig(cfg.pricing)
-        const title = getEventTitle(e.title)
-        document.title = title
-          ? `${title} — Rejestracja`
-          : 'Rejestracja — ICPE Mission'
         setLoading(false)
       })
       .catch(() => {
@@ -435,6 +432,14 @@ export default function PublicFunnel() {
     loadEvent()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug])
+
+  // Tytuł karty przeglądarki — w języku strony; odświeża się po zmianie języka.
+  useEffect(() => {
+    if (!event) return
+    const title = getEventTitle(event.title, lng)
+    const suffix = t('common.tab_registration')
+    document.title = title ? `${title} — ${suffix}` : `${suffix} — ICPE Mission`
+  }, [event, lng, t])
 
   const patchStepper = (patch: Partial<StepperState>) => {
     setStepper((prev) => ({ ...prev, ...patch }))
@@ -477,7 +482,7 @@ export default function PublicFunnel() {
     if (!pricingConfig.rooms || pricingConfig.rooms.length === 0) return null // event bez pokoi
     const n = stepper.participants.length
     if (n === 0) return null
-    if (stepper.rooms.length === 0) return 'Dodaj pokój i przypisz do niego uczestników, zanim przejdziesz dalej.'
+    if (stepper.rooms.length === 0) return t('room.err_no_room')
     const assigned = new Set<number>()
     stepper.rooms.forEach((r) =>
       r.participantIndexes.forEach((i) => {
@@ -486,7 +491,7 @@ export default function PublicFunnel() {
     )
     if (assigned.size < n) {
       const missing = n - assigned.size
-      return `Przypisz wszystkich uczestników do pokoi — brakuje ${missing} ${missing === 1 ? 'osoby' : 'osób'}.`
+      return t('room.err_unassigned', { count: missing })
     }
     const { ok, errors } = validateRoomCapacity(
       {
@@ -499,7 +504,18 @@ export default function PublicFunnel() {
       },
       pricingConfig,
     )
-    if (!ok) return errors[0] ?? 'Sprawdź przypisanie osób do pokoi.'
+    if (!ok) {
+      // Komunikaty silnika wyceny są po polsku (wspólne z API) — tu budujemy własne, przetłumaczone.
+      for (const r of stepper.rooms) {
+        const room = pricingConfig.rooms.find((x) => x.id === r.roomId)
+        const cnt = r.participantIndexes.filter((i) => i >= 0 && i < n).length
+        if (!room) continue
+        const name = roomLabel(room.name, lng)
+        if (cnt === 0) return t('room.err_empty', { name })
+        if (cnt > room.cap) return t('room.err_over', { name, cap: room.cap, count: cnt })
+      }
+      return errors.length ? t('room.err_check') : null
+    }
     return null
   }
 
@@ -649,7 +665,7 @@ export default function PublicFunnel() {
       <div className="min-h-screen mx-auto relative" style={{ maxWidth: 452, background: 'var(--bg)' }}>
         <ThemeToggle />
         <LanguageSwitch locales={eventConfig?.locales} />
-        <RsvpScreen event={event} onBack={() => window.history.back()} />
+        <RsvpScreen event={event} content={eventConfig?.customFields} onBack={() => window.history.back()} />
       </div>
     )
   }

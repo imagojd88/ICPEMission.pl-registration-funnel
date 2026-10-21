@@ -165,7 +165,7 @@ export default function LandingScreen({ event, onRegister, pricingConfig, conten
               className="flex items-center gap-1.5 text-sm font-semibold px-3.5 py-2 rounded-[12px] transition-colors hover:bg-[var(--brand-soft)]"
               style={{ border: '1.5px solid var(--brand)', color: 'var(--brand)', background: 'transparent', cursor: 'pointer' }}
             >
-              <Clock size={15} /> Zobacz program
+              <Clock size={15} /> {t('content.see_program')}
             </button>
           ) : (
             <span />

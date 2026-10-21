@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { Sun, Moon } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { getTheme, setTheme } from '@/lib/theme'
 
 /** Pływający przełącznik motywu (jasny/ciemny) dla stron publicznych. */
 export default function ThemeToggle() {
+  const { t } = useTranslation()
   const [theme, setThemeState] = useState<'light' | 'dark'>(getTheme())
 
   function toggle() {
@@ -15,8 +17,8 @@ export default function ThemeToggle() {
   return (
     <button
       onClick={toggle}
-      aria-label={theme === 'dark' ? 'Włącz jasny motyw' : 'Włącz ciemny motyw'}
-      title={theme === 'dark' ? 'Jasny motyw' : 'Ciemny motyw'}
+      aria-label={theme === 'dark' ? t('common.theme_light_on') : t('common.theme_dark_on')}
+      title={theme === 'dark' ? t('common.theme_light') : t('common.theme_dark')}
       className="fixed z-50 flex items-center justify-center rounded-full transition-all duration-150 active:scale-95"
       style={{
         top: 'calc(12px + env(safe-area-inset-top, 0px))',

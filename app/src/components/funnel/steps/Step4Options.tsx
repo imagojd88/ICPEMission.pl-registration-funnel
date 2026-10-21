@@ -228,7 +228,7 @@ export default function Step4Options({
           <span className="text-sm leading-relaxed" style={{ color: 'var(--muted)' }}>
             {t('options.rodo')}{' '}
             <a href="/rodo" className="underline" style={{ color: 'var(--brand)' }}>
-              RODO
+              {t('options.rodo_link')}
             </a>
           </span>
         </label>
@@ -265,7 +265,7 @@ export default function Step4Options({
           <span className="text-sm leading-relaxed" style={{ color: 'var(--muted)' }}>
             {t('options.regulamin')}{' '}
             <a href="/regulamin" className="underline" style={{ color: 'var(--brand)' }}>
-              regulamin
+              {t('options.terms_link')}
             </a>
           </span>
         </label>

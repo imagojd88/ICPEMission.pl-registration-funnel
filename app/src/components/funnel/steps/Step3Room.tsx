@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { validateRoomCapacity, formatMoney, roomLabel } from '@icpe/shared'
-import type { PricingConfig, PriceInput } from '@icpe/shared'
+import { formatMoney, roomLabel } from '@icpe/shared'
+import type { PricingConfig } from '@icpe/shared'
 import type { Participant, RoomEntry } from '../../../pages/PublicFunnel'
 import { X, Plus } from 'lucide-react'
 
@@ -37,16 +37,17 @@ export default function Step3Room({ rooms, participants, pricingConfig, onChange
     .map((_, idx) => idx)
     .filter((idx) => !assignedIndexes.has(idx))
 
-  // Walidacja pojemności
-  const validationInput: PriceInput = {
-    rooms: rooms.map((r) => ({
-      roomId: r.roomId,
-      participants: r.participantIndexes
-        .filter((idx) => idx >= 0 && idx < participants.length)
-        .map((idx) => ({ type: participants[idx].type, age: participants[idx].age })),
-    })),
+  // Walidacja pojemności — per pokój (po uid), komunikaty w języku strony.
+  // (Silnik `validateRoomCapacity` z @icpe/shared zwraca teksty po polsku — wspólny z API.)
+  const roomErrors = new Map<string, string>()
+  for (const r of rooms) {
+    const rt = pricingConfig.rooms.find((x) => x.id === r.roomId)
+    if (!rt) continue
+    const cnt = r.participantIndexes.filter((idx) => idx >= 0 && idx < participants.length).length
+    const name = roomLabel(rt.name, i18n.language)
+    if (cnt === 0) roomErrors.set(r.uid, t('room.err_empty', { name }))
+    else if (cnt > rt.cap) roomErrors.set(r.uid, t('room.err_over', { name, cap: rt.cap, count: cnt }))
   }
-  const { errors: capErrors } = validateRoomCapacity(validationInput, pricingConfig)
 
   function addRoom() {
     const defaultRoomId = roomTypes[0]?.id ?? ''
@@ -74,8 +75,8 @@ export default function Step3Room({ rooms, participants, pricingConfig, onChange
   }
 
   function participantLabel(p: Participant, idx: number) {
-    const name = p.name.trim() || (p.type === 'adult' ? 'Dorosły' : 'Dziecko')
-    return `#${idx + 1} ${name}${p.type === 'child' ? ` (${p.age} lat)` : ''}`
+    const name = p.name.trim() || (p.type === 'adult' ? t('participants.adult') : t('participants.child'))
+    return `#${idx + 1} ${name}${p.type === 'child' ? ` (${p.age} ${t('participants.age_suffix')})` : ''}`
   }
 
   return (
@@ -84,7 +85,7 @@ export default function Step3Room({ rooms, participants, pricingConfig, onChange
         {t('room.title')}
       </h2>
       <p className="text-sm -mt-2" style={{ color: 'var(--muted)' }}>
-        Zaznacz, kto śpi w którym pokoju. Każda osoba musi być przypisana do pokoju — dopiero wtedy przejdziesz dalej.
+        {t('room.assign_hint')}
       </p>
 
       {/* Nieprzypisane osoby */}
@@ -94,7 +95,7 @@ export default function Step3Room({ rooms, participants, pricingConfig, onChange
           style={{ background: 'var(--err-soft)', border: '1px solid var(--err)' }}
         >
           <span className="text-xs font-semibold w-full" style={{ color: 'var(--err)' }}>
-            Nieprzypisane osoby:
+            {t('room.unassigned')}
           </span>
           {unassignedIndexes.map((idx) => (
             <span
@@ -112,7 +113,7 @@ export default function Step3Room({ rooms, participants, pricingConfig, onChange
       {rooms.map((room, roomIdx) => {
         const selectedType = roomTypes.find((rt) => rt.id === room.roomId) ?? roomTypes[0]
         // Błędy pojemności dotyczące tego pokoju
-        const roomCapError = capErrors.find((e) => selectedType && e.includes(roomLabel(selectedType.name)))
+        const roomCapError = roomErrors.get(room.uid)
 
         return (
           <div
@@ -126,13 +127,13 @@ export default function Step3Room({ rooms, participants, pricingConfig, onChange
             {/* Header pokoju */}
             <div className="flex items-center justify-between gap-2">
               <span className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-                Pokój {roomIdx + 1}
+                {t('summary.room_n', { n: roomIdx + 1 })}
               </span>
               <button
                 onClick={() => removeRoom(room.uid)}
                 className="p-1 rounded-[8px] transition-colors hover:bg-[var(--err-soft)]"
                 style={{ color: 'var(--muted)', border: 'none', background: 'none', cursor: 'pointer' }}
-                aria-label="Usuń pokój"
+                aria-label={t('room.remove')}
               >
                 <X size={16} />
               </button>
@@ -141,7 +142,7 @@ export default function Step3Room({ rooms, participants, pricingConfig, onChange
             {/* Wybór typu pokoju */}
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-medium" style={{ color: 'var(--muted)' }}>
-                Typ pokoju
+                {t('room.type')}
               </label>
               <select
                 value={room.roomId}
@@ -155,7 +156,7 @@ export default function Step3Room({ rooms, participants, pricingConfig, onChange
               >
                 {roomTypes.map((rt) => (
                   <option key={rt.id} value={rt.id}>
-                    {roomLabel(rt.name, i18n.language)} — {money(rt.perPerson)}/os/noc · maks. {rt.cap} os.
+                    {roomLabel(rt.name, i18n.language)} — {money(rt.perPerson)} {t('room.per_person_night')} · {t('room.max_n', { n: rt.cap })}
                   </option>
                 ))}
               </select>
@@ -183,7 +184,7 @@ export default function Step3Room({ rooms, participants, pricingConfig, onChange
             {/* Przypisanie osób */}
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-medium" style={{ color: 'var(--muted)' }}>
-                Osoby w pokoju
+                {t('room.people')}
               </label>
               <div className="flex flex-col gap-1">
                 {participants.map((p, pIdx) => {
@@ -241,7 +242,7 @@ export default function Step3Room({ rooms, participants, pricingConfig, onChange
                       </span>
                       {isInOther && (
                         <span className="text-xs ml-auto" style={{ color: 'var(--muted)' }}>
-                          (inny pokój)
+                          ({t('room.other_room')})
                         </span>
                       )}
                     </label>
@@ -272,27 +273,9 @@ export default function Step3Room({ rooms, participants, pricingConfig, onChange
         }}
       >
         <Plus size={16} />
-        Dodaj pokój
+        {t('room.add')}
       </button>
 
-      {/* Globalne błędy walidacji */}
-      {capErrors.length > 0 && (
-        <div className="flex flex-col gap-1">
-          {capErrors
-            .filter(
-              (e) =>
-                !rooms.some((r) => {
-                  const rt = pricingConfig.rooms.find((t) => t.id === r.roomId)
-                  return rt && e.includes(roomLabel(rt.name))
-                }),
-            )
-            .map((e, i) => (
-              <p key={i} className="text-xs font-medium" style={{ color: 'var(--err)' }}>
-                {e}
-              </p>
-            ))}
-        </div>
-      )}
     </div>
   )
 }

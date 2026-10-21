@@ -62,11 +62,11 @@ export default function StickyPriceBar({ state, pricingConfig, onNext, disabled 
             className="font-serif font-semibold leading-none"
             style={{ fontSize: 23, color: 'var(--ink)' }}
           >
-            {free ? 'Bezpłatne' : money(priceResult.total)}
+            {free ? t('summary.free_short') : money(priceResult.total)}
           </span>
           {hasPrice && (
             <span className="text-xs leading-none mt-0.5" style={{ color: 'var(--muted)' }}>
-              {money(priceResult.formation)} form. + {money(priceResult.accommodation)} nocl. + {money(priceResult.meals)} wyż.
+              {money(priceResult.formation)} {t('summary.abbr_formation')} + {money(priceResult.accommodation)} {t('summary.abbr_accommodation')} + {money(priceResult.meals)} {t('summary.abbr_meals')}
             </span>
           )}
         </div>

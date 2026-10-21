@@ -98,7 +98,7 @@ function ParticipantCard({ p, index, canRemove, onUpdate, onRemove, applicantNam
         label={t('participants.name')}
         value={p.name}
         onChange={(e) => onUpdate({ ...p, name: e.target.value })}
-        placeholder="Jan Kowalski"
+        placeholder={t('rsvp.name_ph')}
       />
       {index === 0 && applicantName && applicantName !== p.name.trim() && (
         <button
@@ -106,7 +106,7 @@ function ParticipantCard({ p, index, canRemove, onUpdate, onRemove, applicantNam
           className="self-start flex items-center gap-1 text-xs font-medium -mt-1"
           style={{ color: 'var(--brand)', background: 'none', border: 'none', cursor: 'pointer' }}
         >
-          <UserPlus size={12} /> Wstaw moje dane ({applicantName})
+          <UserPlus size={12} /> {t('participants.fill_mine', { name: applicantName })}
         </button>
       )}
 
@@ -123,7 +123,7 @@ function ParticipantCard({ p, index, canRemove, onUpdate, onRemove, applicantNam
               min={0}
               max={120}
               value={p.age || ''}
-              placeholder={isChild ? 'wiek dziecka' : 'opcjonalnie'}
+              placeholder={isChild ? t('participants.age_child_ph') : t('participants.optional')}
               onChange={(e) => onUpdate({ ...p, age: e.target.value === '' ? 0 : Number(e.target.value) })}
               className="w-full rounded-[12px] pr-9 pl-3 py-[13px] text-sm transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
               style={{
@@ -176,7 +176,7 @@ function ParticipantCard({ p, index, canRemove, onUpdate, onRemove, applicantNam
         label={t('participants.diet')}
         value={p.diet}
         onChange={(e) => onUpdate({ ...p, diet: e.target.value })}
-        placeholder="np. wegetariańska, bez glutenu"
+        placeholder={t('participants.diet_ph')}
       />
     </div>
   )
