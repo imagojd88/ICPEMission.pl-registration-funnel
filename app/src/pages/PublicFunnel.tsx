@@ -40,6 +40,7 @@ import Step1Participants from '../components/funnel/steps/Step1Participants'
 import Step2Prefs from '../components/funnel/steps/Step2Prefs'
 import Step3Room from '../components/funnel/steps/Step3Room'
 import Step4Options from '../components/funnel/steps/Step4Options'
+import { COMMUNITY_OTHER, type AffiliationField } from '../lib/communities'
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -51,6 +52,12 @@ export interface Applicant {
   email: string
   phone: string
   address: string
+  /** Parafia (pole tekstowe) — gdy event pyta o parafię. */
+  parish: string
+  /** Wybrana wspólnota z listy albo COMMUNITY_OTHER („Inna"). */
+  community: string
+  /** Nazwa wpisana ręcznie po wyborze „Inna". */
+  communityOther: string
 }
 
 export interface Participant {
@@ -89,10 +96,26 @@ export interface StepperState {
 
 // ─── Initial state ──────────────────────────────────────────────────────────
 
+/** Pola kontaktu dla wybranego trybu przynależności (zapisywane w `Registration.contact`). */
+function affiliationContact(a: Applicant, mode: AffiliationField | null): {
+  parish?: string
+  community?: string
+  communityOther?: boolean
+} {
+  if (mode === 'parish') return a.parish.trim() ? { parish: a.parish.trim() } : {}
+  if (mode === 'community') {
+    if (a.community === COMMUNITY_OTHER) {
+      return a.communityOther.trim() ? { community: a.communityOther.trim(), communityOther: true } : {}
+    }
+    return a.community ? { community: a.community } : {}
+  }
+  return {}
+}
+
 function buildInitialStepper(): StepperState {
   return {
     step: 0,
-    applicant: { firstName: '', lastName: '', email: '', phone: '', address: '' },
+    applicant: { firstName: '', lastName: '', email: '', phone: '', address: '', parish: '', community: '', communityOther: '' },
     participants: [
       { id: 'p-1', type: 'adult', name: '', age: 0, gender: 'M', diet: '' },
     ],
@@ -187,10 +210,13 @@ function StepperView({
   onBack,
   onNext,
   error,
+  affiliation,
 }: {
   state: StepperState
   event: EventInstanceDto
   pricingConfig: PricingConfig
+  /** Pole przynależności ustawione dla eventu (parafia / wspólnota) albo brak. */
+  affiliation?: AffiliationField | null
   onChange: (patch: Partial<StepperState>) => void
   onBack: () => void
   onNext: () => void
@@ -203,6 +229,7 @@ function StepperView({
           <Step0Applicant
             value={state.applicant}
             onChange={(applicant) => onChange({ applicant })}
+            affiliation={affiliation}
           />
         )
       case 1:
@@ -338,6 +365,8 @@ export default function PublicFunnel() {
   const [stepper, setStepper] = useState<StepperState>(buildInitialStepper())
   const [event, setEvent] = useState<EventInstanceDto | null>(null)
   const [eventConfig, setEventConfig] = useState<EventConfig | null>(null)
+  // Pole przynależności z ustawień eventu: parafia (tekst) / wspólnota (lista) / brak.
+  const affiliation: AffiliationField | null = eventConfig?.customFields?.affiliationField ?? null
   const [pricingConfig, setPricingConfig] = useState<PricingConfig>(DEFAULT_PRICING)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
@@ -521,6 +550,12 @@ export default function PublicFunnel() {
 
   const handleStepperNext = () => {
     setStepError(null)
+    // Krok „Dane" (0): wspólnota jest wymagana, gdy event o nią pyta (lista ma opcję „Inna").
+    if (stepper.step === 0 && affiliation === 'community') {
+      const a = stepper.applicant
+      if (!a.community) { setStepError(t('community.err_required')); return }
+      if (a.community === COMMUNITY_OTHER && !a.communityOther.trim()) { setStepError(t('community.err_other')); return }
+    }
     // Krok „Pokój" (3): nie przepuszczamy dalej bez poprawnego wyboru pokoju.
     if (stepper.step === 3) {
       const err = validateRoomStep()
@@ -562,13 +597,15 @@ export default function PublicFunnel() {
     try {
       const dto: CreateRegistrationDto = {
         instanceId: event.id,
-        locale: 'pl',
+        // Język gościa → mail z potwierdzeniem w jego języku (API ma PL i EN; inne → PL).
+        locale: (['pl', 'en', 'it'].includes(lng) ? lng : 'pl') as CreateRegistrationDto['locale'],
         contact: {
           firstName: stepper.applicant.firstName,
           lastName: stepper.applicant.lastName,
           email: stepper.applicant.email,
           phone: stepper.applicant.phone || undefined,
           address: stepper.applicant.address || undefined,
+          ...affiliationContact(stepper.applicant, affiliation),
         },
         participants: stepper.participants.map((p) => {
           const n = splitName(p.name)
@@ -622,7 +659,7 @@ export default function PublicFunnel() {
       firstName: stepper.applicant.firstName,
       lastName: stepper.applicant.lastName,
       phone: stepper.applicant.phone || undefined,
-      locale: 'pl',
+      locale: ['pl', 'en', 'it'].includes(lng) ? lng : 'pl',
     })
   }
 
@@ -733,6 +770,7 @@ export default function PublicFunnel() {
           onBack={handleStepperBack}
           onNext={handleStepperNext}
           error={stepError}
+          affiliation={affiliation}
         />
       )}
 

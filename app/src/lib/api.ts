@@ -877,6 +877,8 @@ export interface EventContent {
   } | null
   /** Ścieżka „uczestnik zaprasza gościa" — włączana per event w edycji. */
   guestInvites?: { enabled?: boolean; maxPerInviter?: number } | null
+  /** Pole przynależności w formularzu zapisu: parafia (tekst) / wspólnota (lista) / brak. */
+  affiliationField?: 'parish' | 'community' | null
 }
 
 export interface InvitationView {

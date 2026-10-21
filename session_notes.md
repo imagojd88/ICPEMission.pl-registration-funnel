@@ -51,6 +51,18 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — panel admina (kreator eventów)
 
+### Pole „Wspólnota” (lista) / „Parafia” w formularzu zapisu (2026-10-21)
+- **Prośba (Jacek):** alternatywa dla pola „parafia” — rozwijana lista wspólnot z sekcjami Polska / ICPE Worldwide; „Inna” → pole do wpisania ręcznego.
+- **Stan zastany:** pola „Parafia” w formularzu nie było — w kreatorze był tylko martwy checkbox „Parafia” w „Pola formularza” (pozostałe checkboxy tej listy też do niczego nie są podłączone; nie ruszane).
+- **Ustawienie per event:** `customFields.affiliationField` = `parish` | `community` | null. Wybór „Nie pytaj / Parafia / Wspólnota” — komponent `admin/events/AffiliationSelect.tsx`, w kreatorze (krok Strona, zamiast checkboxa „Parafia”) i w „Edytuj event” (nowa sekcja „Formularz zapisu”). Domyślnie: nie pytaj.
+- **Formularz (krok „Dane zgłaszającego”, `Step0Applicant`):** Parafia = pole tekstowe, nieobowiązkowe. Wspólnota = `<select>` z `<optgroup>` Polska (4 + „Inna” na końcu sekcji, jak na liście Jacka) i ICPE Worldwide (16); obowiązkowe — walidacja w `PublicFunnel.handleStepperNext` (brak wyboru / „Inna” bez nazwy). Lista w `app/src/lib/communities.ts` (nazwy własne bez tłumaczenia; tłumaczone: nagłówki sekcji, „Inna”, komunikaty — sekcja `community` w locales).
+- **Zapis:** `Registration.contact` (JSON, bez zmian schematu): `parish` albo `community` (+ `communityOther: true`, gdy wpisana ręcznie). Typ `Contact` rozszerzony w `shared/src/types.ts` i `api/src/_shared/types.ts`.
+- **Admin:** API (`admin.service` i `registrations.service.toContractRegistration`) zwraca w `contact` także `address`, `parish`, `community`, `communityOther` (wcześniej obcinało do imienia/nazwiska/e-maila/telefonu). Szczegóły zgłoszenia: wiersze Adres / Parafia / Wspólnota („Inna: …” dla wpisanej ręcznie); lista zgłoszeń: wspólnota/parafia pod e-mailem; wyszukiwarka szuka też po wspólnocie/parafii.
+- **Poprawka przy okazji:** edycja zgłoszenia przez admina (i przez gościa linkiem) nadpisywała cały `contact` — gubiła adres; teraz scala z istniejącym.
+- **Poprawka przy okazji:** formularz wysyłał zawsze `locale: 'pl'` (zgłoszenie i zakładanie konta) → gość z wersji EN dostawał polski mail; teraz język gościa (API ma maile PL/EN; IT → na razie PL).
+- **Weryfikacja:** tsc app ✓, api ✓ (poza 2 starymi błędami w src/courses — niezwiązane); Playwright z mockiem API: lista w EN (sekcje Poland / ICPE Worldwide, „Other”), walidacja brak wyboru / „Inna” bez nazwy, wysłany contact `{community: "…", communityOther: true}` + `locale: en`; tryb parafii (PL) → `{parish}`; tryb „nie pytaj” (IT) → bez pól; kreator wysyła `customFields.affiliationField`.
+- Stan: do pushu + **Manual Deploy `icpe-api`** (zmiany w API: zwracanie pól kontaktu, scalanie przy edycji). Bez zmian w bazie.
+
 ### Strona zapisów: tytuł karty, „Zobacz program” i pozostałe polskie napisy w EN/IT (2026-10-21)
 - **Zgłoszenie (Jacek):** po zmianie języka tytuł karty przeglądarki zostawał polski („Dzień ICPE — Rejestracja”), przycisk „Zobacz program” też.
 - **Przyczyna:** `document.title` ustawiany raz przy wczytaniu, z wersji PL i z dopiskiem na sztywno; w publicznych ekranach ~80 napisów wpisanych po polsku zamiast przez `t()`.

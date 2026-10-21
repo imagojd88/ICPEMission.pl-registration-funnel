@@ -392,5 +392,18 @@
     "email_ph": "es. mario@example.com",
     "sending": "Invio…",
     "confirm": "Conferma"
+  },
+  "community": {
+    "label": "Comunità",
+    "choose": "— scegli la tua comunità —",
+    "group_pl": "Polonia",
+    "group_world": "ICPE Worldwide",
+    "other": "Altra",
+    "other_label": "Nome della comunità",
+    "other_ph": "Scrivi il nome della tua comunità",
+    "parish": "Parrocchia",
+    "parish_ph": "es. Parrocchia di Sant’Anna, Varsavia",
+    "err_required": "Scegli la tua comunità (se non è nell’elenco, scegli «Altra»).",
+    "err_other": "Scrivi il nome della tua comunità."
   }
 }

@@ -4,6 +4,8 @@ import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import ImageGalleryPicker from '@/components/admin/ImageGalleryPicker'
 import InvitedGuestsSection from '@/components/admin/events/InvitedGuestsSection'
+import AffiliationSelect from '@/components/admin/events/AffiliationSelect'
+import type { AffiliationField } from '@/lib/communities'
 import {
   getEventEditConfig,
   updateEventInstance,
@@ -131,6 +133,8 @@ export default function EventEditForm({
   const [eventType, setEventType] = useState<string>('')
   // Ścieżka „uczestnik zaprasza gościa" (customFields.guestInvites).
   const [guestInvitesEnabled, setGuestInvitesEnabled] = useState(false)
+  // Pole przynależności w formularzu zapisu (customFields.affiliationField).
+  const [affiliationField, setAffiliationField] = useState<AffiliationField | ''>('')
   const [guestInvitesMax, setGuestInvitesMax] = useState('2')
 
   async function handleGuestPhoto(e: ChangeEvent<HTMLInputElement>) {
@@ -293,6 +297,7 @@ export default function EventEditForm({
         const gb = cfg.customFields?.specialGuest?.bio
         setGuestBioMap(typeof gb === 'string' ? (gb ? { pl: gb } : {}) : (gb ?? {}))
         setGuestInvitesEnabled(cfg.customFields?.guestInvites?.enabled === true)
+        setAffiliationField(cfg.customFields?.affiliationField ?? '')
         setGuestInvitesMax(String(cfg.customFields?.guestInvites?.maxPerInviter ?? 2))
         const loc = cfg.locales ?? ['pl']
         // PL i EN zawsze aktywne (patrz activeLocales); IT według ustawień.
@@ -410,6 +415,7 @@ export default function EventEditForm({
                   bio: cleanMap(guestBioMap),
                 }
               : null,
+          affiliationField: affiliationField || null,
           guestInvites: {
             enabled: guestInvitesEnabled,
             maxPerInviter: Math.min(10, Math.max(1, parseInt(guestInvitesMax, 10) || 2)),
@@ -813,6 +819,16 @@ export default function EventEditForm({
           />
         </Section>
       )}
+
+      <Section title="Formularz zapisu">
+        {/* Nie <Field> (to <label>) — kliknięcie w odstęp wybierałoby pierwszy przycisk. */}
+        <div className="flex flex-col gap-1.5">
+          <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--faint)' }}>
+            Przynależność (krok „Dane zgłaszającego”)
+          </span>
+          <AffiliationSelect value={affiliationField} onChange={setAffiliationField} />
+        </div>
+      </Section>
 
       <Section title="Program i gość specjalny">
         <Field label={`Program (godzina + punkt)${multi ? ` — treść: ${LANG_LABEL[editLang]}` : ''}`}>

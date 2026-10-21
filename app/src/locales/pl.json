@@ -397,5 +397,18 @@
     "email_ph": "np. jan@example.com",
     "sending": "Wysyłanie…",
     "confirm": "Potwierdź"
+  },
+  "community": {
+    "label": "Wspólnota",
+    "choose": "— wybierz wspólnotę —",
+    "group_pl": "Polska",
+    "group_world": "ICPE Worldwide",
+    "other": "Inna",
+    "other_label": "Nazwa wspólnoty",
+    "other_ph": "Wpisz nazwę swojej wspólnoty",
+    "parish": "Parafia",
+    "parish_ph": "np. Parafia św. Anny w Warszawie",
+    "err_required": "Wybierz swoją wspólnotę (jeśli nie ma jej na liście — „Inna”).",
+    "err_other": "Wpisz nazwę swojej wspólnoty."
   }
 }

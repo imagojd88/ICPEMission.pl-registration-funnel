@@ -13,6 +13,7 @@ import type { RegistrationDto, EventInstanceDto, PricingConfig } from '@icpe/sha
 import { DEFAULT_PRICING } from '@icpe/shared'
 import RegistrationEditForm from './RegistrationEditForm'
 import { useAutoRefresh } from '@/hooks/useAutoRefresh'
+import { communityDisplay } from '@/lib/communities'
 
 function formatUpdatedAt(d: Date): string {
   return d.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })
@@ -151,6 +152,10 @@ function RegistrationDrawer({
                 { label: 'Imię i nazwisko', value: fullName },
                 { label: 'E-mail', value: r.contact.email },
                 { label: 'Telefon', value: r.contact.phone ?? '—' },
+                // Pola dodatkowe — tylko gdy wypełnione.
+                ...(r.contact.address ? [{ label: 'Adres', value: r.contact.address }] : []),
+                ...(r.contact.parish ? [{ label: 'Parafia', value: r.contact.parish }] : []),
+                ...(r.contact.community ? [{ label: 'Wspólnota', value: communityDisplay(r.contact) }] : []),
               ].map((item) => (
                 <div key={item.label} className="flex items-start justify-between gap-2">
                   <span className="text-sm" style={{ color: 'var(--muted)' }}>{item.label}</span>
@@ -388,7 +393,9 @@ export default function RegistrationsScreen() {
       !q ||
       r.contact.firstName.toLowerCase().includes(q) ||
       r.contact.lastName.toLowerCase().includes(q) ||
-      r.contact.email.toLowerCase().includes(q)
+      r.contact.email.toLowerCase().includes(q) ||
+      (r.contact.community ?? '').toLowerCase().includes(q) ||
+      (r.contact.parish ?? '').toLowerCase().includes(q)
     return matchSearch && payStatusMatch(r, statusFilter)
   })
 
@@ -603,6 +610,11 @@ export default function RegistrationsScreen() {
                         {r.contact.firstName} {r.contact.lastName}
                       </p>
                       <p className="text-xs" style={{ color: 'var(--faint)' }}>{r.contact.email}</p>
+                      {(r.contact.community || r.contact.parish) && (
+                        <p className="text-xs" style={{ color: 'var(--muted)' }}>
+                          {r.contact.community ? communityDisplay(r.contact) : r.contact.parish}
+                        </p>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-center" style={{ color: 'var(--ink)' }}>
                       {r.participants.length}

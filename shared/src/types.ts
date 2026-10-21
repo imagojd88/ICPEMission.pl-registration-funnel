@@ -29,6 +29,11 @@ export interface Contact {
   email: string;
   phone?: string;
   address?: string;
+  /** Parafia — gdy event pyta o parafię. */
+  parish?: string;
+  /** Wspólnota z listy albo nazwa wpisana ręcznie (wtedy communityOther = true). */
+  community?: string;
+  communityOther?: boolean;
 }
 
 export interface ParticipantDto {

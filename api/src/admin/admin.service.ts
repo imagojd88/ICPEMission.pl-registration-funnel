@@ -126,14 +126,20 @@ export class AdminService {
       },
     });
     if (!reg) throw new NotFoundException('Registration not found');
-    const c = (reg.contact ?? {}) as { firstName?: string; lastName?: string; email?: string; phone?: string };
+    const c = (reg.contact ?? {}) as { firstName?: string; lastName?: string; email?: string; phone?: string; address?: string; parish?: string; community?: string; communityOther?: boolean };
     return {
       ok: true,
       id: reg.id,
       instanceId: reg.instanceId,
       status: mapRegStatus(reg.status),
       locale: reg.locale,
-      contact: { firstName: c.firstName ?? '', lastName: c.lastName ?? '', email: c.email, phone: c.phone },
+      contact: {
+        firstName: c.firstName ?? '', lastName: c.lastName ?? '', email: c.email, phone: c.phone,
+        // Pola dodatkowe formularza (puste → pominięte): adres, parafia, wspólnota.
+        ...(c.address ? { address: c.address } : {}),
+        ...(c.parish ? { parish: c.parish } : {}),
+        ...(c.community ? { community: c.community, communityOther: !!c.communityOther } : {}),
+      },
       participants: reg.participants.map((p: {
         type: string; firstName: string; lastName: string; age: number | null; gender: string | null; dietary: string | null;
       }) => ({

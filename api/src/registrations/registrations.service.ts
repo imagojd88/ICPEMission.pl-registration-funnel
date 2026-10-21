@@ -199,7 +199,9 @@ export class RegistrationsService {
       p.registration.update({
         where: { id },
         data: {
-          ...(dto.contact ? { contact: dto.contact as object } : {}),
+          // Scalamy z istniejącym kontaktem — formularz admina edytuje tylko część pól
+          // (adres, parafia, wspólnota zostają).
+          ...(dto.contact ? { contact: { ...((reg.contact ?? {}) as object), ...dto.contact } as object } : {}),
           ...(dto.locale ? { locale: dto.locale } : {}),
           roomsJson: dto.rooms as unknown,
           optionsJson: (dto.options ?? {}) as unknown,
@@ -249,7 +251,7 @@ export class RegistrationsService {
       where: { id },
       data: {
         locale: dto.locale ?? reg.locale,
-        contact: dto.contact ? dto.contact as object : reg.contact as object,
+        contact: dto.contact ? { ...((reg.contact ?? {}) as object), ...dto.contact } as object : reg.contact as object,
         dietaryNotes: dto.dietaryNotes ?? reg.dietaryNotes ?? undefined,
       },
       include: { participants: true, payments: true },
@@ -358,7 +360,7 @@ export class RegistrationsService {
     },
     roomNames?: Map<string, string>,
   ) {
-    const c = (reg.contact ?? {}) as { firstName?: string; lastName?: string; email?: string; phone?: string };
+    const c = (reg.contact ?? {}) as { firstName?: string; lastName?: string; email?: string; phone?: string; address?: string; parish?: string; community?: string; communityOther?: boolean };
     // Skomponowane pokoje (roomsJson) → czytelne podsumowanie typów pokoi.
     const comp = (Array.isArray(reg.roomsJson) ? reg.roomsJson : []) as Array<{ roomId?: string }>;
     const summaryParts = comp
@@ -375,6 +377,10 @@ export class RegistrationsService {
         lastName: c.lastName ?? '',
         email: c.email,
         phone: c.phone,
+        // Pola dodatkowe formularza (puste → pominięte): adres, parafia, wspólnota.
+        ...(c.address ? { address: c.address } : {}),
+        ...(c.parish ? { parish: c.parish } : {}),
+        ...(c.community ? { community: c.community, communityOther: !!c.communityOther } : {}),
       },
       participants: reg.participants.map((p) => ({
         type: mapParticipantType(p.type),

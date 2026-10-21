@@ -20,6 +20,8 @@ import { SUPERTITLE_PRESETS, isPresetSupertitle } from '@/lib/supertitles'
 import { DEFAULT_PRICING } from '@icpe/shared'
 import type { PricingConfig, AgeBracket } from '@icpe/shared'
 import type { EventEditConfig, Place, InvitationItem, Invitee } from '@/lib/api'
+import AffiliationSelect from '@/components/admin/events/AffiliationSelect'
+import type { AffiliationField } from '@/lib/communities'
 
 /** Parsuje listę zaproszonych: 1 wiersz = „Imię Nazwisko, email, telefon" (telefon opcjonalny). */
 function parseInvitees(raw: string): Invitee[] {
@@ -144,6 +146,8 @@ interface WizardState {
   supertitleI18n: Tr
   specialGuestNameI18n: Tr
   specialGuestBioI18n: Tr
+  /** Pole przynależności w formularzu zapisu (customFields.affiliationField). */
+  affiliationField: AffiliationField | ''
 }
 
 // ── Color config ──────────────────────────────────────────────────────────────
@@ -170,7 +174,8 @@ const COLOR_DARK_MAP: Record<ColorSwatch, string> = {
 }
 
 const STEP_LABELS = ['Typ', 'Szczegóły', 'Pokoje', 'Cennik', 'Strona']
-const FIELD_CHECKS = ['Telefon', 'Adres', 'Dieta', 'Dzieci', 'Parafia', 'Transport']
+// „Parafia” zastąpiona ustawieniem przynależności (AffiliationSelect) — parafia / wspólnota / brak.
+const FIELD_CHECKS = ['Telefon', 'Adres', 'Dieta', 'Dzieci', 'Transport']
 
 // ── Default age brackets from DEFAULT_PRICING ─────────────────────────────────
 
@@ -1566,6 +1571,16 @@ function Step4Page({ state, update }: { state: WizardState; update: (p: Partial<
       </div>
 
       <div>
+        <p className="text-sm font-semibold mb-1" style={{ color: 'var(--ink)' }}>
+          Przynależność uczestnika
+        </p>
+        <p className="text-xs mb-2" style={{ color: 'var(--muted)' }}>
+          Pytanie w kroku „Dane zgłaszającego”: o parafię (wpis) albo o wspólnotę (lista).
+        </p>
+        <AffiliationSelect value={state.affiliationField} onChange={(v) => update({ affiliationField: v })} />
+      </div>
+
+      <div>
         <p className="text-sm font-semibold mb-2" style={{ color: 'var(--ink)' }}>
           Języki strony
         </p>
@@ -1767,6 +1782,7 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
     supertitleI18n: {},
     specialGuestNameI18n: {},
     specialGuestBioI18n: {},
+    affiliationField: '',
   })
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -1869,6 +1885,7 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
                 bio: withPl(state.specialGuestBio, state.specialGuestBioI18n),
               }
             : null,
+        affiliationField: state.affiliationField || null,
       }
 
       // Tryb edycji — aktualizujemy istniejący event i kończymy.

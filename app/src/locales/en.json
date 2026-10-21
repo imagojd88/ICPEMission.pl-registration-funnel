@@ -389,5 +389,18 @@
     "email_ph": "e.g. john@example.com",
     "sending": "Sending…",
     "confirm": "Confirm"
+  },
+  "community": {
+    "label": "Community",
+    "choose": "— choose your community —",
+    "group_pl": "Poland",
+    "group_world": "ICPE Worldwide",
+    "other": "Other",
+    "other_label": "Community name",
+    "other_ph": "Enter the name of your community",
+    "parish": "Parish",
+    "parish_ph": "e.g. St Anne’s Parish, Warsaw",
+    "err_required": "Please choose your community (if it is not listed, pick “Other”).",
+    "err_other": "Please enter the name of your community."
   }
 }
