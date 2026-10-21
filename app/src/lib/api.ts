@@ -862,19 +862,31 @@ export function eventLocation(
   return tr && (m.pl ?? '').trim() === base ? tr : base
 }
 
+/** Gość specjalny (osoba albo para — wtedy jedno zdjęcie i wspólny opis). */
+export interface SpecialGuest {
+  /** Imiona — string (starsze eventy) albo mapa językowa („Anna i Mario" / „Anna and Mario"). */
+  name?: LangText
+  photoUrl?: string
+  /** true → para / kilka osób w jednym wpisie (np. małżeństwo). */
+  plural?: boolean
+  /** Krótkie 1–2 zdania: kim są. Wielojęzyczne jak program. */
+  bio?: LangText
+}
+
+/** Lista gości specjalnych eventu — nowy format `specialGuests` albo starszy pojedynczy `specialGuest`. */
+export function eventGuests(content: EventContent | null | undefined): SpecialGuest[] {
+  if (Array.isArray(content?.specialGuests)) return content!.specialGuests!.filter(Boolean)
+  return content?.specialGuest ? [content.specialGuest] : []
+}
+
 export interface EventContent {
   program?: { time: string; item: LangText }[]
   /** Wersje językowe miejsca — patrz `LocationI18n`. */
   locationI18n?: LocationI18n | null
-  specialGuest?: {
-    /** Imiona — string (starsze eventy) albo mapa językowa („Anna i Mario" / „Anna and Mario"). */
-    name?: LangText
-    photoUrl?: string
-    /** true → etykieta „Goście specjalni" (np. małżeństwo, duet prowadzących). */
-    plural?: boolean
-    /** Krótkie 1–2 zdania: kim są. Wielojęzyczne jak program. */
-    bio?: LangText
-  } | null
+  /** Starszy format: jeden gość (lub para). Nowe zapisy używają `specialGuests`. */
+  specialGuest?: SpecialGuest | null
+  /** Goście specjalni — dowolnie wielu, w kolejności wyświetlania. */
+  specialGuests?: SpecialGuest[] | null
   /** Ścieżka „uczestnik zaprasza gościa" — włączana per event w edycji. */
   guestInvites?: { enabled?: boolean; maxPerInviter?: number } | null
   /** Pole przynależności w formularzu zapisu: parafia (tekst) / wspólnota (lista) / brak. */

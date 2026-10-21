@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import type { EventInstanceDto, PricingConfig } from '@icpe/shared'
 import { pickLang, eventLocation, type EventContent } from '../../lib/api'
 import { formatDateRange } from '../../lib/utils'
+import { SpecialGuestsBlock } from './EventContentBlocks'
 
 interface Props {
   event: EventInstanceDto
@@ -155,6 +156,9 @@ export default function LandingScreen({ event, onRegister, pricingConfig, conten
           </p>
         ) : null
       })()}
+
+      {/* Goście specjalni (jeden lub kilku) */}
+      <SpecialGuestsBlock content={content} />
 
       {/* Program (popup) + miejsca */}
       {(program.length > 0 || hasCapacity) && (

@@ -5,6 +5,7 @@ import Input from '@/components/ui/Input'
 import ImageGalleryPicker from '@/components/admin/ImageGalleryPicker'
 import InvitedGuestsSection from '@/components/admin/events/InvitedGuestsSection'
 import AffiliationSelect from '@/components/admin/events/AffiliationSelect'
+import SpecialGuestsEditor, { guestRowsFrom, guestsToSave, guestsMissingBio, type GuestRow } from '@/components/admin/events/SpecialGuestsEditor'
 import type { AffiliationField } from '@/lib/communities'
 import {
   getEventEditConfig,
@@ -121,13 +122,8 @@ export default function EventEditForm({
   // Ręcznie wybrana opcja „Inny…" — trzyma otwarte pole tekstowe, gdy jest jeszcze puste.
   const [superCustom, setSuperCustom] = useState(false)
   const [program, setProgram] = useState<{ id: string; time: string; item: Record<string, string> }[]>([])
-  // Imiona gości per język („Anna i Mario" → „Anna and Mario"); pusty EN = jak PL.
-  const [guestNameMap, setGuestNameMap] = useState<Record<string, string>>({})
-  const [specialGuestPhoto, setSpecialGuestPhoto] = useState('')
-  // Kilka osób (np. małżeństwo) → etykieta „Goście specjalni" zamiast „Gość specjalny".
-  const [specialGuestPlural, setSpecialGuestPlural] = useState(false)
-  const [guestBioMap, setGuestBioMap] = useState<Record<string, string>>({})
-  const [uploadingGuest, setUploadingGuest] = useState(false)
+  // Goście specjalni — lista (imiona i opis per język, portret i „para” wspólne).
+  const [guests, setGuests] = useState<GuestRow[]>([])
   const [places, setPlaces] = useState<Place[]>([])
   // Typ eventu z serii — decyduje, czy pokazać sekcję zaproszonych gości.
   const [eventType, setEventType] = useState<string>('')
@@ -137,19 +133,6 @@ export default function EventEditForm({
   const [affiliationField, setAffiliationField] = useState<AffiliationField | ''>('')
   const [guestInvitesMax, setGuestInvitesMax] = useState('2')
 
-  async function handleGuestPhoto(e: ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0]
-    if (!f) return
-    setUploadingGuest(true)
-    try {
-      const url = await uploadImage(f)
-      setSpecialGuestPhoto(url)
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : String(err))
-    } finally {
-      setUploadingGuest(false)
-    }
-  }
   const addProgramRow = () => setProgram((p) => [...p, { id: `pg-${Date.now()}`, time: '', item: {} }])
   const setProgramTime = (id: string, time: string) =>
     setProgram((p) => p.map((r) => (r.id === id ? { ...r, time } : r)))
@@ -209,7 +192,8 @@ export default function EventEditForm({
     if (miss(superMap)) out.push('nadtytuł')
     const p = program.filter((r) => miss(r.item)).length
     if (p) out.push(`program (${p})`)
-    if (miss(guestBioMap)) out.push('opis gości')
+    const gm = guestsMissingBio(guests, l)
+    if (gm) out.push(`opis gości (${gm})`)
     const rm = isFree ? 0 : rooms.filter((r) => miss(r.name)).length
     if (rm) out.push(`pokoje (${rm})`)
     if (locStale && locI18n[l]?.trim()) out.push('miejsce (sprawdź)')
@@ -290,12 +274,7 @@ export default function EventEditForm({
             item: typeof p.item === 'string' ? (p.item ? { pl: p.item } : {}) : (p.item ?? {}),
           })),
         )
-        const gn = cfg.customFields?.specialGuest?.name
-        setGuestNameMap(typeof gn === 'string' ? (gn ? { pl: gn } : {}) : (gn ?? {}))
-        setSpecialGuestPhoto(cfg.customFields?.specialGuest?.photoUrl ?? '')
-        setSpecialGuestPlural(!!cfg.customFields?.specialGuest?.plural)
-        const gb = cfg.customFields?.specialGuest?.bio
-        setGuestBioMap(typeof gb === 'string' ? (gb ? { pl: gb } : {}) : (gb ?? {}))
+        setGuests(guestRowsFrom(cfg.customFields))
         setGuestInvitesEnabled(cfg.customFields?.guestInvites?.enabled === true)
         setAffiliationField(cfg.customFields?.affiliationField ?? '')
         setGuestInvitesMax(String(cfg.customFields?.guestInvites?.maxPerInviter ?? 2))
@@ -383,7 +362,6 @@ export default function EventEditForm({
       })
 
       const locales = [...activeLocales]
-      const guestNameClean = cleanMap(guestNameMap)
       const locTr = cleanMap({ en: locI18n.en ?? '', it: locI18n.it ?? '' })
       // `pl` = wersja, z której zrobiono tłumaczenie. Niepotwierdzone po zmianie PL → strona
       // pokaże aktualne miejsce po polsku (eventLocation porównuje `pl` z location).
@@ -406,15 +384,9 @@ export default function EventEditForm({
             .filter((r) => r.time.trim() || Object.keys(cleanMap(r.item)).length)
             .map((r) => ({ time: r.time.trim(), item: cleanMap(r.item) })),
           locationI18n,
-          specialGuest:
-            Object.keys(guestNameClean).length || specialGuestPhoto
-              ? {
-                  name: guestNameClean,
-                  photoUrl: specialGuestPhoto,
-                  plural: specialGuestPlural,
-                  bio: cleanMap(guestBioMap),
-                }
-              : null,
+          // Nowy format: lista gości. Stary pojedynczy `specialGuest` czyścimy, żeby nie dublował.
+          specialGuests: guestsToSave(guests),
+          specialGuest: null,
           affiliationField: affiliationField || null,
           guestInvites: {
             enabled: guestInvitesEnabled,
@@ -830,7 +802,7 @@ export default function EventEditForm({
         </div>
       </Section>
 
-      <Section title="Program i gość specjalny">
+      <Section title="Program i goście specjalni">
         <Field label={`Program (godzina + punkt)${multi ? ` — treść: ${LANG_LABEL[editLang]}` : ''}`}>
           <div className="flex flex-col gap-2">
             {program.map((row) => (
@@ -846,51 +818,18 @@ export default function EventEditForm({
         <p className="text-xs" style={{ color: 'var(--faint)' }}>
           Godzina jest wspólna dla wszystkich języków; tłumaczysz tylko opis punktu.
         </p>
-        <Field label={`${specialGuestPlural ? 'Goście specjalni' : 'Gość specjalny'} (imiona i portret)${multi ? ` — ${LANG_LABEL[editLang]}` : ''}`}>
-          <div className="flex items-center gap-3">
-            {specialGuestPhoto ? (
-              <img src={specialGuestPhoto} alt="" className="rounded-full object-cover shrink-0" style={{ width: 44, height: 44 }} />
-            ) : (
-              <div className="rounded-full shrink-0" style={{ width: 44, height: 44, background: 'var(--surface-2)', border: '1px solid var(--border)' }} />
-            )}
-            <Input
-              value={guestNameMap[editLang] ?? ''}
-              onChange={(e) => setGuestNameMap((m) => ({ ...m, [editLang]: e.target.value }))}
-              placeholder={srcPh(
-                guestNameMap.pl,
-                specialGuestPlural ? 'np. Anna i Mario Cappello' : 'Imię i nazwisko',
-              )}
-            />
-            <label className="flex items-center gap-1 px-3 py-2 rounded-[10px] text-sm cursor-pointer shrink-0" style={{ background: 'var(--surface-2)', color: 'var(--muted)', border: '1px solid var(--border)' }}>
-              {uploadingGuest ? '…' : 'Portret'}
-              <input type="file" accept="image/*" className="hidden" onChange={handleGuestPhoto} />
-            </label>
-          </div>
-          {editLang !== 'pl' && (
-            <span className="text-xs" style={{ color: 'var(--faint)' }}>
-              Puste = jak po polsku. Wpisz, jeśli coś się tłumaczy (np. „Anna and Mario Cappello”).
-            </span>
-          )}
-        </Field>
-        <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: 'var(--ink)' }}>
-          <input
-            type="checkbox"
-            checked={specialGuestPlural}
-            onChange={(e) => setSpecialGuestPlural(e.target.checked)}
-            className="accent-[var(--brand)] w-4 h-4"
+        {/* Nie <Field> (to <label>) — w środku są przyciski i pola kilku gości. */}
+        <div className="flex flex-col gap-1.5">
+          <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--faint)' }}>
+            Goście specjalni{multi ? ` — imiona i opis: ${LANG_LABEL[editLang]}` : ''}
+          </span>
+          <SpecialGuestsEditor
+            rows={guests}
+            onChange={setGuests}
+            lang={editLang as 'pl' | 'en' | 'it'}
+            onError={setError}
           />
-          To więcej niż jedna osoba (np. małżeństwo) — pokaż „Goście specjalni"
-        </label>
-        <Field label={`Kim są — 1–2 zdania${multi ? ` — treść: ${LANG_LABEL[editLang]}` : ''}`}>
-          <textarea
-            value={guestBioMap[editLang] ?? ''}
-            onChange={(e) => setGuestBioMap((m) => ({ ...m, [editLang]: e.target.value }))}
-            rows={3}
-            placeholder={srcPh(guestBioMap.pl, 'np. Anna i Mario prowadzą wspólnotę ICPE Mission na Malcie i od 20 lat głoszą rekolekcje w całej Europie.')}
-            className={inputCls}
-            style={{ ...inputStyle, resize: 'vertical' }}
-          />
-        </Field>
+        </div>
       </Section>
 
       <Section title="Dane do przelewu">

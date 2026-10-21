@@ -51,6 +51,15 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — panel admina (kreator eventów)
 
+### Wielu gości specjalnych na event (2026-10-21)
+- **Prośba (Jacek):** dało się dodać tylko jednego gościa (lub małżeństwo) — potrzeba kilku.
+- **Model:** nowe `customFields.specialGuests: SpecialGuest[]` (`{name, bio, photoUrl, plural}`; name/bio = mapy językowe). Stary pojedynczy `specialGuest` nadal czytany — `eventGuests()` w `lib/api.ts` (lista albo [stary gość]). Zapis z panelu: `specialGuests` + `specialGuest: null` (bez dublowania). Istniejące eventy działają bez zmian; po pierwszym zapisie w „Edytuj event” przechodzą na nowy format.
+- **Panel:** wspólny edytor `admin/events/SpecialGuestsEditor.tsx` (kreator i „Edytuj event”): karta na gościa — portret (upload), imiona i opis w bieżącym języku treści (placeholder „PL: …”), „Para / kilka osób w jednym wpisie”, strzałki kolejności, usuń; „Dodaj kolejnego gościa”. Puste wpisy pomijane przy zapisie. Licznik braków tłumaczeń liczy opisy gości.
+- **Strona:** `SpecialGuestsBlock` (w `EventContentBlocks.tsx`) — nagłówek „Gość specjalny” / „Goście specjalni” (liczba mnoga przy >1 gościu lub parze) i karta na każdego.
+- **Poprawka przy okazji:** zwykła strona eventu (`LandingScreen`) w ogóle nie pokazywała gościa specjalnego — tylko strony zaproszeń. Teraz goście są pod opisem, nad programem.
+- **Weryfikacja:** tsc ✓; Playwright z mockiem: kreator 3 karty (1 pusta) + przesunięcie + EN opis → zapis 2 gości w nowej kolejności, z `en`; „Edytuj event” na starym evencie z `specialGuest` → 1 karta, dodanie drugiego → zapis `specialGuests` (2) + `specialGuest: null`; strona EN: „Special guests” + 2 karty (EN imiona/opisy), stary event: „Special guest”. 0 błędów JS.
+- Stan: do pushu (tylko frontend, auto-deploy `icpe-frontend`). Następny krok, o który Jacek prosił wcześniej: biblioteka zapisanych gości (wybór z listy zamiast ponownego wgrywania zdjęcia/opisu).
+
 ### Pole „Wspólnota” (lista) / „Parafia” w formularzu zapisu (2026-10-21)
 - **Prośba (Jacek):** alternatywa dla pola „parafia” — rozwijana lista wspólnot z sekcjami Polska / ICPE Worldwide; „Inna” → pole do wpisania ręcznego.
 - **Stan zastany:** pola „Parafia” w formularzu nie było — w kreatorze był tylko martwy checkbox „Parafia” w „Pola formularza” (pozostałe checkboxy tej listy też do niczego nie są podłączone; nie ruszane).

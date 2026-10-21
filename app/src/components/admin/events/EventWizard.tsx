@@ -21,6 +21,7 @@ import { DEFAULT_PRICING } from '@icpe/shared'
 import type { PricingConfig, AgeBracket } from '@icpe/shared'
 import type { EventEditConfig, Place, InvitationItem, Invitee } from '@/lib/api'
 import AffiliationSelect from '@/components/admin/events/AffiliationSelect'
+import SpecialGuestsEditor, { guestsToSave, guestsMissingBio, guestsHaveContentIn, type GuestRow } from '@/components/admin/events/SpecialGuestsEditor'
 import type { AffiliationField } from '@/lib/communities'
 
 /** Parsuje listę zaproszonych: 1 wiersz = „Imię Nazwisko, email, telefon" (telefon opcjonalny). */
@@ -133,10 +134,8 @@ interface WizardState {
   // program wydarzenia: godzina + punkt
   program: { id: string; time: string; item: string; itemI18n?: Tr }[]
   // gość specjalny + portret (URL)
-  specialGuestName: string
-  specialGuestPhoto: string
-  specialGuestPlural: boolean
-  specialGuestBio: string
+  /** Goście specjalni — lista (imiona i opis jako mapy {pl,en,it}). */
+  guests: GuestRow[]
   // ── Wersje językowe (przełącznik PL / EN / IT w kreatorze) ──
   /** Język, w którym aktualnie edytujemy treści. */
   editLang: ContentLang
@@ -144,8 +143,6 @@ interface WizardState {
   descriptionI18n: Tr
   locationI18n: Tr
   supertitleI18n: Tr
-  specialGuestNameI18n: Tr
-  specialGuestBioI18n: Tr
   /** Pole przynależności w formularzu zapisu (customFields.affiliationField). */
   affiliationField: AffiliationField | ''
 }
@@ -250,7 +247,8 @@ function missingIn(state: WizardState, l: ContentLang): string[] {
   if (miss(state.description, state.descriptionI18n)) out.push('opis')
   const p = state.program.filter((r) => miss(r.item, r.itemI18n)).length
   if (p) out.push(`program (${p})`)
-  if (miss(state.specialGuestBio, state.specialGuestBioI18n)) out.push('opis gości')
+  const gm = guestsMissingBio(state.guests, l)
+  if (gm) out.push(`opis gości (${gm})`)
   const rm = state.noAccommodation ? 0 : state.rooms.filter((r) => miss(r.name, r.nameI18n)).length
   if (rm) out.push(`pokoje (${rm})`)
   if (miss(state.supertitle, state.supertitleI18n)) out.push('nadtytuł')
@@ -262,7 +260,7 @@ function hasContentIn(state: WizardState, l: ContentLang): boolean {
   const has = (tr: Tr | undefined) => !!tr?.[l]?.trim()
   return (
     has(state.nameI18n) || has(state.descriptionI18n) || has(state.locationI18n) ||
-    has(state.supertitleI18n) || has(state.specialGuestNameI18n) || has(state.specialGuestBioI18n) ||
+    has(state.supertitleI18n) || guestsHaveContentIn(state.guests, l) ||
     state.program.some((r) => has(r.itemI18n)) || state.rooms.some((r) => has(r.nameI18n))
   )
 }
@@ -731,20 +729,6 @@ function Step1Details({ state, update }: { state: WizardState; update: (p: Parti
     }
   }
 
-  const [uploadingGuest, setUploadingGuest] = useState(false)
-  async function handleGuestPhoto(e: ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0]
-    if (!f) return
-    setUploadingGuest(true)
-    try {
-      const url = await uploadImage(f)
-      update({ specialGuestPhoto: url })
-    } catch {
-      /* ignoruj błąd uploadu */
-    } finally {
-      setUploadingGuest(false)
-    }
-  }
   const addProgramRow = () =>
     update({ program: [...state.program, { id: `pg-${Date.now()}`, time: '', item: '' }] })
   const updateProgramRow = (id: string, patch: Partial<{ time: string; item: string; itemI18n: Tr }>) =>
@@ -755,8 +739,8 @@ function Step1Details({ state, update }: { state: WizardState; update: (p: Parti
   const lang = curLang(state)
   const isPl = lang === 'pl'
   const sfx = ` — ${LANG_LABEL[lang]}`
-  type PlKey = 'name' | 'description' | 'location' | 'specialGuestName' | 'specialGuestBio'
-  type TrKey = 'nameI18n' | 'descriptionI18n' | 'locationI18n' | 'specialGuestNameI18n' | 'specialGuestBioI18n'
+  type PlKey = 'name' | 'description' | 'location'
+  type TrKey = 'nameI18n' | 'descriptionI18n' | 'locationI18n'
   const tf = (plKey: PlKey, trKey: TrKey, fallback: string) => ({
     value: isPl ? state[plKey] : state[trKey][lang] ?? '',
     onChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
@@ -903,47 +887,12 @@ function Step1Details({ state, update }: { state: WizardState; update: (p: Parti
         )}
       </div>
 
-      {/* Gość specjalny */}
+      {/* Goście specjalni — lista */}
       <div className="flex flex-col gap-2">
         <label className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
-          {state.specialGuestPlural ? 'Goście specjalni' : 'Gość specjalny'} (opcjonalnie){sfx}
+          Goście specjalni (opcjonalnie){sfx}
         </label>
-        <div className="flex items-center gap-3">
-          {state.specialGuestPhoto ? (
-            <img src={state.specialGuestPhoto} alt="" className="rounded-full object-cover shrink-0" style={{ width: 48, height: 48 }} />
-          ) : (
-            <div className="rounded-full shrink-0" style={{ width: 48, height: 48, background: 'var(--surface-2)', border: '1px solid var(--border)' }} />
-          )}
-          <input
-            {...tf('specialGuestName', 'specialGuestNameI18n', state.specialGuestPlural ? 'np. Anna i Mario Cappello' : 'Imię i nazwisko gościa')}
-            className="flex-1 rounded-[10px] px-3 py-2 text-sm"
-            style={{ border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--ink)' }}
-          />
-          <label className="flex items-center gap-1 px-3 py-2 rounded-[10px] text-sm cursor-pointer shrink-0" style={{ background: 'var(--surface-2)', color: 'var(--muted)', border: '1px solid var(--border)' }}>
-            {uploadingGuest ? '…' : 'Portret'}
-            <input type="file" accept="image/*" className="hidden" onChange={handleGuestPhoto} />
-          </label>
-        </div>
-        {!isPl && (
-          <span className="text-xs" style={{ color: 'var(--faint)' }}>
-            Imiona: puste = jak po polsku. Wpisz, jeśli coś się tłumaczy (np. „Anna and Mario Cappello”).
-          </span>
-        )}
-        <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: 'var(--ink)' }}>
-          <input
-            type="checkbox"
-            checked={state.specialGuestPlural}
-            onChange={(e) => update({ specialGuestPlural: e.target.checked })}
-            className="accent-[var(--brand)] w-4 h-4"
-          />
-          To więcej niż jedna osoba (np. małżeństwo) — pokaż „Goście specjalni"
-        </label>
-        <textarea
-          {...tf('specialGuestBio', 'specialGuestBioI18n', 'Kim są — 1–2 zdania, np. Anna i Mario prowadzą wspólnotę ICPE Mission na Malcie.')}
-          rows={3}
-          className="w-full rounded-[10px] px-3 py-2 text-sm"
-          style={{ border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--ink)', resize: 'vertical' }}
-        />
+        <SpecialGuestsEditor rows={state.guests} onChange={(guests) => update({ guests })} lang={lang} />
       </div>
 
       <div>
@@ -1771,17 +1720,12 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
     confirmedSendMail: true,
     noAccommodation: false,
     program: [],
-    specialGuestName: '',
-    specialGuestPhoto: '',
-    specialGuestPlural: false,
-    specialGuestBio: '',
+    guests: [],
     editLang: 'pl',
     nameI18n: {},
     descriptionI18n: {},
     locationI18n: {},
     supertitleI18n: {},
-    specialGuestNameI18n: {},
-    specialGuestBioI18n: {},
     affiliationField: '',
   })
   const [submitting, setSubmitting] = useState(false)
@@ -1858,7 +1802,6 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
       const description = withPl(state.description, state.descriptionI18n)
       const supertitle = withPl(state.supertitle, state.supertitleI18n)
       const locTr = cleanTr({ en: state.locationI18n.en ?? '', it: state.locationI18n.it ?? '' })
-      const guestName = withPl(state.specialGuestName, state.specialGuestNameI18n)
 
       const theme: Record<string, unknown> = {
         primaryColor: COLOR_MAP[state.color],
@@ -1876,15 +1819,7 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
           .map((r) => ({ time: r.time.trim(), item: withPl(r.item, r.itemI18n) })),
         // `pl` = wersja, z której zrobiono tłumaczenie (strona porównuje ją z aktualnym miejscem).
         locationI18n: state.location.trim() && Object.keys(locTr).length ? { pl: state.location.trim(), ...locTr } : null,
-        specialGuest:
-          Object.keys(guestName).length || state.specialGuestPhoto
-            ? {
-                name: guestName,
-                photoUrl: state.specialGuestPhoto,
-                plural: state.specialGuestPlural,
-                bio: withPl(state.specialGuestBio, state.specialGuestBioI18n),
-              }
-            : null,
+        specialGuests: guestsToSave(state.guests),
         affiliationField: state.affiliationField || null,
       }
 
