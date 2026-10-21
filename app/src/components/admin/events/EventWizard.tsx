@@ -58,7 +58,13 @@ interface RoomRow {
   price: string
   quantity: string
   tag?: string
+  /** Tłumaczenia nazwy pokoju (en/it); PL = `name`. */
+  nameI18n?: Tr
 }
+
+/** Tłumaczenia pola na języki obce: { en?, it? }. Wersja PL siedzi w polu podstawowym. */
+type Tr = Record<string, string>
+type ContentLang = 'pl' | 'en' | 'it'
 
 /** Wiersz progu wiekowego w formularzu */
 interface AgeBracketRow {
@@ -109,7 +115,7 @@ interface WizardState {
   color: ColorSwatch
   heroImageUrl: string
   titleColor: string
-  /** Mały tekst nad nazwą eventu w hero (kreator: jednojęzycznie, PL). */
+  /** Mały tekst nad nazwą eventu w hero (PL; tłumaczenia w `supertitleI18n`). */
   supertitle: string
   langPL: boolean
   langEN: boolean
@@ -123,12 +129,21 @@ interface WizardState {
   // spotkanie bez noclegu (kilka godzin) → pomijamy Pokoje i Cennik, ukrywamy noclegi
   noAccommodation: boolean
   // program wydarzenia: godzina + punkt
-  program: { id: string; time: string; item: string }[]
+  program: { id: string; time: string; item: string; itemI18n?: Tr }[]
   // gość specjalny + portret (URL)
   specialGuestName: string
   specialGuestPhoto: string
   specialGuestPlural: boolean
   specialGuestBio: string
+  // ── Wersje językowe (przełącznik PL / EN / IT w kreatorze) ──
+  /** Język, w którym aktualnie edytujemy treści. */
+  editLang: ContentLang
+  nameI18n: Tr
+  descriptionI18n: Tr
+  locationI18n: Tr
+  supertitleI18n: Tr
+  specialGuestNameI18n: Tr
+  specialGuestBioI18n: Tr
 }
 
 // ── Color config ──────────────────────────────────────────────────────────────
@@ -192,6 +207,122 @@ function colorFromHex(hex?: string): ColorSwatch {
     ([, v]) => v.toLowerCase() === (hex ?? '').toLowerCase(),
   )
   return entry ? entry[0] : 'blue'
+}
+
+// ── Wersje językowe ───────────────────────────────────────────────────────────
+
+const LANG_LABEL: Record<ContentLang, string> = { pl: 'PL', en: 'EN', it: 'IT' }
+const LANG_NAME: Record<ContentLang, string> = { pl: 'polsku', en: 'angielsku', it: 'włosku' }
+
+/** Aktualny język edycji (IT wraca do PL, gdy włoski został wyłączony). */
+function curLang(state: WizardState): ContentLang {
+  return state.editLang === 'it' && !state.langIT ? 'pl' : state.editLang
+}
+
+/** Usuwa puste wpisy i przycina spacje. */
+function cleanTr(m: Tr | undefined): Tr {
+  return Object.fromEntries(
+    Object.entries(m ?? {}).map(([k, v]) => [k, (v ?? '').trim()]).filter(([, v]) => v),
+  )
+}
+
+/** PL + tłumaczenia jako mapa {pl, en, it} (puste pomijamy) — format jak w edycji eventu. */
+function withPl(pl: string, tr: Tr | undefined): Tr {
+  return cleanTr({ ...(tr ?? {}), pl })
+}
+
+/** Placeholder w zakładce obcego języka: pokazuje polski oryginał do przetłumaczenia. */
+function srcPh(lang: ContentLang, pl: string | undefined, fallback: string): string {
+  return lang !== 'pl' && pl?.trim() ? `PL: ${pl.trim()}` : fallback
+}
+
+/** Czego brakuje w języku `l` (wypełnione po polsku, puste w `l`). Imiona gości pomijamy — zwykle się nie tłumaczą. */
+function missingIn(state: WizardState, l: ContentLang): string[] {
+  if (l === 'pl') return []
+  const miss = (pl: string, tr: Tr | undefined) => !!pl.trim() && !tr?.[l]?.trim()
+  const out: string[] = []
+  if (miss(state.name, state.nameI18n)) out.push('nazwa')
+  if (miss(state.description, state.descriptionI18n)) out.push('opis')
+  const p = state.program.filter((r) => miss(r.item, r.itemI18n)).length
+  if (p) out.push(`program (${p})`)
+  if (miss(state.specialGuestBio, state.specialGuestBioI18n)) out.push('opis gości')
+  const rm = state.noAccommodation ? 0 : state.rooms.filter((r) => miss(r.name, r.nameI18n)).length
+  if (rm) out.push(`pokoje (${rm})`)
+  if (miss(state.supertitle, state.supertitleI18n)) out.push('nadtytuł')
+  return out
+}
+
+/** Czy w danym języku jest jakakolwiek treść (→ dodajemy go do języków strony). */
+function hasContentIn(state: WizardState, l: ContentLang): boolean {
+  const has = (tr: Tr | undefined) => !!tr?.[l]?.trim()
+  return (
+    has(state.nameI18n) || has(state.descriptionI18n) || has(state.locationI18n) ||
+    has(state.supertitleI18n) || has(state.specialGuestNameI18n) || has(state.specialGuestBioI18n) ||
+    state.program.some((r) => has(r.itemI18n)) || state.rooms.some((r) => has(r.nameI18n))
+  )
+}
+
+/** Pasek „Język treści": PL / EN (zawsze) / IT (po włączeniu) z licznikiem braków. */
+function LangTabs({ state, update }: { state: WizardState; update: (p: Partial<WizardState>) => void }) {
+  const lang = curLang(state)
+  const langs: ContentLang[] = ['pl', 'en', ...(state.langIT ? (['it'] as const) : [])]
+  const missingHere = missingIn(state, lang)
+  return (
+    <div
+      className="flex flex-col gap-1.5 rounded-[12px] px-3 py-2 sticky top-2 z-10"
+      style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}
+    >
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-xs font-semibold uppercase tracking-wider mr-1" style={{ color: 'var(--faint)' }}>
+          Język treści
+        </span>
+        {langs.map((l) => {
+          const active = lang === l
+          const missing = missingIn(state, l)
+          return (
+            <button
+              key={l}
+              type="button"
+              onClick={() => update({ editLang: l })}
+              title={missing.length ? `Brakuje tłumaczeń: ${missing.join(', ')}` : undefined}
+              className="flex items-center gap-1.5 text-xs font-semibold rounded-full px-3 py-1.5 transition-colors"
+              style={{
+                background: active ? 'var(--brand)' : 'transparent',
+                color: active ? '#fff' : 'var(--muted)',
+                border: `1px solid ${active ? 'var(--brand)' : 'var(--border)'}`,
+                cursor: 'pointer',
+              }}
+            >
+              {LANG_LABEL[l]}
+              {missing.length > 0 && (
+                <span className="rounded-full px-1.5 text-[10px] leading-4" style={{ background: 'var(--warn-soft)', color: 'var(--warn)' }}>
+                  {missing.length}
+                </span>
+              )}
+            </button>
+          )
+        })}
+        {!state.langIT && (
+          <button
+            type="button"
+            onClick={() => update({ langIT: true, editLang: 'it' })}
+            className="flex items-center gap-1 text-xs font-semibold rounded-full px-3 py-1.5"
+            style={{ background: 'transparent', color: 'var(--faint)', border: '1px dashed var(--border)', cursor: 'pointer' }}
+          >
+            <Plus size={12} /> IT
+          </button>
+        )}
+        <span className="text-xs ml-auto" style={{ color: 'var(--faint)' }}>edytujesz: {LANG_LABEL[lang]}</span>
+      </div>
+      <p className="text-xs" style={{ color: lang !== 'pl' && missingHere.length ? 'var(--warn)' : 'var(--faint)' }}>
+        {lang === 'pl'
+          ? 'Wersja podstawowa. Po wpisaniu treści przełącz na EN (i IT) i wpisz tłumaczenia — goście widzą język wybrany na stronie.'
+          : missingHere.length
+            ? `Do przetłumaczenia: ${missingHere.join(', ')}. Puste pola goście zobaczą po polsku; oryginał widać w podpowiedzi pola.`
+            : `Wszystko przetłumaczone na ${LANG_NAME[lang]}. Pola, których nie wypełnisz (np. imiona), pokażą się jak po polsku.`}
+      </p>
+    </div>
+  )
 }
 
 /** Mapuje dane istniejącego eventu (z API) na stan kreatora — tryb edycji. */
@@ -266,7 +397,8 @@ function buildPricingConfig(state: WizardState): PricingConfig {
 
   const roomDefs = state.rooms.map((r) => ({
     id: r.id,
-    name: r.name,
+    // Z tłumaczeniami → mapa {pl, en, it} (jak w edycji); bez — zwykły tekst PL.
+    name: Object.keys(cleanTr(r.nameI18n)).length ? withPl(r.name, r.nameI18n) : r.name,
     cap: parseInt(r.capacity) || 1,
     perPerson: parseFloat(r.price) || 0,
     model: r.model,
@@ -354,9 +486,12 @@ function LivePreview({ state }: { state: WizardState }) {
   const slug = state.slug || 'nowy-event'
   const langs: string[] = [
     state.langPL && 'PL',
-    state.langEN && 'EN',
-    state.langIT && 'IT',
+    (state.langEN || hasContentIn(state, 'en')) && 'EN',
+    (state.langIT || hasContentIn(state, 'it')) && 'IT',
   ].filter(Boolean) as string[]
+  // Tytuł w podglądzie — w edytowanym języku (pusty → wersja PL, jak na stronie).
+  const lang = curLang(state)
+  const previewName = (lang !== 'pl' && state.nameI18n[lang]?.trim()) || state.name
 
   const heroStyle = state.heroImageUrl
     ? {
@@ -386,7 +521,7 @@ function LivePreview({ state }: { state: WizardState }) {
         style={heroStyle}
       >
         <p className="font-bold text-base leading-tight" style={{ color: titleColorStyle }}>
-          {state.name || 'Nazwa eventu'}
+          {previewName || 'Nazwa eventu'}
         </p>
         <span
           className="mt-1 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold"
@@ -607,25 +742,43 @@ function Step1Details({ state, update }: { state: WizardState; update: (p: Parti
   }
   const addProgramRow = () =>
     update({ program: [...state.program, { id: `pg-${Date.now()}`, time: '', item: '' }] })
-  const updateProgramRow = (id: string, patch: Partial<{ time: string; item: string }>) =>
+  const updateProgramRow = (id: string, patch: Partial<{ time: string; item: string; itemI18n: Tr }>) =>
     update({ program: state.program.map((r) => (r.id === id ? { ...r, ...patch } : r)) })
   const removeProgramRow = (id: string) => update({ program: state.program.filter((r) => r.id !== id) })
 
+  // ── Język treści: PL pisze do pól podstawowych, EN/IT do map tłumaczeń ──
+  const lang = curLang(state)
+  const isPl = lang === 'pl'
+  const sfx = ` — ${LANG_LABEL[lang]}`
+  type PlKey = 'name' | 'description' | 'location' | 'specialGuestName' | 'specialGuestBio'
+  type TrKey = 'nameI18n' | 'descriptionI18n' | 'locationI18n' | 'specialGuestNameI18n' | 'specialGuestBioI18n'
+  const tf = (plKey: PlKey, trKey: TrKey, fallback: string) => ({
+    value: isPl ? state[plKey] : state[trKey][lang] ?? '',
+    onChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+      update(
+        isPl
+          ? ({ [plKey]: e.target.value } as Partial<WizardState>)
+          : ({ [trKey]: { ...state[trKey], [lang]: e.target.value } } as Partial<WizardState>),
+      ),
+    placeholder: srcPh(lang, state[plKey], fallback),
+  })
+  const setProgramItem = (row: WizardState['program'][number], v: string) =>
+    isPl
+      ? updateProgramRow(row.id, { item: v })
+      : updateProgramRow(row.id, { itemI18n: { ...(row.itemI18n ?? {}), [lang]: v } })
+
   return (
     <div className="flex flex-col gap-4">
+      <LangTabs state={state} update={update} />
       <Input
-        label="Nazwa eventu"
-        value={state.name}
-        onChange={(e) => update({ name: e.target.value })}
-        placeholder="np. Dzień Formacji 2026"
+        label={`Nazwa eventu${sfx}`}
+        {...tf('name', 'nameI18n', 'np. Dzień Formacji 2026')}
       />
       <div className="flex flex-col gap-1.5">
-        <label className="text-sm font-medium" style={{ color: 'var(--ink)' }}>Opis (na stronie zapisów)</label>
+        <label className="text-sm font-medium" style={{ color: 'var(--ink)' }}>Opis (na stronie zapisów){sfx}</label>
         <textarea
-          value={state.description}
-          onChange={(e) => update({ description: e.target.value })}
+          {...tf('description', 'descriptionI18n', 'Krótki opis wydarzenia — zaproszenie, program, miejsce…')}
           rows={4}
-          placeholder="Krótki opis wydarzenia — zaproszenie, program, miejsce…"
           className="w-full rounded-[12px] px-3 py-[11px] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
           style={{ border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--ink)', resize: 'vertical' }}
         />
@@ -675,12 +828,15 @@ function Step1Details({ state, update }: { state: WizardState; update: (p: Parti
         )}
       </div>
       <Input
-        label="Miejsce"
-        value={state.location}
-        onChange={(e) => update({ location: e.target.value })}
-        placeholder="Centrum Formacyjne, ul. ..."
+        label={`Miejsce${sfx}`}
+        {...tf('location', 'locationI18n', isPl ? 'Centrum Formacyjne, ul. ...' : 'np. Formation Centre, ul. …, city')}
       />
-      <div className="flex items-center gap-2 flex-wrap -mt-2">
+      {!isPl && (
+        <p className="text-xs -mt-2" style={{ color: 'var(--faint)' }}>
+          Puste = goście zobaczą adres po polsku. Kalendarz (.ics) i maile używają wersji PL.
+        </p>
+      )}
+      {isPl && <div className="flex items-center gap-2 flex-wrap -mt-2">
         {places.length > 0 && (
           <select
             value=""
@@ -697,7 +853,7 @@ function Step1Details({ state, update }: { state: WizardState; update: (p: Parti
         <Button size="sm" variant="outline" onClick={() => { void handleSavePlace() }} disabled={!state.location.trim()}>
           Zapisz to miejsce
         </Button>
-      </div>
+      </div>}
       <Input
         label="Pojemność (max osób)"
         type="number"
@@ -708,7 +864,9 @@ function Step1Details({ state, update }: { state: WizardState; update: (p: Parti
 
       {/* Program wydarzenia */}
       <div className="flex flex-col gap-2">
-        <label className="text-sm font-medium" style={{ color: 'var(--ink)' }}>Program (godzina + punkt)</label>
+        <label className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
+          Program (godzina + punkt){isPl ? '' : ` — treść: ${LANG_LABEL[lang]}`}
+        </label>
         {state.program.map((row) => (
           <div key={row.id} className="flex items-center gap-2">
             <input
@@ -719,9 +877,9 @@ function Step1Details({ state, update }: { state: WizardState; update: (p: Parti
               style={{ border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--ink)', width: 90 }}
             />
             <input
-              value={row.item}
-              onChange={(e) => updateProgramRow(row.id, { item: e.target.value })}
-              placeholder="Punkt programu"
+              value={isPl ? row.item : row.itemI18n?.[lang] ?? ''}
+              onChange={(e) => setProgramItem(row, e.target.value)}
+              placeholder={srcPh(lang, row.item, 'Punkt programu')}
               className="flex-1 rounded-[10px] px-3 py-2 text-sm"
               style={{ border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--ink)' }}
             />
@@ -733,12 +891,17 @@ function Step1Details({ state, update }: { state: WizardState; update: (p: Parti
         <Button size="sm" variant="outline" onClick={addProgramRow}>
           <Plus size={14} /> Dodaj punkt programu
         </Button>
+        {!isPl && state.program.length > 0 && (
+          <p className="text-xs" style={{ color: 'var(--faint)' }}>
+            Godzina jest wspólna dla wszystkich języków; tłumaczysz tylko opis punktu.
+          </p>
+        )}
       </div>
 
       {/* Gość specjalny */}
       <div className="flex flex-col gap-2">
         <label className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
-          {state.specialGuestPlural ? 'Goście specjalni' : 'Gość specjalny'} (opcjonalnie)
+          {state.specialGuestPlural ? 'Goście specjalni' : 'Gość specjalny'} (opcjonalnie){sfx}
         </label>
         <div className="flex items-center gap-3">
           {state.specialGuestPhoto ? (
@@ -747,9 +910,7 @@ function Step1Details({ state, update }: { state: WizardState; update: (p: Parti
             <div className="rounded-full shrink-0" style={{ width: 48, height: 48, background: 'var(--surface-2)', border: '1px solid var(--border)' }} />
           )}
           <input
-            value={state.specialGuestName}
-            onChange={(e) => update({ specialGuestName: e.target.value })}
-            placeholder={state.specialGuestPlural ? 'np. Anna i Mario Cappello' : 'Imię i nazwisko gościa'}
+            {...tf('specialGuestName', 'specialGuestNameI18n', state.specialGuestPlural ? 'np. Anna i Mario Cappello' : 'Imię i nazwisko gościa')}
             className="flex-1 rounded-[10px] px-3 py-2 text-sm"
             style={{ border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--ink)' }}
           />
@@ -758,6 +919,11 @@ function Step1Details({ state, update }: { state: WizardState; update: (p: Parti
             <input type="file" accept="image/*" className="hidden" onChange={handleGuestPhoto} />
           </label>
         </div>
+        {!isPl && (
+          <span className="text-xs" style={{ color: 'var(--faint)' }}>
+            Imiona: puste = jak po polsku. Wpisz, jeśli coś się tłumaczy (np. „Anna and Mario Cappello”).
+          </span>
+        )}
         <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: 'var(--ink)' }}>
           <input
             type="checkbox"
@@ -768,10 +934,8 @@ function Step1Details({ state, update }: { state: WizardState; update: (p: Parti
           To więcej niż jedna osoba (np. małżeństwo) — pokaż „Goście specjalni"
         </label>
         <textarea
-          value={state.specialGuestBio}
-          onChange={(e) => update({ specialGuestBio: e.target.value })}
+          {...tf('specialGuestBio', 'specialGuestBioI18n', 'Kim są — 1–2 zdania, np. Anna i Mario prowadzą wspólnotę ICPE Mission na Malcie.')}
           rows={3}
-          placeholder="Kim są — 1–2 zdania, np. Anna i Mario prowadzą wspólnotę ICPE Mission na Malcie."
           className="w-full rounded-[10px] px-3 py-2 text-sm"
           style={{ border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--ink)', resize: 'vertical' }}
         />
@@ -901,6 +1065,12 @@ function Step2Rooms({ state, update }: { state: WizardState; update: (p: Partial
         </Button>
       </div>
 
+      {state.rooms.length > 0 && <LangTabs state={state} update={update} />}
+      {state.rooms.length > 0 && curLang(state) !== 'pl' && (
+        <p className="text-xs -mt-2" style={{ color: 'var(--faint)' }}>
+          Nowe pokoje dodajesz po polsku (formularz wyżej); w tabeli wpisujesz nazwy w języku {LANG_LABEL[curLang(state)]}.
+        </p>
+      )}
       {state.rooms.length > 0 && (
         <div className="overflow-x-auto rounded-[12px] border" style={{ borderColor: 'var(--border)' }}>
           <table className="w-full text-sm" style={{ borderCollapse: 'collapse' }}>
@@ -919,7 +1089,26 @@ function Step2Rooms({ state, update }: { state: WizardState; update: (p: Partial
                   key={r.id}
                   style={{ borderBottom: i < state.rooms.length - 1 ? '1px solid var(--border-2)' : undefined }}
                 >
-                  <td className="px-3 py-2" style={{ color: 'var(--ink)' }}>{r.name}</td>
+                  <td className="px-3 py-2" style={{ color: 'var(--ink)' }}>
+                    {curLang(state) === 'pl' ? (
+                      r.name
+                    ) : (
+                      <input
+                        value={r.nameI18n?.[curLang(state)] ?? ''}
+                        onChange={(e) => {
+                          const l = curLang(state)
+                          update({
+                            rooms: state.rooms.map((x) =>
+                              x.id === r.id ? { ...x, nameI18n: { ...(x.nameI18n ?? {}), [l]: e.target.value } } : x,
+                            ),
+                          })
+                        }}
+                        placeholder={`PL: ${r.name}`}
+                        className="w-full rounded-[8px] px-2 py-1 text-sm"
+                        style={{ border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--ink)', minWidth: 160 }}
+                      />
+                    )}
+                  </td>
                   <td className="px-3 py-2 text-xs" style={{ color: 'var(--muted)' }}>{r.model}</td>
                   <td className="px-3 py-2" style={{ color: 'var(--ink)' }}>{r.capacity}</td>
                   <td className="px-3 py-2" style={{ color: 'var(--ink)' }}>{r.price} zł</td>
@@ -1215,8 +1404,11 @@ function Step3Pricing({ state, update }: { state: WizardState; update: (p: Parti
 function Step4Page({ state, update }: { state: WizardState; update: (p: Partial<WizardState>) => void }) {
   // Wybrana opcja „Inny…" — trzyma otwarte pole tekstowe, dopóki jest puste.
   const [superCustom, setSuperCustom] = useState(false)
+  const lang = curLang(state)
   return (
     <div className="flex flex-col gap-5">
+      {/* Ostatni krok: pasek pokazuje też braki tłumaczeń z poprzednich kroków. */}
+      <LangTabs state={state} update={update} />
       <div className="flex flex-col gap-1.5">
         <label className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
           Adres strony
@@ -1272,8 +1464,18 @@ function Step4Page({ state, update }: { state: WizardState; update: (p: Partial<
 
       <div className="flex flex-col gap-1.5">
         <label className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
-          Nadtytuł (mały tekst nad nazwą eventu)
+          Nadtytuł (mały tekst nad nazwą eventu) — {LANG_LABEL[lang]}
         </label>
+        {lang !== 'pl' ? (
+          // Gotowe nadtytuły są po polsku — w innych językach wpisujemy tłumaczenie wprost.
+          <input
+            value={state.supertitleI18n[lang] ?? ''}
+            onChange={(e) => update({ supertitleI18n: { ...state.supertitleI18n, [lang]: e.target.value } })}
+            placeholder={srcPh(lang, state.supertitle, 'np. Community celebration')}
+            className="w-full h-[46px] px-3 text-sm rounded-[12px] border"
+            style={{ borderColor: 'var(--border)', background: 'var(--surface)', color: 'var(--ink)', outline: 'none' }}
+          />
+        ) : (<>
         <select
           value={
             isPresetSupertitle(state.supertitle) ? state.supertitle : state.supertitle ? '__custom' : ''
@@ -1301,6 +1503,7 @@ function Step4Page({ state, update }: { state: WizardState; update: (p: Partial<
             style={{ borderColor: 'var(--border)', background: 'var(--surface)', color: 'var(--ink)', outline: 'none' }}
           />
         )}
+        </>)}
       </div>
 
       <div className="flex flex-col gap-1.5">
@@ -1557,6 +1760,13 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
     specialGuestPhoto: '',
     specialGuestPlural: false,
     specialGuestBio: '',
+    editLang: 'pl',
+    nameI18n: {},
+    descriptionI18n: {},
+    locationI18n: {},
+    supertitleI18n: {},
+    specialGuestNameI18n: {},
+    specialGuestBioI18n: {},
   })
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -1620,31 +1830,43 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
       // Build full pricing config from wizard state
       const pricingConfig = buildPricingConfig(state)
 
+      // Języki strony: zaznaczone w kroku „Strona" + każdy, w którym wpisano tłumaczenia.
       const locales: string[] = []
       if (state.langPL) locales.push('pl')
-      if (state.langEN) locales.push('en')
-      if (state.langIT) locales.push('it')
+      if (state.langEN || hasContentIn(state, 'en')) locales.push('en')
+      if (state.langIT || hasContentIn(state, 'it')) locales.push('it')
       if (locales.length === 0) locales.push('pl')
 
-      const theme: Record<string, string> = {
+      // Mapy językowe {pl, en, it} — ten sam format, który zapisuje „Edytuj event".
+      const title = withPl(state.name, state.nameI18n)
+      const description = withPl(state.description, state.descriptionI18n)
+      const supertitle = withPl(state.supertitle, state.supertitleI18n)
+      const locTr = cleanTr({ en: state.locationI18n.en ?? '', it: state.locationI18n.it ?? '' })
+      const guestName = withPl(state.specialGuestName, state.specialGuestNameI18n)
+
+      const theme: Record<string, unknown> = {
         primaryColor: COLOR_MAP[state.color],
       }
       if (state.heroImageUrl) theme.heroImageUrl = state.heroImageUrl
       if (state.titleColor) theme.titleColor = state.titleColor
-      if (state.supertitle.trim()) theme.supertitle = state.supertitle.trim()
+      if (Object.keys(supertitle).length) {
+        // Bez tłumaczeń zostaje zwykły tekst (jak dotąd); z tłumaczeniami — mapa językowa.
+        theme.supertitle = Object.keys(supertitle).length === 1 && supertitle.pl ? supertitle.pl : supertitle
+      }
 
       const customFields = {
         program: state.program
-          .filter((r) => r.time.trim() || r.item.trim())
-          .map((r) => ({ time: r.time.trim(), item: r.item.trim() })),
+          .filter((r) => r.time.trim() || Object.keys(withPl(r.item, r.itemI18n)).length)
+          .map((r) => ({ time: r.time.trim(), item: withPl(r.item, r.itemI18n) })),
+        // `pl` = wersja, z której zrobiono tłumaczenie (strona porównuje ją z aktualnym miejscem).
+        locationI18n: state.location.trim() && Object.keys(locTr).length ? { pl: state.location.trim(), ...locTr } : null,
         specialGuest:
-          state.specialGuestName.trim() || state.specialGuestPhoto
+          Object.keys(guestName).length || state.specialGuestPhoto
             ? {
-                name: state.specialGuestName.trim(),
+                name: guestName,
                 photoUrl: state.specialGuestPhoto,
                 plural: state.specialGuestPlural,
-                // Kreator jest jednojęzyczny (PL); tłumaczenia dodaje się w edycji eventu.
-                bio: state.specialGuestBio.trim() ? { pl: state.specialGuestBio.trim() } : {},
+                bio: withPl(state.specialGuestBio, state.specialGuestBioI18n),
               }
             : null,
       }
@@ -1652,7 +1874,7 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
       // Tryb edycji — aktualizujemy istniejący event i kończymy.
       if (editTarget) {
         await updateEventInstance(editTarget.instanceId, {
-          title: { pl: state.name },
+          title: { ...title, pl: state.name.trim() },
           startsAt,
           endsAt,
           location: state.location || null,
@@ -1676,8 +1898,8 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
       // Step 1: create series
       const series = await createEventSeries({
         type: mapEventType(state.eventType),
-        title: { pl: state.name },
-        description: state.description.trim() ? { pl: state.description } : undefined,
+        title: { ...title, pl: state.name.trim() },
+        description: Object.keys(description).length ? description : undefined,
         startsAt,
         endsAt,
         location: state.location || undefined,
@@ -1696,7 +1918,7 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
       // Step 2: add room types
       for (const r of state.rooms) {
         await addRoomType(instanceId, {
-          name: { pl: r.name },
+          name: withPl(r.name, r.nameI18n),
           capacity: parseInt(r.capacity) || 1,
           pricingModel: mapPricingModel(r.model),
           price: parseFloat(r.price) || 0,
@@ -1826,7 +2048,7 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
         </div>
 
         {/* Step content */}
-        <div className="flex-1 p-6 overflow-y-auto">
+        <div className="flex-1 p-6">
           {step === 0 && <Step0Type state={state} update={update} />}
           {step === 1 && <Step1Details state={state} update={update} />}
           {step === 2 && <Step2Rooms state={state} update={update} />}

@@ -1,0 +1,79 @@
+---
+// /nowosci/ — „Wszystkie nowości”. Strona włącza się dopiero, gdy wpisów jest więcej niż HOME_LIMIT
+// (starsze przestają się mieścić w sekcji na stronie głównej). Wcześniej ten adres przekierowuje na /#nowosci.
+import LandingLayout from '../../layouts/LandingLayout.astro';
+import SiteShell from '../../components/SiteShell.astro';
+import NewsCard from '../../components/news/NewsCard.astro';
+import { getNews, archiveActive, NEWS_BASE } from '../../lib/news';
+
+const news = await getNews();
+const active = archiveActive(news.length);
+
+// Grupowanie po latach (od najnowszego).
+const years: { year: number; items: typeof news }[] = [];
+for (const n of news) {
+  const y = n.date.getUTCFullYear();
+  const last = years[years.length - 1];
+  if (last && last.year === y) last.items.push(n);
+  else years.push({ year: y, items: [n] });
+}
+const plCount = (n: number) => {
+  const t = n % 10, h = n % 100;
+  if (n === 1) return 'wpis';
+  return t >= 2 && t <= 4 && !(h >= 12 && h <= 14) ? 'wpisy' : 'wpisów';
+};
+---
+
+{active ? (
+  <LandingLayout
+    title="Wszystkie nowości — ICPE Mission Warszawa"
+    description="Nowości i relacje z życia wspólnoty ICPE Mission Warszawa: wydarzenia, formacja, misje."
+    ogImage={news[0]?.cover?.src}
+  >
+    <SiteShell base="/" newsHref={`${NEWS_BASE}/`}>
+      <section class="archive">
+        <header class="archive-head">
+          <a class="back" href="/"><span aria-hidden="true">←</span> <span data-pl>Strona główna</span><span data-en>Home</span></a>
+          <div class="kicker"><span data-pl>Nowości</span><span data-en>News</span></div>
+          <h1><span data-pl>Wszystkie <em>nowości</em></span><span data-en>All the <em>news</em></span></h1>
+          <p class="count"><span data-pl>{`${news.length} ${plCount(news.length)}`}</span><span data-en>{`${news.length} ${news.length === 1 ? "post" : "posts"}`}</span></p>
+        </header>
+
+        {years.map(({ year, items }) => (
+          <section class="year" aria-label={String(year)}>
+            <div class="year-label"><span class="line"></span>{year}</div>
+            <div class="grid">
+              {items.map((n) => <NewsCard item={n} headingLevel="h2" />)}
+            </div>
+          </section>
+        ))}
+      </section>
+    </SiteShell>
+  </LandingLayout>
+) : (
+  <LandingLayout title="Nowości — ICPE Mission Warszawa" noindex>
+    <Fragment slot="head"><meta http-equiv="refresh" content="0; url=/#nowosci" /></Fragment>
+    <p style="font-family:'Bricolage Grotesque',sans-serif; padding:40px; text-align:center;"><a href="/#nowosci">Nowości ICPE Mission Warszawa →</a></p>
+  </LandingLayout>
+)}
+
+<style>
+  .archive { padding: 64px 72px 96px; }
+  .archive-head { margin-bottom: 56px; }
+  .back { display: inline-flex; gap: 8px; font-size: 14px; font-weight: 600; color: #6B615A; text-decoration: none; margin-bottom: 40px; }
+  .back:hover { color: #C0603C; }
+  .kicker { font-family: 'Space Mono', monospace; font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: #A0724F; margin-bottom: 18px; }
+  h1 { margin: 0; font-size: clamp(44px, 6vw, 74px); line-height: .98; letter-spacing: -.035em; font-weight: 800; }
+  h1 em { font-family: 'Instrument Serif', serif; font-style: italic; font-weight: 400; color: #C0603C; }
+  .count { margin: 22px 0 0; font-family: 'Space Mono', monospace; font-size: 13px; letter-spacing: .06em; color: #8A7F73; }
+  .year + .year { margin-top: 72px; }
+  .year-label { display: flex; align-items: center; gap: 16px; font-family: 'Space Mono', monospace; font-size: 13px; letter-spacing: .1em; color: #A0724F; margin-bottom: 28px; }
+  .year-label .line { width: 46px; height: 1px; background: #C0603C; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 48px 32px; }
+  @media (max-width: 1000px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 640px) {
+    .archive { padding: 40px 22px 72px; }
+    .grid { grid-template-columns: 1fr; gap: 44px; }
+    .back { margin-bottom: 28px; }
+  }
+</style>

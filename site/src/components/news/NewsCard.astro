@@ -1,0 +1,37 @@
+---
+// Karta wpisu na liście „Wszystkie nowości” i w „Więcej nowości” pod artykułem.
+import Bi from './Bi.astro';
+import NewsMeta from './NewsMeta.astro';
+import NewsCover from './NewsCover.astro';
+import type { NewsItem } from '../../lib/news';
+interface Props { item: NewsItem; headingLevel?: 'h2' | 'h3' }
+const { item, headingLevel = 'h3' } = Astro.props;
+const H = headingLevel;
+---
+<article class="ncard">
+  <div class="ncard-img"><NewsCover image={item.cover} /></div>
+  <div class="ncard-body">
+    <NewsMeta item={item} />
+    <H class="ncard-title"><a href={item.href} class="stretched"><Bi pl={item.pl.data.title} en={item.en?.data.title} /></a></H>
+    <p class="ncard-excerpt"><Bi pl={item.pl.data.excerpt} en={item.en?.data.excerpt} /></p>
+    <span class="more" aria-hidden="true"><span data-pl>Czytaj dalej</span><span data-en>Read more</span> <span class="arrow">→</span></span>
+  </div>
+</article>
+
+<style>
+  .ncard { position: relative; display: flex; flex-direction: column; height: 100%; }
+  .ncard-img { aspect-ratio: 3 / 2; border-radius: 14px; overflow: hidden; border: 1px solid #E2D8C8; background: #E9DFCF; }
+  .ncard-body { padding-top: 20px; display: flex; flex-direction: column; align-items: flex-start; flex: 1; }
+  .ncard-title { margin: 10px 0 0; font-size: 22px; line-height: 1.15; letter-spacing: -.02em; font-weight: 800; text-wrap: balance; }
+  .ncard:hover .ncard-title { color: #8E4229; }
+  .ncard-excerpt { margin: 10px 0 0; font-size: 15px; line-height: 1.55; color: #6B615A; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .more { margin-top: auto; padding-top: 14px; display: inline-flex; align-items: center; gap: 6px; font-size: 14.5px; font-weight: 600; color: #241E1A; }
+  .arrow { color: #C0603C; transition: transform .25s ease; display: inline-block; }
+  .ncard:hover .arrow { transform: translateX(4px); }
+  .ncard:hover .more > span:first-child { text-decoration: underline; text-underline-offset: 4px; text-decoration-color: #C0603C; }
+  .ncard:hover :global(.nc-img) { transform: scale(1.035); }
+  .stretched { color: inherit; text-decoration: none; }
+  .stretched::after { content: ''; position: absolute; inset: 0; z-index: 1; border-radius: 14px; }
+  .stretched:focus-visible { outline: none; }
+  .stretched:focus-visible::after { outline: 2px solid #C0603C; outline-offset: 6px; }
+</style>

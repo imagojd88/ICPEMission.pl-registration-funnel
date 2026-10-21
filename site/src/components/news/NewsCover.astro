@@ -1,0 +1,26 @@
+---
+// Miniatura wpisu (kadrowana do proporcji kontenera). Brak zdjęcia → grafika zastępcza z globusem ICPE.
+import type { NewsImage } from '../../lib/news';
+interface Props { image: NewsImage | null; eager?: boolean; sizes?: string }
+const { image, eager = false } = Astro.props;
+---
+{image ? (
+  <img
+    class="nc-img"
+    src={image.src}
+    alt={image.alt}
+    width={image.w || undefined}
+    height={image.h || undefined}
+    loading={eager ? 'eager' : 'lazy'}
+    decoding="async"
+    style={image.position ? `object-position:${image.position};` : undefined}
+  />
+) : (
+  <div class="nc-ph" aria-hidden="true"><img src="/assets/icpe-globe-cream.png" alt="" /></div>
+)}
+
+<style>
+  .nc-img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .6s cubic-bezier(.2,.7,.2,1); }
+  .nc-ph { width: 100%; height: 100%; display: grid; place-items: center; background: radial-gradient(120% 90% at 30% 20%, #D9845F 0%, #C0603C 45%, #8E4229 100%); }
+  .nc-ph img { width: 26%; max-width: 92px; height: auto; opacity: .9; }
+</style>

@@ -1,0 +1,15 @@
+---
+// Data (+ miejsce) wpisu: „16 października 2026 · Kraków”.
+import { formatNewsDate, type NewsItem } from '../../lib/news';
+interface Props { item: NewsItem; class?: string }
+const { item, class: cls } = Astro.props;
+---
+<p class:list={['news-meta', cls]}>
+  <time datetime={item.dateIso}><span data-pl>{formatNewsDate(item.date, 'pl')}</span><span data-en>{formatNewsDate(item.date, 'en')}</span></time>
+  {item.place && <span class="news-place">{item.place}</span>}
+</p>
+
+<style>
+  .news-meta { margin: 0; font-family: 'Space Mono', monospace; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: #A0724F; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+  .news-place::before { content: '·'; margin-right: 10px; color: #C9BCA9; }
+</style>

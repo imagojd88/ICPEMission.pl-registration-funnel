@@ -1,0 +1,6 @@
+---
+// Tekst dwujęzyczny: gdy jest wersja EN — dwa spany przełączane przez data-lang, inaczej sam PL.
+interface Props { pl: string; en?: string | null }
+const { pl, en } = Astro.props;
+---
+{en && en !== pl ? (<><span data-pl>{pl}</span><span data-en>{en}</span></>) : pl}

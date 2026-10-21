@@ -42,7 +42,7 @@ Fetch jest defensywny: gdy API jest niedostępne, strona zbuduje się z pustą t
 
 - **Strona** (`Page`): slug, tytuł, bloki (JSON), SEO. `slug = "home"` → treść strony
   głównej; pozostałe slugi → `/{slug}`.
-- **Artykuł** (`Article`): aktualności pod `/aktualnosci` i `/aktualnosci/{slug}`.
+- **Nowości** — pliki w repo (nie CMS): `src/content/nowosci/<adres>/pl.md` (+ `en.md`), zdjęcia w `public/nowosci/<adres>/`. Sekcja `#nowosci` na głównej (najnowsze 4), `/nowosci/` gdy wpisów > 4, wpis pod `/nowosci/<adres>/`. Szablon: `src/content/nowosci/_SZABLON.md`, logika: `src/lib/news.ts`. (`/aktualnosci` przekierowuje; model `Article` w API nieużywany.)
 - **Menu** (`MenuItem`): nawigacja `header`/`footer`.
 - **Ustawienia** (`SiteSettings`): nazwa, logo, kontakt, social, stopka.
 
@@ -62,7 +62,8 @@ site/
     pages/
       index.astro                # home (Page „home") + wydarzenia + aktualności
       [slug].astro               # strony statyczne (getStaticPaths z /site/pages)
-      aktualnosci/index.astro    # lista artykułów
-      aktualnosci/[slug].astro   # artykuł
+      nowosci/index.astro        # „Wszystkie nowości” (aktywna, gdy wpisów > 4)
+      nowosci/[slug].astro       # wpis
+      aktualnosci/index.astro    # przekierowanie na nowości
     styles/global.css            # tokeny brandu ICPE
 ```

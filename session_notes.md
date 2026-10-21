@@ -49,6 +49,31 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 - Wzorzec na przyszłość: publiczne pliki do pobrania = `site/public/<katalog>/<plik>` + push; panel nie ma uploadu plików publicznych. `/r/` na icpemission.pl nie koliduje z lejkiem (`/r/:slug` działa na rejestracja.icpemission.pl).
 - Lokalna kopia repo jest 1 commit za origin → przed kolejną pracą `git pull`.
 
+## Dziennik prac — panel admina (kreator eventów)
+
+### Przełącznik języków PL / EN / IT w kreatorze nowego eventu (2026-10-21)
+- **Problem (Jacek):** przy tworzeniu eventu jednorazowego nie było pól na wersje językowe — tytuł i opis zawsze po polsku; tłumaczenia dało się wpisać dopiero w „Edytuj event” po utworzeniu (niewygodne).
+- **Zmiana:** `app/src/components/admin/events/EventWizard.tsx` — pasek „Język treści” (PL / EN zawsze, „+ IT” dokłada włoski i zaznacza IT w językach strony), przyklejony u góry przy przewijaniu, z licznikiem braków tłumaczeń na każdej zakładce (jak w edycji). Widoczny w krokach Szczegóły, Pokoje (gdy są pokoje) i Strona (tam pokazuje też braki z wcześniejszych kroków).
+- **Tłumaczone pola:** nazwa, opis, miejsce (`customFields.locationI18n`), punkty programu (godzina wspólna), imiona gości, „kim są”, nazwy pokoi (w tabeli pokoi, gdy zakładka EN/IT), nadtytuł (w EN/IT wpisywany ręcznie, gotowe presety są po polsku). W zakładce obcej placeholder pokazuje polski oryginał („PL: …”); puste = gość widzi wersję PL.
+- **Zapis:** ten sam format co „Edytuj event” — mapy `{pl, en, it}` (title, description, program.item, specialGuest.name/bio, pricingConfig.rooms[].name, RoomType.name, theme.supertitle; nadtytuł bez tłumaczeń zostaje zwykłym tekstem). Języki strony: zaznaczone w kroku Strona + automatycznie każdy język, w którym coś wpisano. Podgląd po prawej pokazuje tytuł w edytowanym języku i plakietki EN/IT.
+- Drobna zmiana układu: kontener treści kroku nie ma już `overflow-y-auto` (był bez limitu wysokości, a blokował przyklejanie paska).
+- **Weryfikacja:** `tsc --noEmit` (app) ✓ na komputerze Jacka; w chmurze harness z zamockowanym API + Playwright: przejście PL → EN → IT → pokoje → strona → Publikuj — payloady `POST /admin/series`, `room-types`, `/page` zawierają poprawne mapy językowe i locales `[pl,en,it]` ✓, brak błędów JS ✓, zrzuty ✓. Backend bez zmian.
+- **Nie zrobione (do decyzji Jacka):** tłumaczenie AI przyciskiem „Przetłumacz z PL” (wymaga klucza API na Render) i biblioteka zapisanych gości specjalnych (portret + opis do wyboru).
+- Stan: do pushu przez Jacka (auto-deploy `icpe-frontend`).
+
+## Dziennik prac — strona icpemission.pl (site/)
+
+### Sekcja Nowości + /nowosci/ (2026-10-20)
+- **Model treści: pliki w repo, nie CMS.** Wpis = katalog `site/src/content/nowosci/<adres>/` z `pl.md` (wymagany: title, date, excerpt, cover, coverAlt, coverPosition?, place?, gallery[{src, alt, caption?, captionEn?}], draft?) i opcjonalnym `en.md` (title, excerpt, coverAlt + treść). Zdjęcia: `site/public/nowosci/<adres>/` (cover.jpg, 01.jpg…; ~1600 px, EXIF obrócony). Kolekcja w `src/content/config.ts`, logika w `src/lib/news.ts` (sortowanie po dacie, wymiary zdjęć czytane z plików przy buildzie). Szablon: `src/content/nowosci/_SZABLON.md`. Tytuły z dwukropkiem brać w cudzysłów (YAML).
+- **Strona główna:** sekcja `#nowosci` (`components/NewsSection.astro`) zaraz pod paskiem miast: najnowszy wpis wyróżniony + do 3 skrótów (zdjęcie, data · miejsce, tytuł, skrót, „Czytaj dalej”). 1 wpis → układ zdjęcie obok tekstu. 0 wpisów → sekcja i link „Nowości” w menu ukryte.
+- **`HOME_LIMIT = 4`** (`lib/news.ts`). Gdy wpisów > 4: przycisk „Wszystkie nowości (N)” na głównej + strona `/nowosci/` (karty 3 kolumny, grupowanie po latach). Do tego czasu `/nowosci/` przekierowuje na `/#nowosci` (noindex).
+- **Strona wpisu** `/nowosci/<adres>/`: data, tytuł, lead (kursywa), zdjęcie główne bez kadrowania, treść Markdown, galeria „wierszami” bez kadrowania (szerokie w osobnym rzędzie, reszta parami, wysokość rzędu maks. ~620 px), lightbox (strzałki/Esc/swipe), Udostępnij/Kopiuj link, „Więcej nowości”, JSON-LD NewsArticle, og:image = okładka. Bez `en.md` gość EN widzi PL + dopisek „available in Polish only”.
+- **Refaktoryzacja:** nawigacja, stopka, wybór języka i antyspamowe maile wydzielone 1:1 z `pages/index.astro` do `components/SiteShell.astro` (wspólne dla głównej i podstron; na podstronach kotwice `/#…`). Logo w nawigacji jest teraz linkiem do `/`. Sprawdzone: HTML głównej bez wpisów identyczny poza tym.
+- **Stare `/aktualnosci`** (szablon CMS, API `/site/articles` było puste): `[slug].astro` usunięty, `index.astro` przekierowuje na nowości. Model `Article` w API/Personal OS nieużywany przez stronę.
+- Pierwszy wpis: `lodz-dar-spotkania` — „Dar spotkania” / „Gift of Encounter”, Łódź 19.10.2026 (EN od Jacka, PL moje tłumaczenie; skrót/excerpt mój), 3 zdjęcia (cover = wspólne zdjęcie, galeria 2 pionowe).
+- Weryfikacja: build ✓ (na komputerze Jacka, kopia w ~/sb), zrzuty desktop/mobile z 1 i 6 wpisami (demo) ✓, lightbox ✓, brak błędów JS. `astro check`: 3 błędy typów tylko z braku @types/node w news.ts (build OK).
+- Stan: do pushu przez Jacka.
+
 ## Dziennik prac — nowa strona icpebook.org („A Cast of Light")
 
 ### Book events zamiast promocji polskiej premiery (2026-10-17)

@@ -1,0 +1,137 @@
+---
+// Sekcja „Nowości” na stronie głównej (#nowosci).
+// Układ: najnowszy wpis wyróżniony (duże zdjęcie) + do 3 kolejnych skrótów obok.
+// Gdy wpisów jest więcej niż HOME_LIMIT — pojawia się przycisk „Wszystkie nowości” (/nowosci/).
+import Bi from './news/Bi.astro';
+import NewsMeta from './news/NewsMeta.astro';
+import NewsCover from './news/NewsCover.astro';
+import { HOME_LIMIT, archiveActive, NEWS_BASE, type NewsItem } from '../lib/news';
+
+interface Props { news: NewsItem[] }
+const { news } = Astro.props;
+const [lead, ...rest] = news.slice(0, HOME_LIMIT);
+const showAll = archiveActive(news.length);
+---
+
+<section id="nowosci" class="news" aria-labelledby="nowosci-title">
+  <div class="news-head">
+    <div>
+      <div class="kicker"><span data-pl>Nowości</span><span data-en>News</span></div>
+      <h2 id="nowosci-title">
+        <span data-pl>Z życia <em>wspólnoty</em></span><span data-en>Life in the <em>community</em></span>
+      </h2>
+    </div>
+    {showAll && (
+      <a class="all-btn" href={`${NEWS_BASE}/`}>
+        <span data-pl>Wszystkie nowości</span><span data-en>All news</span>
+        <span class="all-count">{news.length}</span>
+        <span class="arrow" aria-hidden="true">→</span>
+      </a>
+    )}
+  </div>
+
+  <div class:list={['news-grid', { solo: rest.length === 0 }]}>
+    <article class="lead">
+      <div class="lead-img"><NewsCover image={lead.cover} /></div>
+      <div class="lead-body">
+        <NewsMeta item={lead} />
+        <h3 class="lead-title">
+          <a href={lead.href} class="stretched"><Bi pl={lead.pl.data.title} en={lead.en?.data.title} /></a>
+        </h3>
+        <p class="lead-excerpt"><Bi pl={lead.pl.data.excerpt} en={lead.en?.data.excerpt} /></p>
+        <span class="more" aria-hidden="true"><span data-pl>Czytaj dalej</span><span data-en>Read more</span> <span class="arrow">→</span></span>
+      </div>
+    </article>
+
+    {rest.length > 0 && (
+      <ol class="rest">
+        {rest.map((n) => (
+          <li>
+            <article class="item">
+              <div class="item-img"><NewsCover image={n.cover} /></div>
+              <div class="item-body">
+                <NewsMeta item={n} />
+                <h3 class="item-title">
+                  <a href={n.href} class="stretched"><Bi pl={n.pl.data.title} en={n.en?.data.title} /></a>
+                </h3>
+                <p class="item-excerpt"><Bi pl={n.pl.data.excerpt} en={n.en?.data.excerpt} /></p>
+                <span class="more" aria-hidden="true"><span data-pl>Czytaj dalej</span><span data-en>Read more</span> <span class="arrow">→</span></span>
+              </div>
+            </article>
+          </li>
+        ))}
+      </ol>
+    )}
+  </div>
+</section>
+
+<style>
+  .news { padding: 76px 72px 84px; border-bottom: 1px solid #E2D8C8; scroll-margin-top: 90px; }
+  .news-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; flex-wrap: wrap; margin-bottom: 44px; }
+  .kicker { font-family: 'Space Mono', monospace; font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: #A0724F; margin-bottom: 18px; }
+  h2 { margin: 0; font-size: clamp(38px, 4.4vw, 56px); line-height: 1; letter-spacing: -.03em; font-weight: 800; }
+  h2 em { font-family: 'Instrument Serif', serif; font-style: italic; font-weight: 400; color: #C0603C; letter-spacing: -.01em; }
+
+  .all-btn { display: inline-flex; align-items: center; gap: 10px; padding: 13px 22px; border-radius: 100px; border: 1px solid #C9BCA9; color: #241E1A; font-size: 15px; font-weight: 600; text-decoration: none; transition: background .2s, color .2s, border-color .2s; }
+  .all-btn:hover { background: #241E1A; color: #F4EEE3; border-color: #241E1A; }
+  .all-count { font-family: 'Space Mono', monospace; font-size: 12px; font-weight: 400; padding: 2px 8px; border-radius: 100px; background: #E9DFCF; color: #6B615A; transition: background .2s, color .2s; }
+  .all-btn:hover .all-count { background: #43372C; color: #EDE3D3; }
+
+  .news-grid { display: grid; grid-template-columns: 1.32fr 1fr; gap: 56px; align-items: start; }
+
+  /* wspólne: cała karta klikalna (link w tytule rozciągnięty na kartę) */
+  article { position: relative; }
+  .stretched { color: inherit; text-decoration: none; }
+  .stretched::after { content: ''; position: absolute; inset: 0; z-index: 1; border-radius: 16px; }
+  .stretched:focus-visible { outline: none; }
+  .stretched:focus-visible::after { outline: 2px solid #C0603C; outline-offset: 6px; }
+  .more { display: inline-flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 600; color: #241E1A; }
+  .arrow { color: #C0603C; transition: transform .25s ease; display: inline-block; }
+  article:hover .more .arrow, .all-btn:hover .arrow { transform: translateX(4px); }
+  article:hover .more > span:first-child { text-decoration: underline; text-underline-offset: 4px; text-decoration-color: #C0603C; }
+  article:hover :global(.nc-img) { transform: scale(1.035); }
+
+  /* wyróżniony wpis */
+  .lead-img { aspect-ratio: 16 / 10; border-radius: 16px; border: 1px solid #E2D8C8; overflow: hidden; background: #E9DFCF; }
+  .lead-body { padding-top: 26px; display: flex; flex-direction: column; align-items: flex-start; }
+  .lead-title { margin: 14px 0 0; font-size: clamp(26px, 2.6vw, 34px); line-height: 1.1; letter-spacing: -.025em; font-weight: 800; text-wrap: balance; }
+  .lead:hover .lead-title { color: #8E4229; }
+  .lead-excerpt { margin: 14px 0 0; font-size: 17px; line-height: 1.6; color: #4A4038; max-width: 60ch; }
+  .lead .more { margin-top: 20px; }
+
+  /* tylko jeden wpis: zdjęcie obok tekstu */
+  .solo { grid-template-columns: 1fr; }
+  .solo .lead { display: grid; grid-template-columns: 1.25fr 1fr; gap: 48px; align-items: center; }
+  .solo .lead-body { padding-top: 0; }
+
+  /* kolejne wpisy — lista skrótów */
+  .rest { list-style: none; margin: 0; padding: 0; border-top: 1px solid #241E1A; }
+  .rest li { border-bottom: 1px solid #E2D8C8; }
+  .item { display: grid; grid-template-columns: 150px 1fr; gap: 22px; padding: 24px 0; align-items: start; }
+  .item .stretched::after { border-radius: 12px; }
+  .item-img { aspect-ratio: 4 / 3; border-radius: 12px; overflow: hidden; border: 1px solid #E2D8C8; background: #E9DFCF; }
+  .item-body { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
+  .item-body :global(.news-meta) { font-size: 11.5px; }
+  .item-title { margin: 8px 0 0; font-size: 20px; line-height: 1.2; letter-spacing: -.015em; font-weight: 700; }
+  .item:hover .item-title { color: #8E4229; }
+  .item-excerpt { margin: 8px 0 0; font-size: 14.5px; line-height: 1.5; color: #6B615A; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .item .more { margin-top: 10px; font-size: 14px; }
+
+  @media (max-width: 1100px) {
+    .item { grid-template-columns: 120px 1fr; gap: 18px; }
+  }
+  @media (max-width: 900px) {
+    .news-grid { grid-template-columns: 1fr; gap: 44px; }
+    .solo .lead { grid-template-columns: 1fr; gap: 0; }
+    .solo .lead-body { padding-top: 26px; }
+    .item { grid-template-columns: 180px 1fr; }
+  }
+  @media (max-width: 560px) {
+    .news { padding: 56px 22px 64px; }
+    .news-head { margin-bottom: 32px; }
+    .item { grid-template-columns: 104px 1fr; gap: 16px; padding: 20px 0; }
+    .item-title { font-size: 17.5px; }
+    .item-excerpt { font-size: 14px; }
+    .lead-excerpt { font-size: 16px; }
+  }
+</style>
