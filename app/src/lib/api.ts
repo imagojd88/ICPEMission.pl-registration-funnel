@@ -567,6 +567,38 @@ export async function createPlace(label: string, token?: string): Promise<Place>
   })
 }
 
+// ── Biblioteka gości specjalnych ─────────────────────────────────────────────
+
+export interface SavedGuest {
+  id: string
+  name: Record<string, string>
+  bio?: Record<string, string> | null
+  photoUrl?: string | null
+  plural: boolean
+  updatedAt?: string
+}
+
+/** Zapisani goście specjalni (najnowsze/ostatnio zmieniane pierwsze). */
+export async function listSavedGuests(token?: string): Promise<SavedGuest[]> {
+  return apiFetch<SavedGuest[]>('/admin/special-guests', { headers: authHeaders(token) })
+}
+
+/** Zapis gościa w bibliotece: z `id` → aktualizacja; bez `id` → po imieniu PL (bez duplikatów). */
+export async function saveSavedGuest(
+  g: { id?: string; name: Record<string, string>; bio: Record<string, string>; photoUrl: string; plural: boolean },
+  token?: string,
+): Promise<SavedGuest> {
+  return apiFetch<SavedGuest>('/admin/special-guests', {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: JSON.stringify(g),
+  })
+}
+
+export async function deleteSavedGuest(id: string, token?: string): Promise<void> {
+  await apiFetch(`/admin/special-guests/${id}`, { method: 'DELETE', headers: authHeaders(token) })
+}
+
 // ── Zaproszenia (event typu INVITE) ──────────────────────────────────────────
 
 export interface Invitee {

@@ -14,6 +14,7 @@ import { AdminModule } from './admin/admin.module';
 import { RsvpModule } from './rsvp/rsvp.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { PlacesModule } from './places/places.module';
+import { SpecialGuestsModule } from './special-guests/special-guests.module';
 import { InvitationsModule } from './invitations/invitations.module';
 import { ContentModule } from './content/content.module';
 import { CourseAccessModule } from './courses/course-access.module';
@@ -36,6 +37,7 @@ import { CoursesModule } from './courses/courses.module';
     RsvpModule,
     UploadsModule,
     PlacesModule,
+    SpecialGuestsModule,
     InvitationsModule,
     ContentModule,
     CourseAccessModule,

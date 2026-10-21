@@ -1,7 +1,17 @@
-import { useState, type ChangeEvent } from 'react'
-import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-react'
+import { useEffect, useState, type ChangeEvent } from 'react'
+import { ArrowDown, ArrowUp, BookUser, Check, Plus, Trash2 } from 'lucide-react'
 import Button from '@/components/ui/Button'
-import { uploadImage, eventGuests, type EventContent, type LangText, type SpecialGuest } from '@/lib/api'
+import {
+  uploadImage,
+  eventGuests,
+  listSavedGuests,
+  saveSavedGuest,
+  deleteSavedGuest,
+  type EventContent,
+  type LangText,
+  type SpecialGuest,
+  type SavedGuest,
+} from '@/lib/api'
 
 type Lang = 'pl' | 'en' | 'it'
 const LANG_LABEL: Record<Lang, string> = { pl: 'PL', en: 'EN', it: 'IT' }
@@ -14,7 +24,18 @@ export interface GuestRow {
   photoUrl: string
   /** Para / kilka osób w jednym wpisie (np. małżeństwo) — jedno zdjęcie, wspólny opis. */
   plural: boolean
+  /** Powiązanie z biblioteką gości (tylko w panelu — nie zapisuje się w evencie). */
+  libraryId?: string
+  /** Stan z chwili zapisu w bibliotece — różnica = „Zaktualizuj w bibliotece”. */
+  librarySig?: string
 }
+
+/** Podpis treści gościa (do wykrywania zmian względem wersji w bibliotece). */
+const sigOf = (g: { name?: Record<string, string> | null; bio?: Record<string, string> | null; photoUrl?: string | null; plural?: boolean }) =>
+  JSON.stringify([clean(g.name ?? {}), clean(g.bio ?? {}), g.photoUrl ?? '', !!g.plural])
+
+const plName = (m: Record<string, string> | null | undefined) =>
+  ((m?.pl ?? Object.values(m ?? {})[0] ?? '') as string).trim().toLowerCase()
 
 const asMap = (v: LangText | undefined): Record<string, string> =>
   typeof v === 'string' ? (v ? { pl: v } : {}) : { ...(v ?? {}) }
@@ -70,6 +91,75 @@ export default function SpecialGuestsEditor({
   const [uploadingId, setUploadingId] = useState<string | null>(null)
   const isPl = lang === 'pl'
 
+  // ── Biblioteka gości ──
+  const [library, setLibrary] = useState<SavedGuest[] | null>(null)
+  const [showLibrary, setShowLibrary] = useState(false)
+  const [savingId, setSavingId] = useState<string | null>(null)
+  const [confirmDel, setConfirmDel] = useState<string | null>(null)
+
+  useEffect(() => {
+    listSavedGuests().then(setLibrary).catch(() => setLibrary([]))
+  }, [])
+
+  // Goście wczytani z eventu, którzy są już w bibliotece (to samo imię PL) → oznacz powiązanie.
+  useEffect(() => {
+    if (!library?.length) return
+    let changed = false
+    const next = rows.map((r) => {
+      if (r.libraryId) return r
+      const hit = library.find((g) => plName(g.name) && plName(g.name) === plName(r.name))
+      if (!hit) return r
+      changed = true
+      return { ...r, libraryId: hit.id, librarySig: sigOf(hit) }
+    })
+    if (changed) onChange(next)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [library, rows.length])
+
+  async function saveToLibrary(r: GuestRow) {
+    if (!plName(r.name)) { onError?.('Wpisz imiona gościa (po polsku), zanim zapiszesz go w bibliotece.'); return }
+    setSavingId(r.id)
+    try {
+      const saved = await saveSavedGuest({ id: r.libraryId, name: clean(r.name), bio: clean(r.bio), photoUrl: r.photoUrl, plural: r.plural })
+      setLibrary((lib) => [saved, ...(lib ?? []).filter((g) => g.id !== saved.id)])
+      patch(r.id, { libraryId: saved.id, librarySig: sigOf(saved) })
+    } catch (err: unknown) {
+      onError?.(err instanceof Error ? err.message : 'Nie udało się zapisać gościa w bibliotece.')
+    } finally {
+      setSavingId(null)
+    }
+  }
+
+  function addFromLibrary(g: SavedGuest) {
+    onChange([
+      ...rows,
+      {
+        ...newGuestRow(),
+        name: { ...g.name },
+        bio: { ...(g.bio ?? {}) },
+        photoUrl: g.photoUrl ?? '',
+        plural: !!g.plural,
+        libraryId: g.id,
+        librarySig: sigOf(g),
+      },
+    ])
+  }
+
+  async function removeFromLibrary(id: string) {
+    try {
+      await deleteSavedGuest(id)
+      setLibrary((lib) => (lib ?? []).filter((g) => g.id !== id))
+      // Karty w evencie zostają — tracą tylko powiązanie z biblioteką.
+      if (rows.some((r) => r.libraryId === id)) {
+        onChange(rows.map((r) => (r.libraryId === id ? { ...r, libraryId: undefined, librarySig: undefined } : r)))
+      }
+    } catch (err: unknown) {
+      onError?.(err instanceof Error ? err.message : 'Nie udało się usunąć gościa z biblioteki.')
+    } finally {
+      setConfirmDel(null)
+    }
+  }
+
   const patch = (id: string, p: Partial<GuestRow>) => onChange(rows.map((r) => (r.id === id ? { ...r, ...p } : r)))
   const setText = (id: string, key: 'name' | 'bio', v: string) =>
     onChange(rows.map((r) => (r.id === id ? { ...r, [key]: { ...r[key], [lang]: v } } : r)))
@@ -101,6 +191,64 @@ export default function SpecialGuestsEditor({
 
   return (
     <div className="flex flex-col gap-3">
+      {/* Biblioteka zapisanych gości */}
+      {library && library.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <button
+            type="button"
+            onClick={() => setShowLibrary((v) => !v)}
+            className="self-start flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-[10px]"
+            style={{ border: '1px solid var(--brand)', color: 'var(--brand)', background: showLibrary ? 'var(--brand-soft)' : 'transparent', cursor: 'pointer' }}
+          >
+            <BookUser size={14} /> Wybierz z biblioteki ({library.length})
+          </button>
+          {showLibrary && (
+            <div className="flex flex-col rounded-[12px] overflow-hidden" style={{ border: '1px solid var(--border)', background: 'var(--surface)' }}>
+              {library.map((g, i) => {
+                const added = rows.some((r) => r.libraryId === g.id)
+                const bioPl = (g.bio?.pl ?? Object.values(g.bio ?? {})[0] ?? '') as string
+                return (
+                  <div
+                    key={g.id}
+                    className="flex items-center gap-3 px-3 py-2"
+                    style={{ borderTop: i ? '1px solid var(--border-2, var(--border))' : undefined }}
+                  >
+                    {g.photoUrl ? (
+                      <img src={g.photoUrl} alt="" className="rounded-full object-cover shrink-0" style={{ width: 36, height: 36 }} />
+                    ) : (
+                      <div className="rounded-full shrink-0" style={{ width: 36, height: 36, background: 'var(--surface-2)', border: '1px solid var(--border)' }} />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium truncate" style={{ color: 'var(--ink)' }}>
+                        {g.name.pl ?? Object.values(g.name)[0]}
+                        {g.plural && <span className="text-xs font-normal" style={{ color: 'var(--faint)' }}> · para</span>}
+                      </p>
+                      {bioPl && <p className="text-xs truncate" style={{ color: 'var(--muted)' }}>{bioPl}</p>}
+                    </div>
+                    {confirmDel === g.id ? (
+                      <div className="flex items-center gap-2 shrink-0 text-xs">
+                        <span style={{ color: 'var(--err)' }}>Usunąć z biblioteki?</span>
+                        <button type="button" onClick={() => { void removeFromLibrary(g.id) }} className="font-semibold" style={{ color: 'var(--err)', cursor: 'pointer' }}>Tak</button>
+                        <button type="button" onClick={() => setConfirmDel(null)} style={{ color: 'var(--muted)', cursor: 'pointer' }}>Nie</button>
+                      </div>
+                    ) : (
+                      <>
+                        <Button size="sm" variant="outline" onClick={() => addFromLibrary(g)} disabled={added}>
+                          {added ? '✓ Dodany' : 'Dodaj'}
+                        </Button>
+                        <button type="button" onClick={() => setConfirmDel(g.id)} title="Usuń z biblioteki" className="p-1.5 rounded-[8px] shrink-0" style={{ color: 'var(--faint)', cursor: 'pointer' }}>
+                          <Trash2 size={14} />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
       {rows.length === 0 && (
         <p className="text-xs" style={{ color: 'var(--faint)' }}>
           Brak gości specjalnych. Dodaj jednego lub kilku — na stronie pokażą się w tej kolejności.
@@ -155,6 +303,24 @@ export default function SpecialGuestsEditor({
             />
             Para / kilka osób w jednym wpisie (np. małżeństwo — wspólne zdjęcie i opis)
           </label>
+          <div className="flex items-center gap-2 -mt-1">
+            {r.libraryId && r.librarySig === sigOf(r) ? (
+              <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--ok)' }}>
+                <Check size={12} /> W bibliotece
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => { void saveToLibrary(r) }}
+                disabled={savingId === r.id || (!plName(r.name) && !r.photoUrl)}
+                className="flex items-center gap-1 text-xs font-medium"
+                style={{ color: 'var(--brand)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', opacity: !plName(r.name) && !r.photoUrl ? 0.4 : 1 }}
+              >
+                <BookUser size={12} />
+                {savingId === r.id ? 'Zapisuję…' : r.libraryId ? 'Zaktualizuj w bibliotece' : 'Zapisz w bibliotece'}
+              </button>
+            )}
+          </div>
           <textarea
             value={r.bio[lang] ?? ''}
             onChange={(e) => setText(r.id, 'bio', e.target.value)}

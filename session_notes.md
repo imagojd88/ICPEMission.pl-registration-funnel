@@ -51,6 +51,13 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — panel admina (kreator eventów)
 
+### Biblioteka gości specjalnych (2026-10-21)
+- **Prośba (Jacek, pierwsza wiadomość dnia):** zapisane zdjęcia i opisy gości do ponownego wyboru, zamiast wgrywać je za każdym razem.
+- **API:** model `SavedGuest` (`name` Json, `bio` Json?, `photoUrl`?, `plural`, timestamps) — wchodzi przez `prisma db push` przy starcie. Moduł `api/src/special-guests/` (wzór: `places`), endpointy JWT `GET/POST /admin/special-guests`, `DELETE /admin/special-guests/:id`. POST: z `id` → aktualizacja; bez `id` → po imieniu PL (bez duplikatów). Nazwa celowo ≠ istniejący moduł `guests` (konta uczestników). Serwis używa `(prisma as any).savedGuest` — typy klienta dojdą po `prisma generate` na Render.
+- **Panel (`SpecialGuestsEditor`, kreator i „Edytuj event”):** przycisk „Wybierz z biblioteki (N)” → lista (portret, imiona, opis PL, „· para”) z „Dodaj” / „✓ Dodany” i usuwaniem z potwierdzeniem w wierszu. Na karcie gościa: „Zapisz w bibliotece” / „✓ W bibliotece” / „Zaktualizuj w bibliotece” (gdy treść różni się od zapisanej). Goście wczytani z eventu są automatycznie łączeni z biblioteką po imieniu PL. Usunięcie z biblioteki nie usuwa gościa z eventu (tylko zrywa powiązanie). Powiązanie z biblioteką nie zapisuje się w evencie (event trzyma pełną kopię gościa — zmiana w bibliotece nie zmienia starych eventów).
+- **Weryfikacja:** tsc app ✓, api ✓ (poza starymi błędami src/courses); Playwright z mockiem API (stateful): stary gość → „W bibliotece”; dodanie z biblioteki (z EN) → karta wypełniona; zmiana opisu → „Zaktualizuj” → POST z id; nowy gość → POST bez id, licznik 3; usunięcie z biblioteki → karta zostaje z „Zapisz w bibliotece”; zapis eventu bez pól biblioteki; kreator: dodanie z biblioteki → publikacja z en. 0 błędów JS.
+- Stan: do pushu + **Manual Deploy `icpe-api`** (nowa tabela + endpointy). Do tego czasu panel po prostu nie pokaże przycisku biblioteki (lista pusta / błąd → ukryty), a „Zapisz w bibliotece” zgłosi błąd.
+
 ### Wielu gości specjalnych na event (2026-10-21)
 - **Prośba (Jacek):** dało się dodać tylko jednego gościa (lub małżeństwo) — potrzeba kilku.
 - **Model:** nowe `customFields.specialGuests: SpecialGuest[]` (`{name, bio, photoUrl, plural}`; name/bio = mapy językowe). Stary pojedynczy `specialGuest` nadal czytany — `eventGuests()` w `lib/api.ts` (lista albo [stary gość]). Zapis z panelu: `specialGuests` + `specialGuest: null` (bez dublowania). Istniejące eventy działają bez zmian; po pierwszym zapisie w „Edytuj event” przechodzą na nowy format.

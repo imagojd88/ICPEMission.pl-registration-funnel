@@ -390,6 +390,18 @@ model Place {
   createdAt DateTime @default(now())
 }
 
+// Biblioteka gości specjalnych — zapisani raz, wybierani przy kolejnych eventach.
+// name/bio = mapy językowe {pl, en, it}; photoUrl = wgrany portret.
+model SavedGuest {
+  id        String   @id @default(cuid())
+  name      Json
+  bio       Json?
+  photoUrl  String?
+  plural    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 // Zaproszenia dla eventów typu INVITE (na zaproszenie).
 model Invitation {
   id          String    @id @default(cuid())
