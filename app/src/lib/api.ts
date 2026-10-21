@@ -567,6 +567,19 @@ export async function createPlace(label: string, token?: string): Promise<Place>
   })
 }
 
+/** Zmiana nazwy zapisanego miejsca (eventy trzymają kopię tekstu — stare się nie zmieniają). */
+export async function renamePlace(id: string, label: string, token?: string): Promise<Place> {
+  return apiFetch<Place>(`/admin/places/${id}`, {
+    method: 'PATCH',
+    headers: authHeaders(token),
+    body: JSON.stringify({ label }),
+  })
+}
+
+export async function deletePlace(id: string, token?: string): Promise<void> {
+  await apiFetch(`/admin/places/${id}`, { method: 'DELETE', headers: authHeaders(token) })
+}
+
 // ── Biblioteka gości specjalnych ─────────────────────────────────────────────
 
 export interface SavedGuest {

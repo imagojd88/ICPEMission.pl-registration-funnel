@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -16,6 +16,13 @@ export class PlacesService {
     const existing = await this.prisma.place.findFirst({ where: { label: v } });
     if (existing) return existing;
     return this.prisma.place.create({ data: { label: v } });
+  }
+
+  /** Zmiana nazwy (np. poprawka adresu). Eventy trzymają kopię tekstu — stare eventy się nie zmieniają. */
+  async rename(id: string, label: string) {
+    const v = (label ?? '').trim();
+    if (!v) throw new BadRequestException('Nazwa miejsca nie może być pusta');
+    return this.prisma.place.update({ where: { id }, data: { label: v } });
   }
 
   async remove(id: string) {

@@ -8,6 +8,7 @@ import {
   UserCheck,
   Settings,
   GraduationCap,
+  Library,
   LogOut,
   Sun,
   Moon,
@@ -19,6 +20,7 @@ import { getAdminEmail } from '@/lib/api'
 type AdminScreen =
   | 'dashboard'
   | 'events'
+  | 'library'
   | 'registrations'
   | 'accommodation'
   | 'payments'
@@ -36,6 +38,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'events', label: 'Eventy', icon: CalendarDays },
+  { id: 'library', label: 'Biblioteka', icon: Library },
   { id: 'registrations', label: 'Zgłoszenia', icon: ClipboardList },
   { id: 'accommodation', label: 'Zakwaterowanie', icon: BedDouble },
   { id: 'payments', label: 'Płatności', icon: CreditCard },

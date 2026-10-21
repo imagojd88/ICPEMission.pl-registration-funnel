@@ -51,6 +51,17 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — panel admina (kreator eventów)
 
+### Zakładka „Biblioteka” w panelu (2026-10-21)
+- **Prośba (Jacek):** osobna zakładka do wgrywania gości specjalnych i miejsc poza tworzeniem eventów.
+- **Panel:** nowy ekran `admin/library/LibraryScreen.tsx`, pozycja „Biblioteka” w pasku bocznym (pod „Eventy”; `AdminPanel.tsx` + `AdminSidebar.tsx`, typ `AdminScreen` + `library`). Dwie zakładki z licznikami:
+  - **Goście specjalni:** lista (portret, imiona, opis PL, plakietki PL/EN/IT = które języki wypełnione), „Dodaj gościa” / ołówek → formularz w miejscu: przełącznik języka PL/EN/IT (imiona + opis), wgranie/zmiana/usunięcie portretu, „para”; zapis = `POST /admin/special-guests` (z id przy edycji). Usuwanie z potwierdzeniem w wierszu. PL imiona wymagane.
+  - **Miejsca:** dodawanie (Enter), zmiana nazwy w miejscu (Enter/Esc), usuwanie z potwierdzeniem; sortowanie alfabetyczne.
+- **API:** `PATCH /admin/places/:id` (zmiana nazwy; pusta → 400) — `places.controller/service`. Front: `renamePlace`, `deletePlace` w `lib/api.ts`.
+- Eventy trzymają kopie (gość, adres) — zmiany w bibliotece nie zmieniają istniejących eventów (opis na ekranie).
+- **Weryfikacja:** tsc app ✓, api ✓ (poza starymi błędami src/courses); Playwright z mockiem (stateful): dodanie gościa PL+EN z portretem, edycja opisu, walidacja pustych imion, usunięcie; miejsca: dodanie, zmiana nazwy, usunięcie; liczniki zakładek; 0 błędów JS.
+- **Deploy (Jacek):** Manual Deploy `icpe-api` pokazał „45 vulnerabilities (4 low, 17 moderate, 23 high, 1 critical)” — to raport `npm audit` przy instalacji, nie błąd; bez nowych zależności. Do osobnego przeglądu (bez `npm audit fix --force`, które podbija główne wersje Nest/Prisma).
+- Stan: do pushu + **Manual Deploy `icpe-api`** (nowy endpoint PATCH miejsc).
+
 ### Biblioteka gości specjalnych (2026-10-21)
 - **Prośba (Jacek, pierwsza wiadomość dnia):** zapisane zdjęcia i opisy gości do ponownego wyboru, zamiast wgrywać je za każdym razem.
 - **API:** model `SavedGuest` (`name` Json, `bio` Json?, `photoUrl`?, `plural`, timestamps) — wchodzi przez `prisma db push` przy starcie. Moduł `api/src/special-guests/` (wzór: `places`), endpointy JWT `GET/POST /admin/special-guests`, `DELETE /admin/special-guests/:id`. POST: z `id` → aktualizacja; bez `id` → po imieniu PL (bez duplikatów). Nazwa celowo ≠ istniejący moduł `guests` (konta uczestników). Serwis używa `(prisma as any).savedGuest` — typy klienta dojdą po `prisma generate` na Render.

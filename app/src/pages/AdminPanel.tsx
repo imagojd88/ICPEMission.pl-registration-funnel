@@ -12,10 +12,12 @@ import AttendanceScreen from '@/components/admin/attendance/AttendanceScreen'
 import AccommodationScreen from '@/components/admin/accommodation/AccommodationScreen'
 import PaymentsScreen from '@/components/admin/payments/PaymentsScreen'
 import CoursesScreen from '@/components/admin/courses/CoursesScreen'
+import LibraryScreen from '@/components/admin/library/LibraryScreen'
 
 type AdminScreen =
   | 'dashboard'
   | 'events'
+  | 'library'
   | 'registrations'
   | 'accommodation'
   | 'payments'
@@ -26,6 +28,7 @@ type AdminScreen =
 const SCREEN_TITLES: Record<AdminScreen, { title: string; subtitle?: string }> = {
   dashboard: { title: 'Dashboard', subtitle: 'Przegląd aktywności i kluczowych wskaźników' },
   events: { title: 'Eventy', subtitle: 'Zarządzaj sesjami i edycjami wydarzeń' },
+  library: { title: 'Biblioteka', subtitle: 'Goście specjalni i miejsca do wyboru przy tworzeniu eventów' },
   registrations: { title: 'Zgłoszenia', subtitle: 'Przeglądaj i zarządzaj zgłoszeniami uczestników' },
   accommodation: { title: 'Zakwaterowanie', subtitle: 'Zarządzaj pokojami i przydziałami' },
   payments: { title: 'Płatności', subtitle: 'Historia transakcji i rozliczenia' },
@@ -107,6 +110,8 @@ export default function AdminPanel() {
             onCloseWizard={() => setShowWizard(false)}
           />
         )
+      case 'library':
+        return <LibraryScreen />
       case 'registrations':
         return <RegistrationsScreen />
       case 'accommodation':
