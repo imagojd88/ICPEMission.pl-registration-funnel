@@ -6,6 +6,7 @@ import { computePrice, formatMoney, roomLabel, roomStockShortages } from '@icpe/
 import { getManagedRegistration, pickLang, updateManagedAccommodation, type ManagedRegistration } from '../lib/api'
 import { funnelPriceInput, isAccommodationOptional } from '../lib/funnelPrice'
 import { formatDateRange } from '../lib/utils'
+import { setAnalyticsContext, track } from '../lib/analytics'
 import Spinner from '../components/ui/Spinner'
 import ThemeToggle from '../components/ui/ThemeToggle'
 import LanguageSwitch from '../components/ui/LanguageSwitch'
@@ -53,7 +54,11 @@ export default function ManageRegistration() {
   useEffect(() => {
     if (!token) return
     getManagedRegistration(token)
-      .then(apply)
+      .then((r) => {
+        apply(r)
+        if (r.event.slug) setAnalyticsContext({ event_slug: r.event.slug })
+        track('manage_registration_viewed', { lock: r.lock ?? 'none', rooms: r.rooms.length, payment_method: r.paymentMethod ?? null })
+      })
       .catch(() => setLoadError(true))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token])
@@ -135,6 +140,16 @@ export default function ManageRegistration() {
         token,
         effectiveRooms.map((r) => ({ roomId: r.roomId, participantIndexes: r.participantIndexes })),
       )
+      const before = reg ?? next
+      track('accommodation_changed', {
+        rooms_before: before.rooms.length,
+        rooms_after: next.rooms.length,
+        change: before.rooms.length === 0 && next.rooms.length > 0 ? 'added' : next.rooms.length === 0 ? 'removed' : 'changed',
+        total_before: before.totalPrice,
+        total_after: next.totalPrice,
+        currency: next.currency,
+        payment_method: next.paymentMethod ?? null,
+      })
       apply(next)
       setMsg({ kind: 'ok', text: t('manage.saved') })
     } catch (e) {

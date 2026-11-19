@@ -6,6 +6,10 @@ import { computePrice, DEFAULT_PRICING, validateRoomCapacity, roomLabel, hasAcco
 import type { PricingConfig } from '@icpe/shared'
 import { getEventBySlug, getEventConfig, createRegistration, registerGuest, getInvitation, pickLang, type EventConfig } from '../lib/api'
 import { funnelPriceInput, isAccommodationOptional } from '../lib/funnelPrice'
+import { setAnalyticsContext, track } from '../lib/analytics'
+
+/** Nazwy kroków w analityce (stałe, niezależne od języka). */
+const STEP_NAMES = ['applicant', 'participants', 'preferences', 'accommodation', 'options'] as const
 import { clearDraft, loadDraft, pruneExpiredDrafts, saveDraft, type ResumableScreen } from '../lib/funnelDraft'
 
 /** Rozdziela „Imię Nazwisko" na pola DTO. */
@@ -463,6 +467,13 @@ export default function PublicFunnel() {
         setEventConfig(cfg)
         setPricingConfig(cfg.pricing)
         setLoading(false)
+        // Kontekst analityki: każde kolejne zdarzenie w tej wizycie ma slug i typ eventu.
+        setAnalyticsContext({
+          event_slug: effectiveSlug,
+          event_type: e.type ?? cfg.type ?? 'ONE_TIME',
+          event_free: !!cfg.pricing?.free,
+          accommodation_optional: isAccommodationOptional(cfg.pricing),
+        })
       })
       .catch(() => {
         setError(true)
@@ -490,6 +501,7 @@ export default function PublicFunnel() {
   }
 
   const handleStartRegister = () => {
+    track('registration_started', { invited: !!invite, had_draft: !!draft })
     const base = buildInitialStepper()
     if (invite) {
       base.applicant = { ...base.applicant, firstName: invite.firstName, lastName: invite.lastName, email: invite.email, phone: invite.phone }
@@ -502,6 +514,7 @@ export default function PublicFunnel() {
   /** Powrót do niedokończonego zgłoszenia — na ten sam krok, z tymi samymi danymi. */
   const handleResumeDraft = () => {
     if (!draft) return
+    track('registration_resumed', { step: draft.stepper.step, step_name: STEP_NAMES[draft.stepper.step] })
     setStepper(draft.stepper)
     setScreen(draft.screen)
     setDraft(null)
@@ -588,9 +601,21 @@ export default function PublicFunnel() {
       const err = validateRoomStep()
       if (err) {
         setStepError(err)
+        track('registration_step_blocked', { step: 3, step_name: 'accommodation' })
         return
       }
+      if (hasAccommodation(pricingConfig)) {
+        const inRooms = new Set(stepper.rooms.flatMap((r) => r.participantIndexes)).size
+        const n = stepper.participants.length
+        track('accommodation_chosen', {
+          choice: stepper.noAccommodation || inRooms === 0 ? 'none' : inRooms < n ? 'partial' : 'all',
+          rooms: stepper.noAccommodation ? 0 : stepper.rooms.length,
+          people: n,
+          people_with_room: stepper.noAccommodation ? 0 : inRooms,
+        })
+      }
     }
+    track('registration_step_completed', { step: stepper.step, step_name: STEP_NAMES[stepper.step] })
     if (stepper.step < STEPS - 1) {
       patchStepper({ step: stepper.step + 1 })
     } else if (pricingConfig.free) {
@@ -609,6 +634,7 @@ export default function PublicFunnel() {
 
   const handlePaymentMethodContinue = () => {
     if (stepper.paymentMethod) {
+      track('payment_method_selected', { payment_method: stepper.paymentMethod })
       setScreen('summary')
     }
   }
@@ -670,8 +696,28 @@ export default function PublicFunnel() {
         manageHref: hasAccommodation(pricingConfig) && editToken ? `/z/${editToken}` : undefined,
       })
       setScreen('success')
+      // Konwersja: bez danych osobowych — tylko liczby, metoda płatności i nocleg.
+      {
+        const inRooms = new Set(stepper.rooms.flatMap((r) => r.participantIndexes)).size
+        track('registration_submitted', {
+          payment_method: pricingConfig.free ? 'free' : stepper.paymentMethod,
+          total: res.summary?.total ?? res.registration.totalPrice ?? 0,
+          currency: pricingConfig.currency ?? 'PLN',
+          people: stepper.participants.length,
+          adults: stepper.participants.filter((p) => p.type === 'adult').length,
+          children: stepper.participants.filter((p) => p.type === 'child').length,
+          rooms: stepper.noAccommodation ? 0 : stepper.rooms.length,
+          people_without_room: hasAccommodation(pricingConfig) ? stepper.participants.length - (stepper.noAccommodation ? 0 : inRooms) : null,
+          invited: !!invite,
+          discount_used: !!stepper.discountApplied,
+        })
+      }
     } catch (e: unknown) {
       const detail = e instanceof Error ? e.message : String(e)
+      track('registration_submit_failed', {
+        reason: /wolnych pokoi/i.test(detail) ? 'rooms_sold_out' : /zamknięte/i.test(detail) ? 'closed' : 'error',
+        payment_method: stepper.paymentMethod,
+      })
       setSubmitError(`Nie udało się zapisać zgłoszenia. ${detail} Sprawdź dane i spróbuj ponownie.`)
     } finally {
       setSubmitting(false)

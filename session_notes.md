@@ -14,7 +14,7 @@
 - **Strona icpemission.pl:** Render Static Site `icpe-site` — `srv-d92mumvaqgkc73fda3sg` · panel: https://dashboard.render.com/static/srv-d92mumvaqgkc73fda3sg · reguły: https://dashboard.render.com/static/srv-d92mumvaqgkc73fda3sg/redirects (Formacja online: Rewrite `/formacja/*` → `/formacja/index.html`).
 - **Prisma:** zmiany schematu wchodzą przez `prisma db push` przy starcie Render (nowe nullable pola/tabele dodają się same).
 - **CORS:** `origin: true` w `main.ts`.
-- **SMTP:** nodemailer przez dynamiczny import + ambient shim (`api/src/nodemailer-shim.d.ts`). Konfiguracja przez ENV na Render (`MAIL_MODE=smtp`, `SMTP_HOST/PORT/USER/PASS/SECURE`, `MAIL_FROM`) jako `sync:false` w `render.yaml`. Dostawca: **Brevo** — UWAGA: NIE włączać blokowania nieautoryzowanych IP (Render ma dynamiczne IP).
+- **Poczta:** dostawca wybierany ENV na Render: `MAIL_MODE=resend | smtp | log` (puste + `RESEND_API_KEY` → **Resend**, zalecany od 2025-09 — HTTP API, `MAIL_FROM` z domeny zweryfikowanej w Resend). Który działa naprawdę: panel ▸ Ustawienia ▸ E-mail (aktywny dostawca + końcówka klucza). Tryb `smtp` (stary, Brevo): nodemailer przez dynamiczny import + shim (`api/src/nodemailer-shim.d.ts`), `SMTP_HOST/PORT/USER/PASS/SECURE` — przy Brevo NIE włączać blokowania nieautoryzowanych IP (Render ma dynamiczne IP). Brevo zostaje też w DNS domeny (MX/SPF/DKIM poczty) — to niezależne od wysyłki z aplikacji.
 
 ### Ograniczenia sandboxa (dla przyszłych sesji)
 - `npm install` w sandboxie zawodzi (FUSE ENOTDIR); `git` z sandboxa zawodzi (FUSE lock) → **user robi push**.
@@ -50,6 +50,15 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 - Lokalna kopia repo jest 1 commit za origin → przed kolejną pracą `git pull`.
 
 ## Dziennik prac — panel admina (kreator eventów)
+
+### Analityka: PostHog w rejestracji, tryb bez cookies (2026-11-19)
+- **Decyzja (Jacek):** na razie tylko PostHog, tylko rejestracja (`rejestracja.icpemission.pl`), bez cookies. GA4 nie (icpemission.pl bez analityki).
+- **PostHog:** organizacja **ICPE PL**, projekt **„ICPE Rejestracja”** (id 357985, chmura EU, `https://eu.posthog.com/project/357985`). Ustawione przez API: strefa Europe/Warsaw, tydzień od poniedziałku, `cookieless_server_hash_mode = 2` (Settings ▸ Web analytics ▸ cookieless tracking — WYMAGANE dla `cookieless_mode: 'always'`), app URL, waluta PLN, anonimizacja IP, autocapture/heatmapy/console log wyłączone, nagrania sesji wyłączone.
+- **Kod:** `app/src/lib/analytics.ts` — oficjalny loader (bez nowej zależności npm; skrypt z `eu-assets.i.posthog.com`), `initAnalytics()` w `main.tsx`. Config: `cookieless_mode: 'always'` (zero cookies/localStorage — sprawdzone), `person_profiles: 'identified_only'` (nikogo nie identyfikujemy), `autocapture: false`, `capture_pageview: 'history_change'`, bez nagrań i ankiet. `before_send`: odrzuca `/admin*` i `/panel*`, wycina tokeny z URL-i (`/z|g|i/<token>` → `/[token]`, `?inv=`/`?token=`). Klucz publiczny w stałej `POSTHOG_KEY` (nadpisywalny `VITE_POSTHOG_KEY`, host `VITE_POSTHOG_HOST`).
+- **Zdarzenia (bez danych osobowych):** kontekst wizyty `event_slug`, `event_type`, `event_free`, `accommodation_optional`; `registration_started` {invited, had_draft}, `registration_resumed` {step}, `registration_step_completed` {step 0–4, step_name applicant/participants/preferences/accommodation/options}, `registration_step_blocked` (krok noclegu), `accommodation_chosen` {choice none/partial/all, rooms, people, people_with_room}, `payment_method_selected`, `registration_submitted` {payment_method, total, currency, people, adults, children, rooms, people_without_room, invited, discount_used}, `registration_submit_failed` {reason rooms_sold_out/closed/error}, `manage_registration_viewed` {lock}, `accommodation_changed` {change added/removed/changed, rooms_before/after, total_before/after}. Plus `$pageview` z UTM-ami.
+- **Weryfikacja:** tsc ✓, build ✓; Playwright z przechwyceniem wysyłki do PostHog (skrypt SDK z npm, bo CDN niedostępny z sandboxa): pełny lejek → wszystkie zdarzenia z poprawnymi właściwościami, `$cookieless_mode: true`, brak imion/maili/tokenów w danych, 0 cookies / localStorage / sessionStorage, panel admina bez zdarzeń. Uwaga do testów: SDK odrzuca headless przeglądarki jako boty (`opt_out_useragent_filter`).
+- **Do zrobienia po pierwszych danych:** dashboard „Lejek rejestracji” (funnel: $pageview /r/ → registration_started → kroki → registration_submitted, rozbicie po `event_slug`).
+- Stan: do pushu (tylko frontend, auto-deploy `icpe-frontend`).
 
 ### Limit pokoi + rezerwa dla gości specjalnych (2026-11-19)
 - **Prośba (Jacek):** limit pokoi per typ; admin może zablokować w systemie określoną liczbę pokoi dla gości specjalnych.
