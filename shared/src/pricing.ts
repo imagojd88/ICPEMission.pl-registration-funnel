@@ -130,6 +130,23 @@ export const DEFAULT_PRICING: PricingConfig = {
 export interface PriceOptions {
   transport?: boolean;
   bedding?: boolean;
+  /** Ręczna korekta ceny zgłoszenia przez admina (zapisywana w `Registration.optionsJson`). */
+  adjustment?: PriceAdjustment;
+}
+
+/**
+ * Ręczna korekta ceny (panel ▸ Edytuj zgłoszenie). Kolejność: cena wg cennika → kod rabatowy →
+ * rabat % → rabat kwotowy. `overrideTotal` (gdy ustawione) zastępuje wynik — np. ustalona z gościem kwota.
+ */
+export interface PriceAdjustment {
+  /** rabat w % od kwoty po kodzie rabatowym (0–100) */
+  discountPct?: number;
+  /** rabat kwotowy (w walucie eventu) */
+  discountAmount?: number;
+  /** kwota końcowa wpisana ręcznie (zastępuje wyliczenie) */
+  overrideTotal?: number;
+  /** powód / notatka dla organizatora */
+  note?: string;
 }
 
 /** Jeden pokój w komponowanym zgłoszeniu wraz z przypisanymi osobami. */
@@ -169,6 +186,10 @@ export interface PriceResult {
   options: number;
   /** kwota rabatu (>= 0) */
   discount: number;
+  /** ręczna korekta admina: o ile zmieniła kwotę (>= 0 = obniżka; ujemna, gdy kwota ręczna jest wyższa) */
+  manualAdjustment?: number;
+  /** kwota końcowa wpisana ręcznie przez admina */
+  overridden?: boolean;
   /** suma przed rabatem */
   subtotal: number;
   /** kwota do zapłaty */
@@ -276,14 +297,28 @@ export function computePrice(input: PriceInput, config: PricingConfig = DEFAULT_
   const frac = config.discountCodes[code] ?? 0;
   const discount = frac > 0 ? Math.round(subtotal * frac) : 0;
 
+  // Ręczna korekta admina (rabat %, rabat kwotowy albo kwota końcowa).
+  const afterCode = subtotal - discount;
+  const adj = input.options?.adjustment;
+  let total = afterCode;
+  if (adj) {
+    const pct = Math.min(100, Math.max(0, Number(adj.discountPct) || 0));
+    total = total - Math.round((total * pct) / 100) - Math.max(0, Number(adj.discountAmount) || 0);
+    total = Math.max(0, total);
+    if (typeof adj.overrideTotal === 'number' && Number.isFinite(adj.overrideTotal) && adj.overrideTotal >= 0) {
+      total = Math.round(adj.overrideTotal * 100) / 100;
+    }
+  }
+
   return {
     formation,
     accommodation,
     meals,
     options: opts,
     discount,
+    ...(adj ? { manualAdjustment: afterCode - total, overridden: typeof adj.overrideTotal === 'number' } : {}),
     subtotal,
-    total: subtotal - discount,
+    total,
     people,
     withoutRoom: noRoom.length,
     lines,

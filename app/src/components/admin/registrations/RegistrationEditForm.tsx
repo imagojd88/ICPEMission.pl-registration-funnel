@@ -75,28 +75,56 @@ export default function RegistrationEditForm({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Ręczna korekta ceny (np. zgłoszenie sprzed zmian w cenniku, rabat rodzinny, kwota ustalona z gościem).
+  const adj0 = registration.options?.adjustment
+  const [adjPct, setAdjPct] = useState(adj0?.discountPct ? String(adj0.discountPct) : '')
+  const [adjAmount, setAdjAmount] = useState(adj0?.discountAmount ? String(adj0.discountAmount) : '')
+  const [adjOverride, setAdjOverride] = useState(typeof adj0?.overrideTotal === 'number' ? String(adj0.overrideTotal) : '')
+  const [adjNote, setAdjNote] = useState(adj0?.note ?? '')
+  const num = (v: string) => {
+    const n = parseFloat(v.replace(',', '.'))
+    return Number.isFinite(n) && n >= 0 ? n : undefined
+  }
+  const adjustment = (() => {
+    const a: { discountPct?: number; discountAmount?: number; overrideTotal?: number; note?: string } = {}
+    const pct = num(adjPct)
+    if (pct) a.discountPct = Math.min(100, pct)
+    const amt = num(adjAmount)
+    if (amt) a.discountAmount = amt
+    if (adjOverride.trim() !== '' && num(adjOverride) !== undefined) a.overrideTotal = num(adjOverride)
+    if (adjNote.trim()) a.note = adjNote.trim()
+    return Object.keys(a).length ? a : undefined
+  })()
+
   const showTransport = (pricingConfig.options?.transport ?? 0) > 0
   const showBedding = (pricingConfig.options?.bedding ?? 0) > 0
 
-  // Żywa cena
-  const total = useMemo(() => {
+  // Żywa cena (pełny wynik — rozbicie na osoby + korekta)
+  const priced = useMemo(() => {
     // Osoby bez pokoju (nocleg opcjonalny) liczone jako „bez noclegu" — tak samo jak w API.
-    const { input } = funnelPriceInput(
+    const { input, owners } = funnelPriceInput(
       participants.map((p) => ({ type: p.type, age: parseInt(p.age) || 0 })),
       rooms.map((r) => ({
         roomId: r.roomId,
         participantIndexes: r.pids.map((pid) => participants.findIndex((p) => p.id === pid)).filter((i) => i >= 0),
       })),
       pricingConfig,
-      { transport: options.transport, bedding: options.bedding },
+      { transport: options.transport, bedding: options.bedding, ...(adjustment ? { adjustment } : {}) },
       registration.discountCode,
     )
     try {
-      return computePrice(input, pricingConfig).total
+      return { result: computePrice(input, pricingConfig), owners }
     } catch {
-      return 0
+      return null
     }
-  }, [rooms, participants, options, pricingConfig, registration.discountCode])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rooms, participants, options, pricingConfig, registration.discountCode, JSON.stringify(adjustment)])
+  const total = priced?.result.total ?? 0
+  const lineFor = (pIdx: number) => {
+    if (!priced) return undefined
+    const li = priced.owners.indexOf(pIdx)
+    return li >= 0 ? priced.result.lines[li] : undefined
+  }
 
   // ── Uczestnicy ──────────────────────────────────────────────
   const addParticipant = () =>
@@ -165,7 +193,7 @@ export default function RegistrationEditForm({
             participantIndexes: r.pids.map((pid) => participants.findIndex((p) => p.id === pid)).filter((i) => i >= 0),
           }))
           .filter((r) => r.participantIndexes.length > 0),
-        options,
+        options: { ...options, ...(adjustment ? { adjustment } : {}) },
         discountCode: registration.discountCode,
         dietaryNotes: dietaryNotes.trim() || null,
         roomsReserved,
@@ -313,6 +341,74 @@ export default function RegistrationEditForm({
                   <input type="checkbox" checked={options.bedding} onChange={(e) => setOptions({ ...options, bedding: e.target.checked })} className="accent-[var(--brand)] w-4 h-4" /> Pościel
                 </label>
               )}
+            </section>
+          )}
+
+          {/* Cena — rozbicie i ręczna korekta */}
+          {!pricingConfig.free && priced && (
+            <section className="flex flex-col gap-2">
+              <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--faint)' }}>Cena</p>
+              <div className="rounded-[12px] overflow-hidden text-sm" style={{ border: '1px solid var(--border)', background: 'var(--surface)' }}>
+                {participants.map((p, i) => {
+                  const l = lineFor(i)
+                  return (
+                    <div key={p.id} className="flex items-start justify-between gap-3 px-3 py-2" style={{ borderTop: i ? '1px solid var(--border)' : 'none' }}>
+                      <div className="flex flex-col">
+                        <span style={{ color: 'var(--ink)' }}>
+                          {p.firstName.trim() || `Osoba ${i + 1}`}{' '}
+                          <span className="text-xs" style={{ color: 'var(--muted)' }}>
+                            {p.type === 'child' ? `dziecko, ${parseInt(p.age) || 0} l.` : 'dorosły'}
+                          </span>
+                        </span>
+                        {l && (
+                          <span className="text-xs" style={{ color: 'var(--muted)' }}>
+                            formacja {money(l.formation)} · {l.roomId === '' ? 'bez noclegu' : `nocleg ${money(l.accommodation)}`} · wyżywienie {money(l.meals)}
+                          </span>
+                        )}
+                      </div>
+                      <span className="font-semibold whitespace-nowrap" style={{ color: 'var(--ink)' }}>{money(l?.total ?? 0)}</span>
+                    </div>
+                  )
+                })}
+                {priced.result.options > 0 && (
+                  <div className="flex justify-between px-3 py-2" style={{ borderTop: '1px solid var(--border)', color: 'var(--muted)' }}>
+                    <span>Opcje</span><span>{money(priced.result.options)}</span>
+                  </div>
+                )}
+                {priced.result.discount > 0 && (
+                  <div className="flex justify-between px-3 py-2" style={{ borderTop: '1px solid var(--border)', color: 'var(--muted)' }}>
+                    <span>Kod rabatowy {registration.discountCode}</span><span>−{money(priced.result.discount)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between px-3 py-2" style={{ borderTop: '1px solid var(--border)', color: 'var(--muted)' }}>
+                  <span>Wg cennika</span><span>{money(priced.result.subtotal - priced.result.discount)}</span>
+                </div>
+              </div>
+              <p className="text-xs" style={{ color: 'var(--muted)' }}>
+                Cena liczy się z aktualnego cennika eventu (zniżki dziecięce, pokoje). Jeśli trzeba inaczej — korekta:
+              </p>
+              <div className="flex items-center gap-2 flex-wrap text-sm" style={{ color: 'var(--ink)' }}>
+                <span>Rabat</span>
+                <input value={adjPct} onChange={(e) => setAdjPct(e.target.value.replace(/[^\d.,]/g, ''))} inputMode="decimal" placeholder="0" className={inputCls} style={{ ...inputStyle, width: 64 }} aria-label="Rabat w %" />
+                <span>%</span>
+                <span style={{ color: 'var(--faint)' }}>i/lub</span>
+                <input value={adjAmount} onChange={(e) => setAdjAmount(e.target.value.replace(/[^\d.,]/g, ''))} inputMode="decimal" placeholder="0" className={inputCls} style={{ ...inputStyle, width: 80 }} aria-label="Rabat kwotowy" />
+                <span>{pricingConfig.currency && pricingConfig.currency !== 'PLN' ? pricingConfig.currency : 'zł'}</span>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap text-sm" style={{ color: 'var(--ink)' }}>
+                <span>albo kwota końcowa</span>
+                <input value={adjOverride} onChange={(e) => setAdjOverride(e.target.value.replace(/[^\d.,]/g, ''))} inputMode="decimal" placeholder="—" className={inputCls} style={{ ...inputStyle, width: 96 }} aria-label="Kwota końcowa" />
+                <span>{pricingConfig.currency && pricingConfig.currency !== 'PLN' ? pricingConfig.currency : 'zł'}</span>
+                <span className="text-xs" style={{ color: 'var(--faint)' }}>(zastępuje wyliczenie)</span>
+              </div>
+              <input value={adjNote} onChange={(e) => setAdjNote(e.target.value)} placeholder="Powód korekty, np. rabat rodzinny, zgłoszenie sprzed zmian w cenniku" className={inputCls} style={inputStyle} />
+              <div className="flex justify-between text-sm font-semibold px-1" style={{ color: 'var(--ink)' }}>
+                <span>Do zapłaty{priced.result.overridden ? ' (kwota ręczna)' : priced.result.manualAdjustment ? ` (rabat −${money(priced.result.manualAdjustment)})` : ''}</span>
+                <span>{money(total)}</span>
+              </div>
+              <p className="text-xs" style={{ color: 'var(--faint)' }}>
+                Zapisana teraz w zgłoszeniu: {money(registration.totalPrice)}. Korekta zostaje przy zgłoszeniu — także gdy gość później zmieni nocleg.
+              </p>
             </section>
           )}
 

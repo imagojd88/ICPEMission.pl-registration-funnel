@@ -7,11 +7,34 @@ import { buildIcs, googleCalendarUrl } from '../shared';
 import { CreateRegistrationDto } from './dto/create-registration.dto';
 import { v4 as uuid } from 'uuid';
 import { guestInviteConfig, guestInvitePageLink, publicAppUrl } from '../invitations/guest-invite-config';
-import { buildPriceInput, hasAccommodation, roomLabel, leaderDepositSplit, PricingConfig } from '../shared';
+import { buildPriceInput, hasAccommodation, roomLabel, leaderDepositSplit, PricingConfig, PriceAdjustment } from '../shared';
 import type { MailAccommodation } from '../notifications/notifications.service';
 import { assertRoomStock, instanceRoomAvailability } from './room-stock';
 
 type RoomsInput = Array<{ roomId: string; participantIndexes: number[] }>;
+
+/** Ręczna korekta ceny od admina — tylko znane pola, liczby nieujemne; null = brak korekty. */
+function cleanAdjustment(raw: unknown): PriceAdjustment | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const a = raw as Record<string, unknown>;
+  const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : undefined);
+  const out: PriceAdjustment = {};
+  const pct = num(a.discountPct);
+  if (pct) out.discountPct = Math.min(100, pct);
+  const amt = num(a.discountAmount);
+  if (amt) out.discountAmount = amt;
+  const ov = num(a.overrideTotal);
+  if (ov !== undefined && a.overrideTotal !== null) out.overrideTotal = ov;
+  if (typeof a.note === 'string' && a.note.trim()) out.note = a.note.trim().slice(0, 500);
+  return Object.keys(out).length ? out : undefined;
+}
+
+/** Opcje z zapisanego zgłoszenia (transport, pościel, ręczna korekta). */
+function storedOptions(optionsJson: unknown): { transport: boolean; bedding: boolean; adjustment?: PriceAdjustment } {
+  const o = (optionsJson ?? {}) as { transport?: boolean; bedding?: boolean; adjustment?: unknown };
+  const adjustment = cleanAdjustment(o.adjustment);
+  return { transport: !!o.transport, bedding: !!o.bedding, ...(adjustment ? { adjustment } : {}) };
+}
 
 /** Link do strony zgłoszenia gościa (zmiana / domówienie noclegu). */
 export function manageRegistrationLink(editToken: string): string {
@@ -128,7 +151,8 @@ export class RegistrationsService {
     const priceInput = buildPriceInput(
       dto.participants.map((p) => ({ type: p.type, age: p.age ?? 0 })),
       rooms,
-      dto.options,
+      // Gość nie może sam ustawić korekty ceny — tylko transport/pościel.
+      { transport: !!dto.options?.transport, bedding: !!dto.options?.bedding },
       dto.discountCode,
     );
 
@@ -144,7 +168,7 @@ export class RegistrationsService {
         contact: dto.contact as object,
         // roomsJson — skład pokoi (nowy model kompozycji); pole dodane do schematu Prisma
         ...(({ roomsJson: rooms as unknown }) as { roomsJson: unknown }),
-        optionsJson: dto.options as unknown,
+        optionsJson: { transport: !!dto.options?.transport, bedding: !!dto.options?.bedding } as unknown,
         discountCode: dto.discountCode,
         dietaryNotes: dto.dietaryNotes,
         totalPrice: priceResult.total,
@@ -241,7 +265,7 @@ export class RegistrationsService {
     contact?: Record<string, unknown>;
     participants: Array<{ type: 'adult' | 'child'; firstName: string; lastName?: string; age?: number; gender?: string; dietary?: string }>;
     rooms: Array<{ roomId: string; participantIndexes: number[] }>;
-    options?: { transport?: boolean; bedding?: boolean };
+    options?: { transport?: boolean; bedding?: boolean; adjustment?: unknown };
     discountCode?: string;
     dietaryNotes?: string | null;
     locale?: string;
@@ -251,13 +275,16 @@ export class RegistrationsService {
     const reg = await this.prisma.registration.findUnique({ where: { id }, include: { instance: { select: { pricingConfig: true } } } });
     if (!reg) throw new NotFoundException('Registration not found');
 
+    // Opcje + ręczna korekta ceny (rabat % / kwotowy / kwota końcowa) — tylko z panelu admina.
+    const adj = cleanAdjustment(dto.options?.adjustment);
+    const adminOptions = { transport: !!dto.options?.transport, bedding: !!dto.options?.bedding, ...(adj ? { adjustment: adj } : {}) };
     // Admin może zostawić osoby bez pokoju (np. ktoś zrezygnował z noclegu) — bez blokady.
     const cfg = ((reg as { instance?: { pricingConfig?: unknown } }).instance?.pricingConfig ?? null) as PricingConfig | null;
     const rooms = normalizeRooms(dto.rooms, dto.participants.length, cfg);
     const priceInput = buildPriceInput(
       dto.participants.map((pp) => ({ type: pp.type, age: pp.age ?? 0 })),
       rooms,
-      { transport: !!dto.options?.transport, bedding: !!dto.options?.bedding },
+      adminOptions,
       dto.discountCode,
     );
     const priceResult = await this.pricing.quote(priceInput, reg.instanceId);
@@ -281,7 +308,7 @@ export class RegistrationsService {
           ...(dto.locale ? { locale: dto.locale } : {}),
           roomsJson: rooms as unknown,
           ...(typeof dto.roomsReserved === 'boolean' ? { roomsReserved: dto.roomsReserved } : {}),
-          optionsJson: (dto.options ?? {}) as unknown,
+          optionsJson: adminOptions as unknown,
           discountCode: dto.discountCode ?? null,
           dietaryNotes: dto.dietaryNotes ?? null,
           totalPrice: priceResult.total,
@@ -350,7 +377,7 @@ export class RegistrationsService {
         age: p.age ?? 0,
       })),
       rooms,
-      options: (reg.optionsJson ?? {}) as { transport?: boolean; bedding?: boolean },
+      options: storedOptions(reg.optionsJson),
       discountCode: reg.discountCode ?? undefined,
       totalPrice: parseFloat(reg.totalPrice.toString()),
       currency: reg.currency,
@@ -389,9 +416,9 @@ export class RegistrationsService {
       await assertRoomStock(this.prisma, reg.instanceId, cfg, rooms, reg.id);
     }
     const people = reg.participants.map((p: { type: string; age: number | null }) => ({ type: (p.type === 'ADULT' ? 'adult' : 'child') as 'adult' | 'child', age: p.age ?? 0 }));
-    const options = (reg.optionsJson ?? {}) as { transport?: boolean; bedding?: boolean };
+    // Zachowujemy ręczną korektę admina (rabat / kwota ustalona z gościem).
     const priceResult = await this.pricing.quote(
-      buildPriceInput(people, rooms, { transport: !!options.transport, bedding: !!options.bedding }, reg.discountCode ?? undefined),
+      buildPriceInput(people, rooms, storedOptions(reg.optionsJson), reg.discountCode ?? undefined),
       reg.instanceId,
     );
     const before = normalizeRooms((reg.roomsJson ?? []) as RoomsInput, n, null);
@@ -619,7 +646,7 @@ export class RegistrationsService {
       createdAt: iso(reg.createdAt),
       // Do edycji przez admina: pełny skład pokoi + opcje + notatki.
       rooms: (Array.isArray(reg.roomsJson) ? reg.roomsJson : []) as Array<{ roomId: string; participantIndexes: number[] }>,
-      options: (reg.optionsJson ?? {}) as { transport?: boolean; bedding?: boolean },
+      options: storedOptions(reg.optionsJson),
       discountCode: reg.discountCode ?? undefined,
       dietaryNotes: reg.dietaryNotes ?? undefined,
     };

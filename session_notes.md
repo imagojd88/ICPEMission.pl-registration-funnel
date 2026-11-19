@@ -51,6 +51,14 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — panel admina (kreator eventów)
 
+### Edytuj zgłoszenie: rozbicie ceny + ręczny rabat / kwota końcowa (2026-11-19)
+- **Prośba (Jacek):** zgłoszenie Ani Załęskiej (mąż + 3 dzieci) sprzed zmian w cenniku — w edycji brak możliwości nadania właściwej zniżki; „zmień sam albo dodaj edycję stawek i rabatów”. Panel w przeglądarce Claude nie był zalogowany (hasła nie wpisujemy) → zrobione narzędzie, poprawkę Jacek robi sam.
+- **Model:** `PriceOptions.adjustment` (`PriceAdjustment`: `discountPct`, `discountAmount`, `overrideTotal`, `note`) — po kodzie rabatowym: rabat % → rabat kwotowy → (opcjonalnie) kwota końcowa zastępuje wynik; nie poniżej 0. `PriceResult.manualAdjustment`, `overridden`. Zapis w `Registration.optionsJson.adjustment` (bez zmian w bazie). Testy 15/15.
+- **API:** `adminUpdate` czyści i zapisuje korektę (`cleanAdjustment`), gość przy zapisie NIE może jej ustawić (create bierze tylko transport/pościel). Zmiana noclegu przez gościa (`/z/`) zachowuje korektę (`storedOptions`). Kontrakt zgłoszeń i strona `/z/` zwracają `options.adjustment`.
+- **Panel („Edytuj zgłoszenie”):** sekcja „Cena” — rozbicie na osoby (formacja / nocleg albo „bez noclegu” / wyżywienie, kwota osoby wg aktualnego cennika), opcje, kod rabatowy, „Wg cennika”; pola: Rabat %, rabat zł, „albo kwota końcowa”, powód; „Do zapłaty” na żywo + „Zapisana teraz w zgłoszeniu”. Zapis = przeliczenie z aktualnego cennika (to samo przeliczenie naprawia stare zgłoszenia — nawet bez korekty).
+- **Weryfikacja:** tsc ✓, build ✓; Playwright (zamockowane API): rodzina 2 + 3 dzieci (8, 5, 2 lata), progi {do 4: nocleg −100%, wydarzenie 0%}, {do 13: −50%/−50%}, pokój 2-os. „za pokój” → rozbicie poprawne, „Wg cennika” 600 zł; rabat 10% → 540 zł; PATCH `options.adjustment = {discountPct: 10, note: 'rabat rodzinny'}`. 0 błędów JS.
+- Stan: do pushu + **Manual Deploy `icpe-api`** (korektę liczy serwer — bez deployu zapis zignoruje rabat).
+
 ### Płatność: zaliczka u lidera wspólnoty (2026-11-19)
 - **Prośba (Jacek):** opcja płatności „przekaż zaliczkę liderowi (50%)”, włączana w ustawieniach eventu, widoczna TYLKO gdy gość wybierze wspólnotę z sieci ICPE. **Ustalenia:** kwalifikuje się cała lista wspólnot (Polska + ICPE Worldwide), bez „Inna”; reszta (50%) gotówką na miejscu.
 - **Model:** nowa wartość enumu `PaymentMethod.LEADER_DEPOSIT` (Prisma + shared + DTO) — w `paymentMethods` eventu; `pricingConfig.leaderDepositPct` (domyślnie 50); `leaderDepositSplit(total, cfg)` → zaliczka (zaokr.) + reszta. Test 14/14.

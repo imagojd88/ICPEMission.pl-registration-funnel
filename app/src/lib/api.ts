@@ -1175,7 +1175,12 @@ export interface AdminEditRegistrationDto {
   contact?: { firstName: string; lastName: string; email: string; phone?: string }
   participants: Array<{ type: 'adult' | 'child'; firstName: string; lastName?: string; age?: number; gender?: string; dietary?: string }>
   rooms: Array<{ roomId: string; participantIndexes: number[] }>
-  options?: { transport?: boolean; bedding?: boolean }
+  options?: {
+    transport?: boolean
+    bedding?: boolean
+    /** ręczna korekta ceny (rabat %, rabat kwotowy, kwota końcowa, notatka) */
+    adjustment?: { discountPct?: number; discountAmount?: number; overrideTotal?: number; note?: string }
+  }
   discountCode?: string
   dietaryNotes?: string | null
   locale?: string
@@ -1406,7 +1411,7 @@ export interface ManagedRegistration {
   contact: { firstName: string; lastName: string; email: string }
   participants: Array<{ type: 'adult' | 'child'; name: string; age: number }>
   rooms: Array<{ roomId: string; participantIndexes: number[] }>
-  options: { transport?: boolean; bedding?: boolean }
+  options: { transport?: boolean; bedding?: boolean; adjustment?: { discountPct?: number; discountAmount?: number; overrideTotal?: number; note?: string } }
   discountCode?: string
   totalPrice: number
   currency: 'PLN' | 'EUR' | 'USD'

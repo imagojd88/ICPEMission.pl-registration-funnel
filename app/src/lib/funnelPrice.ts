@@ -1,5 +1,5 @@
 import { buildPriceInput, hasAccommodation } from '@icpe/shared'
-import type { PriceInput, PricingConfig } from '@icpe/shared'
+import type { PriceInput, PriceOptions, PricingConfig } from '@icpe/shared'
 
 interface PersonLike {
   type: 'adult' | 'child'
@@ -18,7 +18,7 @@ export function funnelPriceInput(
   participants: PersonLike[],
   rooms: Array<{ roomId: string; participantIndexes: number[] }>,
   cfg: PricingConfig,
-  options?: { transport?: boolean; bedding?: boolean },
+  options?: PriceOptions,
   discountCode?: string,
 ): { input: PriceInput; owners: number[] } {
   const input = buildPriceInput(participants, rooms, options, discountCode)

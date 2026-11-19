@@ -100,7 +100,12 @@ export interface RegistrationDto {
   createdAt: string;
   /** Do edycji przez admina: pełny skład pokoi + opcje + kod rabatowy. */
   rooms?: Array<{ roomId: string; participantIndexes: number[] }>;
-  options?: { transport?: boolean; bedding?: boolean };
+  options?: {
+    transport?: boolean;
+    bedding?: boolean;
+    /** ręczna korekta ceny admina (rabat %, rabat kwotowy, kwota końcowa, notatka) */
+    adjustment?: { discountPct?: number; discountAmount?: number; overrideTotal?: number; note?: string };
+  };
   discountCode?: string;
 }
 

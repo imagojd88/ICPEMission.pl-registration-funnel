@@ -179,3 +179,16 @@ test('zaliczka u lidera: domyślnie 50%, reszta na miejscu', () => {
   assert.deepEqual(leaderDepositSplit(225), { pct: 50, deposit: 113, rest: 112 });
   assert.deepEqual(leaderDepositSplit(200, { leaderDepositPct: 30 }), { pct: 30, deposit: 60, rest: 140 });
 });
+
+test('ręczna korekta admina: rabat %, kwotowy i kwota końcowa', () => {
+  const base = computePrice({ rooms: [], withoutRoom: [{ type: 'adult', age: 30 }, { type: 'adult', age: 30 }] });
+  assert.equal(base.total, 260); // 2 × (50 + 80)
+  const pct = computePrice({ rooms: [], withoutRoom: [{ type: 'adult', age: 30 }, { type: 'adult', age: 30 }], options: { adjustment: { discountPct: 10, discountAmount: 20 } } });
+  assert.equal(pct.total, 260 - 26 - 20);
+  assert.equal(pct.manualAdjustment, 46);
+  const over = computePrice({ rooms: [], withoutRoom: [{ type: 'adult', age: 30 }], options: { adjustment: { discountPct: 50, overrideTotal: 99 } } });
+  assert.equal(over.total, 99);
+  assert.equal(over.overridden, true);
+  const floor = computePrice({ rooms: [], withoutRoom: [{ type: 'adult', age: 30 }], options: { adjustment: { discountAmount: 999 } } });
+  assert.equal(floor.total, 0);
+});
