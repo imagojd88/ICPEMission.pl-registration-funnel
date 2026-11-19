@@ -41,7 +41,12 @@ export function funnelPriceInput(
   return { input, owners }
 }
 
-/** Event ma noclegi do wyboru, ale nie są obowiązkowe. */
+/**
+ * Event ma pokoje do wyboru, ale nocleg nie jest obowiązkowy.
+ * Celowo NIE zależy od liczby nocy: przy „nocleg opcjonalny" + 0 nocy (błąd konfiguracji)
+ * gość i tak musi móc zaznaczyć „Nie potrzebuję noclegu" — inaczej krok pokoju blokuje zapis
+ * (zgłoszenie 19.11.2026, foundation-day-2027).
+ */
 export function isAccommodationOptional(cfg: PricingConfig | null | undefined): boolean {
-  return hasAccommodation(cfg) && !!cfg?.accommodationOptional
+  return !!cfg?.accommodationOptional && (cfg?.rooms?.length ?? 0) > 0
 }

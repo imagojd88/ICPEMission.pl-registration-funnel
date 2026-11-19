@@ -1812,6 +1812,10 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
     if (!state.name) { setSubmitError('Podaj nazwę eventu.'); return }
     if (!state.slug) { setSubmitError('Podaj slug (adres strony).'); return }
     if (!state.dateStart) { setSubmitError('Podaj datę rozpoczęcia.'); return }
+    if (state.optionalStay && !state.noAccommodation && (parseInt(state.nights) || 0) < 1) {
+      setSubmitError('Nocleg opcjonalny wymaga liczby nocy co najmniej 1 (np. nocleg z piątku na sobotę = 1). Przy 0 nocach pokoje kosztują 0 zł.')
+      return
+    }
 
     setSubmitting(true)
     setSubmitError(null)

@@ -373,6 +373,11 @@ export default function EventEditForm({
     if (!Object.keys(titleClean).length) { setError('Podaj nazwę eventu.'); return }
     if (!slug) { setError('Podaj slug (adres strony).'); return }
     if (!dateStart) { setError('Podaj datę rozpoczęcia.'); return }
+    // Nocleg przy 0 nocach: pokoje kosztowałyby 0 zł, a gość nie widziałby wyboru noclegu.
+    if (optionalStay && rooms.length > 0 && (parseInt(nights) || 0) < 1) {
+      setError('Nocleg opcjonalny wymaga liczby nocy co najmniej 1 (np. nocleg z piątku na sobotę = 1). Przy 0 nocach pokoje kosztują 0 zł.')
+      return
+    }
     setSaving(true)
     setError(null)
     try {
