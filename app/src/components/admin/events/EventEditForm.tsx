@@ -379,7 +379,7 @@ export default function EventEditForm({
     if (!dateStart) { setError('Podaj datę rozpoczęcia.'); return }
     // Nocleg przy 0 nocach: pokoje kosztowałyby 0 zł, a gość nie widziałby wyboru noclegu.
     if (optionalStay && rooms.length > 0 && (parseInt(nights) || 0) < 1) {
-      setError('Nocleg opcjonalny wymaga liczby nocy co najmniej 1 (np. nocleg z piątku na sobotę = 1). Przy 0 nocach pokoje kosztują 0 zł.')
+      setError('Nocleg opcjonalny wymaga liczby nocy co najmniej 1 (np. nocleg z piątku na sobotę = 1). Wpisz ją w polu „Liczba nocy” w sekcji Szczegóły (obok „Limit miejsc”) albo w polu pod „Nocleg opcjonalny” w Cenniku. Przy 0 nocach pokoje kosztują 0 zł.')
       return
     }
     setSaving(true)
@@ -662,6 +662,7 @@ export default function EventEditForm({
             onOvernightMeals={setOvernightMeals}
             nights={parseInt(nights) || 0}
             hasRooms={rooms.length > 0}
+            onNights={setNights}
           />
           {rooms.map((r) => (
             <div key={r.id} className="flex flex-col gap-1.5 pb-2" style={{ borderBottom: '1px dashed var(--border)' }}>

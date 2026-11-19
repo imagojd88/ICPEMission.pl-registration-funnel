@@ -10,6 +10,7 @@ export default function OptionalStayFields({
   onOvernightMeals,
   nights,
   hasRooms,
+  onNights,
 }: {
   optional: boolean
   onOptional: (v: boolean) => void
@@ -17,6 +18,8 @@ export default function OptionalStayFields({
   onOvernightMeals: (v: string) => void
   nights: number
   hasRooms: boolean
+  /** Gdy podane — przy 0 nocach pokazujemy pole „Liczba nocy” od razu tutaj (to samo co w Szczegółach). */
+  onNights?: (v: string) => void
 }) {
   return (
     <div
@@ -50,9 +53,22 @@ export default function OptionalStayFields({
             className="w-full rounded-[10px] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
             style={{ border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--ink)', maxWidth: 140 }}
           />
+          {nights < 1 && onNights && (
+            <label className="flex items-center gap-2 text-xs font-medium mt-1" style={{ color: 'var(--warn)' }}>
+              Liczba nocy (teraz 0 — wpisz co najmniej 1):
+              <input
+                defaultValue=""
+                onChange={(e) => onNights(e.target.value.replace(/\D/g, ''))}
+                inputMode="numeric"
+                placeholder="1"
+                className="rounded-[10px] px-3 py-1.5 text-sm"
+                style={{ border: '1.5px solid var(--warn)', background: 'var(--surface)', color: 'var(--ink)', width: 70 }}
+              />
+            </label>
+          )}
           {(nights < 1 || !hasRooms) && (
             <p className="text-xs" style={{ color: 'var(--warn)' }}>
-              Żeby goście widzieli wybór noclegu, ustaw liczbę nocy ≥ 1 i dodaj co najmniej jeden pokój.
+              Żeby goście widzieli wybór noclegu, ustaw liczbę nocy ≥ 1 (pole „Liczba nocy” w sekcji Szczegóły) i dodaj co najmniej jeden pokój.
             </p>
           )}
         </div>
