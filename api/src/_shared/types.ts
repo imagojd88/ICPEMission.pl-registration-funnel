@@ -94,6 +94,8 @@ export interface RegistrationDto {
   /** Zakwaterowanie: numer/nazwa przydzielonego pokoju i komentarz. */
   roomLabel?: string | null;
   roomNote?: string | null;
+  /** Pokoje z puli zarezerwowanej dla gości specjalnych (ustawia admin). */
+  roomsReserved?: boolean;
   createdAt: string;
   /** Do edycji przez admina: pełny skład pokoi + opcje + kod rabatowy. */
   rooms?: Array<{ roomId: string; participantIndexes: number[] }>;

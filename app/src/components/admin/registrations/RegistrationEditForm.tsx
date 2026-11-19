@@ -69,6 +69,9 @@ export default function RegistrationEditForm({
     bedding: !!registration.options?.bedding,
   })
   const [dietaryNotes, setDietaryNotes] = useState(registration.dietaryNotes ?? '')
+  // Pokoje z puli zarezerwowanej dla gości specjalnych (nie zmniejszają puli zapisów publicznych).
+  const [roomsReserved, setRoomsReserved] = useState(!!registration.roomsReserved)
+  const hasReserve = (pricingConfig.rooms ?? []).some((r) => (r.reserved ?? 0) > 0)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -165,6 +168,7 @@ export default function RegistrationEditForm({
         options,
         discountCode: registration.discountCode,
         dietaryNotes: dietaryNotes.trim() || null,
+        roomsReserved,
       })
       onSaved()
     } catch (e: unknown) {
@@ -234,6 +238,17 @@ export default function RegistrationEditForm({
               <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--faint)' }}>
                 Pokoje{isAccommodationOptional(pricingConfig) ? ' (nocleg opcjonalny)' : ''}
               </p>
+              {(hasReserve || roomsReserved) && (
+                <label className="flex items-start gap-2 text-sm rounded-[10px] px-3 py-2 cursor-pointer" style={{ background: roomsReserved ? 'var(--brand-soft)' : 'var(--surface-2)', border: `1px solid ${roomsReserved ? 'var(--brand)' : 'var(--border)'}`, color: 'var(--ink)' }}>
+                  <input type="checkbox" checked={roomsReserved} onChange={(e) => setRoomsReserved(e.target.checked)} className="accent-[var(--brand)] w-4 h-4 mt-0.5" />
+                  <span className="flex flex-col">
+                    Pokoje z rezerwy dla gości specjalnych
+                    <span className="text-xs" style={{ color: 'var(--muted)' }}>
+                      Pokoje tego zgłoszenia liczą się do puli zablokowanej dla gości specjalnych, nie do miejsc w zapisach publicznych. Limit nie blokuje zapisu przez admina.
+                    </span>
+                  </span>
+                </label>
+              )}
               {isAccommodationOptional(pricingConfig) && (
                 <p className="text-xs -mt-1" style={{ color: 'var(--muted)' }}>
                   {(() => {

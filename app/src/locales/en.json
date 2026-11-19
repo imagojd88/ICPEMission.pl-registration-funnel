@@ -202,7 +202,12 @@
     "no_accommodation_short": "No accommodation",
     "without_room_list": "No accommodation:",
     "add_first": "Choose a room",
-    "err_choose": "Tick “I don’t need accommodation” or choose a room."
+    "err_choose": "Tick “I don’t need accommodation” or choose a room.",
+    "left_one": "{{count}} room left",
+    "left_other": "{{count}} rooms left",
+    "sold_out": "sold out",
+    "err_sold_out_one": "No “{{name}}” rooms left — please choose another type.",
+    "err_sold_out": "No “{{name}}” rooms left — choose another type or remove a room."
   },
   "options": {
     "title": "Options and consents",

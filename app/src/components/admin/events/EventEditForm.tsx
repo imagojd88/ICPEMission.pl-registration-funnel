@@ -1,3 +1,4 @@
+import RoomStockFields from './RoomStockFields'
 import OptionalStayFields from './OptionalStayFields'
 import { useState, useEffect, type ChangeEvent } from 'react'
 import { Plus, Trash2, Upload, Images } from 'lucide-react'
@@ -32,11 +33,17 @@ type PricingModel = 'os/noc' | 'za pokój' | 'za osobę' | 'dopłata 1-os'
 
 interface RoomRow {
   id: string
+  /** id typu pokoju w zapisanym cenniku — zachowujemy, bo zgłoszenia (roomsJson) wskazują pokoje po id */
+  origId?: string
   name: Record<string, string>
   model: PricingModel
   capacity: string
   price: string
   tag: string
+  /** liczba pokoi tego typu (puste = bez limitu) */
+  stock: string
+  /** ile z nich zablokowanych dla gości specjalnych */
+  reserved: string
 }
 interface BracketRow { id: string; ltAge: string; multiplier: string }
 interface DiscountRow { id: string; code: string; pct: string }
@@ -107,6 +114,8 @@ export default function EventEditForm({
   const [mealsFee, setMealsFee] = useState(String(DEFAULT_PRICING.mealsFee))
   // Nocleg opcjonalny (event dzienny z noclegiem dla przyjezdnych) + posiłki tylko dla nocujących.
   const [optionalStay, setOptionalStay] = useState(false)
+  // Limit pokoi: zajętość z API (publicznie / z rezerwy) i wolne publicznie — do podglądu przy pokojach.
+  const [roomUsage, setRoomUsage] = useState<{ pub: Record<string, number>; res: Record<string, number>; free: Record<string, number> }>({ pub: {}, res: {}, free: {} })
   const [overnightMeals, setOvernightMeals] = useState('0')
   const [transport, setTransport] = useState(String(DEFAULT_PRICING.options.transport))
   const [bedding, setBedding] = useState(String(DEFAULT_PRICING.options.bedding))
@@ -243,13 +252,17 @@ export default function EventEditForm({
         setRooms(
           (pc?.rooms ?? []).map((r, i) => ({
             id: `r-${i}`,
+            origId: String(r.id),
             name: typeof r.name === 'string' ? (r.name ? { pl: r.name } : {}) : (r.name ?? {}),
             model: (r.model as PricingModel) || 'os/noc',
             capacity: String(r.cap ?? 1),
             price: String(r.perPerson ?? 0),
             tag: r.tag || '',
+            stock: r.stock ? String(r.stock) : '',
+            reserved: r.reserved ? String(r.reserved) : '',
           })),
         )
+        setRoomUsage({ pub: cfg.roomUsage ?? {}, res: cfg.roomUsageReserved ?? {}, free: cfg.roomAvailability ?? {} })
         setBrackets(
           (pc?.childBrackets ?? []).map((b, i) => ({
             id: `b-${i}`,
@@ -321,14 +334,31 @@ export default function EventEditForm({
       childBrackets: brackets
         .map((b) => ({ ltAge: parseInt(b.ltAge) || 0, multiplier: parseFloat(b.multiplier) || 0 }))
         .sort((a, b) => a.ltAge - b.ltAge),
-      rooms: rooms.map((r, i) => ({
-        id: String(i + 1),
-        name: cleanMap(r.name),
-        cap: parseInt(r.capacity) || 1,
-        perPerson: parseFloat(r.price) || 0,
-        model: r.model,
-        tag: r.tag || '',
-      })),
+      rooms: (() => {
+        // Id typu pokoju musi zostać stały (zgłoszenia i limit pokoi liczą po id) —
+        // wcześniej numerowane od nowa, więc usunięcie pokoju przesuwało id pozostałych.
+        const used = new Set(rooms.map((r) => r.origId).filter(Boolean) as string[])
+        let next = 1
+        const freshId = () => {
+          while (used.has(String(next))) next++
+          used.add(String(next))
+          return String(next)
+        }
+        return rooms.map((r) => {
+          const stock = parseInt(r.stock) || 0
+          const reserved = Math.min(parseInt(r.reserved) || 0, stock || Infinity)
+          return {
+            id: r.origId ?? freshId(),
+            name: cleanMap(r.name),
+            cap: parseInt(r.capacity) || 1,
+            perPerson: parseFloat(r.price) || 0,
+            model: r.model,
+            tag: r.tag || '',
+            ...(stock > 0 ? { stock } : {}),
+            ...(stock > 0 && reserved > 0 ? { reserved } : {}),
+          }
+        })
+      })(),
       options: { transport: parseFloat(transport) || 0, bedding: parseFloat(bedding) || 0 },
       discountCodes: Object.fromEntries(
         discounts
@@ -621,14 +651,24 @@ export default function EventEditForm({
             hasRooms={rooms.length > 0}
           />
           {rooms.map((r) => (
-            <div key={r.id} className="flex items-center gap-2">
+            <div key={r.id} className="flex flex-col gap-1.5 pb-2" style={{ borderBottom: '1px dashed var(--border)' }}>
+            <div className="flex items-center gap-2">
               <Input value={r.name[editLang] ?? ''} onChange={(e) => setRooms((p) => p.map((x) => x.id === r.id ? { ...x, name: { ...x.name, [editLang]: e.target.value } } : x))} placeholder={srcPh(r.name.pl, multi ? `Nazwa (${LANG_LABEL[editLang]})` : 'Nazwa')} />
               <input value={r.capacity} onChange={(e) => setRooms((p) => p.map((x) => x.id === r.id ? { ...x, capacity: e.target.value } : x))} placeholder="os." inputMode="numeric" className={inputCls} style={{ ...inputStyle, width: 70 }} />
               <input value={r.price} onChange={(e) => setRooms((p) => p.map((x) => x.id === r.id ? { ...x, price: e.target.value } : x))} placeholder="zł/os" inputMode="numeric" className={inputCls} style={{ ...inputStyle, width: 90 }} />
               <button onClick={() => setRooms((p) => p.filter((x) => x.id !== r.id))} className="p-2 rounded-[8px]" style={{ color: 'var(--err)' }}><Trash2 size={15} /></button>
             </div>
+            <RoomStockFields
+              stock={r.stock}
+              reserved={r.reserved}
+              onStock={(v) => setRooms((p) => p.map((x) => (x.id === r.id ? { ...x, stock: v } : x)))}
+              onReserved={(v) => setRooms((p) => p.map((x) => (x.id === r.id ? { ...x, reserved: v } : x)))}
+              usedPublic={r.origId ? roomUsage.pub[r.origId] ?? 0 : 0}
+              usedReserved={r.origId ? roomUsage.res[r.origId] ?? 0 : 0}
+            />
+            </div>
           ))}
-          <Button size="sm" variant="outline" onClick={() => setRooms((p) => [...p, { id: `r-new-${Date.now()}`, name: {}, model: 'os/noc', capacity: '2', price: '80', tag: '' }])}>
+          <Button size="sm" variant="outline" onClick={() => setRooms((p) => [...p, { id: `r-new-${Date.now()}`, name: {}, model: 'os/noc', capacity: '2', price: '80', tag: '', stock: '', reserved: '' }])}>
             <Plus size={14} /> Dodaj pokój
           </Button>
         </div>

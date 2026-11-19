@@ -1,5 +1,7 @@
 import { BadRequestException, Injectable, Logger, NotFoundException, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { instanceRoomStock } from '../registrations/room-stock';
+import type { PricingConfig } from '../shared';
 import {
   toLocalized,
   localizedName,
@@ -153,6 +155,10 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
     return { page, instance };
   }
 
+  private roomStock(instanceId: string, cfg: PricingConfig | null) {
+    return instanceRoomStock(this.prisma, instanceId, cfg);
+  }
+
   async getSlugConfig(slug: string, locale: string) {
     const { page, instance } = await this.findBySlug(slug);
     const seriesType = (page.series as { type?: string }).type ?? 'ONE_TIME';
@@ -171,6 +177,8 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       capacity: instance.capacity,
       paymentMethods: instance.paymentMethods,
       pricingConfig: instance.pricingConfig,
+      // Limit pokoi: wolne pokoje per typ (tylko typy z limitem) + zajętość (dla panelu).
+      ...(await this.roomStock(instance.id, instance.pricingConfig as unknown as PricingConfig | null)),
       roomTypes: (instance.roomTypes as Array<{
         id: string; name: unknown; capacity: number;
         pricingModel: string; price: { toString(): string }; quantity: number;

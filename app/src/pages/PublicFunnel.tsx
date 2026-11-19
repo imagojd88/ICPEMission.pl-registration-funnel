@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useSearchParams } from 'react-router-dom'
 import type { EventInstanceDto, CreateRegistrationDto, RegistrationStatus, PaymentMethod } from '@icpe/shared'
-import { computePrice, DEFAULT_PRICING, validateRoomCapacity, roomLabel, hasAccommodation } from '@icpe/shared'
+import { computePrice, DEFAULT_PRICING, validateRoomCapacity, roomLabel, hasAccommodation, roomStockShortages } from '@icpe/shared'
 import type { PricingConfig } from '@icpe/shared'
 import { getEventBySlug, getEventConfig, createRegistration, registerGuest, getInvitation, pickLang, type EventConfig } from '../lib/api'
 import { funnelPriceInput, isAccommodationOptional } from '../lib/funnelPrice'
@@ -216,6 +216,7 @@ function StepperView({
   onNext,
   error,
   affiliation,
+  roomAvailability,
 }: {
   state: StepperState
   event: EventInstanceDto
@@ -226,6 +227,8 @@ function StepperView({
   onBack: () => void
   onNext: () => void
   error?: string | null
+  /** Limit pokoi: wolne pokoje per typ (brak klucza = bez limitu). */
+  roomAvailability?: Record<string, number>
 }) {
   const renderStep = () => {
     switch (state.step) {
@@ -264,6 +267,7 @@ function StepperView({
             pricingConfig={pricingConfig}
             onChange={(rooms) => onChange({ rooms })}
             noAccommodation={state.noAccommodation}
+            availability={roomAvailability}
             onNoAccommodationChange={(noAccommodation) =>
               onChange(noAccommodation ? { noAccommodation, rooms: [] } : { noAccommodation })
             }
@@ -550,6 +554,12 @@ export default function PublicFunnel() {
       },
       pricingConfig,
     )
+    // Limit pokoi: więcej pokoi danego typu niż wolnych.
+    const short = roomStockShortages(pricingConfig, stepper.rooms, eventConfig?.roomAvailability ?? {})
+    if (short.length) {
+      const def = pricingConfig.rooms.find((x) => x.id === short[0].roomId)
+      return t('room.err_sold_out', { name: def ? roomLabel(def.name, lng) : short[0].roomId })
+    }
     if (!ok) {
       // Komunikaty silnika wyceny są po polsku (wspólne z API) — tu budujemy własne, przetłumaczone.
       for (const r of stepper.rooms) {
@@ -789,6 +799,7 @@ export default function PublicFunnel() {
           onNext={handleStepperNext}
           error={stepError}
           affiliation={affiliation}
+          roomAvailability={eventConfig?.roomAvailability}
         />
       )}
 

@@ -205,7 +205,13 @@
     "no_accommodation_short": "Senza alloggio",
     "without_room_list": "Senza alloggio:",
     "add_first": "Scegli una camera",
-    "err_choose": "Seleziona “Non ho bisogno di alloggio” oppure scegli una camera."
+    "err_choose": "Seleziona “Non ho bisogno di alloggio” oppure scegli una camera.",
+    "left_one": "ne resta {{count}}",
+    "left_many": "ne restano {{count}}",
+    "left_other": "ne restano {{count}}",
+    "sold_out": "esaurito",
+    "err_sold_out_one": "Camere “{{name}}” esaurite — scegli un altro tipo.",
+    "err_sold_out": "Camere “{{name}}” esaurite — scegli un altro tipo o rimuovi una camera."
   },
   "options": {
     "title": "Opzioni e consensi",

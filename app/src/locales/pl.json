@@ -210,7 +210,14 @@
     "no_accommodation_short": "Bez noclegu",
     "without_room_list": "Bez noclegu:",
     "add_first": "Wybierz pokój",
-    "err_choose": "Zaznacz „Nie potrzebuję noclegu” albo wybierz pokój."
+    "err_choose": "Zaznacz „Nie potrzebuję noclegu” albo wybierz pokój.",
+    "left_one": "został {{count}} pokój",
+    "left_few": "zostały {{count}} pokoje",
+    "left_many": "zostało {{count}} pokoi",
+    "left_other": "zostało {{count}} pokoi",
+    "sold_out": "brak wolnych",
+    "err_sold_out_one": "Brak wolnych pokoi typu „{{name}}” — wybierz inny typ.",
+    "err_sold_out": "Brak wolnych pokoi typu „{{name}}” — wybierz inny typ lub usuń pokój."
   },
   "options": {
     "title": "Opcje i zgody",

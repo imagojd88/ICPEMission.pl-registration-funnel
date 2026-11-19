@@ -60,7 +60,10 @@ interface RoomRow {
   model: PricingModel
   capacity: string
   price: string
+  /** liczba pokoi tego typu — limit w zapisach (puste = bez limitu) */
   quantity: string
+  /** ile z nich zablokowanych dla gości specjalnych */
+  reserved?: string
   tag?: string
   /** Tłumaczenia nazwy pokoju (en/it); PL = `name`. */
   nameI18n?: Tr
@@ -342,7 +345,8 @@ function mapEditConfigToState(prev: WizardState, cfg: EventEditConfig, slug: str
     model: (r.model as PricingModel) || 'os/noc',
     capacity: String(r.cap ?? 1),
     price: String(r.perPerson ?? 0),
-    quantity: '1',
+    quantity: r.stock ? String(r.stock) : '',
+    reserved: r.reserved ? String(r.reserved) : '',
     tag: r.tag || '',
   }))
   const ageBrackets: AgeBracketRow[] = (pc?.childBrackets ?? []).map((b, i) => ({
@@ -413,6 +417,11 @@ function buildPricingConfig(state: WizardState): PricingConfig {
     perPerson: parseFloat(r.price) || 0,
     model: r.model,
     tag: r.tag,
+    // Limit pokoi (puste = bez limitu) + rezerwa dla gości specjalnych.
+    ...((parseInt(r.quantity) || 0) > 0 ? { stock: parseInt(r.quantity) } : {}),
+    ...((parseInt(r.quantity) || 0) > 0 && (parseInt(r.reserved ?? '') || 0) > 0
+      ? { reserved: Math.min(parseInt(r.reserved ?? ''), parseInt(r.quantity)) }
+      : {}),
   }))
 
   // Parse age brackets (sort by ltAge ascending)
@@ -961,7 +970,7 @@ function Step2Rooms({ state, update }: { state: WizardState; update: (p: Partial
   function addRoom() {
     if (!state.newRoom.name) return
     const room: RoomRow = { ...state.newRoom, id: Date.now().toString() }
-    update({ rooms: [...state.rooms, room], newRoom: { name: '', model: 'os/noc', capacity: '', price: '', quantity: '', tag: '' } })
+    update({ rooms: [...state.rooms, room], newRoom: { name: '', model: 'os/noc', capacity: '', price: '', quantity: '', reserved: '', tag: '' } })
   }
 
   function removeRoom(id: string) {
@@ -1023,9 +1032,19 @@ function Step2Rooms({ state, update }: { state: WizardState; update: (p: Partial
             type="number"
             value={state.newRoom.quantity}
             onChange={(e) => update({ newRoom: { ...state.newRoom, quantity: e.target.value } })}
-            placeholder="10"
+            placeholder="bez limitu"
           />
         </div>
+        <Input
+          label="W tym zablokowane dla gości specjalnych (opcjonalnie)"
+          type="number"
+          value={state.newRoom.reserved ?? ''}
+          onChange={(e) => update({ newRoom: { ...state.newRoom, reserved: e.target.value } })}
+          placeholder="0"
+        />
+        <p className="text-xs -mt-1" style={{ color: 'var(--faint)' }}>
+          Liczba pokoi = limit w zapisach (puste = bez limitu). Pokoje dla gości specjalnych nie są dostępne w zapisie publicznym — przydzielasz je w panelu („Edytuj zgłoszenie” → „Pokoje z rezerwy”).
+        </p>
         <Input
           label="Tag (opcjonalny)"
           value={state.newRoom.tag ?? ''}
@@ -1049,7 +1068,7 @@ function Step2Rooms({ state, update }: { state: WizardState; update: (p: Partial
           <table className="w-full text-sm" style={{ borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: 'var(--surface-2)', borderBottom: '1px solid var(--border)' }}>
-                {['Nazwa', 'Model', 'Poj.', 'Cena', 'Szt.', ''].map((h) => (
+                {['Nazwa', 'Model', 'Poj.', 'Cena', 'Szt. (rez.)', ''].map((h) => (
                   <th key={h} className="px-3 py-2 text-left text-xs font-semibold" style={{ color: 'var(--faint)' }}>
                     {h}
                   </th>
@@ -1085,7 +1104,9 @@ function Step2Rooms({ state, update }: { state: WizardState; update: (p: Partial
                   <td className="px-3 py-2 text-xs" style={{ color: 'var(--muted)' }}>{r.model}</td>
                   <td className="px-3 py-2" style={{ color: 'var(--ink)' }}>{r.capacity}</td>
                   <td className="px-3 py-2" style={{ color: 'var(--ink)' }}>{r.price} zł</td>
-                  <td className="px-3 py-2" style={{ color: 'var(--ink)' }}>{r.quantity}</td>
+                  <td className="px-3 py-2" style={{ color: 'var(--ink)' }}>
+                    {r.quantity || '∞'}{(parseInt(r.reserved ?? '') || 0) > 0 ? ` (${r.reserved})` : ''}
+                  </td>
                   <td className="px-3 py-2">
                     <button onClick={() => removeRoom(r.id)} className="p-1 hover:text-[var(--err)] transition-colors">
                       <X size={14} style={{ color: 'var(--faint)' }} />
@@ -1712,7 +1733,7 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
     payFree: false,
     currency: 'PLN',
     rooms: [],
-    newRoom: { name: '', model: 'os/noc', capacity: '', price: '', quantity: '', tag: '' },
+    newRoom: { name: '', model: 'os/noc', capacity: '', price: '', quantity: '', reserved: '', tag: '' },
     // Cennik — pola kwotowe startują PUSTE (admin wpisuje sam, bez auto-wypełniania).
     formationFee: '',
     mealsFee: '',

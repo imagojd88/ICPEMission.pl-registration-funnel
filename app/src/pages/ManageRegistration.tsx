@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams } from 'react-router-dom'
 import { Calendar, MapPin } from 'lucide-react'
-import { computePrice, formatMoney, roomLabel } from '@icpe/shared'
+import { computePrice, formatMoney, roomLabel, roomStockShortages } from '@icpe/shared'
 import { getManagedRegistration, pickLang, updateManagedAccommodation, type ManagedRegistration } from '../lib/api'
 import { funnelPriceInput, isAccommodationOptional } from '../lib/funnelPrice'
 import { formatDateRange } from '../lib/utils'
@@ -104,6 +104,11 @@ export default function ManageRegistration() {
   function validate(): string | null {
     if (optional && noAcc) return null
     if (rooms.length === 0) return optional ? t('room.err_choose') : t('room.err_no_room')
+    const short = roomStockShortages(cfg, rooms, reg?.roomAvailability ?? {})
+    if (short.length) {
+      const def = cfg.rooms.find((x) => x.id === short[0].roomId)
+      return t('room.err_sold_out', { name: def ? roomLabel(def.name, lng) : short[0].roomId })
+    }
     for (const r of rooms) {
       const def = cfg.rooms.find((x) => x.id === r.roomId)
       if (!def) continue
@@ -201,6 +206,7 @@ export default function ManageRegistration() {
               pricingConfig={cfg}
               onChange={(r) => { setRooms(r); setMsg(null) }}
               noAccommodation={noAcc}
+              availability={reg.roomAvailability ?? {}}
               onNoAccommodationChange={(v) => { setNoAcc(v); if (v) setRooms([]); setMsg(null) }}
             />
           )}

@@ -274,6 +274,7 @@ model Registration {
   checkedInAt         DateTime?          // obecność: znacznik check-in na miejscu (null = nieobecny)
   roomLabel           String?            // zakwaterowanie: numer/nazwa przydzielonego pokoju
   roomNote            String?            // zakwaterowanie: opcjonalny komentarz
+  roomsReserved       Boolean            @default(false) // pokoje z puli zarezerwowanej dla gości specjalnych (ustawia admin)
   editToken           String             @unique @default(cuid())
   participants        Participant[]
   payments            Payment[]

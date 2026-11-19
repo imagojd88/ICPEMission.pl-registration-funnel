@@ -9,6 +9,7 @@ import { v4 as uuid } from 'uuid';
 import { guestInviteConfig, guestInvitePageLink, publicAppUrl } from '../invitations/guest-invite-config';
 import { buildPriceInput, hasAccommodation, roomLabel, PricingConfig } from '../shared';
 import type { MailAccommodation } from '../notifications/notifications.service';
+import { assertRoomStock, instanceRoomAvailability } from './room-stock';
 
 type RoomsInput = Array<{ roomId: string; participantIndexes: number[] }>;
 
@@ -112,6 +113,8 @@ export class RegistrationsService {
     const n = dto.participants.length;
     const rooms = normalizeRooms(dto.rooms, n, cfg);
     assertRooms(rooms, n, cfg);
+    // Limit pokoi: nie przyjmujemy zgłoszenia na wyczerpany typ pokoju (409).
+    await assertRoomStock(this.prisma, dto.instanceId, cfg, rooms);
     const priceInput = buildPriceInput(
       dto.participants.map((p) => ({ type: p.type, age: p.age ?? 0 })),
       rooms,
@@ -229,6 +232,8 @@ export class RegistrationsService {
     discountCode?: string;
     dietaryNotes?: string | null;
     locale?: string;
+    /** Pokoje z puli zarezerwowanej dla gości specjalnych (nie zmniejszają puli publicznej). */
+    roomsReserved?: boolean;
   }) {
     const reg = await this.prisma.registration.findUnique({ where: { id }, include: { instance: { select: { pricingConfig: true } } } });
     if (!reg) throw new NotFoundException('Registration not found');
@@ -262,6 +267,7 @@ export class RegistrationsService {
           ...(dto.contact ? { contact: { ...((reg.contact ?? {}) as object), ...dto.contact } as object } : {}),
           ...(dto.locale ? { locale: dto.locale } : {}),
           roomsJson: rooms as unknown,
+          ...(typeof dto.roomsReserved === 'boolean' ? { roomsReserved: dto.roomsReserved } : {}),
           optionsJson: (dto.options ?? {}) as unknown,
           discountCode: dto.discountCode ?? null,
           dietaryNotes: dto.dietaryNotes ?? null,
@@ -346,6 +352,11 @@ export class RegistrationsService {
         theme: page?.theme ?? null,
       },
       pricing: cfg,
+      // Wolne pokoje dla TEGO zgłoszenia (jego własne pokoje wracają do puli).
+      // Gość specjalny (pokoje z rezerwy) — bez ograniczeń puli publicznej.
+      roomAvailability: (reg as { roomsReserved?: boolean }).roomsReserved
+        ? {}
+        : await instanceRoomAvailability(this.prisma, reg.instanceId, cfg, reg.id),
       lock: this.accommodationLock(reg, inst, cfg),
     };
   }
@@ -360,6 +371,10 @@ export class RegistrationsService {
     const n = reg.participants.length;
     const rooms = normalizeRooms(dto.rooms, n, cfg);
     assertRooms(rooms, n, cfg);
+    // Gość specjalny (pokoje z rezerwy) nie jest ograniczany pulą publiczną.
+    if (!(reg as { roomsReserved?: boolean }).roomsReserved) {
+      await assertRoomStock(this.prisma, reg.instanceId, cfg, rooms, reg.id);
+    }
     const people = reg.participants.map((p: { type: string; age: number | null }) => ({ type: (p.type === 'ADULT' ? 'adult' : 'child') as 'adult' | 'child', age: p.age ?? 0 }));
     const options = (reg.optionsJson ?? {}) as { transport?: boolean; bedding?: boolean };
     const priceResult = await this.pricing.quote(
@@ -528,6 +543,7 @@ export class RegistrationsService {
       checkedInAt?: Date | null;
       roomLabel?: string | null;
       roomNote?: string | null;
+      roomsReserved?: boolean | null;
       createdAt: Date;
       payments?: Array<{ status: string }>;
       assignments?: Array<{ room?: { label: string } | null }>;
@@ -549,7 +565,7 @@ export class RegistrationsService {
     if (roomNames && roomNames.size > 0 && noRoomCount > 0) {
       summaryParts.push(summaryParts.length ? `bez noclegu: ${noRoomCount} os.` : 'bez noclegu');
     }
-    const roomSummary = summaryParts.join(', ');
+    const roomSummary = summaryParts.join(', ') + (reg.roomsReserved && summaryParts.length ? ' (rezerwa gości specjalnych)' : '');
     return {
       id: reg.id,
       instanceId: reg.instanceId,
@@ -585,6 +601,7 @@ export class RegistrationsService {
       checkedInAt: reg.checkedInAt ? iso(reg.checkedInAt) : null,
       roomLabel: reg.roomLabel ?? null,
       roomNote: reg.roomNote ?? null,
+      roomsReserved: !!reg.roomsReserved,
       createdAt: iso(reg.createdAt),
       // Do edycji przez admina: pełny skład pokoi + opcje + notatki.
       rooms: (Array.isArray(reg.roomsJson) ? reg.roomsJson : []) as Array<{ roomId: string; participantIndexes: number[] }>,

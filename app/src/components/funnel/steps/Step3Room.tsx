@@ -16,6 +16,8 @@ interface Props {
   onNoAccommodationChange?: (v: boolean) => void
   /** Ukryj nagłówek kroku (strona zgłoszenia gościa ma własny). */
   hideTitle?: boolean
+  /** Limit pokoi: wolne pokoje per typ (brak klucza = bez limitu). */
+  availability?: Record<string, number>
 }
 
 let uidCounter = 0
@@ -23,7 +25,7 @@ function newRoomUid() {
   return `room-${++uidCounter}-${Date.now()}`
 }
 
-export default function Step3Room({ rooms, participants, pricingConfig, onChange, noAccommodation = false, onNoAccommodationChange, hideTitle }: Props) {
+export default function Step3Room({ rooms, participants, pricingConfig, onChange, noAccommodation = false, onNoAccommodationChange, hideTitle, availability = {} }: Props) {
   const { t, i18n } = useTranslation()
   const money = (n: number) => formatMoney(n, pricingConfig.currency, i18n.language)
 
@@ -49,17 +51,31 @@ export default function Step3Room({ rooms, participants, pricingConfig, onChange
   // Walidacja pojemności — per pokój (po uid), komunikaty w języku strony.
   // (Silnik `validateRoomCapacity` z @icpe/shared zwraca teksty po polsku — wspólny z API.)
   const roomErrors = new Map<string, string>()
+  // Limit pokoi: kolejne pokoje tego samego typu ponad liczbę wolnych dostają błąd.
+  const takenSoFar: Record<string, number> = {}
   for (const r of rooms) {
     const rt = pricingConfig.rooms.find((x) => x.id === r.roomId)
     if (!rt) continue
     const cnt = r.participantIndexes.filter((idx) => idx >= 0 && idx < participants.length).length
     const name = roomLabel(rt.name, i18n.language)
-    if (cnt === 0) roomErrors.set(r.uid, t('room.err_empty', { name }))
+    takenSoFar[r.roomId] = (takenSoFar[r.roomId] ?? 0) + 1
+    const overStock = r.roomId in availability && takenSoFar[r.roomId] > availability[r.roomId]
+    if (overStock) roomErrors.set(r.uid, t('room.err_sold_out_one', { name }))
+    else if (cnt === 0) roomErrors.set(r.uid, t('room.err_empty', { name }))
     else if (cnt > rt.cap) roomErrors.set(r.uid, t('room.err_over', { name, cap: rt.cap, count: cnt }))
   }
 
+  /** Ile pokoi danego typu zostało, nie licząc pokoju `exceptUid` w tym formularzu (null = bez limitu). */
+  function remainingFor(roomId: string, exceptUid?: string): number | null {
+    if (!(roomId in availability)) return null
+    const mine = rooms.filter((r) => r.roomId === roomId && r.uid !== exceptUid).length
+    return availability[roomId] - mine
+  }
+
   function addRoom() {
-    const defaultRoomId = roomTypes[0]?.id ?? ''
+    // Domyślnie pierwszy typ, który ma jeszcze wolne pokoje.
+    const defaultRoomId =
+      roomTypes.find((rt) => { const left = remainingFor(rt.id); return left === null || left > 0 })?.id ?? roomTypes[0]?.id ?? ''
     onChange([...rooms, { uid: newRoomUid(), roomId: defaultRoomId, participantIndexes: [] }])
   }
 
@@ -220,11 +236,16 @@ export default function Step3Room({ rooms, participants, pricingConfig, onChange
                   color: 'var(--ink)',
                 }}
               >
-                {roomTypes.map((rt) => (
-                  <option key={rt.id} value={rt.id}>
+                {roomTypes.map((rt) => {
+                  const left = remainingFor(rt.id, room.uid)
+                  const soldOut = left !== null && left <= 0
+                  return (
+                  <option key={rt.id} value={rt.id} disabled={soldOut && rt.id !== room.roomId}>
                     {roomLabel(rt.name, i18n.language)} — {money(rt.perPerson)} {t('room.per_person_night')} · {t('room.max_n', { n: rt.cap })}
+                    {left === null ? '' : soldOut ? ` · ${t('room.sold_out')}` : left <= 5 ? ` · ${t('room.left', { count: left })}` : ''}
                   </option>
-                ))}
+                  )
+                })}
               </select>
             </div>
 

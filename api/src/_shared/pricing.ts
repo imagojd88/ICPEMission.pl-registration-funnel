@@ -35,6 +35,13 @@ export interface RoomTypeDef {
   perPerson: number;
   /** etykieta modelu cenowego (informacyjna) */
   model?: string;
+  /** liczba pokoi tego typu do wynajęcia; brak / 0 = bez limitu */
+  stock?: number;
+  /**
+   * Ile z `stock` jest zablokowanych dla gości specjalnych (niedostępne w publicznym
+   * zapisie; przydziela je admin w panelu — zgłoszenie oznaczone „z rezerwy").
+   */
+  reserved?: number;
   tag?: string;
 }
 
@@ -315,4 +322,51 @@ export function formatMoney(n: number, currency: 'PLN' | 'EUR' | 'USD' = 'PLN', 
   } catch {
     return `${new Intl.NumberFormat(locale).format(Math.round(n))} ${currency}`;
   }
+}
+
+/** Ile pokoi każdego typu zajmuje skład pokoi (lista z roomsJson / formularza). */
+export function countRoomsByType(rooms: Array<{ roomId: string; participantIndexes?: unknown }> | null | undefined): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const r of rooms ?? []) {
+    if (!r || typeof r.roomId !== 'string') continue;
+    if (Array.isArray(r.participantIndexes) && r.participantIndexes.length === 0) continue;
+    out[r.roomId] = (out[r.roomId] ?? 0) + 1;
+  }
+  return out;
+}
+
+/**
+ * Wolne pokoje per typ dla zapisu publicznego:
+ *   stock − max(rezerwa, zajęte z rezerwy) − zajęte publicznie.
+ * Goście specjalni najpierw zużywają rezerwę; ponad nią — pulę publiczną.
+ * Tylko typy z limitem (stock > 0); typ bez limitu nie występuje w wyniku.
+ */
+export function roomAvailability(
+  config: PricingConfig | null | undefined,
+  used: Record<string, number>,
+  usedReserved: Record<string, number> = {},
+): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const r of config?.rooms ?? []) {
+    const stock = Number(r.stock ?? 0);
+    if (stock <= 0) continue;
+    const reserve = Math.min(stock, Math.max(0, Number(r.reserved ?? 0)));
+    out[r.id] = Math.max(0, stock - Math.max(reserve, usedReserved[r.id] ?? 0) - (used[r.id] ?? 0));
+  }
+  return out;
+}
+
+/** Typy pokoi, których w zgłoszeniu jest więcej niż wolnych (puste = OK). */
+export function roomStockShortages(
+  config: PricingConfig | null | undefined,
+  requested: Array<{ roomId: string; participantIndexes?: unknown }>,
+  available: Record<string, number>,
+): Array<{ roomId: string; requested: number; available: number }> {
+  const want = countRoomsByType(requested);
+  const out: Array<{ roomId: string; requested: number; available: number }> = [];
+  for (const [roomId, n] of Object.entries(want)) {
+    if (!(roomId in available)) continue;
+    if (n > available[roomId]) out.push({ roomId, requested: n, available: available[roomId] });
+  }
+  return out;
 }

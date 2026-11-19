@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { computePrice, validateRoomCapacity, buildPriceInput, DEFAULT_PRICING, type PricingConfig } from './pricing.ts';
+import { computePrice, validateRoomCapacity, buildPriceInput, countRoomsByType, roomAvailability, roomStockShortages, DEFAULT_PRICING, type PricingConfig } from './pricing.ts';
 
 test('ojciec + dziecko 8 + maluch 2 w pokoju 2-os. (1 noc)', () => {
   const r = computePrice({
@@ -105,4 +105,32 @@ test('buildPriceInput: bez pokoi wszyscy trafiają do withoutRoom, duplikaty ind
 test('waluta wyniku = waluta eventu', () => {
   const r = computePrice({ rooms: [], withoutRoom: [{ type: 'adult', age: 30 }] }, { ...DEFAULT_PRICING, currency: 'EUR' });
   assert.equal(r.currency, 'EUR');
+});
+
+test('limit pokoi: wolne = stock − zajęte, typ bez limitu pomijany, braki wykrywane', () => {
+  const cfg: PricingConfig = {
+    ...DEFAULT_PRICING,
+    rooms: DEFAULT_PRICING.rooms.map((r) => (r.id === 'double' ? { ...r, stock: 3 } : r.id === 'single' ? { ...r, stock: 1 } : r)),
+  };
+  const used = countRoomsByType([
+    { roomId: 'double', participantIndexes: [0, 1] },
+    { roomId: 'double', participantIndexes: [0] },
+    { roomId: 'single', participantIndexes: [] }, // pusty pokój się nie liczy
+  ]);
+  assert.deepEqual(used, { double: 2 });
+  const av = roomAvailability(cfg, used);
+  assert.deepEqual(av, { double: 1, single: 1 });
+  assert.deepEqual(roomStockShortages(cfg, [{ roomId: 'double', participantIndexes: [0] }], av), []);
+  assert.deepEqual(roomStockShortages(cfg, [{ roomId: 'double', participantIndexes: [0] }, { roomId: 'double', participantIndexes: [1] }, { roomId: 'family', participantIndexes: [2] }], av), [
+    { roomId: 'double', requested: 2, available: 1 },
+  ]);
+});
+
+test('rezerwa dla gości specjalnych: zdejmowana z puli publicznej, zużywana najpierw przez gości specjalnych', () => {
+  const cfg: PricingConfig = { ...DEFAULT_PRICING, rooms: [{ ...DEFAULT_PRICING.rooms[0], stock: 10, reserved: 2 }] };
+  const id = cfg.rooms[0].id;
+  assert.deepEqual(roomAvailability(cfg, { [id]: 5 }), { [id]: 3 }); // 10 − 2 − 5
+  assert.deepEqual(roomAvailability(cfg, { [id]: 5 }, { [id]: 1 }), { [id]: 3 }); // gość specjalny w rezerwie
+  assert.deepEqual(roomAvailability(cfg, { [id]: 5 }, { [id]: 4 }), { [id]: 1 }); // ponad rezerwę → z puli
+  assert.deepEqual(roomAvailability(cfg, { [id]: 9 }), { [id]: 0 }); // nigdy poniżej zera
 });

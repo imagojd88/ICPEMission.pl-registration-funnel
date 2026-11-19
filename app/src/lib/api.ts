@@ -474,6 +474,8 @@ export interface EventConfig {
   theme?: EventTheme
   paymentInfo?: { recipient?: string; account?: string }
   customFields?: EventContent
+  /** Limit pokoi: wolne pokoje per typ (tylko typy z limitem; brak klucza = bez limitu). */
+  roomAvailability?: Record<string, number>
 }
 
 export async function getEventConfig(slug: string, locale = 'pl'): Promise<EventConfig> {
@@ -489,6 +491,7 @@ export async function getEventConfig(slug: string, locale = 'pl'): Promise<Event
       theme: raw.theme as EventTheme | undefined,
       paymentInfo: raw.paymentInfo as { recipient?: string; account?: string } | undefined,
       customFields: raw.customFields as EventContent | undefined,
+      roomAvailability: (raw.roomAvailability as Record<string, number> | undefined) ?? {},
     }
   } catch {
     return {
@@ -1174,6 +1177,8 @@ export interface AdminEditRegistrationDto {
   discountCode?: string
   dietaryNotes?: string | null
   locale?: string
+  /** Pokoje z puli zarezerwowanej dla gości specjalnych. */
+  roomsReserved?: boolean
 }
 export async function adminUpdateRegistration(
   id: string,
@@ -1270,6 +1275,10 @@ export interface EventEditConfig {
   capacity?: number | null
   paymentMethods: string[]
   pricingConfig: PricingConfig
+  /** Limit pokoi: wolne publicznie / zajęte publicznie / zajęte z rezerwy (tylko typy z limitem). */
+  roomAvailability?: Record<string, number>
+  roomUsage?: Record<string, number>
+  roomUsageReserved?: Record<string, number>
   enabledFields?: Record<string, boolean>
   locales: string[]
   theme?: { primaryColor?: string; heroImageUrl?: string; titleColor?: string; badge?: string; supertitle?: LangText }
@@ -1410,6 +1419,8 @@ export interface ManagedRegistration {
     theme: Record<string, unknown> | null
   }
   pricing: PricingConfig | null
+  /** Wolne pokoje dla tego zgłoszenia (jego pokoje wliczone w pulę). */
+  roomAvailability?: Record<string, number>
   lock: ManageLock
 }
 
