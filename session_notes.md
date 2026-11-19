@@ -51,6 +51,12 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — panel admina (kreator eventów)
 
+### Zniżki dzieci: trzy osobne pola — nocleg / opłata formacyjna / wyżywienie (2026-11-19)
+- **Zasada Jacka (foundation-day-2027):** dzieci do 3 lat włącznie: nocleg gratis, obiady bez zniżki, opłata formacyjna −50% → próg „do 4 lat · nocleg −100% · formacja −50% · wyżywienie −0%”.
+- **Model:** `AgeBracket.mealsMultiplier?` (wyżywienie dzienne); `eventMultiplier` = teraz opłata formacyjna (dla wyżywienia tylko, gdy brak `mealsMultiplier` — progi zapisane w poprzedniej wersji liczą się bez zmian). Posiłki dla nocujących dalej wg zniżki na nocleg. Test 16/16.
+- **Panel (`AgeDiscountsEditor`):** kolumny „nocleg −%”, „formacja −%”, „wyżywienie −%”. Oba ostatnie puste = dotychczasowe zasady; wypełnione jedno → puste drugie = 0%. Test panelu: stary próg (tylko eventMultiplier 0.5) wczytuje się jako formacja 50 / wyżywienie 50; zapis „do 4 / 100 / 50 / puste” → `{ltAge 4, multiplier 0, eventMultiplier 0.5, mealsMultiplier 1}`.
+- Stan: do pushu + **Manual Deploy `icpe-api`**.
+
 ### Edytuj zgłoszenie: rozbicie ceny + ręczny rabat / kwota końcowa (2026-11-19)
 - **Prośba (Jacek):** zgłoszenie Ani Załęskiej (mąż + 3 dzieci) sprzed zmian w cenniku — w edycji brak możliwości nadania właściwej zniżki; „zmień sam albo dodaj edycję stawek i rabatów”. Panel w przeglądarce Claude nie był zalogowany (hasła nie wpisujemy) → zrobione narzędzie, poprawkę Jacek robi sam.
 - **Model:** `PriceOptions.adjustment` (`PriceAdjustment`: `discountPct`, `discountAmount`, `overrideTotal`, `note`) — po kodzie rabatowym: rabat % → rabat kwotowy → (opcjonalnie) kwota końcowa zastępuje wynik; nie poniżej 0. `PriceResult.manualAdjustment`, `overridden`. Zapis w `Registration.optionsJson.adjustment` (bez zmian w bazie). Testy 15/15.

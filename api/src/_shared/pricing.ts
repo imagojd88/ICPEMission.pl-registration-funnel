@@ -63,10 +63,13 @@ export interface AgeBracket {
    */
   multiplier: number;
   /**
-   * Mnożnik WYDARZENIA (opłata formacyjna + wyżywienie dzienne), np. 1 = pełna cena, 0.5 = −50%.
+   * Mnożnik OPŁATY FORMACYJNEJ, np. 1 = pełna, 0.5 = −50%. (Wcześniej także wyżywienia —
+   * obowiązuje dla wyżywienia, gdy brak `mealsMultiplier`.)
    * Brak = dotychczasowe zasady (opłata formacyjna pełna, 0 tylko przy multiplier 0; wyżywienie × multiplier).
    */
   eventMultiplier?: number;
+  /** Mnożnik WYŻYWIENIA dziennego (obiady itp.), np. 1 = bez zniżki. Brak = jak `eventMultiplier`. */
+  mealsMultiplier?: number;
 }
 
 export interface PricingConfig {
@@ -227,7 +230,8 @@ function personFactors(p: PricedParticipant, config: PricingConfig): { stay: num
   const b = ageBracketFor(p, config.childBrackets);
   const stay = b ? b.multiplier : 1;
   if (b && typeof b.eventMultiplier === 'number') {
-    return { stay, formation: config.formationFee * b.eventMultiplier, dayMeals: b.eventMultiplier };
+    const meals = typeof b.mealsMultiplier === 'number' ? b.mealsMultiplier : b.eventMultiplier;
+    return { stay, formation: config.formationFee * b.eventMultiplier, dayMeals: meals };
   }
   // Dotychczasowe zasady: próg „gratis" (mnożnik 0) zeruje całą cenę osoby.
   return { stay, formation: stay === 0 ? 0 : config.formationFee, dayMeals: stay };

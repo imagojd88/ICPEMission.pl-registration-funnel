@@ -2,11 +2,12 @@ import { Plus, Trash2 } from 'lucide-react'
 import type { AgeBracket } from '@icpe/shared'
 
 /**
- * Zniżki wiekowe dla dzieci — osobno na NOCLEG i na samo WYDARZENIE (kreator i „Edytuj event").
+ * Zniżki wiekowe dla dzieci — osobno: NOCLEG, OPŁATA FORMACYJNA, WYŻYWIENIE (kreator i „Edytuj event").
  *  - Nocleg = pokój liczony za osobę + posiłki tylko dla nocujących (`AgeBracket.multiplier`).
- *  - Wydarzenie = opłata formacyjna + wyżywienie dzienne (`AgeBracket.eventMultiplier`).
+ *  - Opłata formacyjna (`AgeBracket.eventMultiplier`), wyżywienie dzienne (`AgeBracket.mealsMultiplier`).
  * W formularzu wpisuje się % zniżki (0–100); w cenniku zapisuje się mnożnik (1 − %/100).
- * Puste „na wydarzenie" = dotychczasowe zasady (brak `eventMultiplier`) — stare eventy liczą się bez zmian.
+ * Puste OBA pola (formacja i wyżywienie) = dotychczasowe zasady — stare eventy liczą się bez zmian;
+ * gdy wypełnione jest choć jedno, puste drugie = bez zniżki (0%).
  */
 export interface AgeDiscountRow {
   id: string
@@ -14,8 +15,10 @@ export interface AgeDiscountRow {
   ltAge: string
   /** % zniżki na nocleg */
   stayPct: string
-  /** % zniżki na wydarzenie; '' = dotychczasowe zasady */
+  /** % zniżki na opłatę formacyjną; '' (razem z mealsPct '') = dotychczasowe zasady */
   eventPct: string
+  /** % zniżki na wyżywienie dzienne */
+  mealsPct: string
 }
 
 const pct = (mult: number) => String(Math.round((1 - mult) * 100))
@@ -27,6 +30,10 @@ export function rowsFromBrackets(brackets: AgeBracket[] | undefined, idPrefix = 
     ltAge: String(b.ltAge),
     stayPct: pct(b.multiplier),
     eventPct: typeof b.eventMultiplier === 'number' ? pct(b.eventMultiplier) : '',
+    mealsPct:
+      typeof b.mealsMultiplier === 'number'
+        ? pct(b.mealsMultiplier)
+        : typeof b.eventMultiplier === 'number' ? pct(b.eventMultiplier) : '',
   }))
 }
 
@@ -34,7 +41,10 @@ export function bracketsFromRows(rows: AgeDiscountRow[]): AgeBracket[] {
   return rows
     .map((r) => {
       const b: AgeBracket = { ltAge: parseInt(r.ltAge) || 0, multiplier: mult(r.stayPct) }
-      if (r.eventPct.trim() !== '') b.eventMultiplier = mult(r.eventPct)
+      if (r.eventPct.trim() !== '' || r.mealsPct.trim() !== '') {
+        b.eventMultiplier = mult(r.eventPct)
+        b.mealsMultiplier = mult(r.mealsPct)
+      }
       return b
     })
     .filter((b) => b.ltAge > 0)
@@ -67,8 +77,8 @@ export default function AgeDiscountsEditor({
   return (
     <div className="flex flex-col gap-2">
       <p className="text-xs" style={{ color: 'var(--muted)' }}>
-        Zniżka w % osobno na <strong>nocleg</strong> (pokój liczony za osobę + posiłki dla nocujących) i na{' '}
-        <strong>wydarzenie</strong> (opłata formacyjna + wyżywienie w dniu wydarzenia). „Do wieku” wyłącznie: 4 = dzieci 0–3 lata.
+        Zniżka w % osobno na <strong>nocleg</strong> (pokój liczony za osobę + posiłki dla nocujących), <strong>opłatę formacyjną</strong> i{' '}
+        <strong>wyżywienie</strong> (obiady w dniu wydarzenia). „Do wieku” wyłącznie: 4 = dzieci 0–3 lata.
         Pokój liczony „za pokój” kosztuje tyle samo bez względu na wiek.
       </p>
       {rows.map((r, i) => (
@@ -80,22 +90,25 @@ export default function AgeDiscountsEditor({
           <span>· nocleg −</span>
           <input value={r.stayPct} onChange={(e) => set(r.id, { stayPct: e.target.value.replace(/[^\d]/g, '') })} inputMode="numeric" className={box} style={{ ...boxStyle, width: 64 }} aria-label="Zniżka na nocleg w %" />
           <span>%</span>
-          <span>· wydarzenie −</span>
-          <input value={r.eventPct} onChange={(e) => set(r.id, { eventPct: e.target.value.replace(/[^\d]/g, '') })} inputMode="numeric" placeholder="jak dotąd" className={box} style={{ ...boxStyle, width: 92 }} aria-label="Zniżka na wydarzenie w %" />
+          <span>· formacja −</span>
+          <input value={r.eventPct} onChange={(e) => set(r.id, { eventPct: e.target.value.replace(/[^\d]/g, '') })} inputMode="numeric" placeholder={r.mealsPct ? '0' : 'jak dotąd'} className={box} style={{ ...boxStyle, width: 80 }} aria-label="Zniżka na opłatę formacyjną w %" />
+          <span>%</span>
+          <span>· wyżywienie −</span>
+          <input value={r.mealsPct} onChange={(e) => set(r.id, { mealsPct: e.target.value.replace(/[^\d]/g, '') })} inputMode="numeric" placeholder={r.eventPct ? '0' : 'jak dotąd'} className={box} style={{ ...boxStyle, width: 80 }} aria-label="Zniżka na wyżywienie w %" />
           <span>%</span>
           <button type="button" onClick={() => onChange(rows.filter((x) => x.id !== r.id))} className="p-2 rounded-[8px]" style={{ color: 'var(--err)', background: 'none', border: 'none', cursor: 'pointer' }} aria-label="Usuń próg">
             <Trash2 size={15} />
           </button>
         </div>
       ))}
-      {rows.some((r) => r.eventPct.trim() === '') && (
+      {rows.some((r) => r.eventPct.trim() === '' && r.mealsPct.trim() === '') && (
         <p className="text-xs" style={{ color: 'var(--faint)' }}>
-          Puste „wydarzenie” = dotychczasowe zasady: opłata formacyjna pełna (0 zł tylko przy 100% zniżki na nocleg), wyżywienie ze zniżką jak nocleg.
+          Puste „formacja” i „wyżywienie” = dotychczasowe zasady: opłata formacyjna pełna (0 zł tylko przy 100% zniżki na nocleg), wyżywienie ze zniżką jak nocleg.
         </p>
       )}
       <button
         type="button"
-        onClick={() => onChange([...rows, { id: `b-new-${Date.now()}`, ltAge: '', stayPct: '0', eventPct: '0' }])}
+        onClick={() => onChange([...rows, { id: `b-new-${Date.now()}`, ltAge: '', stayPct: '0', eventPct: '0', mealsPct: '0' }])}
         className="self-start flex items-center gap-1.5 text-sm font-semibold rounded-[10px] px-3 py-1.5"
         style={{ border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--ink)', cursor: 'pointer' }}
       >

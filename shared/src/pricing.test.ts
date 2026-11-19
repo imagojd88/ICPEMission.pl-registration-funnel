@@ -192,3 +192,16 @@ test('ręczna korekta admina: rabat %, kwotowy i kwota końcowa', () => {
   const floor = computePrice({ rooms: [], withoutRoom: [{ type: 'adult', age: 30 }], options: { adjustment: { discountAmount: 999 } } });
   assert.equal(floor.total, 0);
 });
+
+test('trzy zniżki osobno: nocleg −100%, formacja −50%, wyżywienie bez zniżki (dziecko do 3 lat)', () => {
+  const cfg: PricingConfig = {
+    ...DEFAULT_PRICING, formationFee: 50, mealsFee: 50, nights: 1,
+    childBrackets: [{ ltAge: 4, multiplier: 0, eventMultiplier: 0.5, mealsMultiplier: 1 }],
+    rooms: [{ id: 'r', name: 'P', cap: 3, perPerson: 100 }],
+  };
+  const r = computePrice({ rooms: [{ roomId: 'r', participants: [{ type: 'child', age: 3 }] }] }, cfg);
+  assert.equal(r.lines[0].accommodation, 0);
+  assert.equal(r.lines[0].formation, 25);
+  assert.equal(r.lines[0].meals, 50);
+  assert.equal(r.total, 75);
+});
