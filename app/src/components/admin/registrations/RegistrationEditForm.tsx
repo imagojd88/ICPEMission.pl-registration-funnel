@@ -3,6 +3,7 @@ import { X, Plus, Trash2 } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import { computePrice, formatMoney, roomLabel } from '@icpe/shared'
+import { funnelPriceInput, isAccommodationOptional } from '../../../lib/funnelPrice'
 import type { PricingConfig } from '@icpe/shared'
 import type { RegistrationDto } from '@icpe/shared'
 import { adminUpdateRegistration } from '@/lib/api'
@@ -76,17 +77,17 @@ export default function RegistrationEditForm({
 
   // Żywa cena
   const total = useMemo(() => {
-    const input = {
-      rooms: rooms.map((r) => ({
+    // Osoby bez pokoju (nocleg opcjonalny) liczone jako „bez noclegu" — tak samo jak w API.
+    const { input } = funnelPriceInput(
+      participants.map((p) => ({ type: p.type, age: parseInt(p.age) || 0 })),
+      rooms.map((r) => ({
         roomId: r.roomId,
-        participants: r.pids
-          .map((pid) => participants.find((p) => p.id === pid))
-          .filter((p): p is EditParticipant => !!p)
-          .map((p) => ({ type: p.type, age: parseInt(p.age) || 0 })),
+        participantIndexes: r.pids.map((pid) => participants.findIndex((p) => p.id === pid)).filter((i) => i >= 0),
       })),
-      options: { transport: options.transport, bedding: options.bedding },
-      discountCode: registration.discountCode,
-    }
+      pricingConfig,
+      { transport: options.transport, bedding: options.bedding },
+      registration.discountCode,
+    )
     try {
       return computePrice(input, pricingConfig).total
     } catch {
@@ -122,7 +123,8 @@ export default function RegistrationEditForm({
     if (!contact.firstName.trim() || !contact.email.trim()) return 'Podaj imię i e-mail zgłaszającego.'
     if (participants.length === 0) return 'Dodaj przynajmniej jednego uczestnika.'
     if (participants.some((p) => !p.firstName.trim())) return 'Uzupełnij imię każdego uczestnika.'
-    if (roomTypes.length > 0) {
+    // Nocleg opcjonalny: osoby bez pokoju = bez noclegu (dozwolone).
+    if (roomTypes.length > 0 && !isAccommodationOptional(pricingConfig)) {
       const unassigned = participants.filter((p) => !assignedPids.has(p.id))
       if (rooms.length === 0) return 'Dodaj pokój i przypisz do niego uczestników.'
       if (unassigned.length > 0) return `Przypisz wszystkich uczestników do pokoi — brakuje ${unassigned.length}.`
@@ -154,10 +156,12 @@ export default function RegistrationEditForm({
           gender: p.gender || undefined,
           dietary: p.dietary.trim() || undefined,
         })),
-        rooms: rooms.map((r) => ({
-          roomId: r.roomId,
-          participantIndexes: r.pids.map((pid) => participants.findIndex((p) => p.id === pid)).filter((i) => i >= 0),
-        })),
+        rooms: rooms
+          .map((r) => ({
+            roomId: r.roomId,
+            participantIndexes: r.pids.map((pid) => participants.findIndex((p) => p.id === pid)).filter((i) => i >= 0),
+          }))
+          .filter((r) => r.participantIndexes.length > 0),
         options,
         discountCode: registration.discountCode,
         dietaryNotes: dietaryNotes.trim() || null,
@@ -227,7 +231,19 @@ export default function RegistrationEditForm({
           {/* Pokoje */}
           {roomTypes.length > 0 && (
             <section className="flex flex-col gap-3">
-              <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--faint)' }}>Pokoje</p>
+              <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--faint)' }}>
+                Pokoje{isAccommodationOptional(pricingConfig) ? ' (nocleg opcjonalny)' : ''}
+              </p>
+              {isAccommodationOptional(pricingConfig) && (
+                <p className="text-xs -mt-1" style={{ color: 'var(--muted)' }}>
+                  {(() => {
+                    const without = participants.filter((p) => !assignedPids.has(p.id))
+                    return without.length === 0
+                      ? 'Wszyscy z noclegiem.'
+                      : `Bez noclegu: ${without.map((p) => p.firstName.trim() || '—').join(', ')} (płacą formację + wyżywienie).`
+                  })()}
+                </p>
+              )}
               {rooms.map((r, ri) => (
                 <div key={r.uid} className="flex flex-col gap-2 p-3 rounded-[12px]" style={{ border: '1px solid var(--border)', background: 'var(--surface)' }}>
                   <div className="flex items-center gap-2">

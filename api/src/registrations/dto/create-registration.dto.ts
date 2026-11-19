@@ -41,7 +41,8 @@ export class CreateRegistrationDto {
   @ValidateNested() @Type(() => ContactDto) @ApiProperty() contact!: ContactDto;
   @IsArray() @ValidateNested({ each: true }) @Type(() => ParticipantInputDto) @ApiProperty({ type: [ParticipantInputDto] }) participants!: ParticipantInputDto[];
   /** Komponowane pokoje — każdy z typem i listą indeksów uczestników z tablicy participants. */
-  @IsArray() @ArrayNotEmpty() @ValidateNested({ each: true }) @Type(() => RoomCompositionEntryDto) @ApiProperty({ type: [RoomCompositionEntryDto] }) rooms!: RoomCompositionEntryDto[];
+  /** Pusta lista / brak = bez noclegu (dozwolone, gdy event ma nocleg opcjonalny albo nie ma pokoi — sprawdza serwis). */
+  @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => RoomCompositionEntryDto) @ApiProperty({ type: [RoomCompositionEntryDto], required: false }) rooms?: RoomCompositionEntryDto[];
   @IsOptional() @IsString() dietaryNotes?: string;
   @IsOptional() @IsArray() @IsString({ each: true }) dietaryTags?: string[];
   @IsOptional() @ValidateNested() @Type(() => OptionsDto) options?: OptionsDto;
@@ -50,4 +51,9 @@ export class CreateRegistrationDto {
   @ValidateNested() @Type(() => ConsentsDto) @ApiProperty() consents!: ConsentsDto;
   /** Token osobistego zaproszenia (link z maila `/r/:slug?inv=`) — spina zaproszenie ze zgłoszeniem. */
   @IsOptional() @IsString() invitationToken?: string;
+}
+
+/** Zmiana / domówienie noclegu przez gościa (strona zgłoszenia `/z/:token`). */
+export class UpdateAccommodationDto {
+  @IsArray() @ValidateNested({ each: true }) @Type(() => RoomCompositionEntryDto) @ApiProperty({ type: [RoomCompositionEntryDto] }) rooms!: RoomCompositionEntryDto[];
 }

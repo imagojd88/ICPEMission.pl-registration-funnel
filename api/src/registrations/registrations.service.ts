@@ -6,8 +6,67 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { buildIcs, googleCalendarUrl } from '../shared';
 import { CreateRegistrationDto } from './dto/create-registration.dto';
 import { v4 as uuid } from 'uuid';
-import { guestInviteConfig, guestInvitePageLink } from '../invitations/guest-invite-config';
-import { PriceInput } from '../shared';
+import { guestInviteConfig, guestInvitePageLink, publicAppUrl } from '../invitations/guest-invite-config';
+import { buildPriceInput, hasAccommodation, roomLabel, PricingConfig } from '../shared';
+import type { MailAccommodation } from '../notifications/notifications.service';
+
+type RoomsInput = Array<{ roomId: string; participantIndexes: number[] }>;
+
+/** Link do strony zgłoszenia gościa (zmiana / domówienie noclegu). */
+export function manageRegistrationLink(editToken: string): string {
+  return `${publicAppUrl()}/z/${editToken}`;
+}
+
+/**
+ * Czyści skład pokoi: tylko znane typy pokoi, indeksy w zakresie, każda osoba w jednym
+ * pokoju, bez pustych pokoi. Zwraca też, ile osób zostało bez noclegu.
+ */
+function normalizeRooms(rooms: RoomsInput | undefined, n: number, cfg: PricingConfig | null): RoomsInput {
+  const known = new Set((cfg?.rooms ?? []).map((r) => r.id));
+  const used = new Set<number>();
+  const out: RoomsInput = [];
+  for (const r of rooms ?? []) {
+    if (!r || typeof r.roomId !== 'string') continue;
+    if (known.size > 0 && !known.has(r.roomId)) throw new BadRequestException(`Nieznany typ pokoju: ${r.roomId}`);
+    const idx: number[] = [];
+    for (const i of Array.isArray(r.participantIndexes) ? r.participantIndexes : []) {
+      if (!Number.isInteger(i) || i < 0 || i >= n || used.has(i)) continue;
+      used.add(i);
+      idx.push(i);
+    }
+    if (idx.length) out.push({ roomId: r.roomId, participantIndexes: idx });
+  }
+  return out;
+}
+
+/** Walidacja noclegu wg ustawień eventu (nocleg obowiązkowy → każdy w pokoju; pojemność). */
+function assertRooms(rooms: RoomsInput, n: number, cfg: PricingConfig | null) {
+  if (!cfg || !hasAccommodation(cfg)) return;
+  for (const r of rooms) {
+    const def = cfg.rooms.find((x) => x.id === r.roomId);
+    if (def && r.participantIndexes.length > def.cap) {
+      throw new BadRequestException(`Pokój „${roomLabel(def.name)}" mieści maks. ${def.cap} os.`);
+    }
+  }
+  if (!cfg.accommodationOptional) {
+    const assigned = rooms.reduce((s, r) => s + r.participantIndexes.length, 0);
+    if (assigned < n) throw new BadRequestException('Każdy uczestnik musi mieć przypisany pokój.');
+  }
+}
+
+/** Podsumowanie noclegu do maili. */
+export function mailAccommodation(cfg: PricingConfig | null, rooms: RoomsInput, n: number, lng: string): MailAccommodation {
+  const assigned = rooms.reduce((s, r) => s + r.participantIndexes.length, 0);
+  return {
+    offered: hasAccommodation(cfg),
+    nights: cfg?.nights ?? 0,
+    rooms: rooms.map((r) => ({
+      name: roomLabel(cfg?.rooms.find((x) => x.id === r.roomId)?.name ?? r.roomId, lng),
+      people: r.participantIndexes.length,
+    })),
+    withoutRoom: Math.max(0, n - assigned),
+  };
+}
 import {
   mapRegStatus,
   mapPaymentStatus,
@@ -48,18 +107,17 @@ export class RegistrationsService {
       );
     }
 
-    // Buduj PriceInput z nowego modelu kompozycji pokoi
-    const priceInput: PriceInput = {
-      rooms: dto.rooms.map(entry => ({
-        roomId: entry.roomId,
-        participants: entry.participantIndexes.map(i => ({
-          type: dto.participants[i].type,
-          age: dto.participants[i].age ?? 0,
-        })),
-      })),
-      options: dto.options,
-      discountCode: dto.discountCode,
-    };
+    // Pokoje (nocleg) — przy noclegu opcjonalnym osoby bez pokoju płacą formację + wyżywienie.
+    const cfg = (instance.pricingConfig ?? null) as unknown as PricingConfig | null;
+    const n = dto.participants.length;
+    const rooms = normalizeRooms(dto.rooms, n, cfg);
+    assertRooms(rooms, n, cfg);
+    const priceInput = buildPriceInput(
+      dto.participants.map((p) => ({ type: p.type, age: p.age ?? 0 })),
+      rooms,
+      dto.options,
+      dto.discountCode,
+    );
 
     // Cena wiążąca — obliczona server-side na podstawie config eventu (lub DEFAULT_PRICING)
     const priceResult = await this.pricing.quote(priceInput, dto.instanceId);
@@ -72,7 +130,7 @@ export class RegistrationsService {
         locale: dto.locale,
         contact: dto.contact as object,
         // roomsJson — skład pokoi (nowy model kompozycji); pole dodane do schematu Prisma
-        ...(({ roomsJson: dto.rooms as unknown }) as { roomsJson: unknown }),
+        ...(({ roomsJson: rooms as unknown }) as { roomsJson: unknown }),
         optionsJson: dto.options as unknown,
         discountCode: dto.discountCode,
         dietaryNotes: dto.dietaryNotes,
@@ -136,6 +194,8 @@ export class RegistrationsService {
       paymentMethod: dto.paymentMethod,
       editToken,
       guestInviteLink,
+      accommodation: mailAccommodation(cfg, rooms, n, dto.locale),
+      manageLink: hasAccommodation(cfg) ? manageRegistrationLink(editToken) : undefined,
     }).catch(console.error);
 
     // Formacja online: kurs z `grantOn = ANY_ACTIVE` daje dostęp już od zapisu.
@@ -170,20 +230,18 @@ export class RegistrationsService {
     dietaryNotes?: string | null;
     locale?: string;
   }) {
-    const reg = await this.prisma.registration.findUnique({ where: { id } });
+    const reg = await this.prisma.registration.findUnique({ where: { id }, include: { instance: { select: { pricingConfig: true } } } });
     if (!reg) throw new NotFoundException('Registration not found');
 
-    const priceInput: PriceInput = {
-      rooms: dto.rooms.map((entry) => ({
-        roomId: entry.roomId,
-        participants: entry.participantIndexes.map((i) => ({
-          type: dto.participants[i].type,
-          age: dto.participants[i].age ?? 0,
-        })),
-      })),
-      options: { transport: !!dto.options?.transport, bedding: !!dto.options?.bedding },
-      discountCode: dto.discountCode,
-    };
+    // Admin może zostawić osoby bez pokoju (np. ktoś zrezygnował z noclegu) — bez blokady.
+    const cfg = ((reg as { instance?: { pricingConfig?: unknown } }).instance?.pricingConfig ?? null) as PricingConfig | null;
+    const rooms = normalizeRooms(dto.rooms, dto.participants.length, cfg);
+    const priceInput = buildPriceInput(
+      dto.participants.map((pp) => ({ type: pp.type, age: pp.age ?? 0 })),
+      rooms,
+      { transport: !!dto.options?.transport, bedding: !!dto.options?.bedding },
+      dto.discountCode,
+    );
     const priceResult = await this.pricing.quote(priceInput, reg.instanceId);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -203,7 +261,7 @@ export class RegistrationsService {
           // (adres, parafia, wspólnota zostają).
           ...(dto.contact ? { contact: { ...((reg.contact ?? {}) as object), ...dto.contact } as object } : {}),
           ...(dto.locale ? { locale: dto.locale } : {}),
-          roomsJson: dto.rooms as unknown,
+          roomsJson: rooms as unknown,
           optionsJson: (dto.options ?? {}) as unknown,
           discountCode: dto.discountCode ?? null,
           dietaryNotes: dto.dietaryNotes ?? null,
@@ -227,6 +285,122 @@ export class RegistrationsService {
     if (!updated) throw new NotFoundException('Registration not found');
     this.courseAccess.syncRegistrationSafe(id); // mógł się zmienić e-mail
     return { registration: this.mapToDto(updated), summary: priceResult };
+  }
+
+  // ── Strona zgłoszenia gościa (/z/:token): podgląd + zmiana / domówienie noclegu ─────────
+
+  /** Dlaczego gość nie może sam zmienić noclegu (null = może). */
+  private accommodationLock(reg: { status: string }, instance: { status: string; startsAt: Date }, cfg: PricingConfig | null): string | null {
+    if (!hasAccommodation(cfg)) return 'NO_ACCOMMODATION';
+    if (reg.status === 'CANCELLED') return 'CANCELLED';
+    // Opłacone (przelew/online) — zmiana kwoty wymaga rozliczenia z organizatorem.
+    if (reg.status === 'CONFIRMED') return 'PAID';
+    if (instance.status !== 'OPEN') return 'CLOSED';
+    if (instance.startsAt.getTime() <= Date.now()) return 'STARTED';
+    return null;
+  }
+
+  private async loadByToken(token: string) {
+    const reg = await this.prisma.registration.findUnique({
+      where: { editToken: token },
+      include: {
+        participants: { orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] },
+        instance: { include: { series: { include: { page: true } } } },
+      },
+    });
+    if (!reg) throw new NotFoundException('Registration not found');
+    return reg;
+  }
+
+  async getByManageToken(token: string) {
+    const reg = await this.loadByToken(token);
+    const inst = reg.instance;
+    const cfg = (inst.pricingConfig ?? null) as unknown as PricingConfig | null;
+    const page = inst.series?.page as { slug?: string; locales?: unknown; theme?: unknown } | null | undefined;
+    const c = (reg.contact ?? {}) as { firstName?: string; lastName?: string; email?: string };
+    const n = reg.participants.length;
+    const rooms = normalizeRooms((reg.roomsJson ?? []) as RoomsInput, n, null);
+    return {
+      id: reg.id,
+      status: reg.status,
+      locale: reg.locale,
+      contact: { firstName: c.firstName ?? '', lastName: c.lastName ?? '', email: c.email ?? '' },
+      participants: reg.participants.map((p: { type: string; firstName: string; lastName: string | null; age: number | null }) => ({
+        type: p.type === 'ADULT' ? 'adult' : 'child',
+        name: `${p.firstName} ${p.lastName ?? ''}`.trim(),
+        age: p.age ?? 0,
+      })),
+      rooms,
+      options: (reg.optionsJson ?? {}) as { transport?: boolean; bedding?: boolean },
+      discountCode: reg.discountCode ?? undefined,
+      totalPrice: parseFloat(reg.totalPrice.toString()),
+      currency: reg.currency,
+      paymentMethod: reg.paymentMethod ?? undefined,
+      event: {
+        title: inst.title,
+        startsAt: inst.startsAt.toISOString(),
+        endsAt: inst.endsAt?.toISOString() ?? null,
+        location: inst.location ?? null,
+        slug: page?.slug ?? null,
+        locales: page?.locales ?? null,
+        theme: page?.theme ?? null,
+      },
+      pricing: cfg,
+      lock: this.accommodationLock(reg, inst, cfg),
+    };
+  }
+
+  async updateAccommodationByToken(token: string, dto: { rooms: RoomsInput }) {
+    const reg = await this.loadByToken(token);
+    const inst = reg.instance;
+    const cfg = (inst.pricingConfig ?? null) as unknown as PricingConfig | null;
+    const lock = this.accommodationLock(reg, inst, cfg);
+    if (lock) throw new ForbiddenException(`Nocleg nie może być teraz zmieniony (${lock}). Skontaktuj się z organizatorem.`);
+
+    const n = reg.participants.length;
+    const rooms = normalizeRooms(dto.rooms, n, cfg);
+    assertRooms(rooms, n, cfg);
+    const people = reg.participants.map((p: { type: string; age: number | null }) => ({ type: (p.type === 'ADULT' ? 'adult' : 'child') as 'adult' | 'child', age: p.age ?? 0 }));
+    const options = (reg.optionsJson ?? {}) as { transport?: boolean; bedding?: boolean };
+    const priceResult = await this.pricing.quote(
+      buildPriceInput(people, rooms, { transport: !!options.transport, bedding: !!options.bedding }, reg.discountCode ?? undefined),
+      reg.instanceId,
+    );
+    const before = normalizeRooms((reg.roomsJson ?? []) as RoomsInput, n, null);
+    const oldTotal = parseFloat(reg.totalPrice.toString());
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const p: any = this.prisma;
+    await this.prisma.$transaction([
+      p.payment.updateMany({
+        where: { registrationId: reg.id, status: 'PENDING' },
+        data: { amount: priceResult.total, currency: priceResult.currency },
+      }),
+      p.registration.update({
+        where: { id: reg.id },
+        data: { roomsJson: rooms as unknown, totalPrice: priceResult.total, currency: priceResult.currency },
+      }),
+    ]);
+
+    const titleMap = inst.title as Record<string, string>;
+    const c = (reg.contact ?? {}) as { firstName?: string; lastName?: string; email?: string };
+    if (c.email) {
+      this.notifications.sendAccommodationChanged({
+        to: c.email,
+        locale: reg.locale,
+        registrationId: reg.id,
+        eventTitle: titleMap[reg.locale] ?? titleMap.pl ?? 'Event',
+        totalPrice: priceResult.total,
+        oldTotal,
+        currency: priceResult.currency,
+        paymentMethod: reg.paymentMethod ?? 'BANK_TRANSFER',
+        accommodation: mailAccommodation(cfg, rooms, n, reg.locale),
+        before: mailAccommodation(cfg, before, n, 'pl'),
+        manageLink: manageRegistrationLink(reg.editToken),
+        guestName: `${c.firstName ?? ''} ${c.lastName ?? ''}`.trim(),
+      }).catch(console.error);
+    }
+    return this.getByManageToken(token);
   }
 
   async findById(id: string, token?: string) {
@@ -366,6 +540,15 @@ export class RegistrationsService {
     const summaryParts = comp
       .map((rb) => roomNames?.get(String(rb.roomId)) ?? (rb.roomId ? String(rb.roomId) : ''))
       .filter(Boolean);
+    // Event z pokojami (mapa nazw niepusta) → osoby bez pokoju opisujemy jako „bez noclegu".
+    const inRooms = (comp as Array<{ participantIndexes?: unknown }>).reduce(
+      (s, rb) => s + (Array.isArray(rb.participantIndexes) ? rb.participantIndexes.length : 0),
+      0,
+    );
+    const noRoomCount = Math.max(0, reg.participants.length - inRooms);
+    if (roomNames && roomNames.size > 0 && noRoomCount > 0) {
+      summaryParts.push(summaryParts.length ? `bez noclegu: ${noRoomCount} os.` : 'bez noclegu');
+    }
     const roomSummary = summaryParts.join(', ');
     return {
       id: reg.id,
@@ -393,6 +576,8 @@ export class RegistrationsService {
       preferredRoomType: reg.preferredRoomTypeId ?? (roomSummary || undefined),
       assignedRoom: reg.assignments?.[0]?.room?.label ?? (roomSummary || undefined),
       roomSummary: roomSummary || undefined,
+      // Ile osób jest bez noclegu (nocleg opcjonalny) — panel pokazuje „bez noclegu".
+      withoutRoom: noRoomCount,
       totalPrice: num(reg.totalPrice),
       currency: reg.currency || 'EUR',
       paymentMethod: mapPaymentMethod(reg.paymentMethod),

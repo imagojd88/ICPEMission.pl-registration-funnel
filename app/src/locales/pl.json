@@ -25,7 +25,8 @@
     "cta_hint": "Rejestracja zajmuje ok. 3 minuty · prosimy o terminowe zgłoszenia",
     "next_date_title": "Najbliższy termin",
     "notify_me": "Powiadom mnie o zapisach",
-    "closed_desc": "Rejestracja na tę edycję jest już zamknięta. Zapisz się na listę powiadomień, by nie przegapić kolejnej."
+    "closed_desc": "Rejestracja na tę edycję jest już zamknięta. Zapisz się na listę powiadomień, by nie przegapić kolejnej.",
+    "optional_stay": "nocleg opcjonalny"
   },
   "invite": {
     "only_badge": "To jest wydarzenie tylko dla zaproszonych gości",
@@ -200,7 +201,16 @@
     "err_unassigned_one": "Przypisz wszystkich uczestników do pokoi — brakuje {{count}} osoby.",
     "err_unassigned_few": "Przypisz wszystkich uczestników do pokoi — brakuje {{count}} osób.",
     "err_unassigned_many": "Przypisz wszystkich uczestników do pokoi — brakuje {{count}} osób.",
-    "err_unassigned_other": "Przypisz wszystkich uczestników do pokoi — brakuje {{count}} osoby."
+    "err_unassigned_other": "Przypisz wszystkich uczestników do pokoi — brakuje {{count}} osoby.",
+    "title_optional": "Nocleg (opcjonalnie)",
+    "optional_hint": "Nocleg nie jest obowiązkowy — przyda się, jeśli przyjeżdżasz z daleka. Wybierz pokój albo zaznacz, że nie potrzebujesz noclegu. Osoby nieprzypisane do pokoju będą bez noclegu.",
+    "no_accommodation": "Nie potrzebuję noclegu",
+    "no_accommodation_many": "Nie potrzebujemy noclegu",
+    "no_accommodation_desc": "Przyjeżdżam tylko na dzień wydarzenia. Nocleg można domówić później przez link z maila.",
+    "no_accommodation_short": "Bez noclegu",
+    "without_room_list": "Bez noclegu:",
+    "add_first": "Wybierz pokój",
+    "err_choose": "Zaznacz „Nie potrzebuję noclegu” albo wybierz pokój."
   },
   "options": {
     "title": "Opcje i zgody",
@@ -410,5 +420,36 @@
     "parish_ph": "np. Parafia św. Anny w Warszawie",
     "err_required": "Wybierz swoją wspólnotę (jeśli nie ma jej na liście — „Inna”).",
     "err_other": "Wpisz nazwę swojej wspólnoty."
+  },
+  "cash": {
+    "title": "Gotówka do przygotowania",
+    "desc": "Tę kwotę prosimy mieć przy sobie podczas rejestracji na miejscu (najlepiej odliczoną). Wysłaliśmy ją też w mailu."
+  },
+  "manage": {
+    "success_q": "Zmienisz zdanie co do noclegu?",
+    "success_desc": "Nocleg możesz domówić lub zmienić później — link jest też w mailu z potwierdzeniem.",
+    "success_cta": "Zmień nocleg",
+    "tab_title": "Twoje zgłoszenie",
+    "supertitle": "Twoje zgłoszenie",
+    "reg_number": "Numer zgłoszenia",
+    "participants": "Uczestnicy",
+    "accommodation": "Nocleg",
+    "current_total": "Obecna kwota",
+    "new_total": "Nowa kwota",
+    "save": "Zapisz zmianę noclegu",
+    "saving": "Zapisywanie…",
+    "saved": "Zapisano. Potwierdzenie z nową kwotą wysłaliśmy mailem.",
+    "no_changes": "Brak zmian do zapisania.",
+    "save_error": "Nie udało się zapisać zmiany. Spróbuj ponownie lub skontaktuj się z organizatorem.",
+    "not_found": "Nie znaleźliśmy zgłoszenia. Sprawdź link z maila.",
+    "lock_PAID": "Zgłoszenie jest już opłacone — zmianę noclegu ustal z organizatorem.",
+    "lock_CANCELLED": "To zgłoszenie zostało anulowane.",
+    "lock_CLOSED": "Zapisy są zamknięte — zmianę noclegu ustal z organizatorem.",
+    "lock_STARTED": "Wydarzenie już się rozpoczęło — zmianę noclegu ustal z organizatorem.",
+    "lock_NO_ACCOMMODATION": "To wydarzenie nie oferuje noclegów.",
+    "payment_cash": "Płatność gotówką przy rejestracji",
+    "payment_transfer": "Płatność przelewem",
+    "payment_online": "Płatność online",
+    "transfer_note": "Jeśli kwota wzrosła, prosimy dopłacić różnicę przelewem (tytuł: numer zgłoszenia)."
   }
 }

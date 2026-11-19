@@ -4,12 +4,18 @@ import { formatMoney, roomLabel } from '@icpe/shared'
 import type { PricingConfig } from '@icpe/shared'
 import type { Participant, RoomEntry } from '../../../pages/PublicFunnel'
 import { X, Plus } from 'lucide-react'
+import { isAccommodationOptional } from '../../../lib/funnelPrice'
 
 interface Props {
   rooms: RoomEntry[]
   participants: Participant[]
   pricingConfig: PricingConfig
   onChange: (rooms: RoomEntry[]) => void
+  /** Nocleg opcjonalny: zaznaczone „Nie potrzebuję noclegu". */
+  noAccommodation?: boolean
+  onNoAccommodationChange?: (v: boolean) => void
+  /** Ukryj nagłówek kroku (strona zgłoszenia gościa ma własny). */
+  hideTitle?: boolean
 }
 
 let uidCounter = 0
@@ -17,15 +23,18 @@ function newRoomUid() {
   return `room-${++uidCounter}-${Date.now()}`
 }
 
-export default function Step3Room({ rooms, participants, pricingConfig, onChange }: Props) {
+export default function Step3Room({ rooms, participants, pricingConfig, onChange, noAccommodation = false, onNoAccommodationChange, hideTitle }: Props) {
   const { t, i18n } = useTranslation()
   const money = (n: number) => formatMoney(n, pricingConfig.currency, i18n.language)
 
   const roomTypes = pricingConfig.rooms
+  // Nocleg opcjonalny: wybór pokoju nie jest wymagany (checkbox „Nie potrzebuję noclegu").
+  const optional = isAccommodationOptional(pricingConfig)
 
   // Auto-dodaj pierwszy pokój, gdy jeszcze żadnego nie ma (czytelny start doboru pokoju).
+  // Przy noclegu opcjonalnym nie — gość sam decyduje, czy chce nocleg.
   useEffect(() => {
-    if (rooms.length === 0 && roomTypes.length > 0) {
+    if (!optional && rooms.length === 0 && roomTypes.length > 0) {
       onChange([{ uid: newRoomUid(), roomId: roomTypes[0].id, participantIndexes: [] }])
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -79,17 +88,74 @@ export default function Step3Room({ rooms, participants, pricingConfig, onChange
     return `#${idx + 1} ${name}${p.type === 'child' ? ` (${p.age} ${t('participants.age_suffix')})` : ''}`
   }
 
+  const many = participants.length > 1
+
   return (
-    <div className="flex flex-col gap-4 px-[22px] py-5">
-      <h2 className="text-base font-semibold" style={{ color: 'var(--ink)' }}>
-        {t('room.title')}
-      </h2>
-      <p className="text-sm -mt-2" style={{ color: 'var(--muted)' }}>
-        {t('room.assign_hint')}
+    <div className={hideTitle ? 'flex flex-col gap-4' : 'flex flex-col gap-4 px-[22px] py-5'}>
+      {!hideTitle && (
+        <h2 className="text-base font-semibold" style={{ color: 'var(--ink)' }}>
+          {optional ? t('room.title_optional') : t('room.title')}
+        </h2>
+      )}
+      <p className={hideTitle ? 'text-sm' : 'text-sm -mt-2'} style={{ color: 'var(--muted)' }}>
+        {optional ? t('room.optional_hint') : t('room.assign_hint')}
       </p>
 
-      {/* Nieprzypisane osoby */}
-      {unassignedIndexes.length > 0 && (
+      {/* Nocleg opcjonalny: „Nie potrzebuję noclegu" — zaznaczenie czyści wybrane pokoje */}
+      {optional && (
+        <label
+          className="flex items-center gap-3 rounded-[15px] px-4 py-3.5 cursor-pointer"
+          style={{
+            border: noAccommodation ? '1.5px solid var(--brand)' : '1.5px solid var(--border)',
+            background: noAccommodation ? 'var(--brand-soft)' : 'var(--surface)',
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={noAccommodation}
+            onChange={(e) => {
+              onNoAccommodationChange?.(e.target.checked)
+              // Odznaczenie → od razu pusty pokój do wyboru (czytelny start).
+              if (!e.target.checked && rooms.length === 0 && roomTypes.length > 0) {
+                onChange([{ uid: newRoomUid(), roomId: roomTypes[0].id, participantIndexes: [] }])
+              }
+            }}
+            style={{ width: 18, height: 18, accentColor: 'var(--brand)' }}
+          />
+          <span className="flex flex-col">
+            <span className="text-sm font-semibold" style={{ color: noAccommodation ? 'var(--brand)' : 'var(--ink)' }}>
+              {many ? t('room.no_accommodation_many') : t('room.no_accommodation')}
+            </span>
+            <span className="text-xs" style={{ color: 'var(--muted)' }}>
+              {t('room.no_accommodation_desc')}
+            </span>
+          </span>
+        </label>
+      )}
+
+      {optional && noAccommodation ? null : (<>
+
+      {/* Nieprzypisane osoby (przy noclegu opcjonalnym: informacyjnie — „bez noclegu") */}
+      {optional && rooms.length > 0 && unassignedIndexes.length > 0 && (
+        <div
+          className="flex flex-wrap gap-1.5 px-3 py-2.5 rounded-[10px]"
+          style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}
+        >
+          <span className="text-xs font-semibold w-full" style={{ color: 'var(--muted)' }}>
+            {t('room.without_room_list')}
+          </span>
+          {unassignedIndexes.map((idx) => (
+            <span
+              key={idx}
+              className="text-xs px-2 py-0.5 rounded-full font-medium"
+              style={{ background: 'var(--surface-3)', color: 'var(--ink)' }}
+            >
+              {participantLabel(participants[idx], idx)}
+            </span>
+          ))}
+        </div>
+      )}
+      {!optional && unassignedIndexes.length > 0 && (
         <div
           className="flex flex-wrap gap-1.5 px-3 py-2.5 rounded-[10px]"
           style={{ background: 'var(--err-soft)', border: '1px solid var(--err)' }}
@@ -273,8 +339,9 @@ export default function Step3Room({ rooms, participants, pricingConfig, onChange
         }}
       >
         <Plus size={16} />
-        {t('room.add')}
+        {optional && rooms.length === 0 ? t('room.add_first') : t('room.add')}
       </button>
+      </>)}
 
     </div>
   )

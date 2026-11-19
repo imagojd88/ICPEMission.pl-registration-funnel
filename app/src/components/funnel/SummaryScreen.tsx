@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { computePrice, formatMoney, roomLabel, buildIcs, googleCalendarUrl } from '@icpe/shared'
+import { computePrice, formatMoney, roomLabel, buildIcs, googleCalendarUrl, hasAccommodation } from '@icpe/shared'
 import type { EventInstanceDto, PricingConfig, PriceLine } from '@icpe/shared'
 import type { StepperState } from '../../pages/PublicFunnel'
 import { bcp47 } from '../../lib/utils'
 import { pickLang } from '../../lib/api'
+import { funnelPriceInput, isAccommodationOptional } from '../../lib/funnelPrice'
 
 interface Props {
   state: StepperState
@@ -58,37 +59,32 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
     }
   })()
 
-  const priceInput = {
-    rooms: state.rooms.map((r) => ({
-      roomId: r.roomId,
-      participants: r.participantIndexes
-        .filter((idx) => idx >= 0 && idx < state.participants.length)
-        .map((idx) => ({
-          type: state.participants[idx].type,
-          age: state.participants[idx].age,
-        })),
-    })),
-    options: { transport: state.options.transport, bedding: state.options.bedding },
-    discountCode: state.discountApplied ? state.discountCode : '',
-  }
+  const { input: priceInput, owners } = funnelPriceInput(
+    state.participants,
+    state.rooms,
+    pricingConfig,
+    { transport: state.options.transport, bedding: state.options.bedding },
+    state.discountApplied ? state.discountCode : '',
+  )
 
   const price = computePrice(priceInput, pricingConfig)
+  const offersRooms = hasAccommodation(pricingConfig)
+  const optionalRooms = isAccommodationOptional(pricingConfig)
 
-  /**
-   * Budujemy mapę: participantIndex → PriceLine
-   * Linie są generowane w kolejności pokoi × osób w pokoju (taką samą jak priceInput).
-   */
+  /** participantIndex → PriceLine (kolejność linii: osoby w pokojach, potem osoby bez noclegu). */
   const participantLineMap = new Map<number, PriceLine>()
-  let lineIdx = 0
-  for (const room of state.rooms) {
-    for (const pIdx of room.participantIndexes) {
-      if (pIdx >= 0 && pIdx < state.participants.length) {
-        const line = price.lines[lineIdx]
-        if (line) participantLineMap.set(pIdx, line)
-        lineIdx++
-      }
-    }
-  }
+  owners.forEach((pIdx, li) => {
+    const line = price.lines[li]
+    if (line) participantLineMap.set(pIdx, line)
+  })
+  /** Osoby bez noclegu (nocleg opcjonalny, częściowe przypisanie albo „Nie potrzebuję noclegu"). */
+  const assignedSet = new Set(state.rooms.flatMap((r) => r.participantIndexes))
+  const withoutRoomNames = optionalRooms
+    ? state.participants
+        .map((p, i) => ({ p, i }))
+        .filter(({ i }) => !assignedSet.has(i))
+        .map(({ p }) => p.name.trim() || (p.type === 'adult' ? t('participants.adult') : t('participants.child')))
+    : []
 
   const isOnline = state.paymentMethod === 'online'
   const isCash = state.paymentMethod === 'cash'
@@ -195,9 +191,15 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
                     <span className="text-xs" style={{ color: 'var(--muted)' }}>
                       {t('summary.line_formation')}: {money(line.formation)}
                     </span>
-                    <span className="text-xs" style={{ color: 'var(--muted)' }}>
-                      {t('summary.line_accommodation')}: {money(line.accommodation)}
-                    </span>
+                    {line.roomId === '' ? (
+                      <span className="text-xs" style={{ color: 'var(--muted)' }}>
+                        {t('room.no_accommodation_short')}
+                      </span>
+                    ) : (
+                      <span className="text-xs" style={{ color: 'var(--muted)' }}>
+                        {t('summary.line_accommodation')}: {money(line.accommodation)}
+                      </span>
+                    )}
                     <span className="text-xs" style={{ color: 'var(--muted)' }}>
                       {t('summary.line_meals')}: {money(line.meals)}
                     </span>
@@ -208,15 +210,15 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
           })}
         </div>
 
-        {/* Pokoje */}
-        {state.rooms.length > 0 && (
+        {/* Pokoje (albo „bez noclegu" przy noclegu opcjonalnym) */}
+        {(state.rooms.length > 0 || optionalRooms) && offersRooms && (
           <div
             className="rounded-[15px] overflow-hidden"
             style={{ border: '1px solid var(--border)' }}
           >
             <div className="flex items-center justify-between px-4 py-3" style={{ background: 'var(--surface-2)' }}>
               <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--muted)' }}>
-                {t('room.title')}
+                {optionalRooms ? t('room.title_optional') : t('room.title')}
               </span>
               <button
                 onClick={() => onEdit(3)}
@@ -256,6 +258,19 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
                 </div>
               )
             })}
+            {withoutRoomNames.length > 0 && (
+              <div
+                className="flex flex-col gap-0.5 px-4 py-3"
+                style={{ borderTop: state.rooms.length === 0 ? 'none' : '1px solid var(--border)' }}
+              >
+                <span className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
+                  {t('room.no_accommodation_short')}
+                </span>
+                <span className="text-xs" style={{ color: 'var(--muted)' }}>
+                  {withoutRoomNames.join(', ')}
+                </span>
+              </div>
+            )}
           </div>
         )}
 
@@ -276,7 +291,8 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
               </span>
             </div>
 
-            {/* Accommodation */}
+            {/* Accommodation (ukryte, gdy nikt nie nocuje przy noclegu opcjonalnym) */}
+            {!(optionalRooms && price.accommodation === 0) && (
             <div className="flex justify-between items-center px-4 py-3">
               <span className="text-sm" style={{ color: 'var(--muted)' }}>
                 {t('summary.accommodation')}
@@ -285,6 +301,7 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
                 {money(price.accommodation)}
               </span>
             </div>
+            )}
 
             {/* Meals */}
             <div className="flex justify-between items-center px-4 py-3">

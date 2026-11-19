@@ -1,3 +1,4 @@
+import OptionalStayFields from './OptionalStayFields'
 import { useState, useEffect, type ChangeEvent } from 'react'
 import { X, Plus, CheckCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -131,6 +132,10 @@ interface WizardState {
   confirmedSendMail: boolean
   // spotkanie bez noclegu (kilka godzin) → pomijamy Pokoje i Cennik, ukrywamy noclegi
   noAccommodation: boolean
+  // nocleg opcjonalny (event dzienny z noclegiem dla przyjezdnych) — gość może go pominąć
+  optionalStay: boolean
+  // posiłki tylko dla nocujących, za osobę za noc (np. kolacja + śniadanie)
+  overnightMeals: string
   // program wydarzenia: godzina + punkt
   program: { id: string; time: string; item: string; itemI18n?: Tr }[]
   // gość specjalny + portret (URL)
@@ -363,6 +368,8 @@ function mapEditConfigToState(prev: WizardState, cfg: EventEditConfig, slug: str
     rooms,
     formationFee: String(pc?.formationFee ?? prev.formationFee),
     mealsFee: String(pc?.mealsFee ?? prev.mealsFee),
+    optionalStay: !!pc?.accommodationOptional,
+    overnightMeals: String(pc?.overnightMealsFee ?? 0),
     ageBrackets: ageBrackets.length > 0 ? ageBrackets : prev.ageBrackets,
     optionsForm: {
       transport: String(pc?.options?.transport ?? prev.optionsForm.transport),
@@ -431,6 +438,8 @@ function buildPricingConfig(state: WizardState): PricingConfig {
     formationFee: parseFloat(state.formationFee) || DEFAULT_PRICING.formationFee,
     mealsFee: parseFloat(state.mealsFee) || DEFAULT_PRICING.mealsFee,
     nights,
+    ...(state.optionalStay && !state.noAccommodation ? { accommodationOptional: true } : {}),
+    ...(state.optionalStay && parseFloat(state.overnightMeals) > 0 ? { overnightMealsFee: parseFloat(state.overnightMeals) } : {}),
     childBrackets: parsedBrackets.length > 0 ? parsedBrackets : DEFAULT_PRICING.childBrackets,
     rooms: roomDefs.length > 0 ? roomDefs : DEFAULT_PRICING.rooms,
     options: {
@@ -813,6 +822,16 @@ function Step1Details({ state, update }: { state: WizardState; update: (p: Parti
             value={state.nights}
             onChange={(e) => update({ nights: e.target.value })}
             placeholder="1"
+          />
+        )}
+        {!state.noAccommodation && (
+          <OptionalStayFields
+            optional={state.optionalStay}
+            onOptional={(v) => update({ optionalStay: v })}
+            overnightMeals={state.overnightMeals}
+            onOvernightMeals={(v) => update({ overnightMeals: v })}
+            nights={parseInt(state.nights) || 0}
+            hasRooms
           />
         )}
       </div>
@@ -1719,6 +1738,8 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
     confirmedInvitees: '',
     confirmedSendMail: true,
     noAccommodation: false,
+    optionalStay: false,
+    overnightMeals: '0',
     program: [],
     guests: [],
     editLang: 'pl',

@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { computePrice, formatMoney } from '@icpe/shared'
 import type { PricingConfig } from '@icpe/shared'
 import type { StepperState } from '../../pages/PublicFunnel'
+import { funnelPriceInput } from '../../lib/funnelPrice'
 
 interface Props {
   state: StepperState
@@ -14,25 +15,14 @@ export default function StickyPriceBar({ state, pricingConfig, onNext, disabled 
   const { t, i18n } = useTranslation()
   const money = (n: number) => formatMoney(n, pricingConfig.currency, i18n.language)
 
-  const priceResult = computePrice(
-    {
-      rooms: state.rooms.map((r) => ({
-        roomId: r.roomId,
-        participants: r.participantIndexes
-          .filter((idx) => idx >= 0 && idx < state.participants.length)
-          .map((idx) => ({
-            type: state.participants[idx].type,
-            age: state.participants[idx].age,
-          })),
-      })),
-      options: {
-        transport: state.options.transport,
-        bedding: state.options.bedding,
-      },
-      discountCode: state.discountApplied ? state.discountCode : '',
-    },
+  const { input } = funnelPriceInput(
+    state.participants,
+    state.rooms,
     pricingConfig,
+    { transport: state.options.transport, bedding: state.options.bedding },
+    state.discountApplied ? state.discountCode : '',
   )
+  const priceResult = computePrice(input, pricingConfig)
 
   const free = !!pricingConfig.free
   const isLastStep = state.step === 4
@@ -66,7 +56,11 @@ export default function StickyPriceBar({ state, pricingConfig, onNext, disabled 
           </span>
           {hasPrice && (
             <span className="text-xs leading-none mt-0.5" style={{ color: 'var(--muted)' }}>
-              {money(priceResult.formation)} {t('summary.abbr_formation')} + {money(priceResult.accommodation)} {t('summary.abbr_accommodation')} + {money(priceResult.meals)} {t('summary.abbr_meals')}
+              {money(priceResult.formation)} {t('summary.abbr_formation')}
+              {priceResult.accommodation > 0 || !pricingConfig.accommodationOptional
+                ? ` + ${money(priceResult.accommodation)} ${t('summary.abbr_accommodation')}`
+                : ''}{' '}
+              + {money(priceResult.meals)} {t('summary.abbr_meals')}
             </span>
           )}
         </div>

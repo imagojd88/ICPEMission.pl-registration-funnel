@@ -4,7 +4,7 @@ export type Locale = 'pl' | 'en' | 'it';
 export type Gender = 'F' | 'M' | 'other';
 export type ParticipantType = 'adult' | 'child';
 
-export type EventType = 'ONE_TIME' | 'EVERGREEN' | 'STANDALONE';
+export type EventType = 'ONE_TIME' | 'EVERGREEN' | 'STANDALONE' | 'INVITE';
 export type InstanceStatus = 'DRAFT' | 'OPEN' | 'CLOSED' | 'ARCHIVED';
 export type PaymentMethod = 'ONLINE' | 'BANK_TRANSFER' | 'CASH';
 export type PaymentStatus =
@@ -89,7 +89,16 @@ export interface RegistrationDto {
   currency: string;
   paymentMethod?: PaymentMethod;
   paymentStatus: PaymentStatus;
+  /** Obecność: znacznik check-in (ISO) lub null, gdy nieobecny. */
+  checkedInAt?: string | null;
+  /** Zakwaterowanie: numer/nazwa przydzielonego pokoju i komentarz. */
+  roomLabel?: string | null;
+  roomNote?: string | null;
   createdAt: string;
+  /** Do edycji przez admina: pełny skład pokoi + opcje + kod rabatowy. */
+  rooms?: Array<{ roomId: string; participantIndexes: number[] }>;
+  options?: { transport?: boolean; bedding?: boolean };
+  discountCode?: string;
 }
 
 /** Jeden pokój w komponowanym zgłoszeniu: typ pokoju + indeksy osób z `participants`. */

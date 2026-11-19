@@ -142,7 +142,11 @@ export default function LandingScreen({ event, onRegister, pricingConfig, conten
       <div className="flex flex-col gap-3">
         <MetaRow
           icon={Calendar}
-          title={`${formatDateRange(event.startsAt, event.endsAt, lng)}${nights > 0 ? ` · ${t('landing.nights', { count: nights })}` : ''}`}
+          title={`${formatDateRange(event.startsAt, event.endsAt, lng)}${
+            nights > 0
+              ? ` · ${pricingConfig?.accommodationOptional ? t('landing.optional_stay') : t('landing.nights', { count: nights })}`
+              : ''
+          }`}
         />
         <MetaRow icon={MapPin} title={eventLocation(event.location, content, lng) || t('landing.place_name')} />
       </div>

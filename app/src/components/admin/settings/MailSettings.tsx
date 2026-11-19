@@ -18,6 +18,8 @@ const TYPE_LABEL: Record<string, string> = {
   INVITE_PRECONFIRMED: 'Udział potwierdzony przez organizatora (dieta)',
   GUEST_INVITE_LINK: 'Link „Zaproś gościa"',
   PAYMENT_REMINDER: 'Przypomnienie o płatności',
+  ACCOMMODATION_CHANGED: 'Zmiana noclegu (do gościa)',
+  ACCOMMODATION_CHANGED_ADMIN: 'Zmiana noclegu (kopia dla organizatora)',
   COURSE_WELCOME: 'Kurs: powitanie (ustaw hasło)',
   COURSE_ACCESS: 'Kurs: nowy dostęp',
   MEMBER_PASSWORD_RESET: 'Kurs: reset hasła',

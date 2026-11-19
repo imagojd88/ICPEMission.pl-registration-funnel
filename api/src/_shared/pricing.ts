@@ -12,6 +12,9 @@
  *
  * Goście komponują pokoje: każdy pokój ma typ i listę przypisanych osób.
  * Cena zakwaterowania liczona per osoba w danym pokoju (stawka typu pokoju × noce × mnożnik).
+ *
+ * Nocleg opcjonalny (`accommodationOptional`): osoby bez pokoju (`withoutRoom`) płacą
+ * opłatę formacyjną + wyżywienie dzienne (bez noclegu i bez `overnightMealsFee`).
  */
 
 import type { ParticipantType } from './types';
@@ -52,6 +55,16 @@ export interface PricingConfig {
   mealsFee: number;
   /** liczba nocy */
   nights: number;
+  /**
+   * Nocleg opcjonalny: gość może zapisać się bez pokoju (np. event 9:00–17:00 z noclegiem
+   * dla przyjezdnych). Osoby bez pokoju płacą opłatę formacyjną + wyżywienie (mealsFee).
+   */
+  accommodationOptional?: boolean;
+  /**
+   * Wyżywienie dodatkowe dla nocujących (np. kolacja + śniadanie), za osobę za noc.
+   * Doliczane tylko osobom z pokojem; podlega mnożnikowi wieku. Domyślnie 0.
+   */
+  overnightMealsFee?: number;
   /** progi wiekowe (mnożnik na nocleg + wyżywienie) — tylko dla type === 'child' */
   childBrackets: AgeBracket[];
   rooms: RoomTypeDef[];
@@ -98,12 +111,15 @@ export interface RoomBooking {
 export interface PriceInput {
   /** komponowane pokoje — każdy z typem i listą osób */
   rooms: RoomBooking[];
+  /** osoby bez noclegu (nocleg opcjonalny albo event bez pokoi) */
+  withoutRoom?: PricedParticipant[];
   options?: PriceOptions;
   /** kod rabatowy wpisany przez użytkownika (case-insensitive) */
   discountCode?: string;
 }
 
 export interface PriceLine extends PricedParticipant {
+  /** id typu pokoju; '' = osoba bez noclegu */
   roomId: string;
   multiplier: number;
   formation: number;
@@ -129,6 +145,8 @@ export interface PriceResult {
   total: number;
   /** liczba osób */
   people: number;
+  /** ile osób jest bez noclegu */
+  withoutRoom?: number;
   /** rozbicie per osoba */
   lines: PriceLine[];
   currency: string;
@@ -148,12 +166,15 @@ export function ageMultiplier(p: PricedParticipant, brackets: AgeBracket[]): num
  */
 export function computePrice(input: PriceInput, config: PricingConfig = DEFAULT_PRICING): PriceResult {
   // Wydarzenie bezpłatne → zero kosztów (ceny ukryte w UI, płatność pominięta).
+  const currency = config.currency ?? 'PLN';
+  const noRoom = input.withoutRoom ?? [];
   if (config.free) {
-    const people = (input.rooms ?? []).reduce((s, b) => s + b.participants.length, 0);
-    return { formation: 0, accommodation: 0, meals: 0, options: 0, discount: 0, subtotal: 0, total: 0, people, lines: [], currency: 'PLN' };
+    const people = (input.rooms ?? []).reduce((s, b) => s + b.participants.length, 0) + noRoom.length;
+    return { formation: 0, accommodation: 0, meals: 0, options: 0, discount: 0, subtotal: 0, total: 0, people, withoutRoom: noRoom.length, lines: [], currency };
   }
 
   const lines: PriceLine[] = [];
+  const overnightMeals = (config.overnightMealsFee ?? 0) * config.nights;
 
   for (const booking of input.rooms ?? []) {
     const room = config.rooms.find((r) => r.id === booking.roomId) ?? config.rooms[0];
@@ -162,7 +183,7 @@ export function computePrice(input: PriceInput, config: PricingConfig = DEFAULT_
       // Próg „gratis" (mnożnik 0) → cała cena osoby = 0 (w tym opłata formacyjna).
       const formation = m === 0 ? 0 : config.formationFee;
       const accommodation = room.perPerson * config.nights * m;
-      const meals = config.mealsFee * m;
+      const meals = (config.mealsFee + overnightMeals) * m;
       lines.push({
         ...p,
         roomId: room.id,
@@ -173,6 +194,14 @@ export function computePrice(input: PriceInput, config: PricingConfig = DEFAULT_
         total: formation + accommodation + meals,
       });
     }
+  }
+
+  // Osoby bez noclegu: opłata formacyjna + wyżywienie dzienne (bez noclegu i posiłków nocujących).
+  for (const p of noRoom) {
+    const m = ageMultiplier(p, config.childBrackets);
+    const formation = m === 0 ? 0 : config.formationFee;
+    const meals = config.mealsFee * m;
+    lines.push({ ...p, roomId: '', multiplier: m, formation, accommodation: 0, meals, total: formation + meals });
   }
 
   const people = lines.length;
@@ -199,9 +228,43 @@ export function computePrice(input: PriceInput, config: PricingConfig = DEFAULT_
     subtotal,
     total: subtotal - discount,
     people,
+    withoutRoom: noRoom.length,
     lines,
-    currency: 'PLN',
+    currency,
   };
+}
+
+/**
+ * Buduje PriceInput z formularza: pokoje (indeksy osób) + osoby nieprzypisane do żadnego
+ * pokoju trafiają do `withoutRoom`. Wspólne dla lejka, strony gościa, panelu i API.
+ */
+export function buildPriceInput(
+  participants: PricedParticipant[],
+  rooms: Array<{ roomId: string; participantIndexes: number[] }>,
+  options?: PriceOptions,
+  discountCode?: string,
+): PriceInput {
+  const n = participants.length;
+  const assigned = new Set<number>();
+  const bookings: RoomBooking[] = (rooms ?? []).map((r) => {
+    const idx: number[] = [];
+    for (const i of r.participantIndexes ?? []) {
+      if (!Number.isInteger(i) || i < 0 || i >= n || assigned.has(i)) continue;
+      assigned.add(i);
+      idx.push(i);
+    }
+    return { roomId: r.roomId, participants: idx.map((i) => ({ type: participants[i].type, age: participants[i].age ?? 0 })) };
+  });
+  const withoutRoom = participants
+    .map((p, i) => ({ p, i }))
+    .filter(({ i }) => !assigned.has(i))
+    .map(({ p }) => ({ type: p.type, age: p.age ?? 0 }));
+  return { rooms: bookings, withoutRoom, options, discountCode };
+}
+
+/** Czy event ma noclegi do wyboru (są typy pokoi i co najmniej 1 noc). */
+export function hasAccommodation(config: PricingConfig | null | undefined): boolean {
+  return !!config && (config.rooms?.length ?? 0) > 0 && (config.nights ?? 0) > 0;
 }
 
 /** Walidacja pojemności: każdy pokój nie przekracza limitu osób swojego typu. */
@@ -223,7 +286,7 @@ export function validateRoomCapacity(input: PriceInput, config: PricingConfig = 
   return { ok: errors.length === 0, errors };
 }
 
-/** Formatowanie waluty: Intl pl-PL + " zł". */
+/** Odczytuje nazwę pokoju w danym języku (string legacy lub mapa { pl, en, it }). */
 export function roomLabel(name: string | Record<string, string> | undefined | null, lng = 'pl'): string {
   if (!name) return '';
   if (typeof name === 'string') return name;
@@ -231,6 +294,25 @@ export function roomLabel(name: string | Record<string, string> | undefined | nu
   return name[l] ?? name.pl ?? name.en ?? name.it ?? Object.values(name)[0] ?? '';
 }
 
+/** Formatowanie waluty: Intl pl-PL + " zł". */
 export function formatZl(n: number): string {
   return new Intl.NumberFormat('pl-PL').format(Math.round(n)) + ' zł';
+}
+
+/**
+ * Formatowanie kwoty zależne od waluty eventu i języka UI.
+ * Dla PLN w polskim locale daje „180 zł", w angielskim „PLN 180"; EUR/USD dostają swój symbol.
+ */
+export function formatMoney(n: number, currency: 'PLN' | 'EUR' | 'USD' = 'PLN', lng = 'pl'): string {
+  const l = (lng || 'pl').slice(0, 2);
+  const locale = l === 'en' ? 'en-GB' : l === 'it' ? 'it-IT' : 'pl-PL';
+  try {
+    return new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency,
+      maximumFractionDigits: 0,
+    }).format(Math.round(n));
+  } catch {
+    return `${new Intl.NumberFormat(locale).format(Math.round(n))} ${currency}`;
+  }
 }

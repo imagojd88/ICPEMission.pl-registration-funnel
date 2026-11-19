@@ -8,6 +8,7 @@ import type {
   PricingConfig,
   PriceInput,
   PriceResult,
+  RegistrationStatus,
 } from '@icpe/shared'
 
 // ---------------------------------------------------------------------------
@@ -1382,3 +1383,46 @@ export async function adminLogin(
 
 // Re-export mock data for use in components/stories (public funnel fallbacks only)
 export { MOCK_INSTANCE, MOCK_ROOM_TYPES, MOCK_PRICING, MOCK_REGISTRATIONS, MOCK_ADMIN_SUMMARY }
+
+// ─── Strona zgłoszenia gościa (/z/:token): podgląd + zmiana / domówienie noclegu ─────
+
+export type ManageLock = 'PAID' | 'CANCELLED' | 'CLOSED' | 'STARTED' | 'NO_ACCOMMODATION' | null
+
+export interface ManagedRegistration {
+  id: string
+  status: RegistrationStatus
+  locale: string
+  contact: { firstName: string; lastName: string; email: string }
+  participants: Array<{ type: 'adult' | 'child'; name: string; age: number }>
+  rooms: Array<{ roomId: string; participantIndexes: number[] }>
+  options: { transport?: boolean; bedding?: boolean }
+  discountCode?: string
+  totalPrice: number
+  currency: 'PLN' | 'EUR' | 'USD'
+  paymentMethod?: 'ONLINE' | 'BANK_TRANSFER' | 'CASH'
+  event: {
+    title: string | Record<string, string>
+    startsAt: string
+    endsAt: string | null
+    location: string | null
+    slug: string | null
+    locales: string[] | null
+    theme: Record<string, unknown> | null
+  }
+  pricing: PricingConfig | null
+  lock: ManageLock
+}
+
+export function getManagedRegistration(token: string): Promise<ManagedRegistration> {
+  return apiFetch<ManagedRegistration>(`/registrations/manage/${encodeURIComponent(token)}`)
+}
+
+export function updateManagedAccommodation(
+  token: string,
+  rooms: Array<{ roomId: string; participantIndexes: number[] }>,
+): Promise<ManagedRegistration> {
+  return apiFetch<ManagedRegistration>(`/registrations/manage/${encodeURIComponent(token)}/accommodation`, {
+    method: 'PUT',
+    body: JSON.stringify({ rooms }),
+  })
+}

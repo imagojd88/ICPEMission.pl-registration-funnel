@@ -22,7 +22,9 @@ class PriceOptionsDto {
 
 /** DTO dla POST /pricing/quote — podgląd ceny (niewiążący). */
 class PriceQuoteDto implements PriceInput {
-  @IsArray() @ArrayNotEmpty() @ValidateNested({ each: true }) @Type(() => RoomBookingDto) rooms!: RoomBookingDto[];
+  @IsArray() @ValidateNested({ each: true }) @Type(() => RoomBookingDto) rooms!: RoomBookingDto[];
+  /** osoby bez noclegu (nocleg opcjonalny) */
+  @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => PricedParticipantDto) withoutRoom?: PricedParticipantDto[];
   @IsOptional() @ValidateNested() @Type(() => PriceOptionsDto) options?: PriceOptionsDto;
   @IsOptional() @IsString() discountCode?: string;
   @IsOptional() @IsString() instanceId?: string;

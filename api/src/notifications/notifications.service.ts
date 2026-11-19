@@ -1,6 +1,55 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
+import { formatMoney } from '../shared';
+
+/** Podsumowanie noclegu w mailach (dane przekazywane przez RegistrationsService). */
+export interface MailAccommodation {
+  /** event oferuje noclegi (są pokoje i co najmniej 1 noc) */
+  offered: boolean;
+  /** wybrane pokoje: nazwa (w języku gościa) + liczba osób */
+  rooms: Array<{ name: string; people: number }>;
+  /** ile osób bez noclegu */
+  withoutRoom: number;
+  /** liczba nocy */
+  nights: number;
+}
+
+type MailLang = 'pl' | 'en';
+
+/** Linie o noclegu do maila (puste, gdy event nie oferuje noclegów). */
+function accommodationLines(acc: MailAccommodation | undefined, lang: MailLang): string[] {
+  if (!acc || !acc.offered) return [];
+  const en = lang === 'en';
+  if (acc.rooms.length === 0) return [en ? 'Accommodation: not needed.' : 'Nocleg: bez noclegu.'];
+  const people = (n: number) => (en ? `${n} ${n === 1 ? 'person' : 'people'}` : `${n} ${n === 1 ? 'os.' : 'os.'}`);
+  const nights = en ? `${acc.nights} ${acc.nights === 1 ? 'night' : 'nights'}` : `${acc.nights} ${acc.nights === 1 ? 'noc' : acc.nights < 5 ? 'noce' : 'nocy'}`;
+  const list = acc.rooms.map((r) => `${r.name} (${people(r.people)})`).join(', ');
+  const lines = [en ? `Accommodation (${nights}): ${list}.` : `Nocleg (${nights}): ${list}.`];
+  if (acc.withoutRoom > 0) {
+    lines.push(en ? `Without accommodation: ${people(acc.withoutRoom)}.` : `Bez noclegu: ${people(acc.withoutRoom)}`);
+  }
+  return lines;
+}
+
+/** Akapit o płatności: przy gotówce — kwota, którą trzeba mieć przy sobie na rejestracji. */
+function paymentLines(method: unknown, amount: string, lang: MailLang, total: number): string[] {
+  const en = lang === 'en';
+  if (total <= 0) return [];
+  if (method === 'CASH') {
+    return en
+      ? [`Payment: cash at registration desk.`, `Please bring ${amount} in cash (the exact amount if possible).`]
+      : [`Płatność: gotówką przy rejestracji na miejscu.`, `Prosimy mieć przy sobie ${amount} gotówką (najlepiej odliczoną kwotę).`]
+  }
+  if (method === 'BANK_TRANSFER') {
+    return en
+      ? [`Amount: ${amount}.`, 'Payment: bank transfer — please make the transfer by the given date.']
+      : [`Kwota: ${amount}.`, 'Płatność: przelew bankowy — prosimy o dokonanie przelewu w podanym terminie.'];
+  }
+  return en
+    ? [`Amount: ${amount}.`, 'Payment: online — it will be confirmed automatically.']
+    : [`Kwota: ${amount}.`, 'Płatność: online — zostanie potwierdzona automatycznie.'];
+}
 
 /** Wspólny układ maila z przyciskiem: akapity (intro) → przycisk → link zapasowy → akapity (outro). */
 function buttonMail(intro: string[], button: { label: string; href: string } | null, outro: string[]): { text: string; html: string } {
@@ -340,34 +389,52 @@ export class NotificationsService {
       m === 'ONLINE' ? 'płatność online' : m === 'CASH' ? 'gotówka na miejscu' : 'przelew bankowy';
 
     if (payload.type === 'CONFIRMATION') {
-      const title = String(d.eventTitle ?? 'wydarzenie');
-      const amount = money(d.totalPrice, d.currency);
-      const subject = `Potwierdzenie zgłoszenia — ${title}`;
+      const lang: MailLang = payload.locale === 'en' ? 'en' : 'pl';
+      const en = lang === 'en';
+      const title = String(d.eventTitle ?? (en ? 'the event' : 'wydarzenie'));
+      const total = Number(d.totalPrice ?? 0);
+      const amount = formatMoney(total, (String(d.currency ?? 'PLN') as 'PLN' | 'EUR' | 'USD'), lang);
+      const acc = d.accommodation as MailAccommodation | undefined;
+      const manageLink = String(d.manageLink ?? '');
+      const subject = en ? `Registration confirmed — ${title}` : `Potwierdzenie zgłoszenia — ${title}`;
       const lines = [
-        'Dzień dobry,',
+        en ? 'Hello,' : 'Dzień dobry,',
         '',
-        `Dziękujemy za zgłoszenie na: ${title}.`,
-        `Kwota: ${amount}.`,
-        `Sposób płatności: ${payLabel(d.paymentMethod)}.`,
-        d.paymentMethod === 'BANK_TRANSFER'
-          ? 'Prosimy o dokonanie przelewu w podanym terminie.'
-          : d.paymentMethod === 'CASH'
-            ? 'Kwotę zapłacisz gotówką na miejscu.'
-            : 'Płatność online zostanie potwierdzona automatycznie.',
+        en ? `Thank you for registering for: ${title}.` : `Dziękujemy za zgłoszenie na: ${title}.`,
+        ...accommodationLines(acc, lang),
+        ...paymentLines(d.paymentMethod, amount, lang, total),
         '',
-        `Numer zgłoszenia: ${String(payload.registrationId ?? '')}`,
+        `${en ? 'Registration number' : 'Numer zgłoszenia'}: ${String(payload.registrationId ?? '')}`,
       ];
+      // Link do zmiany noclegu (gdy event oferuje noclegi) — jako tekst, bo przycisk bywa zajęty
+      // przez „Zaproś gościa"; bez zaproszeń link dostaje własny przycisk.
+      const manageText = acc?.offered && manageLink
+        ? [en
+            ? 'Changed your mind about accommodation? You can add or change it here:'
+            : 'Zmiana planów? Nocleg możesz domówić lub zmienić tutaj:']
+        : [];
       const guestLink = String(d.guestInviteLink ?? '');
-      if (guestLink) {
-        // Ścieżka „zaproś gościa" włączona dla eventu — link działa na podstawie tokenu zgłoszenia.
+      if (manageText.length && !guestLink) {
         const { text, html } = buttonMail(
-          [...lines, '', 'Chcesz zabrać kogoś ze sobą? Możesz zaprosić gościa — dostanie od nas zaproszenie z linkiem do rejestracji:'],
-          { label: 'Zaproś gościa', href: guestLink },
-          ['', ...SIGNATURE],
+          [...lines, '', ...manageText],
+          { label: en ? 'Manage accommodation' : 'Zmień nocleg', href: manageLink },
+          en ? ['God bless,', 'ICPE Mission Poland'] : SIGNATURE,
         );
         return { subject, text, html };
       }
-      const { text, html } = buttonMail([...lines, '', ...SIGNATURE], null, []);
+      if (manageText.length) lines.push('', `${manageText[0]} ${manageLink}`);
+      if (guestLink) {
+        // Ścieżka „zaproś gościa" włączona dla eventu — link działa na podstawie tokenu zgłoszenia.
+        const { text, html } = buttonMail(
+          [...lines, '', en
+            ? 'Would you like to bring someone along? You can invite a guest — we will send them an invitation with a registration link:'
+            : 'Chcesz zabrać kogoś ze sobą? Możesz zaprosić gościa — dostanie od nas zaproszenie z linkiem do rejestracji:'],
+          { label: en ? 'Invite a guest' : 'Zaproś gościa', href: guestLink },
+          ['', ...(en ? ['God bless,', 'ICPE Mission Poland'] : SIGNATURE)],
+        );
+        return { subject, text, html };
+      }
+      const { text, html } = buttonMail([...lines, '', ...(en ? ['God bless,', 'ICPE Mission Poland'] : SIGNATURE)], null, []);
       return { subject, text, html };
     }
 
@@ -518,6 +585,54 @@ export class NotificationsService {
       return { subject, text, html };
     }
 
+    if (payload.type === 'ACCOMMODATION_CHANGED') {
+      // Gość zmienił / domówił nocleg na stronie zgłoszenia — nowa kwota (i gotówka do przygotowania).
+      const lang: MailLang = payload.locale === 'en' ? 'en' : 'pl';
+      const en = lang === 'en';
+      const title = String(d.eventTitle ?? (en ? 'the event' : 'wydarzenie'));
+      const total = Number(d.totalPrice ?? 0);
+      const amount = formatMoney(total, (String(d.currency ?? 'PLN') as 'PLN' | 'EUR' | 'USD'), lang);
+      const subject = en ? `Accommodation updated — ${title}` : `Zmiana noclegu — ${title}`;
+      const { text, html } = buttonMail(
+        [
+          en ? 'Hello,' : 'Dzień dobry,',
+          '',
+          en ? `We have saved your accommodation change for: ${title}.` : `Zapisaliśmy zmianę noclegu w zgłoszeniu na: ${title}.`,
+          ...accommodationLines(d.accommodation as MailAccommodation | undefined, lang),
+          ...(total > 0 ? paymentLines(d.paymentMethod, amount, lang, total) : [en ? 'Amount: free of charge.' : 'Kwota: bezpłatnie.']),
+          '',
+          `${en ? 'Registration number' : 'Numer zgłoszenia'}: ${String(payload.registrationId ?? '')}`,
+        ],
+        d.manageLink ? { label: en ? 'View registration' : 'Zobacz zgłoszenie', href: String(d.manageLink) } : null,
+        en ? ['God bless,', 'ICPE Mission Poland'] : SIGNATURE,
+      );
+      return { subject, text, html };
+    }
+
+    if (payload.type === 'ACCOMMODATION_CHANGED_ADMIN') {
+      // Kopia dla organizatora (adres MAIL_REPLY_TO): kto zmienił nocleg i jak.
+      const title = String(d.eventTitle ?? 'wydarzenie');
+      const who = String(d.guestName ?? '');
+      const subject = `Zmiana noclegu: ${who} — ${title}`;
+      const before = (d.before as MailAccommodation | undefined);
+      const after = (d.accommodation as MailAccommodation | undefined);
+      const { text, html } = buttonMail(
+        [
+          `${who} (${String(d.guestEmail ?? '')}) zmienił(a) nocleg w zgłoszeniu ${String(payload.registrationId ?? '')} na: ${title}.`,
+          '',
+          'Było:',
+          ...accommodationLines(before, 'pl'),
+          '',
+          'Jest:',
+          ...accommodationLines(after, 'pl'),
+          `Kwota: ${formatMoney(Number(d.oldTotal ?? 0), (String(d.currency ?? 'PLN') as 'PLN'), 'pl')} → ${formatMoney(Number(d.totalPrice ?? 0), (String(d.currency ?? 'PLN') as 'PLN'), 'pl')} (${payLabel(d.paymentMethod)}).`,
+        ],
+        null,
+        [],
+      );
+      return { subject, text, html };
+    }
+
     if (payload.type === 'PAYMENT_REMINDER') {
       const subject = `Przypomnienie o płatności — ${String(d.transferTitle ?? '')}`;
       const text = `Dzień dobry,\n\nPrzypominamy o płatności na kwotę ${money(d.amount, 'PLN')} (tytuł: ${String(
@@ -642,6 +757,10 @@ export class NotificationsService {
     paymentMethod: string; editToken: string;
     /** Link do strony „Zaproś gościa" — tylko gdy event ma włączoną tę ścieżkę. */
     guestInviteLink?: string;
+    /** Podsumowanie noclegu (gdy event oferuje noclegi). */
+    accommodation?: MailAccommodation;
+    /** Link do strony zgłoszenia (zmiana / domówienie noclegu). */
+    manageLink?: string;
   }) {
     await this.sendMail({
       to: opts.to,
@@ -650,6 +769,26 @@ export class NotificationsService {
       registrationId: opts.registrationId,
       data: opts,
     });
+  }
+
+  /** Gość zmienił nocleg: mail do gościa + kopia do organizatora (MAIL_REPLY_TO, gdy ustawiony). */
+  async sendAccommodationChanged(opts: {
+    to: string; locale: string; registrationId: string; eventTitle: string;
+    totalPrice: number; oldTotal: number; currency: string; paymentMethod: string;
+    accommodation: MailAccommodation; before: MailAccommodation; manageLink: string;
+    guestName: string;
+  }) {
+    await this.sendMail({ to: opts.to, type: 'ACCOMMODATION_CHANGED', locale: opts.locale, registrationId: opts.registrationId, data: opts });
+    const admin = this.replyTo();
+    if (admin) {
+      await this.sendMail({
+        to: admin,
+        type: 'ACCOMMODATION_CHANGED_ADMIN',
+        locale: 'pl',
+        registrationId: opts.registrationId,
+        data: { ...opts, guestEmail: opts.to, eventTitle: opts.eventTitle },
+      });
+    }
   }
 
   async sendPaymentReminder(opts: { to: string; locale: string; registrationId: string; amount: number; transferTitle: string }) {

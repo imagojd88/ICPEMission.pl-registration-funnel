@@ -19,3 +19,4 @@ api/prisma/*.db
 .book-public.tgz
 book-src-assets/
 .book-src.tgz
+_to_delete/

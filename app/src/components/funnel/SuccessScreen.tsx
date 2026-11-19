@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { UserPlus, Users } from 'lucide-react'
+import { UserPlus, Users, BedDouble } from 'lucide-react'
+import CashAmountBox from './CashAmountBox'
 import { Link } from 'react-router-dom'
 import { formatMoney } from '@icpe/shared'
 import type { RegistrationStatus } from '@icpe/shared'
@@ -16,9 +17,11 @@ interface Props {
   onCreateAccount?: () => Promise<void>
   /** Link do strony „Zaproś gościa" — tylko gdy event ma włączoną tę ścieżkę. */
   guestInviteHref?: string
+  /** Strona zgłoszenia (zmiana / domówienie noclegu) — gdy event oferuje noclegi. */
+  manageHref?: string
 }
 
-export default function SuccessScreen({ paymentMethod, email, total, currency, regNumber, status, onBack, onCreateAccount, guestInviteHref }: Props) {
+export default function SuccessScreen({ paymentMethod, email, total, currency, regNumber, status, onBack, onCreateAccount, guestInviteHref, manageHref }: Props) {
   const { t, i18n } = useTranslation()
   const [acct, setAcct] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
 
@@ -76,6 +79,9 @@ export default function SuccessScreen({ paymentMethod, email, total, currency, r
         {isPaid ? t('success.paid_msg') : isCash ? t('success.cash_msg') : t('success.transfer_msg')}
       </p>
 
+      {/* Gotówka: kwota, którą trzeba mieć przy sobie (też w mailu z potwierdzeniem) */}
+      {isCash && !isPaid && <CashAmountBox total={total} currency={currency} />}
+
       {/* Registration card */}
       <div
         className="w-full rounded-[15px] p-5 flex flex-col gap-4"
@@ -126,6 +132,21 @@ export default function SuccessScreen({ paymentMethod, email, total, currency, r
       <p className="text-xs text-center" style={{ color: 'var(--muted)' }}>
         {t('success.email_sent', { email })}
       </p>
+
+      {/* Zmiana / domówienie noclegu później — ten sam link jest w mailu */}
+      {manageHref && (
+        <div className="w-full flex flex-col items-center gap-2 rounded-[15px] px-4 py-4" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+          <p className="text-sm font-semibold text-center" style={{ color: 'var(--ink)' }}>{t('manage.success_q')}</p>
+          <p className="text-xs text-center" style={{ color: 'var(--muted)' }}>{t('manage.success_desc')}</p>
+          <Link
+            to={manageHref}
+            className="w-full flex items-center justify-center gap-2 text-sm font-semibold rounded-[12px] py-3 no-underline"
+            style={{ background: 'var(--brand-soft)', color: 'var(--brand)', border: '1px solid var(--brand)' }}
+          >
+            <BedDouble size={16} /> {t('manage.success_cta')}
+          </Link>
+        </div>
+      )}
 
       {/* Zaproś gościa — ten sam link jest też w mailu z potwierdzeniem */}
       {guestInviteHref && (

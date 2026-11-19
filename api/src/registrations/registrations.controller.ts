@@ -3,7 +3,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { RegistrationsService } from './registrations.service';
-import { CreateRegistrationDto } from './dto/create-registration.dto';
+import { CreateRegistrationDto, UpdateAccommodationDto } from './dto/create-registration.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import type { Response } from 'express';
 
@@ -16,6 +16,20 @@ export class RegistrationsController {
   @ApiOperation({ summary: 'Create registration (binding price computed server-side)' })
   create(@Body() dto: CreateRegistrationDto) {
     return this.regs.create(dto);
+  }
+
+  // Strona zgłoszenia gościa (link z maila): podgląd + zmiana / domówienie noclegu.
+  // Trasy „manage/…" muszą być PRZED „registrations/:id", żeby nie złapał ich parametr.
+  @Get('registrations/manage/:token')
+  @ApiOperation({ summary: 'Guest registration page (by edit token)' })
+  manage(@Param('token') token: string) {
+    return this.regs.getByManageToken(token);
+  }
+
+  @Put('registrations/manage/:token/accommodation')
+  @ApiOperation({ summary: 'Guest changes / adds accommodation (re-priced server-side)' })
+  updateAccommodation(@Param('token') token: string, @Body() dto: UpdateAccommodationDto) {
+    return this.regs.updateAccommodationByToken(token, dto);
   }
 
   @Get('registrations/:id')

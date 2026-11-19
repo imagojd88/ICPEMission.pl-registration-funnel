@@ -1,3 +1,4 @@
+import OptionalStayFields from './OptionalStayFields'
 import { useState, useEffect, type ChangeEvent } from 'react'
 import { Plus, Trash2, Upload, Images } from 'lucide-react'
 import Button from '@/components/ui/Button'
@@ -104,6 +105,9 @@ export default function EventEditForm({
   const [currency, setCurrency] = useState<'PLN' | 'EUR' | 'USD'>('PLN')
   const [formationFee, setFormationFee] = useState(String(DEFAULT_PRICING.formationFee))
   const [mealsFee, setMealsFee] = useState(String(DEFAULT_PRICING.mealsFee))
+  // Nocleg opcjonalny (event dzienny z noclegiem dla przyjezdnych) + posiłki tylko dla nocujących.
+  const [optionalStay, setOptionalStay] = useState(false)
+  const [overnightMeals, setOvernightMeals] = useState('0')
   const [transport, setTransport] = useState(String(DEFAULT_PRICING.options.transport))
   const [bedding, setBedding] = useState(String(DEFAULT_PRICING.options.bedding))
   const [rooms, setRooms] = useState<RoomRow[]>([])
@@ -232,6 +236,8 @@ export default function EventEditForm({
         setCurrency((pc?.currency as 'PLN' | 'EUR' | 'USD') ?? 'PLN')
         setFormationFee(String(pc?.formationFee ?? DEFAULT_PRICING.formationFee))
         setMealsFee(String(pc?.mealsFee ?? DEFAULT_PRICING.mealsFee))
+        setOptionalStay(!!pc?.accommodationOptional)
+        setOvernightMeals(String(pc?.overnightMealsFee ?? 0))
         setTransport(String(pc?.options?.transport ?? DEFAULT_PRICING.options.transport))
         setBedding(String(pc?.options?.bedding ?? DEFAULT_PRICING.options.bedding))
         setRooms(
@@ -310,6 +316,8 @@ export default function EventEditForm({
       formationFee: parseFloat(formationFee) || 0,
       mealsFee: parseFloat(mealsFee) || 0,
       nights: n,
+      ...(optionalStay ? { accommodationOptional: true } : {}),
+      ...(parseFloat(overnightMeals) > 0 ? { overnightMealsFee: parseFloat(overnightMeals) } : {}),
       childBrackets: brackets
         .map((b) => ({ ltAge: parseInt(b.ltAge) || 0, multiplier: parseFloat(b.multiplier) || 0 }))
         .sort((a, b) => a.ltAge - b.ltAge),
@@ -604,6 +612,14 @@ export default function EventEditForm({
         {/* Pokoje */}
         <div className="flex flex-col gap-2">
           <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--faint)' }}>Pokoje</span>
+          <OptionalStayFields
+            optional={optionalStay}
+            onOptional={setOptionalStay}
+            overnightMeals={overnightMeals}
+            onOvernightMeals={setOvernightMeals}
+            nights={parseInt(nights) || 0}
+            hasRooms={rooms.length > 0}
+          />
           {rooms.map((r) => (
             <div key={r.id} className="flex items-center gap-2">
               <Input value={r.name[editLang] ?? ''} onChange={(e) => setRooms((p) => p.map((x) => x.id === r.id ? { ...x, name: { ...x.name, [editLang]: e.target.value } } : x))} placeholder={srcPh(r.name.pl, multi ? `Nazwa (${LANG_LABEL[editLang]})` : 'Nazwa')} />

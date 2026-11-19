@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useSearchParams } from 'react-router-dom'
 import type { EventInstanceDto, CreateRegistrationDto, RegistrationStatus, PaymentMethod } from '@icpe/shared'
-import { computePrice, DEFAULT_PRICING, validateRoomCapacity, roomLabel } from '@icpe/shared'
+import { computePrice, DEFAULT_PRICING, validateRoomCapacity, roomLabel, hasAccommodation } from '@icpe/shared'
 import type { PricingConfig } from '@icpe/shared'
 import { getEventBySlug, getEventConfig, createRegistration, registerGuest, getInvitation, pickLang, type EventConfig } from '../lib/api'
+import { funnelPriceInput, isAccommodationOptional } from '../lib/funnelPrice'
 import { clearDraft, loadDraft, pruneExpiredDrafts, saveDraft, type ResumableScreen } from '../lib/funnelDraft'
 
 /** Rozdziela „Imię Nazwisko" na pola DTO. */
@@ -87,6 +88,8 @@ export interface StepperState {
   dietaryNotes: string
   extraNotes: string
   rooms: RoomEntry[]
+  /** Nocleg opcjonalny: gość zaznaczył „Nie potrzebuję noclegu" (pokoje wtedy puste). */
+  noAccommodation: boolean
   options: { transport: boolean; bedding: boolean }
   discountCode: string
   discountApplied: boolean
@@ -123,6 +126,7 @@ function buildInitialStepper(): StepperState {
     dietaryNotes: '',
     extraNotes: '',
     rooms: [],
+    noAccommodation: false,
     options: { transport: false, bedding: false },
     discountCode: '',
     discountApplied: false,
@@ -155,6 +159,7 @@ function normalizeStepper(raw: unknown): StepperState | null {
     participants,
     dietaryTags: Array.isArray(r.dietaryTags) ? r.dietaryTags : base.dietaryTags,
     rooms: Array.isArray(r.rooms) ? r.rooms : base.rooms,
+    noAccommodation: r.noAccommodation === true,
     options: obj(r.options, base.options),
     consents: obj(r.consents, base.consents),
   }
@@ -258,6 +263,10 @@ function StepperView({
             participants={state.participants}
             pricingConfig={pricingConfig}
             onChange={(rooms) => onChange({ rooms })}
+            noAccommodation={state.noAccommodation}
+            onNoAccommodationChange={(noAccommodation) =>
+              onChange(noAccommodation ? { noAccommodation, rooms: [] } : { noAccommodation })
+            }
           />
         )
       case 4:
@@ -373,7 +382,7 @@ export default function PublicFunnel() {
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [stepError, setStepError] = useState<string | null>(null)
-  const [result, setResult] = useState<{ regId: string; status: RegistrationStatus; total: number; guestInviteHref?: string } | null>(null)
+  const [result, setResult] = useState<{ regId: string; status: RegistrationStatus; total: number; guestInviteHref?: string; manageHref?: string } | null>(null)
   // Osobiste zaproszenie z maila (`?inv=token`): dane gościa wpisujemy w formularz,
   // a token idzie z rejestracją, żeby zgłoszenie spięło się z listą gości w panelu.
   const [searchParams] = useSearchParams()
@@ -472,6 +481,8 @@ export default function PublicFunnel() {
 
   const patchStepper = (patch: Partial<StepperState>) => {
     setStepper((prev) => ({ ...prev, ...patch }))
+    // Każda zmiana w formularzu chowa komunikat walidacji kroku (np. po zaznaczeniu „Nie potrzebuję noclegu").
+    setStepError(null)
   }
 
   const handleStartRegister = () => {
@@ -506,19 +517,25 @@ export default function PublicFunnel() {
     }
   }
 
-  /** Walidacja kroku „Pokój" (3): każdy uczestnik przypisany, pojemność OK. */
+  /**
+   * Walidacja kroku „Pokój" (3): każdy uczestnik przypisany, pojemność OK.
+   * Nocleg opcjonalny: wystarczy „Nie potrzebuję noclegu" albo co najmniej jeden pokój —
+   * osoby nieprzypisane do pokoju są po prostu bez noclegu.
+   */
   const validateRoomStep = (): string | null => {
     if (!pricingConfig.rooms || pricingConfig.rooms.length === 0) return null // event bez pokoi
+    const optional = isAccommodationOptional(pricingConfig)
+    if (optional && stepper.noAccommodation) return null
     const n = stepper.participants.length
     if (n === 0) return null
-    if (stepper.rooms.length === 0) return t('room.err_no_room')
+    if (stepper.rooms.length === 0) return optional ? t('room.err_choose') : t('room.err_no_room')
     const assigned = new Set<number>()
     stepper.rooms.forEach((r) =>
       r.participantIndexes.forEach((i) => {
         if (i >= 0 && i < n) assigned.add(i)
       }),
     )
-    if (assigned.size < n) {
+    if (assigned.size < n && !optional) {
       const missing = n - assigned.size
       return t('room.err_unassigned', { count: missing })
     }
@@ -618,7 +635,12 @@ export default function PublicFunnel() {
             dietary: p.diet || undefined,
           }
         }),
-        rooms: stepper.rooms.map((r) => ({ roomId: r.roomId, participantIndexes: r.participantIndexes })),
+        // Bez noclegu → pusta lista pokoi (API przyjmie ją, gdy nocleg jest opcjonalny).
+        rooms: stepper.noAccommodation
+          ? []
+          : stepper.rooms
+              .map((r) => ({ roomId: r.roomId, participantIndexes: r.participantIndexes }))
+              .filter((r) => r.participantIndexes.length > 0),
         dietaryNotes: stepper.dietaryNotes || undefined,
         dietaryTags: stepper.dietaryTags,
         options: { transport: stepper.options.transport, bedding: stepper.options.bedding },
@@ -634,6 +656,8 @@ export default function PublicFunnel() {
         status: res.registration.status,
         total: res.summary?.total ?? res.registration.totalPrice ?? 0,
         guestInviteHref: res.canInviteGuests && editToken ? `/g/${editToken}` : undefined,
+        // Strona zgłoszenia (zmiana / domówienie noclegu) — gdy event oferuje noclegi.
+        manageHref: hasAccommodation(pricingConfig) && editToken ? `/z/${editToken}` : undefined,
       })
       setScreen('success')
     } catch (e: unknown) {
@@ -663,20 +687,14 @@ export default function PublicFunnel() {
     })
   }
 
-  // Buduj PriceInput z nowego formatu rooms
-  const priceInput = {
-    rooms: stepper.rooms.map((r) => ({
-      roomId: r.roomId,
-      participants: r.participantIndexes
-        .filter((idx) => idx >= 0 && idx < stepper.participants.length)
-        .map((idx) => ({
-          type: stepper.participants[idx].type,
-          age: stepper.participants[idx].age,
-        })),
-    })),
-    options: { transport: stepper.options.transport, bedding: stepper.options.bedding },
-    discountCode: stepper.discountApplied ? stepper.discountCode : '',
-  }
+  // Wycena (osoby bez pokoju przy noclegu opcjonalnym = formacja + wyżywienie)
+  const { input: priceInput } = funnelPriceInput(
+    stepper.participants,
+    stepper.rooms,
+    pricingConfig,
+    { transport: stepper.options.transport, bedding: stepper.options.bedding },
+    stepper.discountApplied ? stepper.discountCode : '',
+  )
 
   const finalPrice = event ? computePrice(priceInput, pricingConfig) : null
 
@@ -809,6 +827,7 @@ export default function PublicFunnel() {
           onBack={handleBackToLanding}
           onCreateAccount={handleCreateAccount}
           guestInviteHref={result?.guestInviteHref}
+          manageHref={result?.manageHref}
         />
       )}
     </div>

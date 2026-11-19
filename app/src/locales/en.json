@@ -23,7 +23,8 @@
     "cta_hint": "Registration takes approx. 3 minutes · please register on time",
     "next_date_title": "Next date",
     "notify_me": "Notify me when registration opens",
-    "closed_desc": "Registration for this edition is now closed. Sign up for the notification list so you don't miss the next one."
+    "closed_desc": "Registration for this edition is now closed. Sign up for the notification list so you don't miss the next one.",
+    "optional_stay": "optional accommodation"
   },
   "invite": {
     "only_badge": "This event is for invited guests only",
@@ -192,7 +193,16 @@
     "err_over": "Room “{{name}}” fits max {{cap}} people, {{count}} assigned.",
     "err_check": "Please check the room assignments.",
     "err_unassigned_one": "Assign all participants to rooms — {{count}} person is still unassigned.",
-    "err_unassigned_other": "Assign all participants to rooms — {{count}} people are still unassigned."
+    "err_unassigned_other": "Assign all participants to rooms — {{count}} people are still unassigned.",
+    "title_optional": "Accommodation (optional)",
+    "optional_hint": "Accommodation is optional — useful if you are coming from far away. Choose a room or tick that you don’t need one. People not assigned to a room will have no accommodation.",
+    "no_accommodation": "I don’t need accommodation",
+    "no_accommodation_many": "We don’t need accommodation",
+    "no_accommodation_desc": "Coming for the day only. You can still add accommodation later via the link in the e-mail.",
+    "no_accommodation_short": "No accommodation",
+    "without_room_list": "No accommodation:",
+    "add_first": "Choose a room",
+    "err_choose": "Tick “I don’t need accommodation” or choose a room."
   },
   "options": {
     "title": "Options and consents",
@@ -402,5 +412,36 @@
     "parish_ph": "e.g. St Anne’s Parish, Warsaw",
     "err_required": "Please choose your community (if it is not listed, pick “Other”).",
     "err_other": "Please enter the name of your community."
+  },
+  "cash": {
+    "title": "Cash to bring",
+    "desc": "Please have this amount with you when you check in on site (exact change if possible). We have also sent it by e-mail."
+  },
+  "manage": {
+    "success_q": "Change of plans?",
+    "success_desc": "You can add or change accommodation later — the link is also in your confirmation e-mail.",
+    "success_cta": "Manage accommodation",
+    "tab_title": "Your registration",
+    "supertitle": "Your registration",
+    "reg_number": "Registration number",
+    "participants": "Participants",
+    "accommodation": "Accommodation",
+    "current_total": "Current amount",
+    "new_total": "New amount",
+    "save": "Save accommodation change",
+    "saving": "Saving…",
+    "saved": "Saved. We have e-mailed you a confirmation with the new amount.",
+    "no_changes": "No changes to save.",
+    "save_error": "The change could not be saved. Please try again or contact the organisers.",
+    "not_found": "Registration not found. Please check the link in your e-mail.",
+    "lock_PAID": "This registration is already paid — please arrange accommodation changes with the organisers.",
+    "lock_CANCELLED": "This registration has been cancelled.",
+    "lock_CLOSED": "Registration is closed — please arrange accommodation changes with the organisers.",
+    "lock_STARTED": "The event has already started — please arrange changes with the organisers.",
+    "lock_NO_ACCOMMODATION": "This event does not offer accommodation.",
+    "payment_cash": "Cash payment at check-in",
+    "payment_transfer": "Bank transfer",
+    "payment_online": "Online payment",
+    "transfer_note": "If the amount went up, please transfer the difference (reference: registration number)."
   }
 }

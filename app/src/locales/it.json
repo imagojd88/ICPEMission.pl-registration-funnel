@@ -23,7 +23,8 @@
     "cta_hint": "La registrazione richiede circa 3 minuti · vi preghiamo di iscrivervi per tempo",
     "next_date_title": "Prossima data",
     "notify_me": "Avvisami quando si aprono le iscrizioni",
-    "closed_desc": "Le iscrizioni per questa edizione sono già chiuse. Iscriviti alla lista di notifiche per non perdere la prossima."
+    "closed_desc": "Le iscrizioni per questa edizione sono già chiuse. Iscriviti alla lista di notifiche per non perdere la prossima.",
+    "optional_stay": "alloggio facoltativo"
   },
   "invite": {
     "only_badge": "Questo evento è riservato agli ospiti invitati",
@@ -195,7 +196,16 @@
     "err_check": "Controlla l’assegnazione delle camere.",
     "err_unassigned_one": "Assegna tutti i partecipanti alle camere — manca {{count}} persona.",
     "err_unassigned_many": "Assegna tutti i partecipanti alle camere — mancano {{count}} persone.",
-    "err_unassigned_other": "Assegna tutti i partecipanti alle camere — mancano {{count}} persone."
+    "err_unassigned_other": "Assegna tutti i partecipanti alle camere — mancano {{count}} persone.",
+    "title_optional": "Alloggio (facoltativo)",
+    "optional_hint": "L’alloggio non è obbligatorio — è utile se arrivi da lontano. Scegli una camera oppure indica che non ti serve. Le persone non assegnate a una camera saranno senza alloggio.",
+    "no_accommodation": "Non ho bisogno di alloggio",
+    "no_accommodation_many": "Non abbiamo bisogno di alloggio",
+    "no_accommodation_desc": "Vengo solo per la giornata. Potrai aggiungere l’alloggio più tardi tramite il link nell’e-mail.",
+    "no_accommodation_short": "Senza alloggio",
+    "without_room_list": "Senza alloggio:",
+    "add_first": "Scegli una camera",
+    "err_choose": "Seleziona “Non ho bisogno di alloggio” oppure scegli una camera."
   },
   "options": {
     "title": "Opzioni e consensi",
@@ -405,5 +415,36 @@
     "parish_ph": "es. Parrocchia di Sant’Anna, Varsavia",
     "err_required": "Scegli la tua comunità (se non è nell’elenco, scegli «Altra»).",
     "err_other": "Scrivi il nome della tua comunità."
+  },
+  "cash": {
+    "title": "Contanti da portare",
+    "desc": "Ti preghiamo di avere con te questo importo al momento della registrazione in loco (possibilmente l’importo esatto). Te lo abbiamo inviato anche via e-mail."
+  },
+  "manage": {
+    "success_q": "Hai cambiato idea?",
+    "success_desc": "Puoi aggiungere o modificare l’alloggio più tardi — il link è anche nell’e-mail di conferma.",
+    "success_cta": "Gestisci l’alloggio",
+    "tab_title": "La tua iscrizione",
+    "supertitle": "La tua iscrizione",
+    "reg_number": "Numero di iscrizione",
+    "participants": "Partecipanti",
+    "accommodation": "Alloggio",
+    "current_total": "Importo attuale",
+    "new_total": "Nuovo importo",
+    "save": "Salva la modifica dell’alloggio",
+    "saving": "Salvataggio…",
+    "saved": "Salvato. Ti abbiamo inviato una conferma con il nuovo importo.",
+    "no_changes": "Nessuna modifica da salvare.",
+    "save_error": "Impossibile salvare la modifica. Riprova o contatta gli organizzatori.",
+    "not_found": "Iscrizione non trovata. Controlla il link nell’e-mail.",
+    "lock_PAID": "L’iscrizione è già pagata — concorda le modifiche con gli organizzatori.",
+    "lock_CANCELLED": "Questa iscrizione è stata annullata.",
+    "lock_CLOSED": "Le iscrizioni sono chiuse — concorda le modifiche con gli organizzatori.",
+    "lock_STARTED": "L’evento è già iniziato — concorda le modifiche con gli organizzatori.",
+    "lock_NO_ACCOMMODATION": "Questo evento non offre alloggio.",
+    "payment_cash": "Pagamento in contanti alla registrazione",
+    "payment_transfer": "Bonifico bancario",
+    "payment_online": "Pagamento online",
+    "transfer_note": "Se l’importo è aumentato, ti preghiamo di versare la differenza (causale: numero di iscrizione)."
   }
 }
