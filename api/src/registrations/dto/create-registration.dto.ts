@@ -47,7 +47,7 @@ export class CreateRegistrationDto {
   @IsOptional() @IsArray() @IsString({ each: true }) dietaryTags?: string[];
   @IsOptional() @ValidateNested() @Type(() => OptionsDto) options?: OptionsDto;
   @IsOptional() @IsString() discountCode?: string;
-  @IsIn(['ONLINE', 'BANK_TRANSFER', 'CASH']) @ApiProperty() paymentMethod!: 'ONLINE' | 'BANK_TRANSFER' | 'CASH';
+  @IsIn(['ONLINE', 'BANK_TRANSFER', 'CASH', 'LEADER_DEPOSIT']) @ApiProperty() paymentMethod!: 'ONLINE' | 'BANK_TRANSFER' | 'CASH' | 'LEADER_DEPOSIT';
   @ValidateNested() @Type(() => ConsentsDto) @ApiProperty() consents!: ConsentsDto;
   /** Token osobistego zaproszenia (link z maila `/r/:slug?inv=`) — spina zaproszenie ze zgłoszeniem. */
   @IsOptional() @IsString() invitationToken?: string;

@@ -42,6 +42,7 @@ enum PaymentMethod {
   ONLINE
   BANK_TRANSFER
   CASH
+  LEADER_DEPOSIT // zaliczka u lidera wspólnoty ICPE + reszta gotówką na miejscu
 }
 
 enum PaymentStatus {

@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
-import { formatMoney } from '../shared';
+import { formatMoney, leaderDepositSplit } from '../shared';
 
 /** Podsumowanie noclegu w mailach (dane przekazywane przez RegistrationsService). */
 export interface MailAccommodation {
@@ -33,9 +33,17 @@ function accommodationLines(acc: MailAccommodation | undefined, lang: MailLang):
 }
 
 /** Akapit o płatności: przy gotówce — kwota, którą trzeba mieć przy sobie na rejestracji. */
-function paymentLines(method: unknown, amount: string, lang: MailLang, total: number): string[] {
+function paymentLines(method: unknown, amount: string, lang: MailLang, total: number, currency = 'PLN', leaderPct?: number): string[] {
   const en = lang === 'en';
   if (total <= 0) return [];
+  if (method === 'LEADER_DEPOSIT') {
+    // Zaliczka u lidera wspólnoty + reszta gotówką przy rejestracji.
+    const s = leaderDepositSplit(total, { leaderDepositPct: leaderPct });
+    const f = (n: number) => formatMoney(n, currency as 'PLN' | 'EUR' | 'USD', lang);
+    return en
+      ? [`Amount: ${amount}.`, `Payment: please hand a deposit of ${f(s.deposit)} (${s.pct}%) to your community leader.`, `Please bring the remaining ${f(s.rest)} in cash to the registration desk.`]
+      : [`Kwota: ${amount}.`, `Płatność: zaliczkę ${f(s.deposit)} (${s.pct}%) przekaż liderowi swojej wspólnoty.`, `Pozostałe ${f(s.rest)} prosimy mieć przy sobie gotówką przy rejestracji na miejscu.`];
+  }
   if (method === 'CASH') {
     return en
       ? [`Payment: cash at registration desk.`, `Please bring ${amount} in cash (the exact amount if possible).`]
@@ -386,7 +394,7 @@ export class NotificationsService {
     const d = payload.data as Record<string, unknown>;
     const money = (v: unknown, cur: unknown) => `${Number(v ?? 0)} ${String(cur ?? 'PLN')}`;
     const payLabel = (m: unknown) =>
-      m === 'ONLINE' ? 'płatność online' : m === 'CASH' ? 'gotówka na miejscu' : 'przelew bankowy';
+      m === 'ONLINE' ? 'płatność online' : m === 'CASH' ? 'gotówka na miejscu' : m === 'LEADER_DEPOSIT' ? 'zaliczka u lidera + reszta gotówką' : 'przelew bankowy';
 
     if (payload.type === 'CONFIRMATION') {
       const lang: MailLang = payload.locale === 'en' ? 'en' : 'pl';
@@ -402,7 +410,7 @@ export class NotificationsService {
         '',
         en ? `Thank you for registering for: ${title}.` : `Dziękujemy za zgłoszenie na: ${title}.`,
         ...accommodationLines(acc, lang),
-        ...paymentLines(d.paymentMethod, amount, lang, total),
+        ...paymentLines(d.paymentMethod, amount, lang, total, String(d.currency ?? 'PLN'), d.leaderDepositPct as number | undefined),
         '',
         `${en ? 'Registration number' : 'Numer zgłoszenia'}: ${String(payload.registrationId ?? '')}`,
       ];
@@ -599,7 +607,7 @@ export class NotificationsService {
           '',
           en ? `We have saved your accommodation change for: ${title}.` : `Zapisaliśmy zmianę noclegu w zgłoszeniu na: ${title}.`,
           ...accommodationLines(d.accommodation as MailAccommodation | undefined, lang),
-          ...(total > 0 ? paymentLines(d.paymentMethod, amount, lang, total) : [en ? 'Amount: free of charge.' : 'Kwota: bezpłatnie.']),
+          ...(total > 0 ? paymentLines(d.paymentMethod, amount, lang, total, String(d.currency ?? 'PLN'), d.leaderDepositPct as number | undefined) : [en ? 'Amount: free of charge.' : 'Kwota: bezpłatnie.']),
           '',
           `${en ? 'Registration number' : 'Numer zgłoszenia'}: ${String(payload.registrationId ?? '')}`,
         ],
@@ -761,6 +769,8 @@ export class NotificationsService {
     accommodation?: MailAccommodation;
     /** Link do strony zgłoszenia (zmiana / domówienie noclegu). */
     manageLink?: string;
+    /** % zaliczki u lidera (metoda LEADER_DEPOSIT); domyślnie 50. */
+    leaderDepositPct?: number;
   }) {
     await this.sendMail({
       to: opts.to,
@@ -776,7 +786,7 @@ export class NotificationsService {
     to: string; locale: string; registrationId: string; eventTitle: string;
     totalPrice: number; oldTotal: number; currency: string; paymentMethod: string;
     accommodation: MailAccommodation; before: MailAccommodation; manageLink: string;
-    guestName: string;
+    guestName: string; leaderDepositPct?: number;
   }) {
     await this.sendMail({ to: opts.to, type: 'ACCOMMODATION_CHANGED', locale: opts.locale, registrationId: opts.registrationId, data: opts });
     const admin = this.replyTo();

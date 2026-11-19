@@ -20,6 +20,7 @@ function methodLabel(m?: string): string {
   if (m === 'ONLINE') return 'Online'
   if (m === 'BANK_TRANSFER') return 'Przelew'
   if (m === 'CASH') return 'Gotówka'
+  if (m === 'LEADER_DEPOSIT') return 'Zaliczka u lidera'
   return '—'
 }
 

@@ -1410,7 +1410,7 @@ export interface ManagedRegistration {
   discountCode?: string
   totalPrice: number
   currency: 'PLN' | 'EUR' | 'USD'
-  paymentMethod?: 'ONLINE' | 'BANK_TRANSFER' | 'CASH'
+  paymentMethod?: 'ONLINE' | 'BANK_TRANSFER' | 'CASH' | 'LEADER_DEPOSIT'
   event: {
     title: string | Record<string, string>
     startsAt: string

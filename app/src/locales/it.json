@@ -240,7 +240,9 @@
     "cta": "Vai al riepilogo →",
     "selected": "Selezionato",
     "cash": "Contanti sul posto",
-    "cash_tags": "Paga in contanti il giorno dell’arrivo"
+    "cash_tags": "Paga in contanti il giorno dell’arrivo",
+    "leader": "Acconto tramite il responsabile della comunità",
+    "leader_tags": "Consegni {{deposit}} ({{pct}}%) al responsabile e paghi il saldo di {{rest}} in contanti sul posto"
   },
   "summary": {
     "supertitle": "Ultimo passo",
@@ -288,7 +290,10 @@
     "abbr_formation": "form.",
     "abbr_accommodation": "alloggio",
     "abbr_meals": "pasti",
-    "diet": "Dieta"
+    "diet": "Dieta",
+    "leader_title": "Acconto tramite il responsabile della comunità",
+    "leader_desc": "Consegna un acconto di {{deposit}} ({{pct}}%) al responsabile della tua comunità. Il saldo di {{rest}} lo paghi in contanti alla registrazione.",
+    "submit_leader": "Iscriviti con acconto al responsabile →"
   },
   "success": {
     "paid_title": "Grazie!",
@@ -311,7 +316,9 @@
     "acct_error": "Impossibile creare l’account. Riprova più tardi.",
     "acct_desc": "Un account ti permette di gestire l’iscrizione e di iscriverti più velocemente la prossima volta.",
     "cash_msg": "La tua iscrizione è stata ricevuta. Pagherai in contanti sul posto.",
-    "status_cash": "Pagamento sul posto"
+    "status_cash": "Pagamento sul posto",
+    "leader_msg": "La tua iscrizione è stata ricevuta. Consegna l’acconto al responsabile della comunità e paga il saldo in contanti sul posto.",
+    "status_leader": "Acconto al responsabile"
   },
   "admin": {
     "dashboard": "Dashboard",
@@ -454,6 +461,13 @@
     "payment_cash": "Pagamento in contanti alla registrazione",
     "payment_transfer": "Bonifico bancario",
     "payment_online": "Pagamento online",
-    "transfer_note": "Se l’importo è aumentato, ti preghiamo di versare la differenza (causale: numero di iscrizione)."
+    "transfer_note": "Se l’importo è aumentato, ti preghiamo di versare la differenza (causale: numero di iscrizione).",
+    "payment_leader": "Acconto al responsabile + saldo in contanti sul posto"
+  },
+  "leader": {
+    "deposit_title": "Acconto per il responsabile ({{pct}}%)",
+    "deposit_desc": "Consegna questo importo al responsabile della tua comunità.",
+    "rest_title": "Saldo in contanti sul posto",
+    "rest_desc": "Ti preghiamo di avere con te questo importo al momento della registrazione (possibilmente esatto). Ti abbiamo inviato entrambi gli importi via e-mail."
   }
 }

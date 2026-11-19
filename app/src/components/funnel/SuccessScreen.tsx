@@ -2,12 +2,13 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { UserPlus, Users, BedDouble } from 'lucide-react'
 import CashAmountBox from './CashAmountBox'
+import LeaderDepositBox from './LeaderDepositBox'
 import { Link } from 'react-router-dom'
 import { formatMoney } from '@icpe/shared'
 import type { RegistrationStatus } from '@icpe/shared'
 
 interface Props {
-  paymentMethod: 'online' | 'transfer' | 'cash' | null
+  paymentMethod: 'online' | 'transfer' | 'cash' | 'leader' | null
   email: string
   total: number
   currency?: 'PLN' | 'EUR' | 'USD'
@@ -19,15 +20,18 @@ interface Props {
   guestInviteHref?: string
   /** Strona zgłoszenia (zmiana / domówienie noclegu) — gdy event oferuje noclegi. */
   manageHref?: string
+  /** % zaliczki u lidera (metoda „leader”). */
+  leaderDepositPct?: number
 }
 
-export default function SuccessScreen({ paymentMethod, email, total, currency, regNumber, status, onBack, onCreateAccount, guestInviteHref, manageHref }: Props) {
+export default function SuccessScreen({ paymentMethod, email, total, currency, regNumber, status, onBack, onCreateAccount, guestInviteHref, manageHref, leaderDepositPct }: Props) {
   const { t, i18n } = useTranslation()
   const [acct, setAcct] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
 
   const isPaid = status ? status === 'CONFIRMED' : paymentMethod === 'online'
   // Gotówka na miejscu — nie prosimy o przelew.
   const isCash = paymentMethod === 'cash'
+  const isLeader = paymentMethod === 'leader'
   const displayReg = regNumber ?? '—'
 
   async function handleAccount() {
@@ -76,11 +80,12 @@ export default function SuccessScreen({ paymentMethod, email, total, currency, r
 
       {/* Message */}
       <p className="text-sm text-center leading-relaxed" style={{ color: 'var(--muted)' }}>
-        {isPaid ? t('success.paid_msg') : isCash ? t('success.cash_msg') : t('success.transfer_msg')}
+        {isPaid ? t('success.paid_msg') : isLeader ? t('success.leader_msg') : isCash ? t('success.cash_msg') : t('success.transfer_msg')}
       </p>
 
       {/* Gotówka: kwota, którą trzeba mieć przy sobie (też w mailu z potwierdzeniem) */}
       {isCash && !isPaid && <CashAmountBox total={total} currency={currency} />}
+      {isLeader && !isPaid && <LeaderDepositBox total={total} currency={currency} pct={leaderDepositPct} />}
 
       {/* Registration card */}
       <div
@@ -113,7 +118,7 @@ export default function SuccessScreen({ paymentMethod, email, total, currency, r
                 : { background: 'var(--warn-soft)', color: 'var(--warn)' }
             }
           >
-            {isPaid ? t('success.status_paid') : isCash ? t('success.status_cash') : t('success.status_pending')}
+            {isPaid ? t('success.status_paid') : isLeader ? t('success.status_leader') : isCash ? t('success.status_cash') : t('success.status_pending')}
           </span>
         </div>
 

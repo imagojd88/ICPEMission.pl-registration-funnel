@@ -236,7 +236,9 @@
     "cta": "Proceed to summary →",
     "selected": "Selected",
     "cash": "Cash on site",
-    "cash_tags": "Pay in cash on the day you arrive"
+    "cash_tags": "Pay in cash on the day you arrive",
+    "leader": "Deposit via your community leader",
+    "leader_tags": "You hand {{deposit}} ({{pct}}%) to your leader and pay the remaining {{rest}} in cash on site"
   },
   "summary": {
     "supertitle": "Final step",
@@ -284,7 +286,10 @@
     "abbr_formation": "form.",
     "abbr_accommodation": "accom.",
     "abbr_meals": "meals",
-    "diet": "Diet"
+    "diet": "Diet",
+    "leader_title": "Deposit via your community leader",
+    "leader_desc": "Hand a deposit of {{deposit}} ({{pct}}%) to your community leader. Pay the remaining {{rest}} in cash at the registration desk.",
+    "submit_leader": "Register with a leader deposit →"
   },
   "success": {
     "paid_title": "Thank you!",
@@ -307,7 +312,9 @@
     "acct_error": "Could not create the account. Please try again later.",
     "acct_desc": "An account lets you manage your registration and sign up faster next time.",
     "cash_msg": "Your registration has been received. You will pay in cash on site.",
-    "status_cash": "Pay on site"
+    "status_cash": "Pay on site",
+    "leader_msg": "Your registration has been received. Hand the deposit to your community leader and pay the rest in cash on site.",
+    "status_leader": "Leader deposit"
   },
   "admin": {
     "dashboard": "Dashboard",
@@ -450,6 +457,13 @@
     "payment_cash": "Cash payment at check-in",
     "payment_transfer": "Bank transfer",
     "payment_online": "Online payment",
-    "transfer_note": "If the amount went up, please transfer the difference (reference: registration number)."
+    "transfer_note": "If the amount went up, please transfer the difference (reference: registration number).",
+    "payment_leader": "Leader deposit + rest in cash on site"
+  },
+  "leader": {
+    "deposit_title": "Deposit for your leader ({{pct}}%)",
+    "deposit_desc": "Hand this amount to your community leader.",
+    "rest_title": "Remaining amount in cash on site",
+    "rest_desc": "Please bring this amount to the registration desk (exact change if possible). We have also e-mailed both amounts."
   }
 }

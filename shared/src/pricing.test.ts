@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { computePrice, validateRoomCapacity, buildPriceInput, countRoomsByType, roomAvailability, roomStockShortages, DEFAULT_PRICING, type PricingConfig } from './pricing.ts';
+import { computePrice, validateRoomCapacity, buildPriceInput, countRoomsByType, roomAvailability, roomStockShortages, leaderDepositSplit, DEFAULT_PRICING, type PricingConfig } from './pricing.ts';
 
 test('ojciec + dziecko 8 + maluch 2 w pokoju 2-os. (1 noc)', () => {
   const r = computePrice({
@@ -172,4 +172,10 @@ test('zniżki dzieci osobno: nocleg gratis do 3 lat, wydarzenie pełne', () => {
   // stary próg (bez eventMultiplier) bez zmian: mnożnik 0 = całość gratis
   const legacy = computePrice({ rooms: [], withoutRoom: [{ type: 'child', age: 2 }] }, { ...cfg, childBrackets: [{ ltAge: 4, multiplier: 0 }] });
   assert.equal(legacy.total, 0);
+});
+
+test('zaliczka u lidera: domyślnie 50%, reszta na miejscu', () => {
+  assert.deepEqual(leaderDepositSplit(230), { pct: 50, deposit: 115, rest: 115 });
+  assert.deepEqual(leaderDepositSplit(225), { pct: 50, deposit: 113, rest: 112 });
+  assert.deepEqual(leaderDepositSplit(200, { leaderDepositPct: 30 }), { pct: 30, deposit: 60, rest: 140 });
 });

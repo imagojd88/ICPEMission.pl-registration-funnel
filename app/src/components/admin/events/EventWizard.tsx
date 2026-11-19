@@ -1,3 +1,4 @@
+import LeaderDepositFields from './LeaderDepositFields'
 import AgeDiscountsEditor, { bracketsFromRows, rowsFromBrackets, type AgeDiscountRow } from './AgeDiscountsEditor'
 import DietOptionsSelect from './DietOptionsSelect'
 import { priceHint } from './RoomPriceFields'
@@ -105,6 +106,10 @@ interface WizardState {
   payOnline: boolean
   payTransfer: boolean
   payCash: boolean
+  /** Zaliczka u lidera wspólnoty (LEADER_DEPOSIT) */
+  payLeader: boolean
+  /** jej wysokość w % */
+  leaderPct: string
   payFree: boolean
   currency: 'PLN' | 'EUR' | 'USD'
   // step 2
@@ -361,6 +366,8 @@ function mapEditConfigToState(prev: WizardState, cfg: EventEditConfig, slug: str
     payOnline: pm.includes('ONLINE'),
     payTransfer: pm.includes('BANK_TRANSFER'),
     payCash: pm.includes('CASH'),
+    payLeader: pm.includes('LEADER_DEPOSIT'),
+    leaderPct: String(pc?.leaderDepositPct ?? 50),
     payFree: !!pc?.free,
     currency: (pc?.currency as 'PLN' | 'EUR' | 'USD') ?? 'PLN',
     rooms,
@@ -437,6 +444,7 @@ function buildPricingConfig(state: WizardState): PricingConfig {
     formationFee: parseFloat(state.formationFee) || DEFAULT_PRICING.formationFee,
     mealsFee: parseFloat(state.mealsFee) || DEFAULT_PRICING.mealsFee,
     nights,
+    ...(state.payLeader ? { leaderDepositPct: Math.min(100, Math.max(1, parseInt(state.leaderPct) || 50)) } : {}),
     ...(state.optionalStay && !state.noAccommodation ? { accommodationOptional: true } : {}),
     ...(state.optionalStay && parseFloat(state.overnightMeals) > 0 ? { overnightMealsFee: parseFloat(state.overnightMeals) } : {}),
     childBrackets: parsedBrackets.length > 0 ? parsedBrackets : DEFAULT_PRICING.childBrackets,
@@ -950,6 +958,15 @@ function Step1Details({ state, update }: { state: WizardState; update: (p: Parti
             </label>
           ))}
         </div>
+        )}
+        {!state.payFree && (
+          <LeaderDepositFields
+            enabled={state.payLeader}
+            onEnabled={(v) => update({ payLeader: v })}
+            pct={state.leaderPct}
+            onPct={(v) => update({ leaderPct: v })}
+            communityField={state.affiliationField === 'community'}
+          />
         )}
       </div>
     </div>
@@ -1642,6 +1659,8 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
     payOnline: true,
     payTransfer: true,
     payCash: false,
+    payLeader: false,
+    leaderPct: '50',
     payFree: false,
     currency: 'PLN',
     rooms: [],
@@ -1739,6 +1758,7 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
       if (state.payOnline) paymentMethods.push('ONLINE')
       if (state.payTransfer) paymentMethods.push('BANK_TRANSFER')
       if (state.payCash) paymentMethods.push('CASH')
+      if (state.payLeader) paymentMethods.push('LEADER_DEPOSIT')
 
       // Compute endsAt: if dateEnd provided use it, else dateStart + nights days
       const endsAt = state.dateEnd

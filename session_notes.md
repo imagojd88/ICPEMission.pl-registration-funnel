@@ -51,6 +51,15 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — panel admina (kreator eventów)
 
+### Płatność: zaliczka u lidera wspólnoty (2026-11-19)
+- **Prośba (Jacek):** opcja płatności „przekaż zaliczkę liderowi (50%)”, włączana w ustawieniach eventu, widoczna TYLKO gdy gość wybierze wspólnotę z sieci ICPE. **Ustalenia:** kwalifikuje się cała lista wspólnot (Polska + ICPE Worldwide), bez „Inna”; reszta (50%) gotówką na miejscu.
+- **Model:** nowa wartość enumu `PaymentMethod.LEADER_DEPOSIT` (Prisma + shared + DTO) — w `paymentMethods` eventu; `pricingConfig.leaderDepositPct` (domyślnie 50); `leaderDepositSplit(total, cfg)` → zaliczka (zaokr.) + reszta. Test 14/14.
+- **API:** `create` odrzuca LEADER_DEPOSIT (400), gdy event jej nie ma albo kontakt nie ma wspólnoty z listy (`community` puste lub `communityOther`). Status jak gotówka (`AWAITING_TRANSFER`). Odpowiedź `payment: {method, pct, deposit, rest}`. Maile (potwierdzenie, zmiana noclegu): „zaliczkę X (50%) przekaż liderowi… Pozostałe Y gotówką przy rejestracji”, PL/EN.
+- **Formularz:** `PaymentMethodScreen` — karta „Zaliczka u lidera wspólnoty” z kwotami, tylko gdy `affiliationField = community` i wybrana wspólnota z listy; wybór kasowany, gdy gość zmieni wspólnotę na „Inna”. Podsumowanie (karta + „Zgłoszenie z zaliczką u lidera →”), ekran sukcesu i strona zgłoszenia `/z/`: `LeaderDepositBox` (zaliczka + reszta gotówką). PostHog: `payment_method: 'leader'`.
+- **Panel:** `admin/events/LeaderDepositFields.tsx` w „Metody płatności” (edycja i kreator): checkbox + % zaliczki; ostrzeżenie, gdy formularz nie pyta o wspólnotę. Płatności: etykieta „Zaliczka u lidera”.
+- **Weryfikacja:** tsc app/api ✓, build ✓; mail wyrenderowany (230 zł → 115 + 115); Playwright: wspólnota „ICPE Mission Warszawa” → opcja widoczna, POST `LEADER_DEPOSIT`, ekran sukcesu 45 + 45 zł; „Inna” → opcji brak. Panelu nie klikałem (tsc).
+- Stan: do pushu + **Manual Deploy `icpe-api` PRZED włączeniem opcji** (nowa wartość enumu w bazie — bez deployu zapis eventu z tą metodą się nie powiedzie). Do sprawdzenia przez Jacka: jak lider rozlicza zaliczkę (panel nie ma osobnego statusu „zaliczka wpłacona”).
+
 ### Podgląd na żywo ekranów gościa w „Edytuj event” (2026-11-19)
 - **Prośba (Jacek):** w pustym miejscu po prawej stronie edycji eventu — podgląd, jak wyglądają poszczególne ekrany dla użytkownika.
 - **Panel:** `admin/events/EventPreviewPane.tsx` — ramka telefonu (sticky, widoczna od szerokości `xl` = 1280 px) z prawdziwym lejkiem `/r/<zapisany slug>?preview=1` w iframe; zakładki: Strona, Dane, Uczestnicy, Preferencje, Nocleg (gdy są pokoje), Opcje, Płatność (gdy płatny), Podsumowanie, Po wysłaniu; STANDALONE/INVITE — tylko Strona. Odśwież / otwórz zapisaną stronę. Język podglądu = zakładka „Język treści”.

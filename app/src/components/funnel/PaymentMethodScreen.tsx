@@ -1,17 +1,23 @@
-import { CreditCard, Landmark, Banknote } from 'lucide-react'
+import { CreditCard, Landmark, Banknote, Users } from 'lucide-react'
+import { formatMoney, leaderDepositSplit } from '@icpe/shared'
 import { useTranslation } from 'react-i18next'
 import type { PaymentMethod } from '@icpe/shared'
 
 interface Props {
-  selected: 'online' | 'transfer' | 'cash' | null
-  onSelect: (method: 'online' | 'transfer' | 'cash') => void
+  selected: 'online' | 'transfer' | 'cash' | 'leader' | null
+  onSelect: (method: 'online' | 'transfer' | 'cash' | 'leader') => void
   onContinue: () => void
   onBack: () => void
   availableMethods?: PaymentMethod[]
+  /** Gość wybrał wspólnotę z listy ICPE — tylko wtedy pokazujemy zaliczkę u lidera. */
+  leaderEligible?: boolean
+  leaderDepositPct?: number
+  total?: number
+  currency?: 'PLN' | 'EUR' | 'USD'
 }
 
 interface CardProps {
-  id: 'online' | 'transfer' | 'cash'
+  id: 'online' | 'transfer' | 'cash' | 'leader'
   icon: typeof CreditCard
   title: string
   tags: string
@@ -82,8 +88,8 @@ function PaymentCard({ icon: Icon, title, tags, selected, onSelect }: CardProps)
   )
 }
 
-export default function PaymentMethodScreen({ selected, onSelect, onContinue, onBack, availableMethods }: Props) {
-  const { t } = useTranslation()
+export default function PaymentMethodScreen({ selected, onSelect, onContinue, onBack, availableMethods, leaderEligible, leaderDepositPct, total = 0, currency }: Props) {
+  const { t, i18n } = useTranslation()
 
   // Default: show all methods if not specified
   const enabled = availableMethods && availableMethods.length > 0
@@ -93,6 +99,9 @@ export default function PaymentMethodScreen({ selected, onSelect, onContinue, on
   const showOnline = enabled.includes('ONLINE')
   const showTransfer = enabled.includes('BANK_TRANSFER')
   const showCash = enabled.includes('CASH')
+  const showLeader = enabled.includes('LEADER_DEPOSIT') && !!leaderEligible
+  const split = leaderDepositSplit(total, { leaderDepositPct })
+  const money = (n: number) => formatMoney(n, currency, i18n.language)
 
   return (
     <div className="flex flex-col min-h-screen" style={{ background: 'var(--bg)' }}>
@@ -146,6 +155,16 @@ export default function PaymentMethodScreen({ selected, onSelect, onContinue, on
               tags={t('payment_method.cash_tags', 'Zapłać gotówką w dniu przyjazdu')}
               selected={selected === 'cash'}
               onSelect={() => onSelect('cash')}
+            />
+          )}
+          {showLeader && (
+            <PaymentCard
+              id="leader"
+              icon={Users}
+              title={t('payment_method.leader')}
+              tags={t('payment_method.leader_tags', { deposit: money(split.deposit), rest: money(split.rest), pct: split.pct })}
+              selected={selected === 'leader'}
+              onSelect={() => onSelect('leader')}
             />
           )}
         </div>

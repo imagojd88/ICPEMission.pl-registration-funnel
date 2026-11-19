@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { computePrice, formatMoney, roomLabel, buildIcs, googleCalendarUrl, hasAccommodation } from '@icpe/shared'
+import { computePrice, formatMoney, roomLabel, buildIcs, googleCalendarUrl, hasAccommodation, leaderDepositSplit } from '@icpe/shared'
 import type { EventInstanceDto, PricingConfig, PriceLine } from '@icpe/shared'
 import type { StepperState } from '../../pages/PublicFunnel'
 import { bcp47 } from '../../lib/utils'
@@ -89,6 +89,8 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
 
   const isOnline = state.paymentMethod === 'online'
   const isCash = state.paymentMethod === 'cash'
+  const isLeader = state.paymentMethod === 'leader'
+  const leaderSplit = leaderDepositSplit(price.total, pricingConfig)
 
   // Calendar helpers
   const calInput = {
@@ -413,6 +415,29 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
             <p className="text-xs text-center" style={{ color: 'var(--muted)' }}>
               {t('summary.payment_secure')}
             </p>
+          </div>
+        ) : isLeader ? (
+          <div className="flex flex-col gap-4">
+            {/* Zaliczka u lidera wspólnoty + reszta gotówką */}
+            <div
+              className="rounded-[15px] p-4 flex flex-col gap-3"
+              style={{ border: '1px solid var(--border)', background: 'var(--surface)' }}
+            >
+              <h3 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+                {t('summary.leader_title')}
+              </h3>
+              <p className="text-sm leading-relaxed" style={{ color: 'var(--muted)' }}>
+                {t('summary.leader_desc', { deposit: money(leaderSplit.deposit), rest: money(leaderSplit.rest), pct: leaderSplit.pct })}
+              </p>
+            </div>
+            <button
+              onClick={onSubmit}
+              disabled={submitting}
+              className="w-full text-white text-sm font-semibold rounded-[16px] py-4 transition-all duration-150 active:scale-[0.98] hover:opacity-90"
+              style={{ background: 'var(--accent)', border: 'none', cursor: 'pointer' }}
+            >
+              {t('summary.submit_leader')}
+            </button>
           </div>
         ) : isCash ? (
           <div className="flex flex-col gap-4">

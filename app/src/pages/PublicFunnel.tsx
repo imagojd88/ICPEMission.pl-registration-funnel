@@ -19,9 +19,10 @@ function splitName(full: string): { firstName: string; lastName?: string } {
   return { firstName: parts[0], lastName: parts.slice(1).join(' ') }
 }
 
-function toPaymentMethod(m: 'online' | 'transfer' | 'cash' | null): PaymentMethod {
+function toPaymentMethod(m: 'online' | 'transfer' | 'cash' | 'leader' | null): PaymentMethod {
   if (m === 'online') return 'ONLINE'
   if (m === 'cash') return 'CASH'
+  if (m === 'leader') return 'LEADER_DEPOSIT'
   return 'BANK_TRANSFER'
 }
 import { Skeleton } from '../components/ui/Skeleton'
@@ -101,7 +102,7 @@ export interface StepperState {
   discountCode: string
   discountApplied: boolean
   consents: { rodo: boolean; regulamin: boolean }
-  paymentMethod: 'online' | 'transfer' | 'cash' | null
+  paymentMethod: 'online' | 'transfer' | 'cash' | 'leader' | null
 }
 
 // ─── Initial state ──────────────────────────────────────────────────────────
@@ -724,6 +725,7 @@ export default function PublicFunnel() {
       patchStepper({ paymentMethod: 'cash' })
       setScreen('summary')
     } else {
+      if (stepper.paymentMethod === 'leader' && !leaderEligible) patchStepper({ paymentMethod: null })
       setScreen('payment_method')
     }
   }
@@ -734,6 +736,11 @@ export default function PublicFunnel() {
   }
 
   const handlePaymentMethodContinue = () => {
+    // Zaliczka u lidera tylko dla wspólnoty z listy — gdyby gość w międzyczasie zmienił wspólnotę.
+    if (stepper.paymentMethod === 'leader' && !leaderEligible) {
+      patchStepper({ paymentMethod: null })
+      return
+    }
     if (stepper.paymentMethod) {
       track('payment_method_selected', { payment_method: stepper.paymentMethod })
       setScreen('summary')
@@ -870,6 +877,12 @@ export default function PublicFunnel() {
 
   const finalPrice = event ? computePrice(priceInput, pricingConfig) : null
 
+  // Zaliczka u lidera: event ją włączył + gość wybrał wspólnotę z listy ICPE (nie „Inna").
+  const leaderEligible =
+    affiliation === 'community' &&
+    !!stepper.applicant.community &&
+    stepper.applicant.community !== COMMUNITY_OTHER
+
   if (loading) {
     return (
       <div className="min-h-screen" style={{ background: 'var(--bg)' }}>
@@ -981,6 +994,10 @@ export default function PublicFunnel() {
           onContinue={handlePaymentMethodContinue}
           onBack={handlePaymentMethodBack}
           availableMethods={event.paymentMethods}
+          leaderEligible={leaderEligible}
+          leaderDepositPct={pricingConfig.leaderDepositPct}
+          total={finalPrice?.total ?? 0}
+          currency={pricingConfig.currency}
         />
       )}
 
@@ -1001,6 +1018,7 @@ export default function PublicFunnel() {
       {screen === 'success' && (
         <SuccessScreen
           paymentMethod={stepper.paymentMethod}
+          leaderDepositPct={pricingConfig.leaderDepositPct}
           email={stepper.applicant.email}
           total={preview ? finalPrice?.total ?? 0 : result?.total ?? finalPrice?.total ?? 0}
           currency={pricingConfig.currency}

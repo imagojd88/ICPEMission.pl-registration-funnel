@@ -6,7 +6,8 @@ export type ParticipantType = 'adult' | 'child';
 
 export type EventType = 'ONE_TIME' | 'EVERGREEN' | 'STANDALONE' | 'INVITE';
 export type InstanceStatus = 'DRAFT' | 'OPEN' | 'CLOSED' | 'ARCHIVED';
-export type PaymentMethod = 'ONLINE' | 'BANK_TRANSFER' | 'CASH';
+/** LEADER_DEPOSIT = zaliczka (domyślnie 50%) u lidera wspólnoty ICPE + reszta gotówką na miejscu. */
+export type PaymentMethod = 'ONLINE' | 'BANK_TRANSFER' | 'CASH' | 'LEADER_DEPOSIT';
 export type PaymentStatus =
   | 'PENDING'
   | 'PAID'

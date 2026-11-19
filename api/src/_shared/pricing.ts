@@ -74,6 +74,11 @@ export interface PricingConfig {
   free?: boolean;
   /** waluta cen wydarzenia (kwoty wpisuje organizator w tej walucie). Domyślnie PLN. */
   currency?: 'PLN' | 'EUR' | 'USD';
+  /**
+   * Zaliczka u lidera wspólnoty (metoda płatności LEADER_DEPOSIT): ile % kwoty gość przekazuje
+   * liderowi; reszta gotówką na miejscu. Domyślnie 50.
+   */
+  leaderDepositPct?: number;
   /** opłata formacyjna per osoba (stała; zerowana tylko dla progu gratis) */
   formationFee: number;
   /** wyżywienie per osoba (pełne, za cały pobyt) — podlega mnożnikowi wieku */
@@ -344,6 +349,14 @@ export function roomLabel(name: string | Record<string, string> | undefined | nu
   if (typeof name === 'string') return name;
   const l = (lng || 'pl').slice(0, 2);
   return name[l] ?? name.pl ?? name.en ?? name.it ?? Object.values(name)[0] ?? '';
+}
+
+/** Podział kwoty przy zaliczce u lidera: zaliczka (zaokrąglona do 1) + reszta na miejscu. */
+export function leaderDepositSplit(total: number, config?: Pick<PricingConfig, 'leaderDepositPct'> | null): { pct: number; deposit: number; rest: number } {
+  const raw = Number(config?.leaderDepositPct ?? 50);
+  const pct = Number.isFinite(raw) ? Math.min(100, Math.max(1, Math.round(raw))) : 50;
+  const deposit = Math.round((total * pct) / 100);
+  return { pct, deposit, rest: Math.max(0, total - deposit) };
 }
 
 /** Formatowanie waluty: Intl pl-PL + " zł". */

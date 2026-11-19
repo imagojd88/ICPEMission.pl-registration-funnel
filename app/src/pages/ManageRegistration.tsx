@@ -12,6 +12,7 @@ import ThemeToggle from '../components/ui/ThemeToggle'
 import LanguageSwitch from '../components/ui/LanguageSwitch'
 import Step3Room from '../components/funnel/steps/Step3Room'
 import CashAmountBox from '../components/funnel/CashAmountBox'
+import LeaderDepositBox from '../components/funnel/LeaderDepositBox'
 import type { Participant, RoomEntry } from './PublicFunnel'
 
 let uid = 0
@@ -159,7 +160,12 @@ export default function ManageRegistration() {
     }
   }
 
-  const payLabel = isCash ? t('manage.payment_cash') : reg.paymentMethod === 'ONLINE' ? t('manage.payment_online') : t('manage.payment_transfer')
+  const isLeader = reg.paymentMethod === 'LEADER_DEPOSIT'
+  const payLabel = isCash
+    ? t('manage.payment_cash')
+    : isLeader
+      ? t('manage.payment_leader')
+      : reg.paymentMethod === 'ONLINE' ? t('manage.payment_online') : t('manage.payment_transfer')
 
   return (
     <div className="min-h-screen mx-auto relative" style={{ maxWidth: 452, background: 'var(--bg)' }}>
@@ -269,6 +275,7 @@ export default function ManageRegistration() {
         )}
 
         {!cfg.free && isCash && reg.status !== 'CONFIRMED' && <CashAmountBox total={reg.totalPrice} currency={currency} />}
+        {!cfg.free && isLeader && reg.status !== 'CONFIRMED' && <LeaderDepositBox total={reg.totalPrice} currency={currency} pct={cfg.leaderDepositPct} />}
         {!cfg.free && reg.paymentMethod === 'BANK_TRANSFER' && reg.status !== 'CONFIRMED' && (
           <p className="text-xs" style={{ color: 'var(--muted)' }}>{t('manage.transfer_note')}</p>
         )}

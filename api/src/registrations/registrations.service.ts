@@ -7,7 +7,7 @@ import { buildIcs, googleCalendarUrl } from '../shared';
 import { CreateRegistrationDto } from './dto/create-registration.dto';
 import { v4 as uuid } from 'uuid';
 import { guestInviteConfig, guestInvitePageLink, publicAppUrl } from '../invitations/guest-invite-config';
-import { buildPriceInput, hasAccommodation, roomLabel, PricingConfig } from '../shared';
+import { buildPriceInput, hasAccommodation, roomLabel, leaderDepositSplit, PricingConfig } from '../shared';
 import type { MailAccommodation } from '../notifications/notifications.service';
 import { assertRoomStock, instanceRoomAvailability } from './room-stock';
 
@@ -110,6 +110,16 @@ export class RegistrationsService {
 
     // Pokoje (nocleg) — przy noclegu opcjonalnym osoby bez pokoju płacą formację + wyżywienie.
     const cfg = (instance.pricingConfig ?? null) as unknown as PricingConfig | null;
+
+    // Zaliczka u lidera: tylko gdy event ją włączył i gość wybrał wspólnotę z listy (nie „Inna").
+    if (dto.paymentMethod === 'LEADER_DEPOSIT') {
+      const allowed = ((instance as { paymentMethods?: string[] }).paymentMethods ?? []).includes('LEADER_DEPOSIT');
+      const c = dto.contact as unknown as { community?: string; communityOther?: boolean };
+      if (!allowed) throw new BadRequestException('Zaliczka u lidera nie jest dostępna dla tego wydarzenia.');
+      if (!c.community?.trim() || c.communityOther) {
+        throw new BadRequestException('Zaliczka u lidera jest dostępna tylko dla członków wspólnot z listy ICPE.');
+      }
+    }
     const n = dto.participants.length;
     const rooms = normalizeRooms(dto.rooms, n, cfg);
     assertRooms(rooms, n, cfg);
@@ -197,6 +207,7 @@ export class RegistrationsService {
       paymentMethod: dto.paymentMethod,
       editToken,
       guestInviteLink,
+      leaderDepositPct: cfg?.leaderDepositPct,
       accommodation: mailAccommodation(cfg, rooms, n, dto.locale),
       manageLink: hasAccommodation(cfg) ? manageRegistrationLink(editToken) : undefined,
     }).catch(console.error);
@@ -214,6 +225,8 @@ export class RegistrationsService {
           ? { method: 'BANK_TRANSFER', transferTitle: `REG-${registration.id}` }
           : dto.paymentMethod === 'CASH'
             ? { method: 'CASH', note: 'Płatność gotówką na miejscu' }
+            : dto.paymentMethod === 'LEADER_DEPOSIT'
+              ? { method: 'LEADER_DEPOSIT', ...leaderDepositSplit(priceResult.total, cfg) }
             : { method: 'ONLINE', registrationId: registration.id },
     };
   }
@@ -412,6 +425,7 @@ export class RegistrationsService {
         accommodation: mailAccommodation(cfg, rooms, n, reg.locale),
         before: mailAccommodation(cfg, before, n, 'pl'),
         manageLink: manageRegistrationLink(reg.editToken),
+        leaderDepositPct: cfg?.leaderDepositPct,
         guestName: `${c.firstName ?? ''} ${c.lastName ?? ''}`.trim(),
       }).catch(console.error);
     }

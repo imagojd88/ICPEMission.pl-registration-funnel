@@ -1,3 +1,4 @@
+import LeaderDepositFields from './LeaderDepositFields'
 import EventPreviewPane from './EventPreviewPane'
 import type { EventInstanceDto } from '@icpe/shared'
 import type { EventConfig } from '@/lib/api'
@@ -115,6 +116,9 @@ export default function EventEditForm({
   const [payOnline, setPayOnline] = useState(false)
   const [payTransfer, setPayTransfer] = useState(false)
   const [payCash, setPayCash] = useState(false)
+  // Zaliczka u lidera wspólnoty (LEADER_DEPOSIT) + jej wysokość w %.
+  const [payLeader, setPayLeader] = useState(false)
+  const [leaderPct, setLeaderPct] = useState('50')
   const [isFree, setIsFree] = useState(false)
   const [currency, setCurrency] = useState<'PLN' | 'EUR' | 'USD'>('PLN')
   const [formationFee, setFormationFee] = useState(String(DEFAULT_PRICING.formationFee))
@@ -250,6 +254,8 @@ export default function EventEditForm({
         setPayOnline(pm.includes('ONLINE'))
         setPayTransfer(pm.includes('BANK_TRANSFER'))
         setPayCash(pm.includes('CASH'))
+        setPayLeader(pm.includes('LEADER_DEPOSIT'))
+        setLeaderPct(String(pc?.leaderDepositPct ?? 50))
         setIsFree(!!pc?.free)
         setCurrency((pc?.currency as 'PLN' | 'EUR' | 'USD') ?? 'PLN')
         setFormationFee(String(pc?.formationFee ?? DEFAULT_PRICING.formationFee))
@@ -336,6 +342,7 @@ export default function EventEditForm({
       formationFee: parseFloat(formationFee) || 0,
       mealsFee: parseFloat(mealsFee) || 0,
       nights: n,
+      ...(payLeader ? { leaderDepositPct: Math.min(100, Math.max(1, parseInt(leaderPct) || 50)) } : {}),
       ...(optionalStay ? { accommodationOptional: true } : {}),
       ...(parseFloat(overnightMeals) > 0 ? { overnightMealsFee: parseFloat(overnightMeals) } : {}),
       childBrackets: bracketsFromRows(brackets),
@@ -381,6 +388,7 @@ export default function EventEditForm({
     if (payOnline) out.push('ONLINE')
     if (payTransfer) out.push('BANK_TRANSFER')
     if (payCash) out.push('CASH')
+    if (payLeader) out.push('LEADER_DEPOSIT')
     return out
   }
   function buildDates(): { startsAt: string; endsAt: string } | null {
@@ -682,6 +690,13 @@ export default function EventEditForm({
                 {p.label}
               </label>
             ))}
+            <LeaderDepositFields
+              enabled={payLeader}
+              onEnabled={setPayLeader}
+              pct={leaderPct}
+              onPct={setLeaderPct}
+              communityField={affiliationField === 'community'}
+            />
           </div>
         )}
       </Section>

@@ -246,7 +246,9 @@
     "cta": "Przejdź do podsumowania →",
     "selected": "Wybrano",
     "cash": "Gotówka na miejscu",
-    "cash_tags": "Zapłać gotówką w dniu przyjazdu"
+    "cash_tags": "Zapłać gotówką w dniu przyjazdu",
+    "leader": "Zaliczka u lidera wspólnoty",
+    "leader_tags": "{{deposit}} ({{pct}}%) przekazujesz liderowi, resztę {{rest}} płacisz gotówką na miejscu"
   },
   "summary": {
     "supertitle": "Ostatni krok",
@@ -294,7 +296,10 @@
     "abbr_formation": "form.",
     "abbr_accommodation": "nocl.",
     "abbr_meals": "wyż.",
-    "diet": "Dieta"
+    "diet": "Dieta",
+    "leader_title": "Zaliczka u lidera wspólnoty",
+    "leader_desc": "Zaliczkę {{deposit}} ({{pct}}%) przekaż liderowi swojej wspólnoty. Pozostałe {{rest}} zapłacisz gotówką przy rejestracji na miejscu.",
+    "submit_leader": "Zgłoszenie z zaliczką u lidera →"
   },
   "success": {
     "paid_title": "Dziękujemy!",
@@ -317,7 +322,9 @@
     "acct_error": "Nie udało się założyć konta. Spróbuj później.",
     "acct_desc": "Konto pozwoli zarządzać zgłoszeniem i szybciej zapisać się następnym razem.",
     "cash_msg": "Twoje zgłoszenie zostało przyjęte. Opłatę uiścisz gotówką na miejscu.",
-    "status_cash": "Płatność na miejscu"
+    "status_cash": "Płatność na miejscu",
+    "leader_msg": "Twoje zgłoszenie zostało przyjęte. Przekaż zaliczkę liderowi wspólnoty, resztę zapłacisz gotówką na miejscu.",
+    "status_leader": "Zaliczka u lidera"
   },
   "admin": {
     "dashboard": "Dashboard",
@@ -460,6 +467,13 @@
     "payment_cash": "Płatność gotówką przy rejestracji",
     "payment_transfer": "Płatność przelewem",
     "payment_online": "Płatność online",
-    "transfer_note": "Jeśli kwota wzrosła, prosimy dopłacić różnicę przelewem (tytuł: numer zgłoszenia)."
+    "transfer_note": "Jeśli kwota wzrosła, prosimy dopłacić różnicę przelewem (tytuł: numer zgłoszenia).",
+    "payment_leader": "Zaliczka u lidera + reszta gotówką na miejscu"
+  },
+  "leader": {
+    "deposit_title": "Zaliczka dla lidera ({{pct}}%)",
+    "deposit_desc": "Przekaż tę kwotę liderowi swojej wspólnoty.",
+    "rest_title": "Reszta gotówką na miejscu",
+    "rest_desc": "Tę kwotę prosimy mieć przy sobie podczas rejestracji (najlepiej odliczoną). Obie kwoty wysłaliśmy też mailem."
   }
 }
