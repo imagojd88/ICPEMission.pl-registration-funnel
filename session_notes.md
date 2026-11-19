@@ -51,6 +51,15 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — panel admina (kreator eventów)
 
+### Zniżki dla dzieci osobno: nocleg / wydarzenie (2026-11-19)
+- **Prośba (Jacek):** odróżnić zniżkę dziecka na samo wydarzenie od zniżki na nocleg; w foundation-day-2027: dzieci do 3 lat −100% tylko na nocleg.
+- **Model:** `AgeBracket.eventMultiplier?` (wydarzenie = opłata formacyjna + wyżywienie dzienne); `multiplier` = nocleg (pokój liczony za osobę + `overnightMealsFee`). Brak `eventMultiplier` = dotychczasowe zasady (opłata formacyjna pełna, 0 tylko przy multiplier 0; wyżywienie × multiplier) → stare eventy bez zmian. Pokój „za pokój” nie podlega zniżce wieku. Helper `ageBracketFor`, wewn. `personFactors`. Testy 13/13.
+- **Panel:** `admin/events/AgeDiscountsEditor.tsx` (edycja eventu i kreator): „do [X] lat (zakres np. 0–3 lat) · nocleg −[%] · wydarzenie −[%]”; puste „wydarzenie” = „jak dotąd”. W formularzu %; w cenniku mnożnik (1 − %/100). Opis nad progami.
+- **Uwaga do konfiguracji:** „do X lat” jest WYŁĄCZNIE — dzieci 0–3 lata = „do 4”. Jacek miał „do 3, mnożnik 0” (= 0–2 lata, całość gratis).
+- **Formularz:** stała etykieta przy dziecku „−30% · dziecko 3–12 lat” (niezależna od eventu) → „Cena dziecka zależy od wieku — zobaczysz ją w podsumowaniu.”
+- **Weryfikacja:** tsc app/api ✓, build ✓; Playwright panel: wczytanie starego progu (do 3, nocleg 100%, wydarzenie puste), zmiana na do 4 / 100% / 0% → zapis `{ltAge: 4, multiplier: 0, eventMultiplier: 1}`, drugi próg bez `eventMultiplier`. Kreatora nie klikałem (tsc).
+- Stan: do pushu + **Manual Deploy `icpe-api`** (cena liczona w API).
+
 ### Diety włączane per event (2026-11-19)
 - **Prośba (Jacek):** admin włącza/wyłącza diety w ustawieniach eventu (domyślnie wszystkie wyłączone); w foundation-day-2027 tylko: bez mięsa, bez laktozy, bez glutenu.
 - **Stan zastany (błędy):** chipy diet w kroku „Preferencje” (stała lista 6 diet, na całe zgłoszenie) szły jako `dietaryTags`, których API NIE zapisywało — wybory gości ginęły. „Dodatkowe uwagi” (krok Preferencje) też nie były wysyłane.

@@ -1,3 +1,4 @@
+import AgeDiscountsEditor, { bracketsFromRows, rowsFromBrackets, type AgeDiscountRow } from './AgeDiscountsEditor'
 import DietOptionsSelect from './DietOptionsSelect'
 import { PriceUnitSelect, priceHint } from './RoomPriceFields'
 import RoomStockFields from './RoomStockFields'
@@ -49,7 +50,6 @@ interface RoomRow {
   /** ile z nich zablokowanych dla gości specjalnych */
   reserved: string
 }
-interface BracketRow { id: string; ltAge: string; multiplier: string }
 interface DiscountRow { id: string; code: string; pct: string }
 
 const COLOR_OPTIONS = [
@@ -124,7 +124,7 @@ export default function EventEditForm({
   const [transport, setTransport] = useState(String(DEFAULT_PRICING.options.transport))
   const [bedding, setBedding] = useState(String(DEFAULT_PRICING.options.bedding))
   const [rooms, setRooms] = useState<RoomRow[]>([])
-  const [brackets, setBrackets] = useState<BracketRow[]>([])
+  const [brackets, setBrackets] = useState<AgeDiscountRow[]>([])
   const [discounts, setDiscounts] = useState<DiscountRow[]>([])
   const [slug, setSlug] = useState('')
   const [primaryColor, setPrimaryColor] = useState('#1C5D99')
@@ -271,11 +271,7 @@ export default function EventEditForm({
         )
         setRoomUsage({ pub: cfg.roomUsage ?? {}, res: cfg.roomUsageReserved ?? {}, free: cfg.roomAvailability ?? {} })
         setBrackets(
-          (pc?.childBrackets ?? []).map((b, i) => ({
-            id: `b-${i}`,
-            ltAge: String(b.ltAge),
-            multiplier: String(b.multiplier),
-          })),
+          rowsFromBrackets(pc?.childBrackets),
         )
         setDiscounts(
           Object.entries(pc?.discountCodes ?? {}).map(([code, frac], i) => ({
@@ -339,9 +335,7 @@ export default function EventEditForm({
       nights: n,
       ...(optionalStay ? { accommodationOptional: true } : {}),
       ...(parseFloat(overnightMeals) > 0 ? { overnightMealsFee: parseFloat(overnightMeals) } : {}),
-      childBrackets: brackets
-        .map((b) => ({ ltAge: parseInt(b.ltAge) || 0, multiplier: parseFloat(b.multiplier) || 0 }))
-        .sort((a, b) => a.ltAge - b.ltAge),
+      childBrackets: bracketsFromRows(brackets),
       rooms: (() => {
         // Id typu pokoju musi zostać stały (zgłoszenia i limit pokoi liczą po id) —
         // wcześniej numerowane od nowa, więc usunięcie pokoju przesuwało id pozostałych.
@@ -698,21 +692,10 @@ export default function EventEditForm({
           </Button>
         </div>
 
-        {/* Progi wiekowe */}
+        {/* Progi wiekowe — zniżki osobno na nocleg i na wydarzenie */}
         <div className="flex flex-col gap-2">
           <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--faint)' }}>Zniżki wiekowe (dzieci)</span>
-          {brackets.map((b) => (
-            <div key={b.id} className="flex items-center gap-2 text-sm" style={{ color: 'var(--ink)' }}>
-              <span>do</span>
-              <input value={b.ltAge} onChange={(e) => setBrackets((p) => p.map((x) => x.id === b.id ? { ...x, ltAge: e.target.value } : x))} inputMode="numeric" className={inputCls} style={{ ...inputStyle, width: 70 }} />
-              <span>lat → mnożnik</span>
-              <input value={b.multiplier} onChange={(e) => setBrackets((p) => p.map((x) => x.id === b.id ? { ...x, multiplier: e.target.value } : x))} inputMode="decimal" className={inputCls} style={{ ...inputStyle, width: 80 }} />
-              <button onClick={() => setBrackets((p) => p.filter((x) => x.id !== b.id))} className="p-2 rounded-[8px]" style={{ color: 'var(--err)' }}><Trash2 size={15} /></button>
-            </div>
-          ))}
-          <Button size="sm" variant="outline" onClick={() => setBrackets((p) => [...p, { id: `b-new-${Date.now()}`, ltAge: '18', multiplier: '0.9' }])}>
-            <Plus size={14} /> Dodaj próg
-          </Button>
+          <AgeDiscountsEditor rows={brackets} onChange={setBrackets} inputCls={inputCls} inputStyle={inputStyle} />
         </div>
 
         {/* Kody rabatowe */}

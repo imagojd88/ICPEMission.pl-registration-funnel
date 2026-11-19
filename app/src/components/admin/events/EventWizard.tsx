@@ -1,3 +1,4 @@
+import AgeDiscountsEditor, { bracketsFromRows, rowsFromBrackets, type AgeDiscountRow } from './AgeDiscountsEditor'
 import DietOptionsSelect from './DietOptionsSelect'
 import { priceHint } from './RoomPriceFields'
 import OptionalStayFields from './OptionalStayFields'
@@ -75,12 +76,8 @@ interface RoomRow {
 type Tr = Record<string, string>
 type ContentLang = 'pl' | 'en' | 'it'
 
-/** Wiersz progu wiekowego w formularzu */
-interface AgeBracketRow {
-  id: string
-  ltAge: string      // górna granica (wyłącznie) — string dla inputa
-  multiplier: string // ułamek np. "0.7"
-}
+/** Wiersz progu wiekowego w formularzu — % zniżki osobno na nocleg i na wydarzenie. */
+type AgeBracketRow = AgeDiscountRow
 
 /** Opcje dodatkowe w formularzu */
 interface OptionsForm {
@@ -189,11 +186,7 @@ const FIELD_CHECKS = ['Telefon', 'Adres', 'Dieta', 'Dzieci', 'Transport']
 // ── Default age brackets from DEFAULT_PRICING ─────────────────────────────────
 
 function defaultAgeBrackets(): AgeBracketRow[] {
-  return DEFAULT_PRICING.childBrackets.map((b, i) => ({
-    id: `bracket-${i}`,
-    ltAge: String(b.ltAge),
-    multiplier: String(b.multiplier),
-  }))
+  return rowsFromBrackets(DEFAULT_PRICING.childBrackets, 'bracket')
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -354,11 +347,7 @@ function mapEditConfigToState(prev: WizardState, cfg: EventEditConfig, slug: str
     reserved: r.reserved ? String(r.reserved) : '',
     tag: r.tag || '',
   }))
-  const ageBrackets: AgeBracketRow[] = (pc?.childBrackets ?? []).map((b, i) => ({
-    id: `edit-b-${i}`,
-    ltAge: String(b.ltAge),
-    multiplier: String(b.multiplier),
-  }))
+  const ageBrackets: AgeBracketRow[] = rowsFromBrackets(pc?.childBrackets, 'edit-b')
   const pm = cfg.paymentMethods ?? []
   return {
     ...prev,
@@ -432,13 +421,7 @@ function buildPricingConfig(state: WizardState): PricingConfig {
   }))
 
   // Parse age brackets (sort by ltAge ascending)
-  const parsedBrackets: AgeBracket[] = state.ageBrackets
-    .map((b) => ({
-      ltAge: parseInt(b.ltAge) || 0,
-      multiplier: parseFloat(b.multiplier) ?? 0,
-    }))
-    .filter((b) => b.ltAge > 0)
-    .sort((a, b) => a.ltAge - b.ltAge)
+  const parsedBrackets: AgeBracket[] = bracketsFromRows(state.ageBrackets)
 
   // Parse discount codes
   const discountCodes: Record<string, number> = {}
@@ -1140,24 +1123,6 @@ function Step2Rooms({ state, update }: { state: WizardState; update: (p: Partial
 // ── Step3Pricing — edytowalny cennik ─────────────────────────────────────────
 
 function Step3Pricing({ state, update }: { state: WizardState; update: (p: Partial<WizardState>) => void }) {
-  function addBracket() {
-    const newBracket: AgeBracketRow = {
-      id: `bracket-${Date.now()}`,
-      ltAge: '',
-      multiplier: '1',
-    }
-    update({ ageBrackets: [...state.ageBrackets, newBracket] })
-  }
-
-  function removeBracket(id: string) {
-    update({ ageBrackets: state.ageBrackets.filter((b) => b.id !== id) })
-  }
-
-  function updateBracket(id: string, patch: Partial<AgeBracketRow>) {
-    update({
-      ageBrackets: state.ageBrackets.map((b) => (b.id === id ? { ...b, ...patch } : b)),
-    })
-  }
 
   function addDiscountRow() {
     update({
@@ -1222,83 +1187,10 @@ function Step3Pricing({ state, update }: { state: WizardState; update: (p: Parti
 
       {/* Progi wiekowe */}
       <div className="flex flex-col gap-3">
-        <div className="flex items-center justify-between">
-          <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-            Progi wiekowe (dzieci)
-          </p>
-          <Button size="sm" variant="outline" onClick={addBracket} className="gap-1.5">
-            <Plus size={13} />
-            Dodaj próg
-          </Button>
-        </div>
-        <p className="text-xs" style={{ color: 'var(--muted)' }}>
-          Mnożnik stosowany na nocleg + wyżywienie. Próg „do wieku" wyłącznie (np. 4 = 0–3 lat).
-          Mnożnik 0 = gratis (też opłata formacyjna).
+        <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+          Zniżki wiekowe (dzieci)
         </p>
-        <div className="rounded-[12px] border overflow-hidden" style={{ borderColor: 'var(--border)' }}>
-          <table className="w-full text-sm" style={{ borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ background: 'var(--surface-2)', borderBottom: '1px solid var(--border)' }}>
-                <th className="px-4 py-2 text-left text-xs font-semibold" style={{ color: 'var(--faint)' }}>
-                  Do wieku (wyłącznie)
-                </th>
-                <th className="px-4 py-2 text-left text-xs font-semibold" style={{ color: 'var(--faint)' }}>
-                  Mnożnik (np. 0.7 = 70%)
-                </th>
-                <th className="px-4 py-2 w-10" />
-              </tr>
-            </thead>
-            <tbody>
-              {state.ageBrackets.map((b, i) => (
-                <tr
-                  key={b.id}
-                  style={{ borderBottom: i < state.ageBrackets.length - 1 ? '1px solid var(--border-2)' : undefined }}
-                >
-                  <td className="px-3 py-2">
-                    <input
-                      type="number"
-                      min={1}
-                      max={120}
-                      value={b.ltAge}
-                      onChange={(e) => updateBracket(b.id, { ltAge: e.target.value })}
-                      className="w-24 rounded-[8px] border px-2 py-1 text-sm"
-                      style={{ borderColor: 'var(--border)', background: 'var(--surface-2)', color: 'var(--ink)' }}
-                      placeholder="np. 4"
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <input
-                      type="number"
-                      min={0}
-                      max={1}
-                      step={0.05}
-                      value={b.multiplier}
-                      onChange={(e) => updateBracket(b.id, { multiplier: e.target.value })}
-                      className="w-24 rounded-[8px] border px-2 py-1 text-sm"
-                      style={{ borderColor: 'var(--border)', background: 'var(--surface-2)', color: 'var(--ink)' }}
-                      placeholder="0.7"
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <button
-                      onClick={() => removeBracket(b.id)}
-                      className="p-1 hover:text-[var(--err)] transition-colors"
-                    >
-                      <X size={14} style={{ color: 'var(--faint)' }} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {state.ageBrackets.length === 0 && (
-                <tr>
-                  <td colSpan={3} className="px-4 py-3 text-xs text-center" style={{ color: 'var(--muted)' }}>
-                    Brak progów — wszyscy traktowani jak dorośli (mnożnik 1.0)
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        <AgeDiscountsEditor rows={state.ageBrackets} onChange={(rows) => update({ ageBrackets: rows })} />
       </div>
 
       {/* Opcje dodatkowe */}

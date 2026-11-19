@@ -150,3 +150,26 @@ test('cena za pokój: stała za pokój i noc, dzielona między mieszkańców, be
   const two2 = computePrice({ rooms: [{ roomId: 'dbl', participants: [{ type: 'adult', age: 40 }] }] }, { ...cfg, nights: 2 });
   assert.equal(two2.accommodation, 400);
 });
+
+test('zniżki dzieci osobno: nocleg gratis do 3 lat, wydarzenie pełne', () => {
+  const cfg: PricingConfig = {
+    ...DEFAULT_PRICING,
+    formationFee: 50, mealsFee: 50, nights: 1, overnightMealsFee: 20,
+    childBrackets: [{ ltAge: 4, multiplier: 0, eventMultiplier: 1 }, { ltAge: 13, multiplier: 0.5, eventMultiplier: 0.5 }],
+    rooms: [{ id: 'r', name: 'P', cap: 3, perPerson: 100 }],
+  };
+  const r = computePrice({ rooms: [{ roomId: 'r', participants: [{ type: 'child', age: 2 }, { type: 'child', age: 8 }] }] }, cfg);
+  // 2 lata: nocleg 0, posiłki nocujących 0, wydarzenie pełne: 50 + 50 = 100
+  assert.equal(r.lines[0].accommodation, 0);
+  assert.equal(r.lines[0].formation, 50);
+  assert.equal(r.lines[0].meals, 50);
+  assert.equal(r.lines[0].total, 100);
+  // 8 lat: 50% wszystkiego: 25 + 50 + (25 + 10) = 110
+  assert.equal(r.lines[1].total, 110);
+  // bez noclegu: 2 lata płaci wydarzenie 100
+  const n = computePrice({ rooms: [], withoutRoom: [{ type: 'child', age: 2 }] }, cfg);
+  assert.equal(n.total, 100);
+  // stary próg (bez eventMultiplier) bez zmian: mnożnik 0 = całość gratis
+  const legacy = computePrice({ rooms: [], withoutRoom: [{ type: 'child', age: 2 }] }, { ...cfg, childBrackets: [{ ltAge: 4, multiplier: 0 }] });
+  assert.equal(legacy.total, 0);
+});

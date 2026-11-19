@@ -57,7 +57,16 @@ export interface RoomTypeDef {
 export interface AgeBracket {
   /** górna granica wieku (wyłącznie). Sortowane rosnąco. */
   ltAge: number;
+  /**
+   * Mnożnik NOCLEGU (pokój za osobę + posiłki dla nocujących), np. 0 = nocleg gratis, 0.7 = −30%.
+   * Bez `eventMultiplier` działa po staremu także na wyżywienie dzienne, a 0 zeruje całą cenę osoby.
+   */
   multiplier: number;
+  /**
+   * Mnożnik WYDARZENIA (opłata formacyjna + wyżywienie dzienne), np. 1 = pełna cena, 0.5 = −50%.
+   * Brak = dotychczasowe zasady (opłata formacyjna pełna, 0 tylko przy multiplier 0; wyżywienie × multiplier).
+   */
+  eventMultiplier?: number;
 }
 
 export interface PricingConfig {
@@ -169,12 +178,33 @@ export interface PriceResult {
 }
 
 export function ageMultiplier(p: PricedParticipant, brackets: AgeBracket[]): number {
+  return ageBracketFor(p, brackets)?.multiplier ?? 1;
+}
+
+/** Próg wiekowy dziecka (pierwszy z `ltAge > wiek`) albo null (dorosły / brak progu). */
+export function ageBracketFor(p: PricedParticipant, brackets: AgeBracket[]): AgeBracket | null {
   if (p.type === 'child') {
     for (const b of brackets) {
-      if (p.age < b.ltAge) return b.multiplier;
+      if (p.age < b.ltAge) return b;
     }
   }
-  return 1;
+  return null;
+}
+
+/**
+ * Części ceny osoby zależne od wieku:
+ *  - `stay` — mnożnik noclegu (pokój za osobę + posiłki nocujących),
+ *  - `formation` — opłata formacyjna po zniżce,
+ *  - `dayMeals` — mnożnik wyżywienia dziennego.
+ */
+function personFactors(p: PricedParticipant, config: PricingConfig): { stay: number; formation: number; dayMeals: number } {
+  const b = ageBracketFor(p, config.childBrackets);
+  const stay = b ? b.multiplier : 1;
+  if (b && typeof b.eventMultiplier === 'number') {
+    return { stay, formation: config.formationFee * b.eventMultiplier, dayMeals: b.eventMultiplier };
+  }
+  // Dotychczasowe zasady: próg „gratis" (mnożnik 0) zeruje całą cenę osoby.
+  return { stay, formation: stay === 0 ? 0 : config.formationFee, dayMeals: stay };
 }
 
 /**
@@ -197,14 +227,14 @@ export function computePrice(input: PriceInput, config: PricingConfig = DEFAULT_
     const perRoom = room.priceUnit === 'room';
     const occupants = booking.participants.length;
     for (const p of booking.participants) {
-      const m = ageMultiplier(p, config.childBrackets);
-      // Próg „gratis" (mnożnik 0) → cała cena osoby = 0 (w tym opłata formacyjna).
-      const formation = m === 0 ? 0 : config.formationFee;
+      const f = personFactors(p, config);
+      const m = f.stay;
+      const formation = f.formation;
       // Cena za pokój: stała za pokój i noc, dzielona po równo (bez mnożnika wieku).
       const accommodation = perRoom
         ? (occupants > 0 ? (room.perPerson * config.nights) / occupants : 0)
         : room.perPerson * config.nights * m;
-      const meals = (config.mealsFee + overnightMeals) * m;
+      const meals = config.mealsFee * f.dayMeals + overnightMeals * m;
       lines.push({
         ...p,
         roomId: room.id,
@@ -219,9 +249,10 @@ export function computePrice(input: PriceInput, config: PricingConfig = DEFAULT_
 
   // Osoby bez noclegu: opłata formacyjna + wyżywienie dzienne (bez noclegu i posiłków nocujących).
   for (const p of noRoom) {
-    const m = ageMultiplier(p, config.childBrackets);
-    const formation = m === 0 ? 0 : config.formationFee;
-    const meals = config.mealsFee * m;
+    const f = personFactors(p, config);
+    const m = f.stay;
+    const formation = f.formation;
+    const meals = config.mealsFee * f.dayMeals;
     lines.push({ ...p, roomId: '', multiplier: m, formation, accommodation: 0, meals, total: formation + meals });
   }
 
