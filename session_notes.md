@@ -51,6 +51,15 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — panel admina (kreator eventów)
 
+### Podgląd na żywo ekranów gościa w „Edytuj event” (2026-11-19)
+- **Prośba (Jacek):** w pustym miejscu po prawej stronie edycji eventu — podgląd, jak wyglądają poszczególne ekrany dla użytkownika.
+- **Panel:** `admin/events/EventPreviewPane.tsx` — ramka telefonu (sticky, widoczna od szerokości `xl` = 1280 px) z prawdziwym lejkiem `/r/<zapisany slug>?preview=1` w iframe; zakładki: Strona, Dane, Uczestnicy, Preferencje, Nocleg (gdy są pokoje), Opcje, Płatność (gdy płatny), Podsumowanie, Po wysłaniu; STANDALONE/INVITE — tylko Strona. Odśwież / otwórz zapisaną stronę. Język podglądu = zakładka „Język treści”.
+- **Szkic na żywo:** `EventEditForm` buduje te same dane co przy zapisie (wydzielone `buildPaymentMethods/buildDates/buildTheme/buildCustomFields/buildLocationI18n` — zapis korzysta z nich też) i wysyła przez `postMessage` (ta sama domena, debounce 300 ms) — zmiany widać przed zapisaniem.
+- **Lejek w trybie `?preview=1`:** `PublicFunnel` nasłuchuje `icpe-preview` (szkic eventu + ekran + język), po starcie wysyła `icpe-preview-ready`; szkic nie jest nadpisywany odpowiedzią API (`previewApplied`). Przykładowe zgłoszenie: Jan Kowalski + Ola 2 lata (pierwszy pokój, pierwsza dieta). Bez wysyłki (podsumowanie → ekran sukcesu lokalnie), bez szkiców w localStorage, bez PostHoga (`analytics.ts` pomija `?preview=1`), znaczek „Podgląd · nic nie jest wysyłane”. `LanguageSwitch`: w podglądzie bez auto-wykrycia języka przeglądarki + podświetlenie zsynchronizowane z `languageChanged`.
+- **Weryfikacja:** tsc ✓, build ✓; Playwright (zamockowane API, admin 1600 px): zmiana nazwy → tytuł w podglądzie bez zapisu; zakładki Nocleg/Preferencje (3 diety)/Podsumowanie (pokój „za pokój” 200 zł dzielony 100/100, dziecko 2 lata: nocleg 0 z progu? — tu pokój za pokój, więc dzielony), wysłanie w podglądzie → ekran sukcesu, 0 POST /registrations, localStorage tylko token admina; przełączenie EN → podgląd po angielsku. 0 błędów JS.
+- Kreator nowego eventu nie ma jeszcze tego podglądu (ma swój uproszczony).
+- Stan: do pushu (tylko frontend).
+
 ### Zniżki dla dzieci osobno: nocleg / wydarzenie (2026-11-19)
 - **Prośba (Jacek):** odróżnić zniżkę dziecka na samo wydarzenie od zniżki na nocleg; w foundation-day-2027: dzieci do 3 lat −100% tylko na nocleg.
 - **Model:** `AgeBracket.eventMultiplier?` (wydarzenie = opłata formacyjna + wyżywienie dzienne); `multiplier` = nocleg (pokój liczony za osobę + `overnightMealsFee`). Brak `eventMultiplier` = dotychczasowe zasady (opłata formacyjna pełna, 0 tylko przy multiplier 0; wyżywienie × multiplier) → stare eventy bez zmian. Pokój „za pokój” nie podlega zniżce wieku. Helper `ageBracketFor`, wewn. `personFactors`. Testy 13/13.

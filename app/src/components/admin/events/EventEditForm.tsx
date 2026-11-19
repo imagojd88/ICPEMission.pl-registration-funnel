@@ -1,3 +1,6 @@
+import EventPreviewPane from './EventPreviewPane'
+import type { EventInstanceDto } from '@icpe/shared'
+import type { EventConfig } from '@/lib/api'
 import AgeDiscountsEditor, { bracketsFromRows, rowsFromBrackets, type AgeDiscountRow } from './AgeDiscountsEditor'
 import DietOptionsSelect from './DietOptionsSelect'
 import { PriceUnitSelect, priceHint } from './RoomPriceFields'
@@ -372,6 +375,55 @@ export default function EventEditForm({
     }
   }
 
+  // ── Budowanie danych eventu (wspólne dla zapisu i podglądu na żywo) ──
+  function buildPaymentMethods(): string[] {
+    const out: string[] = []
+    if (payOnline) out.push('ONLINE')
+    if (payTransfer) out.push('BANK_TRANSFER')
+    if (payCash) out.push('CASH')
+    return out
+  }
+  function buildDates(): { startsAt: string; endsAt: string } | null {
+    if (!dateStart) return null
+    const n = parseInt(nights) || 0
+    const startsAt = new Date(`${dateStart}T14:00:00`).toISOString()
+    const endsAt = dateEnd
+      ? new Date(`${dateEnd}T22:00:00`).toISOString()
+      : new Date(new Date(`${dateStart}T14:00:00`).getTime() + n * 86400000 + 8 * 3600000).toISOString()
+    return { startsAt, endsAt }
+  }
+  function buildLocationI18n() {
+    const locTr = cleanMap({ en: locI18n.en ?? '', it: locI18n.it ?? '' })
+    // `pl` = wersja, z której zrobiono tłumaczenie. Niepotwierdzone po zmianie PL → strona
+    // pokaże aktualne miejsce po polsku (eventLocation porównuje `pl` z location).
+    return location.trim() && Object.keys(locTr).length ? { pl: locTrSrc || location.trim(), ...locTr } : null
+  }
+  function buildTheme(): Record<string, unknown> {
+    const theme: Record<string, unknown> = { primaryColor }
+    if (heroImageUrl) theme.heroImageUrl = heroImageUrl
+    if (titleColor) theme.titleColor = titleColor
+    theme.badge = badge
+    theme.supertitle = cleanMap(superMap)
+    return theme
+  }
+  function buildCustomFields() {
+    return {
+      program: program
+        .filter((r) => r.time.trim() || Object.keys(cleanMap(r.item)).length)
+        .map((r) => ({ time: r.time.trim(), item: cleanMap(r.item) })),
+      locationI18n: buildLocationI18n(),
+      // Nowy format: lista gości. Stary pojedynczy `specialGuest` czyścimy, żeby nie dublował.
+      specialGuests: guestsToSave(guests),
+      specialGuest: null,
+      affiliationField: affiliationField || null,
+      diets,
+      guestInvites: {
+        enabled: guestInvitesEnabled,
+        maxPerInviter: Math.min(10, Math.max(1, parseInt(guestInvitesMax, 10) || 2)),
+      },
+    }
+  }
+
   async function handleSave() {
     const titleClean = cleanMap(nameMap)
     if (!Object.keys(titleClean).length) { setError('Podaj nazwę eventu.'); return }
@@ -386,14 +438,8 @@ export default function EventEditForm({
     setError(null)
     try {
       const n = parseInt(nights) || 0
-      const paymentMethods: string[] = []
-      if (payOnline) paymentMethods.push('ONLINE')
-      if (payTransfer) paymentMethods.push('BANK_TRANSFER')
-      if (payCash) paymentMethods.push('CASH')
-      const startsAt = new Date(`${dateStart}T14:00:00`).toISOString()
-      const endsAt = dateEnd
-        ? new Date(`${dateEnd}T22:00:00`).toISOString()
-        : new Date(new Date(`${dateStart}T14:00:00`).getTime() + n * 86400000 + 8 * 3600000).toISOString()
+      const paymentMethods = buildPaymentMethods()
+      const { startsAt, endsAt } = buildDates()!
 
       const descClean = cleanMap(descMap)
       await updateEventInstance(editTarget.instanceId, {
@@ -409,38 +455,14 @@ export default function EventEditForm({
       })
 
       const locales = [...activeLocales]
-      const locTr = cleanMap({ en: locI18n.en ?? '', it: locI18n.it ?? '' })
-      // `pl` = wersja, z której zrobiono tłumaczenie. Niepotwierdzone po zmianie PL → strona
-      // pokaże aktualne miejsce po polsku (eventLocation porównuje `pl` z location).
-      const locationI18n = location.trim() && Object.keys(locTr).length
-        ? { pl: locTrSrc || location.trim(), ...locTr }
-        : null
-      const theme: Record<string, unknown> = { primaryColor }
-      if (heroImageUrl) theme.heroImageUrl = heroImageUrl
-      if (titleColor) theme.titleColor = titleColor
-      theme.badge = badge
-      theme.supertitle = cleanMap(superMap)
+      const theme = buildTheme()
 
       await configureSeriesPage(editTarget.seriesId, {
         slug,
         theme,
         enabledFields: { phone: true, address: true, dietary: true, children: true },
         paymentInfo: { recipient: bankRecipient.trim(), account: bankAccount.trim() },
-        customFields: {
-          program: program
-            .filter((r) => r.time.trim() || Object.keys(cleanMap(r.item)).length)
-            .map((r) => ({ time: r.time.trim(), item: cleanMap(r.item) })),
-          locationI18n,
-          // Nowy format: lista gości. Stary pojedynczy `specialGuest` czyścimy, żeby nie dublował.
-          specialGuests: guestsToSave(guests),
-          specialGuest: null,
-          affiliationField: affiliationField || null,
-          diets,
-          guestInvites: {
-            enabled: guestInvitesEnabled,
-            maxPerInviter: Math.min(10, Math.max(1, parseInt(guestInvitesMax, 10) || 2)),
-          },
-        },
+        customFields: buildCustomFields(),
         locales,
         isEvergreen: false,
       })
@@ -464,8 +486,38 @@ export default function EventEditForm({
     )
   }
 
+  // Szkic dla podglądu na żywo (to, co gość zobaczy po zapisaniu).
+  const previewDates = buildDates()
+  const titleDraft = cleanMap(nameMap)
+  const descDraft = cleanMap(descMap)
+  const previewDraft = {
+    event: {
+      type: (eventType || 'ONE_TIME') as EventInstanceDto['type'],
+      // Mapy językowe bywają niepełne (np. bez IT) — lejek i tak czyta je przez pickLang.
+      title: { pl: titleDraft.pl ?? Object.values(titleDraft)[0] ?? '', ...titleDraft } as unknown as EventInstanceDto['title'],
+      description: (Object.keys(descDraft).length ? descDraft : undefined) as unknown as EventInstanceDto['description'],
+      ...(previewDates ?? {}),
+      location: location || undefined,
+      nights: parseInt(nights) || 0,
+      capacity: capacity ? parseInt(capacity) : null,
+      paymentMethods: buildPaymentMethods() as EventInstanceDto['paymentMethods'],
+      status: 'OPEN' as EventInstanceDto['status'],
+      registeredCount: 0,
+      slug,
+    },
+    config: {
+      type: (eventType || 'ONE_TIME') as EventConfig['type'],
+      pricing: buildPricing(),
+      customFields: buildCustomFields() as EventConfig['customFields'],
+      theme: buildTheme() as EventConfig['theme'],
+      locales: [...activeLocales],
+      paymentInfo: { recipient: bankRecipient.trim(), account: bankAccount.trim() },
+    },
+  }
+
   return (
-    <div className="flex flex-col gap-5" style={{ maxWidth: 760 }}>
+  <div className="flex gap-6 items-start">
+    <div className="flex flex-col gap-5 min-w-0" style={{ maxWidth: 760, flex: '1 1 760px' }}>
       {error && (
         <div className="px-4 py-3 rounded-[12px] text-sm" style={{ background: 'var(--err-soft)', color: 'var(--err)', border: '1px solid var(--err)' }}>
           {error}
@@ -929,5 +981,14 @@ export default function EventEditForm({
         />
       )}
     </div>
+    <EventPreviewPane
+      slug={editTarget.slug}
+      draft={previewDraft}
+      lang={editLang}
+      hasRooms={rooms.length > 0}
+      free={isFree}
+      simple={eventType === 'STANDALONE' || eventType === 'INVITE'}
+    />
+  </div>
   )
 }

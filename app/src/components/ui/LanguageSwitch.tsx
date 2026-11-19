@@ -24,6 +24,13 @@ export default function LanguageSwitch({ locales }: { locales?: string[] }) {
   const [current, setCurrent] = useState(i18n.language)
   const initialized = useRef(false)
 
+  // Język mógł zmienić ktoś inny (np. podgląd w panelu admina) — trzymaj podświetlenie w zgodzie.
+  useEffect(() => {
+    const on = (l: string) => setCurrent(l)
+    i18n.on('languageChanged', on)
+    return () => i18n.off('languageChanged', on)
+  }, [i18n])
+
   useEffect(() => {
     // Czekamy na języki eventu (undefined = jeszcze się ładują) — inaczej wykrycie języka
     // przeglądarki odbyłoby się tylko wśród PL/EN i Włoch nie dostałby automatycznie IT.
@@ -31,6 +38,11 @@ export default function LanguageSwitch({ locales }: { locales?: string[] }) {
     // Pierwsze realne wczytanie (po dociągnięciu locales eventu) → wybierz język gościa.
     if (!initialized.current) {
       initialized.current = true
+      // Podgląd w panelu admina: język ustawia panel (zakładka języka treści), nie przeglądarka.
+      if (new URLSearchParams(window.location.search).get('preview') === '1') {
+        setCurrent(i18n.language)
+        return
+      }
       const pref = resolveLang(langs)
       if (pref && pref !== i18n.language) {
         void i18n.changeLanguage(pref)

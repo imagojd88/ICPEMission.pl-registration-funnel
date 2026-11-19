@@ -56,6 +56,8 @@ const URL_PROPS = [
 export function initAnalytics(): void {
   if (started || !KEY || typeof window === 'undefined') return
   if (isAdminPath(window.location.pathname)) return
+  // Podgląd w panelu admina (iframe /r/:slug?preview=1) — nie liczymy w statystykach.
+  if (new URLSearchParams(window.location.search).get('preview') === '1') return
   started = true
 
   // Oficjalny loader PostHog (kolejkuje wywołania do czasu wczytania skryptu z CDN EU).

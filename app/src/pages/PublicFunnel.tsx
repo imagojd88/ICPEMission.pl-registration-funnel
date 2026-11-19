@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useSearchParams } from 'react-router-dom'
 import type { EventInstanceDto, CreateRegistrationDto, RegistrationStatus, PaymentMethod } from '@icpe/shared'
@@ -374,6 +374,42 @@ function DraftBanner({
   )
 }
 
+// ─── Podgląd w panelu admina (iframe ?preview=1) ─────────────────────────────
+
+/** Ekrany, które panel może pokazać w podglądzie. */
+export type PreviewScreen =
+  | 'landing' | 'step0' | 'step1' | 'step2' | 'step3' | 'step4'
+  | 'payment_method' | 'summary' | 'success'
+
+/** Wiadomość z panelu (EventPreviewPane) do iframe'a z lejkiem. */
+export interface PreviewMessage {
+  type: 'icpe-preview'
+  event?: Partial<EventInstanceDto>
+  config?: Partial<EventConfig>
+  screen?: PreviewScreen
+  lang?: string
+}
+
+/** Przykładowe zgłoszenie do podglądu kroków: dorosły + dziecko 2 lata. */
+function previewStepper(cfg: PricingConfig, diets: string[] | undefined, methods: PaymentMethod[] | undefined): StepperState {
+  const base = buildInitialStepper()
+  const room = cfg.rooms?.[0]
+  const both = room && room.cap >= 2
+  const firstDiet = (diets ?? [])[0]
+  const m = methods?.[0]
+  return {
+    ...base,
+    applicant: { ...base.applicant, firstName: 'Jan', lastName: 'Kowalski', email: 'jan.kowalski@example.com', phone: '600 100 200' },
+    participants: [
+      { id: 'p-1', type: 'adult', name: 'Jan Kowalski', age: 0, gender: 'M', diet: '' },
+      { id: 'p-2', type: 'child', name: 'Ola Kowalska', age: 2, gender: 'F', diet: '', dietKeys: firstDiet ? [firstDiet] : [] },
+    ],
+    rooms: room && (cfg.nights ?? 0) > 0 ? [{ uid: 'preview-room', roomId: room.id, participantIndexes: both ? [0, 1] : [0] }] : [],
+    consents: { rodo: true, regulamin: true },
+    paymentMethod: cfg.free ? 'cash' : m === 'ONLINE' ? 'online' : m === 'BANK_TRANSFER' ? 'transfer' : 'cash',
+  }
+}
+
 // ─── Main container ───────────────────────────────────────────────────────────
 
 /** Odczytuje tytuł eventu w aktywnym języku (Localized lub string). */
@@ -402,6 +438,11 @@ export default function PublicFunnel() {
   // a token idzie z rejestracją, żeby zgłoszenie spięło się z listą gości w panelu.
   const [searchParams] = useSearchParams()
   const invToken = searchParams.get('inv')
+  // Podgląd w panelu admina: dane eventu z formularza edycji (postMessage), przykładowe zgłoszenie,
+  // bez wysyłki, bez szkiców w localStorage i bez analityki.
+  const preview = searchParams.get('preview') === '1'
+  // Podgląd: szkic z panelu już przyszedł — odpowiedź API (zapisana wersja) go nie nadpisuje.
+  const previewApplied = useRef(false)
   const [invite, setInvite] = useState<{
     token: string; firstName: string; lastName: string; email: string; phone: string; invitedByName: string | null
   } | null>(null)
@@ -430,7 +471,7 @@ export default function PublicFunnel() {
   // Draft odczytujemy przy każdym powrocie na ekran startowy — inaczej trzymalibyśmy
   // nieaktualny snapshot i po wysłaniu zgłoszenia baner proponowałby wysłać je ponownie.
   useEffect(() => {
-    if (screen !== 'landing') return
+    if (screen !== 'landing' || preview) return
     const raw = loadDraft(draftSlug)
     const stepper = raw ? normalizeStepper(raw.stepper) : null
     if (raw && !stepper) clearDraft(draftSlug) // niezgodny kształt → wyrzucamy
@@ -443,7 +484,7 @@ export default function PublicFunnel() {
 
   // Autozapis na każdą zmianę kroku/danych — poza ekranem startowym i sukcesem.
   useEffect(() => {
-    if (!draftSlug) return
+    if (!draftSlug || preview) return
     if (screen === 'landing') return
     if (screen === 'success') {
       clearDraft(draftSlug)
@@ -470,6 +511,10 @@ export default function PublicFunnel() {
       getEventConfig(effectiveSlug),
     ])
       .then(([e, cfg]) => {
+        if (previewApplied.current) {
+          setLoading(false)
+          return
+        }
         setEvent(e)
         setEventConfig(cfg)
         setPricingConfig(cfg.pricing)
@@ -492,6 +537,55 @@ export default function PublicFunnel() {
     loadEvent()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug])
+
+  // Podgląd: odbieramy szkic eventu i wybrany ekran z panelu (ta sama domena).
+  // Najświeższe dane trzymamy w refie — nasłuch rejestrujemy raz (inaczej pętla „ready”).
+  const previewLatest = useRef({ pricingConfig, eventConfig, event })
+  previewLatest.current = { pricingConfig, eventConfig, event }
+  useEffect(() => {
+    if (!preview) return
+    const onMsg = (e: MessageEvent) => {
+      if (e.origin !== window.location.origin) return
+      const d = e.data as PreviewMessage
+      if (!d || d.type !== 'icpe-preview') return
+      if (d.lang && d.lang !== i18n.language) void i18n.changeLanguage(d.lang)
+      if (d.event || d.config) previewApplied.current = true
+      if (d.event) setEvent((prev) => ({ ...(prev ?? ({} as EventInstanceDto)), ...d.event }) as EventInstanceDto)
+      if (d.config) {
+        setEventConfig((prev) => ({ ...(prev ?? ({} as EventConfig)), ...d.config }) as EventConfig)
+        if (d.config.pricing) setPricingConfig(d.config.pricing)
+      }
+      setLoading(false)
+      setError(false)
+      if (d.screen) {
+        const sc = d.screen
+        // Stan z tej samej wiadomości (setState powyżej jest asynchroniczny).
+        const cur = previewLatest.current
+        const pc = d.config?.pricing ?? cur.pricingConfig
+        const diets = d.config?.customFields?.diets ?? cur.eventConfig?.customFields?.diets ?? []
+        const methods = (d.event?.paymentMethods ?? cur.event?.paymentMethods) as PaymentMethod[] | undefined
+        setSubmitError(null)
+        setStepError(null)
+        if (sc === 'landing') {
+          setScreen('landing')
+        } else if (sc.startsWith('step')) {
+          setStepper({ ...previewStepper(pc, diets ?? undefined, methods), step: Number(sc.slice(4)) })
+          setScreen('stepper')
+        } else {
+          setStepper({ ...previewStepper(pc, diets ?? undefined, methods), step: STEPS - 1 })
+          if (sc === 'success') {
+            setResult({ regId: 'PODGLĄD', status: 'AWAITING_TRANSFER' as RegistrationStatus, total: 0 })
+          }
+          setScreen(sc as PublicScreen)
+        }
+      }
+    }
+    window.addEventListener('message', onMsg)
+    // Daj znać panelowi, że można wysyłać szkic.
+    window.parent?.postMessage({ type: 'icpe-preview-ready' }, window.location.origin)
+    return () => window.removeEventListener('message', onMsg)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preview, i18n])
 
   // Tytuł karty przeglądarki — w języku strony; odświeża się po zmianie języka.
   useEffect(() => {
@@ -652,6 +746,12 @@ export default function PublicFunnel() {
 
   const handleSummarySubmit = async () => {
     if (!event || submitting) return
+    if (preview) {
+      // Podgląd: nic nie wysyłamy — pokazujemy ekran sukcesu z wyliczoną kwotą.
+      setResult({ regId: 'PODGLĄD', status: 'AWAITING_TRANSFER' as RegistrationStatus, total: finalPrice?.total ?? 0 })
+      setScreen('success')
+      return
+    }
     setSubmitting(true)
     setSubmitError(null)
     try {
@@ -749,6 +849,7 @@ export default function PublicFunnel() {
   }
 
   const handleCreateAccount = async () => {
+    if (preview) return
     await registerGuest({
       email: stepper.applicant.email,
       firstName: stepper.applicant.firstName,
@@ -820,6 +921,14 @@ export default function PublicFunnel() {
     >
       <ThemeToggle />
       <LanguageSwitch locales={eventConfig?.locales} />
+      {preview && (
+        <div
+          className="fixed bottom-2 left-2 z-50 text-[10px] font-semibold uppercase tracking-wider px-2 py-1 rounded-full pointer-events-none"
+          style={{ background: 'rgba(0,0,0,0.55)', color: '#fff' }}
+        >
+          Podgląd · nic nie jest wysyłane
+        </div>
+      )}
       {screen === 'landing' && (
         <>
           <LandingHero
@@ -893,7 +1002,7 @@ export default function PublicFunnel() {
         <SuccessScreen
           paymentMethod={stepper.paymentMethod}
           email={stepper.applicant.email}
-          total={result?.total ?? finalPrice?.total ?? 0}
+          total={preview ? finalPrice?.total ?? 0 : result?.total ?? finalPrice?.total ?? 0}
           currency={pricingConfig.currency}
           regNumber={result?.regId}
           status={result?.status}
