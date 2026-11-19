@@ -1,3 +1,5 @@
+import DietOptionsSelect from './DietOptionsSelect'
+import { priceHint } from './RoomPriceFields'
 import OptionalStayFields from './OptionalStayFields'
 import { useState, useEffect, type ChangeEvent } from 'react'
 import { X, Plus, CheckCircle } from 'lucide-react'
@@ -153,6 +155,8 @@ interface WizardState {
   supertitleI18n: Tr
   /** Pole przynależności w formularzu zapisu (customFields.affiliationField). */
   affiliationField: AffiliationField | ''
+  /** Diety do wyboru w formularzu (customFields.diets) — domyślnie żadna. */
+  diets: string[]
 }
 
 // ── Color config ──────────────────────────────────────────────────────────────
@@ -342,7 +346,8 @@ function mapEditConfigToState(prev: WizardState, cfg: EventEditConfig, slug: str
   const rooms: RoomRow[] = (pc?.rooms ?? []).map((r, i) => ({
     id: `edit-room-${i}`,
     name: typeof r.name === 'string' ? r.name : (r.name?.pl ?? Object.values(r.name ?? {})[0] ?? ''),
-    model: (r.model as PricingModel) || 'os/noc',
+    // Jednostka ceny (za osobę / za pokój) → wybór w kreatorze (pole „Cena za”).
+    model: r.priceUnit === 'room' ? 'za pokój' : 'os/noc',
     capacity: String(r.cap ?? 1),
     price: String(r.perPerson ?? 0),
     quantity: r.stock ? String(r.stock) : '',
@@ -374,6 +379,7 @@ function mapEditConfigToState(prev: WizardState, cfg: EventEditConfig, slug: str
     mealsFee: String(pc?.mealsFee ?? prev.mealsFee),
     optionalStay: !!pc?.accommodationOptional,
     overnightMeals: String(pc?.overnightMealsFee ?? 0),
+    diets: Array.isArray(cfg.customFields?.diets) ? cfg.customFields!.diets! : prev.diets,
     ageBrackets: ageBrackets.length > 0 ? ageBrackets : prev.ageBrackets,
     optionsForm: {
       transport: String(pc?.options?.transport ?? prev.optionsForm.transport),
@@ -415,6 +421,7 @@ function buildPricingConfig(state: WizardState): PricingConfig {
     name: Object.keys(cleanTr(r.nameI18n)).length ? withPl(r.name, r.nameI18n) : r.name,
     cap: parseInt(r.capacity) || 1,
     perPerson: parseFloat(r.price) || 0,
+    priceUnit: (r.model === 'za pokój' ? 'room' : 'person') as 'room' | 'person',
     model: r.model,
     tag: r.tag,
     // Limit pokoi (puste = bez limitu) + rezerwa dla gości specjalnych.
@@ -997,7 +1004,7 @@ function Step2Rooms({ state, update }: { state: WizardState; update: (p: Partial
           />
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
-              Model wyceny
+              Cena za
             </label>
             <select
               value={state.newRoom.model}
@@ -1005,10 +1012,8 @@ function Step2Rooms({ state, update }: { state: WizardState; update: (p: Partial
               className="rounded-[12px] border px-3 py-[13px] text-sm"
               style={{ borderColor: 'var(--border)', background: 'var(--surface)', color: 'var(--ink)' }}
             >
-              <option value="os/noc">os / noc</option>
-              <option value="za pokój">za pokój</option>
-              <option value="za osobę">za osobę</option>
-              <option value="dopłata 1-os">dopłata 1-os</option>
+              <option value="os/noc">za osobę / noc</option>
+              <option value="za pokój">za pokój / noc</option>
             </select>
           </div>
         </div>
@@ -1021,7 +1026,7 @@ function Step2Rooms({ state, update }: { state: WizardState; update: (p: Partial
             placeholder="2"
           />
           <Input
-            label="Cena (zł)"
+            label={state.newRoom.model === 'za pokój' ? 'Cena za pokój / noc' : 'Cena za osobę / noc'}
             type="number"
             value={state.newRoom.price}
             onChange={(e) => update({ newRoom: { ...state.newRoom, price: e.target.value } })}
@@ -1051,6 +1056,11 @@ function Step2Rooms({ state, update }: { state: WizardState; update: (p: Partial
           onChange={(e) => update({ newRoom: { ...state.newRoom, tag: e.target.value } })}
           placeholder="np. Najpopularniejsze"
         />
+        {priceHint(state.newRoom.price, state.newRoom.capacity, state.newRoom.model === 'za pokój' ? 'room' : 'person', state.currency === 'PLN' ? 'zł' : state.currency) && (
+          <p className="text-xs -mt-1" style={{ color: 'var(--muted)' }}>
+            {priceHint(state.newRoom.price, state.newRoom.capacity, state.newRoom.model === 'za pokój' ? 'room' : 'person', state.currency === 'PLN' ? 'zł' : state.currency)}
+          </p>
+        )}
         <Button size="sm" onClick={addRoom} className="self-start gap-1.5">
           <Plus size={14} />
           Dodaj
@@ -1101,7 +1111,7 @@ function Step2Rooms({ state, update }: { state: WizardState; update: (p: Partial
                       />
                     )}
                   </td>
-                  <td className="px-3 py-2 text-xs" style={{ color: 'var(--muted)' }}>{r.model}</td>
+                  <td className="px-3 py-2 text-xs" style={{ color: 'var(--muted)' }}>{r.model === 'za pokój' ? 'za pokój / noc' : 'za osobę / noc'}</td>
                   <td className="px-3 py-2" style={{ color: 'var(--ink)' }}>{r.capacity}</td>
                   <td className="px-3 py-2" style={{ color: 'var(--ink)' }}>{r.price} zł</td>
                   <td className="px-3 py-2" style={{ color: 'var(--ink)' }}>
@@ -1570,6 +1580,16 @@ function Step4Page({ state, update }: { state: WizardState; update: (p: Partial<
       </div>
 
       <div>
+        <p className="text-sm font-semibold mb-1" style={{ color: 'var(--ink)' }}>
+          Diety do wyboru
+        </p>
+        <p className="text-xs mb-2" style={{ color: 'var(--muted)' }}>
+          Włącz tylko te, które kuchnia przygotuje. Gość zaznacza je przy każdym uczestniku w kroku „Preferencje”.
+        </p>
+        <DietOptionsSelect value={state.diets} onChange={(v) => update({ diets: v })} />
+      </div>
+
+      <div>
         <p className="text-sm font-semibold mb-2" style={{ color: 'var(--ink)' }}>
           Języki strony
         </p>
@@ -1769,6 +1789,7 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
     locationI18n: {},
     supertitleI18n: {},
     affiliationField: '',
+    diets: [],
   })
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -1867,6 +1888,7 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
         locationI18n: state.location.trim() && Object.keys(locTr).length ? { pl: state.location.trim(), ...locTr } : null,
         specialGuests: guestsToSave(state.guests),
         affiliationField: state.affiliationField || null,
+        diets: state.diets,
       }
 
       // Tryb edycji — aktualizujemy istniejący event i kończymy.

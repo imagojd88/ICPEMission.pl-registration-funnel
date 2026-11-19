@@ -940,6 +940,8 @@ export interface EventContent {
   guestInvites?: { enabled?: boolean; maxPerInviter?: number } | null
   /** Pole przynależności w formularzu zapisu: parafia (tekst) / wspólnota (lista) / brak. */
   affiliationField?: 'parish' | 'community' | null
+  /** Diety do wyboru w formularzu (klucze z `lib/diets.ts`); brak/pusta = bez wyboru diet. */
+  diets?: string[] | null
 }
 
 export interface InvitationView {

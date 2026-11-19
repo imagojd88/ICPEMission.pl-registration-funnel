@@ -179,7 +179,8 @@
     "allergies_label": "Alergie i nietolerancje (szczegółowo)",
     "allergies_placeholder": "Opisz szczegółowo wszelkie alergie i nietolerancje pokarmowe...",
     "notes_label": "Dodatkowe uwagi",
-    "notes_placeholder": "Wszelkie inne informacje, które powinniśmy znać..."
+    "notes_placeholder": "Wszelkie inne informacje, które powinniśmy znać...",
+    "diets_hint": "Kuchnia przygotuje tylko poniższe diety. Zaznacz je przy osobach, które ich potrzebują — alergie opisz niżej."
   },
   "room": {
     "title": "Wybór pokoju",
@@ -217,7 +218,8 @@
     "left_other": "zostało {{count}} pokoi",
     "sold_out": "brak wolnych",
     "err_sold_out_one": "Brak wolnych pokoi typu „{{name}}” — wybierz inny typ.",
-    "err_sold_out": "Brak wolnych pokoi typu „{{name}}” — wybierz inny typ lub usuń pokój."
+    "err_sold_out": "Brak wolnych pokoi typu „{{name}}” — wybierz inny typ lub usuń pokój.",
+    "per_room_night": "/ pokój / noc"
   },
   "options": {
     "title": "Opcje i zgody",
@@ -291,7 +293,8 @@
     "ref_value": "Numer zgłoszenia (otrzymasz po wysłaniu i w e-mailu)",
     "abbr_formation": "form.",
     "abbr_accommodation": "nocl.",
-    "abbr_meals": "wyż."
+    "abbr_meals": "wyż.",
+    "diet": "Dieta"
   },
   "success": {
     "paid_title": "Dziękujemy!",

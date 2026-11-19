@@ -1,46 +1,44 @@
 import { useTranslation } from 'react-i18next'
 import { Textarea } from '../../ui/Textarea'
+import type { Participant } from '../../../pages/PublicFunnel'
+import { enabledDiets } from '../../../lib/diets'
 
 interface Props {
-  dietaryTags: string[]
+  /** Uczestnicy — diety zaznacza się osobno dla każdej osoby. */
+  participants: Participant[]
+  onParticipantsChange: (participants: Participant[]) => void
+  /** Diety włączone w evencie przez admina (`customFields.diets`). Pusta = brak wyboru diet. */
+  dietKeys: string[]
   dietaryNotes: string
   extraNotes: string
-  onTagsChange: (tags: string[]) => void
   onDietaryNotesChange: (value: string) => void
   onExtraNotesChange: (value: string) => void
 }
 
-// Wartości zapisywane w zgłoszeniu zostają po polsku (czyta je organizator);
-// gość widzi etykiety w swoim języku (`prefs.diets` — ta sama kolejność).
-const DIET_OPTIONS = [
-  'Wegetariańska',
-  'Wegańska',
-  'Bezglutenowa',
-  'Bez laktozy',
-  'Bez orzechów',
-  'Koszerna',
-]
-
 export default function Step2Prefs({
-  dietaryTags,
+  participants,
+  onParticipantsChange,
+  dietKeys,
   dietaryNotes,
   extraNotes,
-  onTagsChange,
   onDietaryNotesChange,
   onExtraNotesChange,
 }: Props) {
-  const { t } = useTranslation()
-  const dietLabels = t('prefs.diets', { returnObjects: true }) as unknown
-  const labelFor = (i: number, fallback: string) =>
-    Array.isArray(dietLabels) && typeof dietLabels[i] === 'string' ? (dietLabels[i] as string) : fallback
+  const { t, i18n } = useTranslation()
+  const lng = (i18n.language || 'pl').slice(0, 2) as 'pl' | 'en' | 'it'
+  const diets = enabledDiets(dietKeys)
 
-  const toggleTag = (tag: string) => {
-    if (dietaryTags.includes(tag)) {
-      onTagsChange(dietaryTags.filter((t) => t !== tag))
-    } else {
-      onTagsChange([...dietaryTags, tag])
-    }
-  }
+  const toggle = (pIdx: number, key: string) =>
+    onParticipantsChange(
+      participants.map((p, i) => {
+        if (i !== pIdx) return p
+        const cur = p.dietKeys ?? []
+        return { ...p, dietKeys: cur.includes(key) ? cur.filter((k) => k !== key) : [...cur, key] }
+      }),
+    )
+
+  const personLabel = (p: Participant, i: number) =>
+    p.name.trim() || `#${i + 1} ${p.type === 'adult' ? t('participants.adult') : t('participants.child')}`
 
   return (
     <div className="flex flex-col gap-5 px-[22px] py-5">
@@ -48,29 +46,49 @@ export default function Step2Prefs({
         {t('prefs.title')}
       </h2>
 
-      {/* Diet chips */}
-      <div className="flex flex-wrap gap-2">
-        {DIET_OPTIONS.map((option, i) => {
-          const isSelected = dietaryTags.includes(option)
-          return (
-            <button
-              key={option}
-              onClick={() => toggleTag(option)}
-              className="text-sm font-medium transition-all duration-150 active:scale-[0.97]"
-              style={{
-                padding: '6px 14px',
-                borderRadius: 99,
-                border: isSelected ? '1.5px solid var(--brand)' : '1.5px solid var(--border)',
-                background: isSelected ? 'var(--brand-soft)' : 'var(--surface-2)',
-                color: isSelected ? 'var(--brand)' : 'var(--ink)',
-                cursor: 'pointer',
-              }}
+      {/* Diety włączone w evencie — osobno dla każdej osoby */}
+      {diets.length > 0 && (
+        <div className="flex flex-col gap-3">
+          <p className="text-sm -mt-2" style={{ color: 'var(--muted)' }}>
+            {t('prefs.diets_hint')}
+          </p>
+          {participants.map((p, pi) => (
+            <div
+              key={p.id}
+              className="flex flex-col gap-2 rounded-[15px] px-4 py-3"
+              style={{ border: '1px solid var(--border)', background: 'var(--surface)' }}
             >
-              {labelFor(i, option)}
-            </button>
-          )
-        })}
-      </div>
+              <span className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+                {personLabel(p, pi)}
+              </span>
+              <div className="flex flex-wrap gap-2">
+                {diets.map((d) => {
+                  const isSelected = (p.dietKeys ?? []).includes(d.key)
+                  return (
+                    <button
+                      key={d.key}
+                      type="button"
+                      onClick={() => toggle(pi, d.key)}
+                      aria-pressed={isSelected}
+                      className="text-sm font-medium transition-all duration-150 active:scale-[0.97]"
+                      style={{
+                        padding: '6px 14px',
+                        borderRadius: 99,
+                        border: isSelected ? '1.5px solid var(--brand)' : '1.5px solid var(--border)',
+                        background: isSelected ? 'var(--brand-soft)' : 'var(--surface-2)',
+                        color: isSelected ? 'var(--brand)' : 'var(--ink)',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {isSelected ? '✓ ' : ''}{d.label[lng] ?? d.label.pl}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Allergies textarea */}
       <Textarea

@@ -51,6 +51,24 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — panel admina (kreator eventów)
 
+### Diety włączane per event (2026-11-19)
+- **Prośba (Jacek):** admin włącza/wyłącza diety w ustawieniach eventu (domyślnie wszystkie wyłączone); w foundation-day-2027 tylko: bez mięsa, bez laktozy, bez glutenu.
+- **Stan zastany (błędy):** chipy diet w kroku „Preferencje” (stała lista 6 diet, na całe zgłoszenie) szły jako `dietaryTags`, których API NIE zapisywało — wybory gości ginęły. „Dodatkowe uwagi” (krok Preferencje) też nie były wysyłane.
+- **Model:** katalog `app/src/lib/diets.ts` (klucze: `no_meat` Bez mięsa, `vegan`, `gluten_free` Bez glutenu, `lactose_free` Bez laktozy, `nut_free`, `kosher`; etykiety PL/EN/IT). Event: `customFields.diets: string[]` (brak = żadna). Bez zmian w API/bazie.
+- **Formularz:** krok „Preferencje” — gdy event ma włączone diety: podpowiedź „Kuchnia przygotuje tylko poniższe diety…” i chipy osobno dla każdego uczestnika (`Participant.dietKeys`); bez włączonych diet — brak chipów (zostają pola alergii i uwag). Zapis: `Participant.dietary` = etykiety PL wybranych diet (tylko włączonych w evencie) + wpis ręczny osoby z kroku Uczestnicy („Bez mięsa, Bez laktozy, alergia na orzechy”). `dietaryNotes` = alergie + „Uwagi: …” (naprawa ginących uwag). Podsumowanie: linia „Dieta: …” przy osobie.
+- **Panel:** „Edytuj event” ▸ Formularz zapisu ▸ „Diety do wyboru” (`admin/events/DietOptionsSelect.tsx`); kreator — krok Strona, pod przynależnością (też wczytywane w trybie edycji kreatora).
+- **Weryfikacja:** tsc ✓, build ✓; Playwright: diety [bez mięsa, bez laktozy, bez glutenu] → chipy per osoba, POST `dietary` ['Bez glutenu', 'Bez mięsa, Bez laktozy, alergia na orzechy'], notatki z „Uwagi:”; event bez diet → brak chipów; panel: włączenie 3 diet → zapis `customFields.diets`. 0 błędów JS.
+- **Otwarte:** pole „Dieta / alergie” (wolny tekst) przy uczestniku w kroku 2 nadal pozwala wpisać dowolną dietę — do decyzji, czy zmienić na „Alergie”. Brak zestawienia „ile porcji której diety” w panelu.
+- Stan: do pushu (tylko frontend). Potem w foundation-day-2027 włączyć 3 diety w „Edytuj event”.
+
+### Cena pokoju: za osobę albo za pokój (2026-11-19)
+- **Problem (Jacek):** raz opłata jest za pokój, raz za osobę — nie wiadomo, jak wypełniać. Silnik liczył ZAWSZE za osobę (`perPerson × noce × mnożnik`); pole „Model wyceny” w kreatorze („za pokój”, „dopłata 1-os” itd.) było tylko etykietą bez wpływu na cenę.
+- **Model:** `RoomTypeDef.priceUnit?: 'person' | 'room'` (brak = `person` → istniejące eventy bez zmian). Przy `room`: `perPerson` = cena pokoju za noc; koszt = cena × noce za pokój, niezależnie od liczby i wieku osób (bez mnożnika wieku); w rozbiciu na osoby dzielony po równo. Test w `pricing.test.ts` (12/12).
+- **Panel:** „Edytuj event” — przy każdym pokoju wybór „za osobę / noc” / „za pokój / noc” + podpowiedź („= 160 zł za pokój przy komplecie (2 os.)” / „= 100 zł/os przy komplecie; jedna osoba płaci 200 zł”), opis nad listą pokoi; zapis `priceUnit` + zgodna etykieta `model`. Kreator: „Model wyceny” → „Cena za” (2 opcje), etykieta pola ceny i podpowiedź; `buildPricingConfig` zapisuje `priceUnit`. Komponent `admin/events/RoomPriceFields.tsx`.
+- **Lejek / panel zgłoszeń:** etykiety „/ pokój / noc” vs „/ os / noc” (`room.per_room_night` PL/EN/IT) w wyborze pokoju, podsumowaniu i „Edytuj zgłoszenie”.
+- **Weryfikacja:** tsc app/api ✓, build ✓; Playwright: pokój „za pokój” 200 zł → 1 os. w pokoju i 2 os. w pokoju = ten sam nocleg 200 zł; panel: podpowiedzi, przełączenie jednostki, zapis `priceUnit: 'room'`, `model: 'za pokój'`. Kreatora nie klikałem (tsc).
+- Stan: do pushu + **Manual Deploy `icpe-api`** (cena wiążąca liczona w API — bez deployu API zgłoszenie z pokojem „za pokój” zostałoby wycenione po staremu, za osobę). **foundation-day-2027:** ustawić noce = 1 i przy „Pokój dla dwóch osób” wybrać „za pokój / noc”, jeśli 200 zł ma być za pokój.
+
 ### Poprawka: brak „Nie potrzebuję noclegu” przy 0 nocach (2026-11-19)
 - **Zgłoszenie (gość przez Jacka):** w `foundation-day-2027` nie da się przejść dalej bez wyboru pokoju, choć „Nocleg opcjonalny” zaznaczony.
 - **Przyczyna:** event miał `nights: 0` (rooms: 1 = „Miejsce w pokoju 3-os. ze śniadaniem (pt/sb)” 100 zł/os, stock 30; 2 = „Pokój dla dwóch osób (pt/sb)” 200 zł/os, stock 7). `isAccommodationOptional` zależał od `hasAccommodation` (pokoje + noce ≥ 1) → przy 0 nocach lejek traktował nocleg jako obowiązkowy. Przy 0 nocach pokoje kosztowały też 0 zł (`perPerson × nights`). Rezerwacji pokoi jeszcze nie było (`roomUsage: {}`).

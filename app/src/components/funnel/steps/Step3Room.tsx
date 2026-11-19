@@ -241,7 +241,7 @@ export default function Step3Room({ rooms, participants, pricingConfig, onChange
                   const soldOut = left !== null && left <= 0
                   return (
                   <option key={rt.id} value={rt.id} disabled={soldOut && rt.id !== room.roomId}>
-                    {roomLabel(rt.name, i18n.language)} — {money(rt.perPerson)} {t('room.per_person_night')} · {t('room.max_n', { n: rt.cap })}
+                    {roomLabel(rt.name, i18n.language)} — {money(rt.perPerson)} {rt.priceUnit === 'room' ? t('room.per_room_night') : t('room.per_person_night')} · {t('room.max_n', { n: rt.cap })}
                     {left === null ? '' : soldOut ? ` · ${t('room.sold_out')}` : left <= 5 ? ` · ${t('room.left', { count: left })}` : ''}
                   </option>
                   )
@@ -260,9 +260,11 @@ export default function Step3Room({ rooms, participants, pricingConfig, onChange
                   {money(selectedType.perPerson)}
                   <span className="text-xs font-sans font-normal" style={{ color: 'var(--muted)' }}>
                     {' '}
-                    {selectedType.model === 'noc'
-                      ? t('room.per_night')
-                      : t('room.per_person_night')}
+                    {selectedType.priceUnit === 'room'
+                      ? t('room.per_room_night')
+                      : selectedType.model === 'noc'
+                        ? t('room.per_night')
+                        : t('room.per_person_night')}
                   </span>
                 </span>
               </div>

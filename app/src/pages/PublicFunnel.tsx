@@ -46,6 +46,7 @@ import Step2Prefs from '../components/funnel/steps/Step2Prefs'
 import Step3Room from '../components/funnel/steps/Step3Room'
 import Step4Options from '../components/funnel/steps/Step4Options'
 import { COMMUNITY_OTHER, type AffiliationField } from '../lib/communities'
+import { participantDietaryText } from '../lib/diets'
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -72,6 +73,8 @@ export interface Participant {
   age: number
   gender: 'F' | 'M'
   diet: string
+  /** Diety zaznaczone dla tej osoby (klucze z `lib/diets.ts`, tylko włączone w evencie). */
+  dietKeys?: string[]
 }
 
 /** Jeden pokój w komponowanym zgłoszeniu. */
@@ -221,6 +224,7 @@ function StepperView({
   error,
   affiliation,
   roomAvailability,
+  dietKeys,
 }: {
   state: StepperState
   event: EventInstanceDto
@@ -233,6 +237,8 @@ function StepperView({
   error?: string | null
   /** Limit pokoi: wolne pokoje per typ (brak klucza = bez limitu). */
   roomAvailability?: Record<string, number>
+  /** Diety włączone w evencie (`customFields.diets`). */
+  dietKeys?: string[]
 }) {
   const renderStep = () => {
     switch (state.step) {
@@ -255,10 +261,11 @@ function StepperView({
       case 2:
         return (
           <Step2Prefs
-            dietaryTags={state.dietaryTags}
+            participants={state.participants}
+            onParticipantsChange={(participants) => onChange({ participants })}
+            dietKeys={dietKeys ?? []}
             dietaryNotes={state.dietaryNotes}
             extraNotes={state.extraNotes}
-            onTagsChange={(dietaryTags) => onChange({ dietaryTags })}
             onDietaryNotesChange={(dietaryNotes) => onChange({ dietaryNotes })}
             onExtraNotesChange={(extraNotes) => onChange({ extraNotes })}
           />
@@ -668,7 +675,11 @@ export default function PublicFunnel() {
             lastName: n.lastName,
             age: p.age,
             gender: p.gender,
-            dietary: p.diet || undefined,
+            // Diety z listy eventu (tylko te, które admin włączył) + wpis ręczny osoby.
+            dietary: participantDietaryText(
+              (p.dietKeys ?? []).filter((k) => (eventConfig?.customFields?.diets ?? []).includes(k)),
+              p.diet,
+            ),
           }
         }),
         // Bez noclegu → pusta lista pokoi (API przyjmie ją, gdy nocleg jest opcjonalny).
@@ -677,8 +688,12 @@ export default function PublicFunnel() {
           : stepper.rooms
               .map((r) => ({ roomId: r.roomId, participantIndexes: r.participantIndexes }))
               .filter((r) => r.participantIndexes.length > 0),
-        dietaryNotes: stepper.dietaryNotes || undefined,
-        dietaryTags: stepper.dietaryTags,
+        // „Dodatkowe uwagi” nie miały własnego pola w API i ginęły — dołączamy je do notatek zgłoszenia.
+        dietaryNotes:
+          [stepper.dietaryNotes.trim(), stepper.extraNotes.trim() ? `Uwagi: ${stepper.extraNotes.trim()}` : '']
+            .filter(Boolean)
+            .join('\n') || undefined,
+        dietaryTags: [],
         options: { transport: stepper.options.transport, bedding: stepper.options.bedding },
         discountCode: stepper.discountApplied ? stepper.discountCode : undefined,
         paymentMethod: toPaymentMethod(stepper.paymentMethod),
@@ -846,6 +861,7 @@ export default function PublicFunnel() {
           error={stepError}
           affiliation={affiliation}
           roomAvailability={eventConfig?.roomAvailability}
+          dietKeys={eventConfig?.customFields?.diets ?? []}
         />
       )}
 

@@ -5,6 +5,7 @@ import type { EventInstanceDto, PricingConfig, PriceLine } from '@icpe/shared'
 import type { StepperState } from '../../pages/PublicFunnel'
 import { bcp47 } from '../../lib/utils'
 import { pickLang } from '../../lib/api'
+import { dietLabel } from '../../lib/diets'
 import { funnelPriceInput, isAccommodationOptional } from '../../lib/funnelPrice'
 
 interface Props {
@@ -180,6 +181,11 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
                     <span className="text-xs" style={{ color: 'var(--muted)' }}>
                       {p.type === 'adult' ? t('participants.adult') : `${t('participants.child')} · ${p.age} ${t('participants.age_suffix')}`}
                     </span>
+                    {((p.dietKeys ?? []).length > 0 || p.diet.trim()) && (
+                      <span className="text-xs" style={{ color: 'var(--muted)' }}>
+                        {t('summary.diet')}: {[...(p.dietKeys ?? []).map((k) => dietLabel(k, i18n.language)), p.diet.trim()].filter(Boolean).join(', ')}
+                      </span>
+                    )}
                   </div>
                   <span className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
                     {money(line?.total ?? 0)}
@@ -247,7 +253,7 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
                       {t('summary.room_n', { n: ri + 1 })}: {roomType ? roomLabel(roomType.name, i18n.language) : room.roomId}
                     </span>
                     <span className="text-sm font-semibold" style={{ color: 'var(--muted)' }}>
-                      {roomType ? `${money(roomType.perPerson)} ${t('room.per_person_night')}` : ''}
+                      {roomType ? `${money(roomType.perPerson)} ${roomType.priceUnit === 'room' ? t('room.per_room_night') : t('room.per_person_night')}` : ''}
                     </span>
                   </div>
                   {assignedNames.length > 0 && (

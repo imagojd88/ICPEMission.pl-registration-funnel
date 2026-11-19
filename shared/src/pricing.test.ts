@@ -134,3 +134,19 @@ test('rezerwa dla gości specjalnych: zdejmowana z puli publicznej, zużywana na
   assert.deepEqual(roomAvailability(cfg, { [id]: 5 }, { [id]: 4 }), { [id]: 1 }); // ponad rezerwę → z puli
   assert.deepEqual(roomAvailability(cfg, { [id]: 9 }), { [id]: 0 }); // nigdy poniżej zera
 });
+
+test('cena za pokój: stała za pokój i noc, dzielona między mieszkańców, bez mnożnika wieku', () => {
+  const cfg: PricingConfig = {
+    ...DEFAULT_PRICING,
+    nights: 1,
+    rooms: [{ id: 'dbl', name: 'Pokój 2-os.', cap: 2, perPerson: 200, priceUnit: 'room' }],
+  };
+  const two = computePrice({ rooms: [{ roomId: 'dbl', participants: [{ type: 'adult', age: 40 }, { type: 'child', age: 8 }] }] }, cfg);
+  assert.equal(two.accommodation, 200);
+  assert.equal(two.lines[0].accommodation, 100);
+  assert.equal(two.lines[1].accommodation, 100);
+  const one = computePrice({ rooms: [{ roomId: 'dbl', participants: [{ type: 'adult', age: 40 }] }] }, cfg);
+  assert.equal(one.accommodation, 200); // sam w pokoju płaci za cały pokój
+  const two2 = computePrice({ rooms: [{ roomId: 'dbl', participants: [{ type: 'adult', age: 40 }] }] }, { ...cfg, nights: 2 });
+  assert.equal(two2.accommodation, 400);
+});

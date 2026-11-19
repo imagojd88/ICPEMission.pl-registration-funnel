@@ -175,7 +175,8 @@
     "allergies_label": "Allergie e intolleranze (dettagliato)",
     "allergies_placeholder": "Descrivi dettagliatamente eventuali allergie e intolleranze alimentari...",
     "notes_label": "Note aggiuntive",
-    "notes_placeholder": "Qualsiasi altra informazione che dovremmo sapere..."
+    "notes_placeholder": "Qualsiasi altra informazione che dovremmo sapere...",
+    "diets_hint": "La cucina può preparare solo le diete qui sotto. Selezionale per ogni persona che ne ha bisogno — descrivi le allergie più in basso."
   },
   "room": {
     "title": "Scelta della camera",
@@ -211,7 +212,8 @@
     "left_other": "ne restano {{count}}",
     "sold_out": "esaurito",
     "err_sold_out_one": "Camere “{{name}}” esaurite — scegli un altro tipo.",
-    "err_sold_out": "Camere “{{name}}” esaurite — scegli un altro tipo o rimuovi una camera."
+    "err_sold_out": "Camere “{{name}}” esaurite — scegli un altro tipo o rimuovi una camera.",
+    "per_room_night": "/ camera / notte"
   },
   "options": {
     "title": "Opzioni e consensi",
@@ -285,7 +287,8 @@
     "ref_value": "Numero di iscrizione (lo riceverai dopo l’invio e via e-mail)",
     "abbr_formation": "form.",
     "abbr_accommodation": "alloggio",
-    "abbr_meals": "pasti"
+    "abbr_meals": "pasti",
+    "diet": "Dieta"
   },
   "success": {
     "paid_title": "Grazie!",

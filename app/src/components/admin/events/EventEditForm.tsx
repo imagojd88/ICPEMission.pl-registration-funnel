@@ -1,3 +1,5 @@
+import DietOptionsSelect from './DietOptionsSelect'
+import { PriceUnitSelect, priceHint } from './RoomPriceFields'
 import RoomStockFields from './RoomStockFields'
 import OptionalStayFields from './OptionalStayFields'
 import { useState, useEffect, type ChangeEvent } from 'react'
@@ -40,6 +42,8 @@ interface RoomRow {
   capacity: string
   price: string
   tag: string
+  /** za co jest cena: osoba / cały pokój (za noc) */
+  priceUnit: 'person' | 'room'
   /** liczba pokoi tego typu (puste = bez limitu) */
   stock: string
   /** ile z nich zablokowanych dla gości specjalnych */
@@ -144,6 +148,8 @@ export default function EventEditForm({
   const [guestInvitesEnabled, setGuestInvitesEnabled] = useState(false)
   // Pole przynależności w formularzu zapisu (customFields.affiliationField).
   const [affiliationField, setAffiliationField] = useState<AffiliationField | ''>('')
+  // Diety do wyboru w formularzu (customFields.diets) — domyślnie żadna.
+  const [diets, setDiets] = useState<string[]>([])
   const [guestInvitesMax, setGuestInvitesMax] = useState('2')
 
   const addProgramRow = () => setProgram((p) => [...p, { id: `pg-${Date.now()}`, time: '', item: {} }])
@@ -258,6 +264,7 @@ export default function EventEditForm({
             capacity: String(r.cap ?? 1),
             price: String(r.perPerson ?? 0),
             tag: r.tag || '',
+            priceUnit: r.priceUnit === 'room' ? 'room' : 'person',
             stock: r.stock ? String(r.stock) : '',
             reserved: r.reserved ? String(r.reserved) : '',
           })),
@@ -296,6 +303,7 @@ export default function EventEditForm({
         setGuests(guestRowsFrom(cfg.customFields))
         setGuestInvitesEnabled(cfg.customFields?.guestInvites?.enabled === true)
         setAffiliationField(cfg.customFields?.affiliationField ?? '')
+        setDiets(Array.isArray(cfg.customFields?.diets) ? cfg.customFields!.diets! : [])
         setGuestInvitesMax(String(cfg.customFields?.guestInvites?.maxPerInviter ?? 2))
         const loc = cfg.locales ?? ['pl']
         // PL i EN zawsze aktywne (patrz activeLocales); IT według ustawień.
@@ -352,7 +360,9 @@ export default function EventEditForm({
             name: cleanMap(r.name),
             cap: parseInt(r.capacity) || 1,
             perPerson: parseFloat(r.price) || 0,
-            model: r.model,
+            // Jednostka ceny liczy się w wycenie; `model` to tylko etykieta (zgodna z jednostką).
+            priceUnit: r.priceUnit,
+            model: r.priceUnit === 'room' ? 'za pokój' : 'os/noc',
             tag: r.tag || '',
             ...(stock > 0 ? { stock } : {}),
             ...(stock > 0 && reserved > 0 ? { reserved } : {}),
@@ -431,6 +441,7 @@ export default function EventEditForm({
           specialGuests: guestsToSave(guests),
           specialGuest: null,
           affiliationField: affiliationField || null,
+          diets,
           guestInvites: {
             enabled: guestInvitesEnabled,
             maxPerInviter: Math.min(10, Math.max(1, parseInt(guestInvitesMax, 10) || 2)),
@@ -647,6 +658,9 @@ export default function EventEditForm({
         {/* Pokoje */}
         <div className="flex flex-col gap-2">
           <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--faint)' }}>Pokoje</span>
+          <p className="text-xs -mt-1" style={{ color: 'var(--muted)' }}>
+            Każdy typ: nazwa · ile osób mieści pokój · cena · <strong>za co jest cena</strong> — za osobę (każdy płaci tyle za noc) albo za cały pokój (stała kwota za noc, niezależnie od liczby osób).
+          </p>
           <OptionalStayFields
             optional={optionalStay}
             onOptional={setOptionalStay}
@@ -660,9 +674,15 @@ export default function EventEditForm({
             <div className="flex items-center gap-2">
               <Input value={r.name[editLang] ?? ''} onChange={(e) => setRooms((p) => p.map((x) => x.id === r.id ? { ...x, name: { ...x.name, [editLang]: e.target.value } } : x))} placeholder={srcPh(r.name.pl, multi ? `Nazwa (${LANG_LABEL[editLang]})` : 'Nazwa')} />
               <input value={r.capacity} onChange={(e) => setRooms((p) => p.map((x) => x.id === r.id ? { ...x, capacity: e.target.value } : x))} placeholder="os." inputMode="numeric" className={inputCls} style={{ ...inputStyle, width: 70 }} />
-              <input value={r.price} onChange={(e) => setRooms((p) => p.map((x) => x.id === r.id ? { ...x, price: e.target.value } : x))} placeholder="zł/os" inputMode="numeric" className={inputCls} style={{ ...inputStyle, width: 90 }} />
+              <input value={r.price} onChange={(e) => setRooms((p) => p.map((x) => x.id === r.id ? { ...x, price: e.target.value } : x))} placeholder="cena" inputMode="numeric" className={inputCls} style={{ ...inputStyle, width: 90 }} />
+              <PriceUnitSelect value={r.priceUnit} onChange={(v) => setRooms((p) => p.map((x) => (x.id === r.id ? { ...x, priceUnit: v } : x)))} className={inputCls} style={{ ...inputStyle, width: 150 }} />
               <button onClick={() => setRooms((p) => p.filter((x) => x.id !== r.id))} className="p-2 rounded-[8px]" style={{ color: 'var(--err)' }}><Trash2 size={15} /></button>
             </div>
+            {priceHint(r.price, r.capacity, r.priceUnit, currency === 'PLN' ? 'zł' : currency) && (
+              <span className="text-xs" style={{ color: 'var(--muted)' }}>
+                Pojemność {parseInt(r.capacity) || 1} os. · {priceHint(r.price, r.capacity, r.priceUnit, currency === 'PLN' ? 'zł' : currency)}
+              </span>
+            )}
             <RoomStockFields
               stock={r.stock}
               reserved={r.reserved}
@@ -673,7 +693,7 @@ export default function EventEditForm({
             />
             </div>
           ))}
-          <Button size="sm" variant="outline" onClick={() => setRooms((p) => [...p, { id: `r-new-${Date.now()}`, name: {}, model: 'os/noc', capacity: '2', price: '80', tag: '', stock: '', reserved: '' }])}>
+          <Button size="sm" variant="outline" onClick={() => setRooms((p) => [...p, { id: `r-new-${Date.now()}`, name: {}, model: 'os/noc', capacity: '2', price: '80', tag: '', priceUnit: 'person', stock: '', reserved: '' }])}>
             <Plus size={14} /> Dodaj pokój
           </Button>
         </div>
@@ -860,6 +880,12 @@ export default function EventEditForm({
             Przynależność (krok „Dane zgłaszającego”)
           </span>
           <AffiliationSelect value={affiliationField} onChange={setAffiliationField} />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--faint)' }}>
+            Diety do wyboru (krok „Preferencje”)
+          </span>
+          <DietOptionsSelect value={diets} onChange={setDiets} />
         </div>
       </Section>
 

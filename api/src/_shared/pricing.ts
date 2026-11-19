@@ -31,8 +31,17 @@ export interface RoomTypeDef {
   desc?: string;
   /** maksymalna liczba osób w pokoju */
   cap: number;
-  /** cena za osobę za noc (dla pokoju 1-os. = cena pokoju/noc) */
+  /**
+   * Cena za noc — za osobę albo za cały pokój, zależnie od `priceUnit`
+   * (nazwa pola historyczna; przy `priceUnit: 'room'` to cena pokoju).
+   */
   perPerson: number;
+  /**
+   * Jednostka ceny: 'person' (domyślnie) = cena × osoby × noce × mnożnik wieku;
+   * 'room' = cena × noce za pokój, niezależnie od liczby i wieku osób w pokoju
+   * (w rozbiciu na osoby dzielona po równo między mieszkańców pokoju).
+   */
+  priceUnit?: 'person' | 'room';
   /** etykieta modelu cenowego (informacyjna) */
   model?: string;
   /** liczba pokoi tego typu do wynajęcia; brak / 0 = bez limitu */
@@ -185,11 +194,16 @@ export function computePrice(input: PriceInput, config: PricingConfig = DEFAULT_
 
   for (const booking of input.rooms ?? []) {
     const room = config.rooms.find((r) => r.id === booking.roomId) ?? config.rooms[0];
+    const perRoom = room.priceUnit === 'room';
+    const occupants = booking.participants.length;
     for (const p of booking.participants) {
       const m = ageMultiplier(p, config.childBrackets);
       // Próg „gratis" (mnożnik 0) → cała cena osoby = 0 (w tym opłata formacyjna).
       const formation = m === 0 ? 0 : config.formationFee;
-      const accommodation = room.perPerson * config.nights * m;
+      // Cena za pokój: stała za pokój i noc, dzielona po równo (bez mnożnika wieku).
+      const accommodation = perRoom
+        ? (occupants > 0 ? (room.perPerson * config.nights) / occupants : 0)
+        : room.perPerson * config.nights * m;
       const meals = (config.mealsFee + overnightMeals) * m;
       lines.push({
         ...p,

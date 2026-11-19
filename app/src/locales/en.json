@@ -173,7 +173,8 @@
     "allergies_label": "Allergies and intolerances (detailed)",
     "allergies_placeholder": "Describe any food allergies and intolerances in detail...",
     "notes_label": "Additional notes",
-    "notes_placeholder": "Any other information we should know..."
+    "notes_placeholder": "Any other information we should know...",
+    "diets_hint": "The kitchen can only prepare the diets below. Tick them for each person who needs one — describe allergies further down."
   },
   "room": {
     "title": "Room selection",
@@ -207,7 +208,8 @@
     "left_other": "{{count}} rooms left",
     "sold_out": "sold out",
     "err_sold_out_one": "No “{{name}}” rooms left — please choose another type.",
-    "err_sold_out": "No “{{name}}” rooms left — choose another type or remove a room."
+    "err_sold_out": "No “{{name}}” rooms left — choose another type or remove a room.",
+    "per_room_night": "/ room / night"
   },
   "options": {
     "title": "Options and consents",
@@ -281,7 +283,8 @@
     "ref_value": "Registration number (you will receive it after submitting and by email)",
     "abbr_formation": "form.",
     "abbr_accommodation": "accom.",
-    "abbr_meals": "meals"
+    "abbr_meals": "meals",
+    "diet": "Diet"
   },
   "success": {
     "paid_title": "Thank you!",

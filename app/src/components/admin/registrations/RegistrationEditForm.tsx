@@ -265,7 +265,7 @@ export default function RegistrationEditForm({
                     <span className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>Pokój {ri + 1}</span>
                     <select value={r.roomId} onChange={(e) => setRoomType(r.uid, e.target.value)} className={inputCls} style={{ ...inputStyle, flex: 1 }}>
                       {roomTypes.map((rt) => (
-                        <option key={rt.id} value={rt.id}>{roomLabel(rt.name, 'pl')} — {money(rt.perPerson)}/os · maks. {rt.cap}</option>
+                        <option key={rt.id} value={rt.id}>{roomLabel(rt.name, 'pl')} — {money(rt.perPerson)}{rt.priceUnit === 'room' ? ' za pokój' : '/os'} · maks. {rt.cap}</option>
                       ))}
                     </select>
                     <button onClick={() => removeRoom(r.uid)} className="p-2 rounded-[8px]" style={{ color: 'var(--err)', background: 'none', border: 'none', cursor: 'pointer' }}><Trash2 size={15} /></button>
