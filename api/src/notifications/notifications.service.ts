@@ -15,59 +15,122 @@ export interface MailAccommodation {
   nights: number;
 }
 
-type MailLang = 'pl' | 'en';
-/** Maile są po polsku albo po angielsku: każdy język gościa poza PL (EN, IT, KO, ZH) dostaje wersję angielską. */
+/**
+ * Język maili do gości: PL, EN, KO (koreański), ZH (chiński uproszczony).
+ * Pozostałe języki gościa (np. IT) dostają wersję angielską.
+ * Terminologia katolicka: KO — 하느님/주님, 미사, 피정, 본당; ZH — 天主, 弥撒, 避静, 堂区.
+ */
+type MailLang = 'pl' | 'en' | 'ko' | 'zh';
+const mailLangOf = (locale: string | undefined | null): MailLang =>
+  locale === 'ko' || locale === 'zh' || locale === 'pl' ? locale : locale ? 'en' : 'pl';
+/** Maile tylko PL/EN (np. formacja online): każdy język poza PL → angielski. */
 const mailEn = (locale: string | undefined | null): boolean => !!locale && locale !== 'pl';
+
+/** Podpis maila w danym języku. */
+function signature(lang: MailLang): string[] {
+  switch (lang) {
+    case 'en': return ['God bless,', 'ICPE Mission Poland'];
+    case 'ko': return ['주님의 축복을 빕니다.', 'ICPE Mission 폴란드'];
+    case 'zh': return ['愿天主祝福您！', 'ICPE Mission 波兰'];
+    default: return ['Szczęść Boże,', 'ICPE Mission Polska'];
+  }
+}
+
+/** Powitanie: KO po katolicku „찬미 예수님!” (z imieniem: „길동님, 찬미 예수님!”). */
+function greetingLine(lang: MailLang, name = ''): string {
+  const n = name.trim();
+  switch (lang) {
+    case 'en': return n ? `${n},` : 'Hello,';
+    case 'ko': return n ? `${n}님, 찬미 예수님!` : '찬미 예수님!';
+    case 'zh': return n ? `${n}，您好！` : '您好！';
+    default: return n ? `${n},` : 'Dzień dobry,';
+  }
+}
+
+/** Wybór tekstu wg języka maila. */
+const L = <T,>(lang: MailLang, v: Record<MailLang, T>): T => v[lang];
 
 /** Linie o noclegu do maila (puste, gdy event nie oferuje noclegów). */
 function accommodationLines(acc: MailAccommodation | undefined, lang: MailLang): string[] {
   if (!acc || !acc.offered) return [];
-  const en = lang === 'en';
-  if (acc.rooms.length === 0) return [en ? 'Accommodation: not needed.' : 'Nocleg: bez noclegu.'];
-  const people = (n: number) => (en ? `${n} ${n === 1 ? 'person' : 'people'}` : `${n} ${n === 1 ? 'os.' : 'os.'}`);
-  const nights = en ? `${acc.nights} ${acc.nights === 1 ? 'night' : 'nights'}` : `${acc.nights} ${acc.nights === 1 ? 'noc' : acc.nights < 5 ? 'noce' : 'nocy'}`;
-  const list = acc.rooms.map((r) => `${r.name} (${people(r.people)})`).join(', ');
-  const lines = [en ? `Accommodation (${nights}): ${list}.` : `Nocleg (${nights}): ${list}.`];
+  if (acc.rooms.length === 0) {
+    return [L(lang, { pl: 'Nocleg: bez noclegu.', en: 'Accommodation: not needed.', ko: '숙박: 필요 없음.', zh: '住宿：不需要。' })];
+  }
+  const people = (n: number) =>
+    L(lang, { pl: `${n} os.`, en: `${n} ${n === 1 ? 'person' : 'people'}`, ko: `${n}명`, zh: `${n}人` });
+  const k = acc.nights;
+  const nights = L(lang, {
+    pl: `${k} ${k === 1 ? 'noc' : k < 5 ? 'noce' : 'nocy'}`,
+    en: `${k} ${k === 1 ? 'night' : 'nights'}`,
+    ko: `${k}박`,
+    zh: `${k}晚`,
+  });
+  const list = acc.rooms
+    .map((r) => (lang === 'zh' ? `${r.name}（${people(r.people)}）` : `${r.name} (${people(r.people)})`))
+    .join(lang === 'zh' ? '，' : ', ');
+  const lines = [L(lang, {
+    pl: `Nocleg (${nights}): ${list}.`,
+    en: `Accommodation (${nights}): ${list}.`,
+    ko: `숙박 (${nights}): ${list}.`,
+    zh: `住宿（${nights}）：${list}。`,
+  })];
   if (acc.withoutRoom > 0) {
-    lines.push(en ? `Without accommodation: ${people(acc.withoutRoom)}.` : `Bez noclegu: ${people(acc.withoutRoom)}`);
+    const w = people(acc.withoutRoom);
+    lines.push(L(lang, { pl: `Bez noclegu: ${w}`, en: `Without accommodation: ${w}.`, ko: `숙박 없음: ${w}.`, zh: `不住宿：${w}。` }));
   }
   return lines;
 }
 
 /** Akapit o płatności: przy gotówce — kwota, którą trzeba mieć przy sobie na rejestracji. */
 function paymentLines(method: unknown, amount: string, lang: MailLang, total: number, currency = 'PLN', leaderPct?: number): string[] {
-  const en = lang === 'en';
   if (total <= 0) return [];
+  const amountLine = L(lang, { pl: `Kwota: ${amount}.`, en: `Amount: ${amount}.`, ko: `금액: ${amount}.`, zh: `金额：${amount}。` });
   if (method === 'LEADER_DEPOSIT') {
     // Zaliczka u lidera wspólnoty + reszta gotówką przy rejestracji.
-    const s = leaderDepositSplit(total, { leaderDepositPct: leaderPct });
+    const sp = leaderDepositSplit(total, { leaderDepositPct: leaderPct });
     const f = (n: number) => formatMoney(n, currency as 'PLN' | 'EUR' | 'USD', lang);
-    return en
-      ? [`Amount: ${amount}.`, `Payment: please hand a deposit of ${f(s.deposit)} (${s.pct}%) to your community leader.`, `Please bring the remaining ${f(s.rest)} in cash to the registration desk.`]
-      : [`Kwota: ${amount}.`, `Płatność: zaliczkę ${f(s.deposit)} (${s.pct}%) przekaż liderowi swojej wspólnoty.`, `Pozostałe ${f(s.rest)} prosimy mieć przy sobie gotówką przy rejestracji na miejscu.`];
+    return [amountLine, ...L(lang, {
+      pl: [`Płatność: zaliczkę ${f(sp.deposit)} (${sp.pct}%) przekaż liderowi swojej wspólnoty.`, `Pozostałe ${f(sp.rest)} prosimy mieć przy sobie gotówką przy rejestracji na miejscu.`],
+      en: [`Payment: please hand a deposit of ${f(sp.deposit)} (${sp.pct}%) to your community leader.`, `Please bring the remaining ${f(sp.rest)} in cash to the registration desk.`],
+      ko: [`결제: 예약금 ${f(sp.deposit)}(${sp.pct}%)를 공동체 리더에게 전달해 주세요.`, `나머지 ${f(sp.rest)}는 현장 접수처에서 현금으로 결제해 주세요.`],
+      zh: [`付款方式：请将定金 ${f(sp.deposit)}（${sp.pct}%）交给您的团体负责人。`, `其余 ${f(sp.rest)} 请在现场报到处以现金支付。`],
+    })];
   }
   if (method === 'CASH') {
-    return en
-      ? [`Payment: cash at registration desk.`, `Please bring ${amount} in cash (the exact amount if possible).`]
-      : [`Płatność: gotówką przy rejestracji na miejscu.`, `Prosimy mieć przy sobie ${amount} gotówką (najlepiej odliczoną kwotę).`]
+    return L(lang, {
+      pl: [`Płatność: gotówką przy rejestracji na miejscu.`, `Prosimy mieć przy sobie ${amount} gotówką (najlepiej odliczoną kwotę).`],
+      en: [`Payment: cash at registration desk.`, `Please bring ${amount} in cash (the exact amount if possible).`],
+      ko: ['결제: 현장 접수 시 현금 결제.', `준비하실 현금: ${amount} (가능하면 정확한 금액으로).`],
+      zh: ['付款方式：现场报到时以现金支付。', `请携带现金 ${amount}（尽量准备零钱）。`],
+    });
   }
   if (method === 'BANK_TRANSFER') {
-    return en
-      ? [`Amount: ${amount}.`, 'Payment: bank transfer — please make the transfer by the given date.']
-      : [`Kwota: ${amount}.`, 'Płatność: przelew bankowy — prosimy o dokonanie przelewu w podanym terminie.'];
+    return [amountLine, L(lang, {
+      pl: 'Płatność: przelew bankowy — prosimy o dokonanie przelewu w podanym terminie.',
+      en: 'Payment: bank transfer — please make the transfer by the given date.',
+      ko: '결제: 계좌 이체 — 기한 내에 이체해 주세요.',
+      zh: '付款方式：银行转账——请在规定期限内完成转账。',
+    })];
   }
-  return en
-    ? [`Amount: ${amount}.`, 'Payment: online — it will be confirmed automatically.']
-    : [`Kwota: ${amount}.`, 'Płatność: online — zostanie potwierdzona automatycznie.'];
+  return [amountLine, L(lang, {
+    pl: 'Płatność: online — zostanie potwierdzona automatycznie.',
+    en: 'Payment: online — it will be confirmed automatically.',
+    ko: '결제: 온라인 — 자동으로 확인됩니다.',
+    zh: '付款方式：在线支付——将自动确认。',
+  })];
 }
 
-/** Wspólny układ maila z przyciskiem: akapity (intro) → przycisk → link zapasowy → akapity (outro). */
-function buttonMail(intro: string[], button: { label: string; href: string } | null, outro: string[]): { text: string; html: string } {
+function buttonMail(intro: string[], button: { label: string; href: string } | null, outro: string[], lang: MailLang = 'pl'): { text: string; html: string } {
   const text = [...intro, ...(button ? [button.href, ''] : []), ...outro].join('\n');
   const p = (l: string) => (l === '' ? '<br/>' : `<p style="margin:0 0 6px">${esc(l)}</p>`);
   const btn = button
     ? `<p style="margin:18px 0"><a href="${esc(button.href)}" style="display:inline-block;background:#C0603C;color:#fff;text-decoration:none;padding:12px 22px;border-radius:12px;font-weight:600">${esc(button.label)}</a></p>
-        <p style="margin:0 0 14px;font-size:12px;color:#6b7280">Gdyby przycisk nie działał, skopiuj link: ${esc(button.href)}</p>`
+        <p style="margin:0 0 14px;font-size:12px;color:#6b7280">${esc(L(lang, {
+          pl: 'Gdyby przycisk nie działał, skopiuj link:',
+          en: "If the button doesn't work, copy this link:",
+          ko: '버튼이 작동하지 않으면 이 링크를 복사해 주세요:',
+          zh: '如果按钮无法使用，请复制此链接：',
+        }))} ${esc(button.href)}</p>`
     : '';
   const html = `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.6;color:#1f2937">
         ${intro.map(p).join('')}
@@ -399,36 +462,51 @@ export class NotificationsService {
       m === 'ONLINE' ? 'płatność online' : m === 'CASH' ? 'gotówka na miejscu' : m === 'LEADER_DEPOSIT' ? 'zaliczka u lidera + reszta gotówką' : 'przelew bankowy';
 
     if (payload.type === 'CONFIRMATION') {
-      const lang: MailLang = mailEn(payload.locale) ? 'en' : 'pl';
-      const en = lang === 'en';
-      const title = String(d.eventTitle ?? (en ? 'the event' : 'wydarzenie'));
+      const lang = mailLangOf(payload.locale);
+      const title = String(d.eventTitle ?? L(lang, { pl: 'wydarzenie', en: 'the event', ko: '행사', zh: '活动' }));
       const total = Number(d.totalPrice ?? 0);
       const amount = formatMoney(total, (String(d.currency ?? 'PLN') as 'PLN' | 'EUR' | 'USD'), lang);
       const acc = d.accommodation as MailAccommodation | undefined;
       const manageLink = String(d.manageLink ?? '');
-      const subject = en ? `Registration confirmed — ${title}` : `Potwierdzenie zgłoszenia — ${title}`;
+      const sig = signature(lang);
+      const subject = L(lang, {
+        pl: `Potwierdzenie zgłoszenia — ${title}`,
+        en: `Registration confirmed — ${title}`,
+        ko: `신청 확인 — ${title}`,
+        zh: `报名确认 — ${title}`,
+      });
+      const regNo = String(payload.registrationId ?? '');
       const lines = [
-        en ? 'Hello,' : 'Dzień dobry,',
+        greetingLine(lang),
         '',
-        en ? `Thank you for registering for: ${title}.` : `Dziękujemy za zgłoszenie na: ${title}.`,
+        L(lang, {
+          pl: `Dziękujemy za zgłoszenie na: ${title}.`,
+          en: `Thank you for registering for: ${title}.`,
+          ko: `${title}에 신청해 주셔서 감사합니다.`,
+          zh: `感谢您报名参加：${title}。`,
+        }),
         ...accommodationLines(acc, lang),
         ...paymentLines(d.paymentMethod, amount, lang, total, String(d.currency ?? 'PLN'), d.leaderDepositPct as number | undefined),
         '',
-        `${en ? 'Registration number' : 'Numer zgłoszenia'}: ${String(payload.registrationId ?? '')}`,
+        L(lang, { pl: `Numer zgłoszenia: ${regNo}`, en: `Registration number: ${regNo}`, ko: `신청 번호: ${regNo}`, zh: `报名编号：${regNo}` }),
       ];
       // Link do zmiany noclegu (gdy event oferuje noclegi) — jako tekst, bo przycisk bywa zajęty
       // przez „Zaproś gościa"; bez zaproszeń link dostaje własny przycisk.
       const manageText = acc?.offered && manageLink
-        ? [en
-            ? 'Changed your mind about accommodation? You can add or change it here:'
-            : 'Zmiana planów? Nocleg możesz domówić lub zmienić tutaj:']
+        ? [L(lang, {
+            pl: 'Zmiana planów? Nocleg możesz domówić lub zmienić tutaj:',
+            en: 'Changed your mind about accommodation? You can add or change it here:',
+            ko: '숙박 계획이 바뀌셨나요? 여기에서 숙박을 추가하거나 변경할 수 있습니다:',
+            zh: '住宿计划有变？您可以在这里添加或更改住宿：',
+          })]
         : [];
       const guestLink = String(d.guestInviteLink ?? '');
       if (manageText.length && !guestLink) {
         const { text, html } = buttonMail(
           [...lines, '', ...manageText],
-          { label: en ? 'Manage accommodation' : 'Zmień nocleg', href: manageLink },
-          en ? ['God bless,', 'ICPE Mission Poland'] : SIGNATURE,
+          { label: L(lang, { pl: 'Zmień nocleg', en: 'Manage accommodation', ko: '숙박 변경', zh: '更改住宿' }), href: manageLink },
+          sig,
+          lang,
         );
         return { subject, text, html };
       }
@@ -436,15 +514,19 @@ export class NotificationsService {
       if (guestLink) {
         // Ścieżka „zaproś gościa" włączona dla eventu — link działa na podstawie tokenu zgłoszenia.
         const { text, html } = buttonMail(
-          [...lines, '', en
-            ? 'Would you like to bring someone along? You can invite a guest — we will send them an invitation with a registration link:'
-            : 'Chcesz zabrać kogoś ze sobą? Możesz zaprosić gościa — dostanie od nas zaproszenie z linkiem do rejestracji:'],
-          { label: en ? 'Invite a guest' : 'Zaproś gościa', href: guestLink },
-          ['', ...(en ? ['God bless,', 'ICPE Mission Poland'] : SIGNATURE)],
+          [...lines, '', L(lang, {
+            pl: 'Chcesz zabrać kogoś ze sobą? Możesz zaprosić gościa — dostanie od nas zaproszenie z linkiem do rejestracji:',
+            en: 'Would you like to bring someone along? You can invite a guest — we will send them an invitation with a registration link:',
+            ko: '함께 오고 싶은 분이 있나요? 손님을 초대하시면 신청 링크가 담긴 초대장을 저희가 보내 드립니다:',
+            zh: '想带朋友一起来吗？您可以邀请一位嘉宾——我们会给对方发送一封附有报名链接的邀请：',
+          })],
+          { label: L(lang, { pl: 'Zaproś gościa', en: 'Invite a guest', ko: '손님 초대하기', zh: '邀请嘉宾' }), href: guestLink },
+          ['', ...sig],
+          lang,
         );
         return { subject, text, html };
       }
-      const { text, html } = buttonMail([...lines, '', ...(en ? ['God bless,', 'ICPE Mission Poland'] : SIGNATURE)], null, []);
+      const { text, html } = buttonMail([...lines, '', ...sig], null, [], lang);
       return { subject, text, html };
     }
 
@@ -597,24 +679,39 @@ export class NotificationsService {
 
     if (payload.type === 'ACCOMMODATION_CHANGED') {
       // Gość zmienił / domówił nocleg na stronie zgłoszenia — nowa kwota (i gotówka do przygotowania).
-      const lang: MailLang = mailEn(payload.locale) ? 'en' : 'pl';
-      const en = lang === 'en';
-      const title = String(d.eventTitle ?? (en ? 'the event' : 'wydarzenie'));
+      const lang = mailLangOf(payload.locale);
+      const title = String(d.eventTitle ?? L(lang, { pl: 'wydarzenie', en: 'the event', ko: '행사', zh: '活动' }));
       const total = Number(d.totalPrice ?? 0);
       const amount = formatMoney(total, (String(d.currency ?? 'PLN') as 'PLN' | 'EUR' | 'USD'), lang);
-      const subject = en ? `Accommodation updated — ${title}` : `Zmiana noclegu — ${title}`;
+      const regNo = String(payload.registrationId ?? '');
+      const subject = L(lang, {
+        pl: `Zmiana noclegu — ${title}`,
+        en: `Accommodation updated — ${title}`,
+        ko: `숙박 변경 — ${title}`,
+        zh: `住宿变更 — ${title}`,
+      });
       const { text, html } = buttonMail(
         [
-          en ? 'Hello,' : 'Dzień dobry,',
+          greetingLine(lang),
           '',
-          en ? `We have saved your accommodation change for: ${title}.` : `Zapisaliśmy zmianę noclegu w zgłoszeniu na: ${title}.`,
+          L(lang, {
+            pl: `Zapisaliśmy zmianę noclegu w zgłoszeniu na: ${title}.`,
+            en: `We have saved your accommodation change for: ${title}.`,
+            ko: `${title} 신청의 숙박 변경 사항을 저장했습니다.`,
+            zh: `我们已保存您在“${title}”报名中的住宿变更。`,
+          }),
           ...accommodationLines(d.accommodation as MailAccommodation | undefined, lang),
-          ...(total > 0 ? paymentLines(d.paymentMethod, amount, lang, total, String(d.currency ?? 'PLN'), d.leaderDepositPct as number | undefined) : [en ? 'Amount: free of charge.' : 'Kwota: bezpłatnie.']),
+          ...(total > 0
+            ? paymentLines(d.paymentMethod, amount, lang, total, String(d.currency ?? 'PLN'), d.leaderDepositPct as number | undefined)
+            : [L(lang, { pl: 'Kwota: bezpłatnie.', en: 'Amount: free of charge.', ko: '금액: 무료.', zh: '金额：免费。' })]),
           '',
-          `${en ? 'Registration number' : 'Numer zgłoszenia'}: ${String(payload.registrationId ?? '')}`,
+          L(lang, { pl: `Numer zgłoszenia: ${regNo}`, en: `Registration number: ${regNo}`, ko: `신청 번호: ${regNo}`, zh: `报名编号：${regNo}` }),
         ],
-        d.manageLink ? { label: en ? 'View registration' : 'Zobacz zgłoszenie', href: String(d.manageLink) } : null,
-        en ? ['God bless,', 'ICPE Mission Poland'] : SIGNATURE,
+        d.manageLink
+          ? { label: L(lang, { pl: 'Zobacz zgłoszenie', en: 'View registration', ko: '신청 보기', zh: '查看报名' }), href: String(d.manageLink) }
+          : null,
+        signature(lang),
+        lang,
       );
       return { subject, text, html };
     }
@@ -645,23 +742,39 @@ export class NotificationsService {
 
     if (payload.type === 'REGISTRATION_REMINDER') {
       // Jedno przypomnienie 3 h po porzuceniu formularza (LeadsService).
-      const en = mailEn(payload.locale);
-      const title = String(d.eventTitle ?? (en ? 'the event' : 'wydarzenie'));
+      const lang = mailLangOf(payload.locale);
+      const title = String(d.eventTitle ?? L(lang, { pl: 'wydarzenie', en: 'the event', ko: '행사', zh: '活动' }));
       const name = String(d.firstName ?? '').trim();
       const when = String(d.when ?? '').trim();
-      const subject = en ? `Don't forget to finish your registration — ${title}` : `Nie zapomnij dokończyć zgłoszenia — ${title}`;
+      const subject = L(lang, {
+        pl: `Nie zapomnij dokończyć zgłoszenia — ${title}`,
+        en: `Don't forget to finish your registration — ${title}`,
+        ko: `신청을 마무리하는 것을 잊지 마세요 — ${title}`,
+        zh: `别忘了完成报名 — ${title}`,
+      });
       const { text, html } = buttonMail(
-        en
-          ? [name ? `${name},` : 'Hello,', '', `you started registering for ${title}${when ? ` (${when})` : ''}, but the registration was not completed.`, 'Your place is not booked until you send the form. You can finish it here:']
-          : [name ? `${name},` : 'Dzień dobry,', '', `rozpoczęłaś/rozpocząłeś zapis na wydarzenie: ${title}${when ? ` (${when})` : ''}, ale zgłoszenie nie zostało wysłane.`, 'Miejsce nie jest zarezerwowane, dopóki nie wyślesz formularza. Dokończysz go tutaj:'],
-        { label: en ? 'Finish registration' : 'Dokończ zgłoszenie', href: String(d.link ?? '') },
         [
-          en
-            ? "If you're not planning to come, just ignore this message — we won't write about it again."
-            : 'Jeśli nie planujesz przyjechać, zignoruj tę wiadomość — nie będziemy już o tym pisać.',
+          greetingLine(lang, name),
           '',
-          ...(en ? ['God bless,', 'ICPE Mission Poland'] : SIGNATURE),
+          ...L(lang, {
+            pl: [`rozpoczęłaś/rozpocząłeś zapis na wydarzenie: ${title}${when ? ` (${when})` : ''}, ale zgłoszenie nie zostało wysłane.`, 'Miejsce nie jest zarezerwowane, dopóki nie wyślesz formularza. Dokończysz go tutaj:'],
+            en: [`you started registering for ${title}${when ? ` (${when})` : ''}, but the registration was not completed.`, 'Your place is not booked until you send the form. You can finish it here:'],
+            ko: [`${title}${when ? ` (${when})` : ''} 신청을 시작하셨지만 아직 신청이 완료되지 않았습니다.`, '신청서를 보내셔야 자리가 확보됩니다. 여기에서 마무리하실 수 있습니다:'],
+            zh: [`您已开始报名参加“${title}”${when ? `（${when}）` : ''}，但报名尚未完成。`, '提交报名表后才会为您保留名额。您可以在这里完成报名：'],
+          }),
         ],
+        { label: L(lang, { pl: 'Dokończ zgłoszenie', en: 'Finish registration', ko: '신청 마치기', zh: '完成报名' }), href: String(d.link ?? '') },
+        [
+          L(lang, {
+            pl: 'Jeśli nie planujesz przyjechać, zignoruj tę wiadomość — nie będziemy już o tym pisać.',
+            en: "If you're not planning to come, just ignore this message — we won't write about it again.",
+            ko: '참석하실 계획이 없다면 이 메일은 무시하셔도 됩니다. 이 일로 다시 연락드리지 않겠습니다.',
+            zh: '如果您不打算参加，请忽略此邮件——我们不会再就此事联系您。',
+          }),
+          '',
+          ...signature(lang),
+        ],
+        lang,
       );
       return { subject, text, html };
     }

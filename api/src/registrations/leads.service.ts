@@ -204,9 +204,11 @@ export class LeadsService implements OnModuleInit, OnModuleDestroy {
         }
       }
       const titles = (inst.title ?? {}) as Record<string, string>;
-      // Mail idzie po polsku albo (każdy inny język) po angielsku — tytuł w tym samym języku.
-      const lang = lead.locale === 'pl' ? 'pl' : 'en';
-      const title = typeof inst.title === 'string' ? inst.title : titles[lang] ?? titles.pl ?? titles.en ?? 'Event';
+      // Mail po polsku, angielsku, koreańsku lub chińsku (inne języki → angielski); tytuł w tym samym języku.
+      const lang = lead.locale === 'pl' || lead.locale === 'ko' || lead.locale === 'zh' ? lead.locale : 'en';
+      const title = typeof inst.title === 'string'
+        ? inst.title
+        : titles[lang]?.trim() || (lang === 'pl' ? titles.en : titles.en?.trim() || titles.pl) || titles.pl || 'Event';
       const status = await this.mail.sendMail({
         to: lead.email,
         type: 'REGISTRATION_REMINDER',
@@ -227,8 +229,8 @@ export class LeadsService implements OnModuleInit, OnModuleDestroy {
   }
 }
 
-function whenOf(startsAt: Date, endsAt: Date, lang: 'pl' | 'en'): string {
-  const loc = lang === 'en' ? 'en-GB' : 'pl-PL';
+function whenOf(startsAt: Date, endsAt: Date, lang: string): string {
+  const loc = lang === 'en' ? 'en-GB' : lang === 'ko' ? 'ko-KR' : lang === 'zh' ? 'zh-CN' : 'pl-PL';
   const f = (d: Date) => d.toLocaleDateString(loc, { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Warsaw' });
   const same = f(startsAt) === f(endsAt);
   return same ? f(startsAt) : `${f(startsAt)} – ${f(endsAt)}`;

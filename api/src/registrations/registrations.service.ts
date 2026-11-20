@@ -80,8 +80,9 @@ function assertRooms(rooms: RoomsInput, n: number, cfg: PricingConfig | null) {
 }
 
 /** Podsumowanie noclegu do maili. */
-/** Język maili: PL dla PL, angielski dla każdego innego języka gościa (EN/IT/KO/ZH). */
-export const mailLang = (locale: string | null | undefined): 'pl' | 'en' => (locale === 'pl' || !locale ? 'pl' : 'en');
+/** Język maili: PL, EN, KO, ZH — inne języki gościa (np. IT) dostają angielski. */
+export const mailLang = (locale: string | null | undefined): 'pl' | 'en' | 'ko' | 'zh' =>
+  !locale || locale === 'pl' ? 'pl' : locale === 'ko' || locale === 'zh' ? locale : 'en';
 
 /** Tytuł eventu w języku `lng`; brak → EN (dla gości spoza PL), potem PL. */
 export function titleFor(title: unknown, lng: string | null | undefined): string {

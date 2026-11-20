@@ -51,6 +51,13 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — panel admina (kreator eventów)
 
+### Maile do gości po koreańsku i chińsku (2026-11-20)
+- **Zasada Jacka:** zawsze terminologia **katolicka**, nie protestancka. KO: 하느님/주님 (nie 하나님), 미사, 피정, 성체 조배, 본당; powitanie „찬미 예수님!”, podpis „주님의 축복을 빕니다.”. ZH: 天主 (nie 上帝/神), 弥撒, 避静, 朝拜圣体, 堂区; podpis „愿天主祝福您！”. Sprawdzone grepem: brak 하나님/예배/목사/교회/上帝/礼拜/牧师/教会 w locale i mailach.
+- **notifications.service.ts:** `MailLang = pl | en | ko | zh`, `mailLangOf(locale)` (IT i inne → EN), helpery `signature(lang)`, `greetingLine(lang, name)`, `L(lang, {pl,en,ko,zh})`. Przetłumaczone: CONFIRMATION, ACCOMMODATION_CHANGED, REGISTRATION_REMINDER (+ linie noclegu i płatności, w ZH pełnoszerokie nawiasy/interpunkcja). `buttonMail(..., lang)` — dopisek „Gdyby przycisk nie działał…” w języku maila (wcześniej zawsze PL, także w EN).
+- Formacja online (COURSE_*) i zaproszenia (INVITATION/GUEST_INVITATION) bez zmian (PL/EN wg dotychczasowych zasad).
+- `registrations.service.mailLang` i `leads.service` zwracają ko/zh; tytuł i nazwy pokoi w języku maila (brak → EN → PL); data w przypomnieniu ko-KR / zh-CN.
+- Test: render maili (tsc → node) dla ko/zh/pl/en — PL i EN identyczne jak wcześniej.
+
 ### Języki KO (koreański) i ZH (chiński uproszczony) w rejestracji (2026-11-20)
 - **Interfejs:** `app/src/locales/ko.json`, `zh.json` (pełne, 415 kluczy jak EN; tłumaczenie Claude — warto dać do przejrzenia native speakerowi). i18n: `supportedLngs` + `fallbackLng: { ko: ['en','pl'], zh: ['en','pl'], default: ['pl'] }`; `<html lang>` synchronizowany z językiem (`zh-Hans`), dla KO `word-break: keep-all`.
 - **Przełącznik:** etykiety „한국어” / „中文”; pokazywane tylko, gdy event ma ten język w `locales` (jak IT). Wykrywanie z przeglądarki (`langPref`): ko → KO, zh-CN/zh-TW → ZH (gdy event je ma), inaczej EN. Licznik kroków w nagłówku lejka przeniesiony na lewo (wcześniej chował się pod przełącznikiem).
