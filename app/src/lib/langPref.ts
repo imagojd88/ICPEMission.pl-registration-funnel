@@ -9,12 +9,12 @@
  *  3. języki przeglądarki: pierwszy z listy preferencji, który strona obsługuje,
  *  4. w każdym innym wypadku — angielski.
  * Przykłady: przeglądarka po polsku → PL; po włosku → IT (gdzie jest wersja włoska, inaczej EN);
- * po niemiecku / hiszpańsku / koreańsku → EN; „de, pl" → PL (gość deklaruje, że zna polski).
+ * po koreańsku → KO, po chińsku (zh-CN, zh-TW…) → ZH — gdy event ma te wersje; po niemiecku / hiszpańsku → EN; „de, pl" → PL (gość deklaruje, że zna polski).
  */
 
-export type Lang = 'pl' | 'en' | 'it'
+export type Lang = 'pl' | 'en' | 'it' | 'ko' | 'zh'
 
-const KNOWN: Lang[] = ['pl', 'en', 'it']
+const KNOWN: Lang[] = ['pl', 'en', 'it', 'ko', 'zh']
 const COOKIE = 'icpe_lang'
 const STORAGE = 'icpe_lang'
 const ONE_YEAR = 60 * 60 * 24 * 365

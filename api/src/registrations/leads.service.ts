@@ -74,7 +74,7 @@ export class LeadsService implements OnModuleInit, OnModuleDestroy {
     }
     const inst = await this.db.eventInstance.findUnique({ where: { id: dto.instanceId }, select: { id: true, status: true } });
     if (!inst || inst.status !== 'OPEN') return { ok: true };
-    const locale = ['pl', 'en', 'it'].includes(String(dto.locale)) ? String(dto.locale) : 'pl';
+    const locale = ['pl', 'en', 'it', 'ko', 'zh'].includes(String(dto.locale)) ? String(dto.locale) : 'pl';
     const step = Math.min(10, Math.max(1, Math.trunc(Number(dto.step) || 1)));
     const lastName = String(dto.lastName ?? '').trim().slice(0, 100) || null;
 
@@ -204,7 +204,8 @@ export class LeadsService implements OnModuleInit, OnModuleDestroy {
         }
       }
       const titles = (inst.title ?? {}) as Record<string, string>;
-      const lang = lead.locale === 'en' ? 'en' : lead.locale === 'it' ? 'it' : 'pl';
+      // Mail idzie po polsku albo (każdy inny język) po angielsku — tytuł w tym samym języku.
+      const lang = lead.locale === 'pl' ? 'pl' : 'en';
       const title = typeof inst.title === 'string' ? inst.title : titles[lang] ?? titles.pl ?? titles.en ?? 'Event';
       const status = await this.mail.sendMail({
         to: lead.email,
@@ -213,7 +214,7 @@ export class LeadsService implements OnModuleInit, OnModuleDestroy {
         data: {
           firstName: lead.firstName,
           eventTitle: title,
-          when: whenOf(inst.startsAt, inst.endsAt, lead.locale === 'en' ? 'en' : 'pl'),
+          when: whenOf(inst.startsAt, inst.endsAt, lang),
           link: `${publicAppUrl()}/r/${encodeURIComponent(slug)}?lead=${encodeURIComponent(lead.token)}`,
         },
       });

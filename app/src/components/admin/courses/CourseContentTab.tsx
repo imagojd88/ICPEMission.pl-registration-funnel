@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { ArrowDown, ArrowUp, Eye, EyeOff, FileText, Film, HardDrive, Layers, Lock, Pencil, PlayCircle, Plus, Trash2, Upload, Wrench, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, Eye, EyeOff, FileText, Film, GripVertical, HardDrive, Layers, Wand2, Lock, Pencil, PlayCircle, Plus, Trash2, Upload, Wrench, X } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import {
-  createCourseModule, createVideoItem, deleteCourseItem, deleteCourseModule, diagnoseVideo, formatBytes, formatDuration, removeItemPdf,
+  createCourseModule, createModulesBulk, createVideoItem, deleteCourseItem, deleteCourseModule, diagnoseVideo, formatBytes, formatDuration, removeItemPdf,
   reorderCourseItems, reorderCourseModules, setItemPdf, setupVideoCors, updateCourseItem, updateCourseModule, uploadPdfItem,
   isoToLocalInput, localInputToIso, fmtWhen, R2_FREE_BYTES,
   type CourseDetail, type CourseItem, type CourseModule, type CoursesConfig, type LangText, type PdfLang,
@@ -39,6 +39,53 @@ export default function CourseContentTab({ course, config, uploads, onStartUploa
   const videoReady = config?.video.configured !== false
   const groups = groupItems(course)
   const hasModules = course.modules.length > 0
+  const [dragId, setDragId] = useState<string | null>(null)
+  const [dropAt, setDropAt] = useState<{ moduleId: string | null; beforeId: string | null } | null>(null)
+
+  /**
+   * Przeciągnij i upuść: materiał trafia do grupy `moduleId` (null = bez modułu) przed `beforeId` (null = na koniec).
+   * Zapis: najpierw moduł materiału (gdy się zmienił), potem pełna kolejność.
+   */
+  async function moveTo(itemId: string, moduleId: string | null, beforeId: string | null) {
+    if (itemId === beforeId) return
+    const item = course.items.find((i) => i.id === itemId)
+    if (!item) return
+    const lists = groups.map((g) => ({ id: g.module?.id ?? null, ids: g.items.map((i) => i.id).filter((id) => id !== itemId) }))
+    let target = lists.find((l) => l.id === moduleId)
+    if (!target) {
+      target = { id: moduleId, ids: [] }
+      lists.push(target)
+    }
+    const at = beforeId ? target.ids.indexOf(beforeId) : -1
+    if (at >= 0) target.ids.splice(at, 0, itemId)
+    else target.ids.push(itemId)
+    setError(null)
+    try {
+      const currentModule = item.moduleId && course.modules.some((m) => m.id === item.moduleId) ? item.moduleId : null
+      if (currentModule !== moduleId) await updateCourseItem(course.id, itemId, { moduleId })
+      await reorderCourseItems(course.id, lists.flatMap((l) => l.ids))
+      await onChanged()
+    } catch (e) {
+      setError(errMsg(e))
+    }
+  }
+
+  const dnd: Dnd = {
+    dragId,
+    dropAt,
+    start: (id) => setDragId(id),
+    end: () => {
+      setDragId(null)
+      setDropAt(null)
+    },
+    over: (moduleId, beforeId) => setDropAt((d) => (d && d.moduleId === moduleId && d.beforeId === beforeId ? d : { moduleId, beforeId })),
+    drop: (moduleId, beforeId) => {
+      const id = dragId
+      setDragId(null)
+      setDropAt(null)
+      if (id) void moveTo(id, moduleId, beforeId)
+    },
+  }
 
   /** Przesunięcie materiału w obrębie grupy; zapisujemy pełną kolejność (grupy po kolei). */
   async function moveItem(group: Group, idx: number, dir: -1 | 1) {
@@ -74,11 +121,18 @@ export default function CourseContentTab({ course, config, uploads, onStartUploa
 
       <StorageSummary course={course} />
       <SequenceInfo course={course} onOpenSettings={onOpenSettings} />
+      <AutoSplit course={course} onChanged={onChanged} onError={setError} />
+      {course.items.length > 1 && (
+        <p className="text-xs -mt-2 px-1" style={{ color: 'var(--faint)' }}>
+          <GripVertical size={12} className="inline -mt-0.5" /> Materiały możesz przeciągać myszką — w obrębie modułu i między modułami.
+        </p>
+      )}
 
       {groups.map((g) => {
         const mIdx = g.module ? course.modules.findIndex((m) => m.id === g.module!.id) : -1
+        const gid = g.module?.id ?? null
         const list = (
-          <>
+          <DropZone dnd={dnd} moduleId={gid}>
             {g.items.length === 0 && (
               <p className="text-sm" style={{ color: 'var(--muted)' }}>
                 {g.module
@@ -100,10 +154,14 @@ export default function CourseContentTab({ course, config, uploads, onStartUploa
                   onCancelUpload={onCancelUpload}
                   onChanged={onChanged}
                   onError={setError}
+                  dnd={dnd}
+                  moduleId={gid}
+                  nextId={g.items[idx + 1]?.id ?? null}
                 />
               ))}
+              {dnd.dragId && dnd.dropAt?.moduleId === gid && dnd.dropAt.beforeId === null && <DropLine />}
             </div>
-          </>
+          </DropZone>
         )
         return g.module ? (
           <ModulePanel
@@ -141,6 +199,140 @@ export default function CourseContentTab({ course, config, uploads, onStartUploa
         <AddPdf course={course} onChanged={onChanged} />
       </div>
     </div>
+  )
+}
+
+/** Stan przeciągania materiałów (drag and drop). */
+interface Dnd {
+  dragId: string | null
+  dropAt: { moduleId: string | null; beforeId: string | null } | null
+  start: (id: string) => void
+  end: () => void
+  over: (moduleId: string | null, beforeId: string | null) => void
+  drop: (moduleId: string | null, beforeId: string | null) => void
+}
+
+/** Obszar grupy (moduł / bez modułu): upuszczenie poza wierszem = na koniec grupy, także do pustego modułu. */
+function DropZone({ dnd, moduleId, children }: { dnd: Dnd; moduleId: string | null; children: React.ReactNode }) {
+  const active = !!dnd.dragId && dnd.dropAt?.moduleId === moduleId
+  return (
+    <div
+      data-dropzone={moduleId ?? 'loose'}
+      className="flex flex-col gap-2 rounded-[12px] transition-colors"
+      style={{ minHeight: dnd.dragId ? 56 : undefined, outline: active ? '2px dashed var(--brand)' : undefined, outlineOffset: 4 }}
+      onDragOver={(e) => {
+        if (!dnd.dragId) return
+        e.preventDefault()
+        dnd.over(moduleId, null)
+      }}
+      onDrop={(e) => {
+        if (!dnd.dragId) return
+        e.preventDefault()
+        dnd.drop(moduleId, null)
+      }}
+    >
+      {children}
+    </div>
+  )
+}
+
+/** „2 moduły”, „5 modułów”. */
+const modulesWord = (n: number) => (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? 'moduły' : n === 1 ? 'moduł' : 'modułów')
+
+const DropLine = () => <div className="h-1 rounded-full" style={{ background: 'var(--brand)' }} />
+
+/** Numer w tytule filmu („Konferencja 2 …”, „2. Wstęp”) — początek nowego modułu przy automatycznym podziale. */
+const numberIn = (s: string) => {
+  const m = s.match(/\d+/)
+  return m ? Number(m[0]) : null
+}
+
+/**
+ * „Podziel na moduły automatycznie”: każdy film z numerem w tytule zaczyna moduł, materiały pod nim do niego należą.
+ * Działa na materiałach bez modułu (w kursie bez modułów — na wszystkich). Najpierw podgląd, zapis po potwierdzeniu.
+ */
+function AutoSplit({ course, onChanged, onError }: { course: CourseDetail; onChanged: Props['onChanged']; onError: (m: string | null) => void }) {
+  const [open, setOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const ids = new Set(course.modules.map((m) => m.id))
+  const loose = course.items.filter((i) => !i.moduleId || !ids.has(i.moduleId))
+  const plan: { title: LangText; items: CourseItem[]; n: number }[] = []
+  const before: CourseItem[] = []
+  for (const it of loose) {
+    const n = it.kind === 'VIDEO' ? numberIn(t(it.title)) : null
+    if (n !== null) plan.push({ title: { ...it.title }, items: [it], n })
+    else if (plan.length) plan[plan.length - 1].items.push(it)
+    else before.push(it)
+  }
+  if (plan.length < 2) return null
+  const outOfOrder = plan.some((p, i) => i > 0 && p.n <= plan[i - 1].n)
+
+  async function apply() {
+    setBusy(true)
+    onError(null)
+    try {
+      await createModulesBulk(course.id, plan.map((p) => ({ title: p.title, itemIds: p.items.map((i) => i.id) })))
+      setOpen(false)
+      await onChanged()
+    } catch (e) {
+      onError(errMsg(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (!open) {
+    return (
+      <div className="flex items-center gap-3 flex-wrap rounded-[12px] border px-4 py-3" style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}>
+        <Wand2 size={16} style={{ color: 'var(--brand)' }} />
+        <p className="text-sm flex-1" style={{ color: 'var(--ink)' }}>
+          {course.modules.length ? 'Materiały bez modułu zawierają' : 'Kurs ma'} {plan.length} filmy z numerem w tytule — możesz podzielić {course.modules.length ? 'je' : 'go'} na {plan.length} {modulesWord(plan.length)}{' '}
+          jednym kliknięciem (pliki zostają, zmienia się tylko grupowanie).
+        </p>
+        <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
+          Pokaż podział
+        </Button>
+      </div>
+    )
+  }
+  return (
+    <Panel title={`Podział na moduły — podgląd (${plan.length})`}>
+      <p className="text-xs" style={{ color: 'var(--muted)' }}>
+        Każdy film z numerem w tytule zaczyna nowy moduł; materiały pod nim (np. PDF-y) trafiają do tego modułu. Nazwa modułu = tytuł filmu
+        (zmienisz ją potem ołówkiem). Po zapisaniu możesz przeciągać materiały między modułami.
+      </p>
+      {outOfOrder && (
+        <Notice kind="err">Numery filmów nie idą po kolei w obecnej kolejności materiałów — sprawdź podgląd; kolejność modułów zmienisz potem strzałkami.</Notice>
+      )}
+      {before.length > 0 && (
+        <div className="text-sm">
+          <p className="font-semibold" style={{ color: 'var(--ink)' }}>Bez modułu (przed pierwszym filmem — zawsze dostępne)</p>
+          <ul className="text-xs mt-1 pl-4 list-disc" style={{ color: 'var(--muted)' }}>
+            {before.map((i) => <li key={i.id}>{t(i.title)}</li>)}
+          </ul>
+        </div>
+      )}
+      {plan.map((p, idx) => (
+        <div key={p.items[0].id} className="text-sm">
+          <p className="font-semibold" style={{ color: 'var(--ink)' }}>
+            Moduł {course.modules.length + idx + 1}: {t(p.title)}
+          </p>
+          <ul className="text-xs mt-1 pl-4 list-disc" style={{ color: 'var(--muted)' }}>
+            {p.items.map((i) => (
+              <li key={i.id}>
+                {i.kind === 'VIDEO' ? '🎬' : '📄'} {t(i.title)}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+      <div className="flex gap-2">
+        <Button onClick={() => void apply()} disabled={busy}>
+          <Layers size={15} /> {busy ? 'Tworzę…' : `Utwórz ${plan.length} ${modulesWord(plan.length)}`}
+        </Button>
+        <Button variant="ghost" onClick={() => setOpen(false)}>Anuluj</Button>
+      </div>
+    </Panel>
   )
 }
 
@@ -408,8 +600,11 @@ function ModuleSelect({ course, value, onChange, disabled, compact }: {
 }
 
 function ItemRow({
-  course, item, first, last, upload, onMove, onStartUpload, onCancelUpload, onChanged, onError,
+  course, item, first, last, upload, onMove, onStartUpload, onCancelUpload, onChanged, onError, dnd, moduleId, nextId,
 }: {
+  dnd: Dnd
+  moduleId: string | null
+  nextId: string | null
   course: CourseDetail
   item: CourseItem
   first: boolean
@@ -471,9 +666,44 @@ function ItemRow({
 
   const pct = upload?.total ? Math.round((upload.sent / upload.total) * 100) : 0
 
+  const dragging = dnd.dragId === item.id
   return (
-    <div className="rounded-[12px] border px-3 py-3 flex flex-col gap-2" style={{ borderColor: 'var(--border)', opacity: item.published ? 1 : 0.65 }}>
+    <>
+    {dnd.dragId && !dragging && dnd.dropAt?.moduleId === moduleId && dnd.dropAt.beforeId === item.id && <DropLine />}
+    <div
+      className="rounded-[12px] border px-3 py-3 flex flex-col gap-2"
+      style={{ borderColor: 'var(--border)', opacity: dragging ? 0.4 : item.published ? 1 : 0.65, background: 'var(--surface)' }}
+      draggable={!editing && !busy}
+      onDragStart={(e) => {
+        // Nie przeciągamy, gdy użytkownik zaznacza tekst w polu albo rozwija listę.
+        const tag = (e.target as HTMLElement).tagName
+        if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return e.preventDefault()
+        e.dataTransfer.effectAllowed = 'move'
+        e.dataTransfer.setData('text/plain', item.id)
+        dnd.start(item.id)
+      }}
+      onDragEnd={dnd.end}
+      onDragOver={(e) => {
+        if (!dnd.dragId) return
+        e.preventDefault()
+        e.stopPropagation()
+        // Górna połowa wiersza → przed nim; dolna → przed następnym (null = na koniec, rozstrzyga DropZone).
+        const r = e.currentTarget.getBoundingClientRect()
+        const upper = e.clientY < r.top + r.height / 2
+        if (upper) dnd.over(moduleId, item.id)
+        else dnd.over(moduleId, nextId ?? null)
+      }}
+      onDrop={(e) => {
+        if (!dnd.dragId) return
+        e.preventDefault()
+        e.stopPropagation()
+        dnd.drop(dnd.dropAt?.moduleId ?? moduleId, dnd.dropAt?.beforeId ?? null)
+      }}
+    >
       <div className="flex items-center gap-3">
+        <span className="shrink-0 cursor-grab" style={{ color: 'var(--faint)' }} title="Przeciągnij, aby przenieść">
+          <GripVertical size={16} />
+        </span>
         <div className="flex flex-col">
           <button type="button" disabled={first || busy} onClick={() => onMove(-1)} className="p-0.5 disabled:opacity-30" style={iconBtn} title="W górę">
             <ArrowUp size={14} />
@@ -692,6 +922,7 @@ function ItemRow({
         </div>
       )}
     </div>
+    </>
   )
 }
 

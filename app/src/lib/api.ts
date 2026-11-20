@@ -878,13 +878,15 @@ export async function syncInvitationRegistrations(
 /** Tekst wielojęzyczny: albo zwykły string (legacy), albo mapa { pl, en, it }. */
 export type LangText = string | Record<string, string>
 
-/** Wybiera wersję językową z LangText; fallback: pl → en → it → pierwsza dostępna. */
+/** Wybiera wersję językową z LangText; fallback: dla PL → pl, en…; dla innych języków → en, potem pl, potem pierwsza dostępna. */
 export function pickLang(value: LangText | undefined | null, lng: string): string {
   if (value == null) return ''
   if (typeof value === 'string') return value
   // Puste wersje traktujemy jak brak tłumaczenia (spadamy do kolejnego języka).
   const has = (v: unknown): v is string => typeof v === 'string' && v.trim() !== ''
-  for (const k of [lng, 'pl', 'en', 'it']) if (has(value[k])) return value[k]
+  const l = (lng || 'pl').slice(0, 2)
+  const order = l === 'pl' ? ['pl', 'en'] : [l, 'en', 'pl']
+  for (const k of order) if (has(value[k])) return value[k]
   return Object.values(value).find(has) ?? ''
 }
 

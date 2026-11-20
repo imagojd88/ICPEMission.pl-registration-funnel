@@ -206,6 +206,8 @@ export const updateCourseModule = (courseId: string, moduleId: string, body: { t
   apiFetch<CourseModule>(`/admin/courses/${courseId}/modules/${moduleId}`, json('PATCH', body))
 export const deleteCourseModule = (courseId: string, moduleId: string) =>
   apiFetch<{ ok: true }>(`/admin/courses/${courseId}/modules/${moduleId}`, json('DELETE'))
+export const createModulesBulk = (courseId: string, modules: { title: LangText; itemIds: string[] }[]) =>
+  apiFetch<{ created: number; moduleIds: string[] }>(`/admin/courses/${courseId}/modules/bulk`, json('POST', { modules }))
 export const reorderCourseModules = (courseId: string, ids: string[]) =>
   apiFetch<{ ok: true }>(`/admin/courses/${courseId}/modules-order`, json('PUT', { ids }))
 export const refreshCourseItem = (courseId: string, itemId: string) =>

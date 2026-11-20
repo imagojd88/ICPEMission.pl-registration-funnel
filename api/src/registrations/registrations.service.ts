@@ -80,6 +80,19 @@ function assertRooms(rooms: RoomsInput, n: number, cfg: PricingConfig | null) {
 }
 
 /** Podsumowanie noclegu do maili. */
+/** Język maili: PL dla PL, angielski dla każdego innego języka gościa (EN/IT/KO/ZH). */
+export const mailLang = (locale: string | null | undefined): 'pl' | 'en' => (locale === 'pl' || !locale ? 'pl' : 'en');
+
+/** Tytuł eventu w języku `lng`; brak → EN (dla gości spoza PL), potem PL. */
+export function titleFor(title: unknown, lng: string | null | undefined): string {
+  if (typeof title === 'string') return title;
+  const m = (title ?? {}) as Record<string, string>;
+  const l = (lng || 'pl').slice(0, 2);
+  const order = l === 'pl' ? ['pl', 'en'] : [l, 'en', 'pl'];
+  for (const k of order) if (m[k]?.trim()) return m[k];
+  return Object.values(m).find((v) => typeof v === 'string' && v.trim()) ?? '';
+}
+
 export function mailAccommodation(cfg: PricingConfig | null, rooms: RoomsInput, n: number, lng: string): MailAccommodation {
   const assigned = rooms.reduce((s, r) => s + r.participantIndexes.length, 0);
   return {
@@ -221,7 +234,7 @@ export class RegistrationsService {
     const guestInviteLink = gi.enabled && !isParticipantGuest ? guestInvitePageLink(editToken) : undefined;
 
     // Send confirmation mail (fire-and-forget)
-    const title = (instance.title as Record<string, string>)[dto.locale] ?? (instance.title as Record<string, string>)['pl'] ?? 'Event';
+    const title = titleFor(instance.title, mailLang(dto.locale)) || 'Event';
     this.notifications.sendConfirmation({
       to: (dto.contact as { email: string }).email,
       locale: dto.locale,
@@ -234,7 +247,7 @@ export class RegistrationsService {
       editToken,
       guestInviteLink,
       leaderDepositPct: cfg?.leaderDepositPct,
-      accommodation: mailAccommodation(cfg, rooms, n, dto.locale),
+      accommodation: mailAccommodation(cfg, rooms, n, mailLang(dto.locale)),
       manageLink: hasAccommodation(cfg) ? manageRegistrationLink(editToken) : undefined,
     }).catch(console.error);
 
@@ -449,12 +462,12 @@ export class RegistrationsService {
         to: c.email,
         locale: reg.locale,
         registrationId: reg.id,
-        eventTitle: titleMap[reg.locale] ?? titleMap.pl ?? 'Event',
+        eventTitle: titleFor(titleMap, mailLang(reg.locale)) || 'Event',
         totalPrice: priceResult.total,
         oldTotal,
         currency: priceResult.currency,
         paymentMethod: reg.paymentMethod ?? 'BANK_TRANSFER',
-        accommodation: mailAccommodation(cfg, rooms, n, reg.locale),
+        accommodation: mailAccommodation(cfg, rooms, n, mailLang(reg.locale)),
         before: mailAccommodation(cfg, before, n, 'pl'),
         manageLink: manageRegistrationLink(reg.editToken),
         leaderDepositPct: cfg?.leaderDepositPct,
@@ -501,9 +514,7 @@ export class RegistrationsService {
       include: { instance: true },
     });
     if (!reg) throw new NotFoundException();
-    const title = (reg.instance.title as Record<string, string>)[reg.locale]
-      ?? (reg.instance.title as Record<string, string>)['pl']
-      ?? 'ICPE Event';
+    const title = titleFor(reg.instance.title, reg.locale) || 'ICPE Event';
     return buildIcs({
       uid: `reg-${id}@icpemission.pl`,
       title,
@@ -520,9 +531,7 @@ export class RegistrationsService {
       include: { instance: true },
     });
     if (!reg) throw new NotFoundException();
-    const title = (reg.instance.title as Record<string, string>)[reg.locale]
-      ?? (reg.instance.title as Record<string, string>)['pl']
-      ?? 'ICPE Event';
+    const title = titleFor(reg.instance.title, reg.locale) || 'ICPE Event';
     return googleCalendarUrl({
       uid: `reg-${id}@icpemission.pl`,
       title,

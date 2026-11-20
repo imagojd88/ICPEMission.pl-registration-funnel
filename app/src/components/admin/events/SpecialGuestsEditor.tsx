@@ -13,8 +13,8 @@ import {
   type SavedGuest,
 } from '@/lib/api'
 
-type Lang = 'pl' | 'en' | 'it'
-const LANG_LABEL: Record<Lang, string> = { pl: 'PL', en: 'EN', it: 'IT' }
+type Lang = 'pl' | 'en' | 'it' | 'ko' | 'zh'
+const LANG_LABEL: Record<Lang, string> = { pl: 'PL', en: 'EN', it: 'IT', ko: 'KO', zh: 'ZH' }
 
 /** Wiersz edytora: imiona i opis jako mapy językowe {pl, en, it}. */
 export interface GuestRow {

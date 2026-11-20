@@ -1,6 +1,6 @@
 /** Wspólne typy domenowe i DTO kontraktu API (frontend ↔ backend). */
 
-export type Locale = 'pl' | 'en' | 'it';
+export type Locale = 'pl' | 'en' | 'it' | 'ko' | 'zh';
 export type Gender = 'F' | 'M' | 'other';
 export type ParticipantType = 'adult' | 'child';
 
@@ -22,7 +22,8 @@ export type RegistrationStatus =
   | 'WAITLIST'
   | 'CANCELLED';
 
-export type Localized = Record<Locale, string>;
+/** Tekst w językach eventu: PL/EN/IT jak dotąd, KO/ZH opcjonalne (brak → interfejs bierze EN). */
+export type Localized = Record<'pl' | 'en' | 'it', string> & Partial<Record<'ko' | 'zh', string>>;
 
 export interface Contact {
   firstName: string;

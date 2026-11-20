@@ -25,7 +25,7 @@ export default function Step2Prefs({
   onExtraNotesChange,
 }: Props) {
   const { t, i18n } = useTranslation()
-  const lng = (i18n.language || 'pl').slice(0, 2) as 'pl' | 'en' | 'it'
+  const lng = (i18n.language || 'pl').slice(0, 2) as 'pl' | 'en' | 'it' | 'ko' | 'zh'
   const diets = enabledDiets(dietKeys)
 
   const toggle = (pIdx: number, key: string) =>

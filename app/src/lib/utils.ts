@@ -12,7 +12,7 @@ export function formatZl(n: number): string {
 /** Mapuje kod języka i18n (pl/en/it) na locale BCP-47 do formatowania dat/liczb. */
 export function bcp47(lng?: string): string {
   const l = (lng ?? 'pl').slice(0, 2)
-  return l === 'en' ? 'en-GB' : l === 'it' ? 'it-IT' : 'pl-PL'
+  return l === 'en' ? 'en-GB' : l === 'it' ? 'it-IT' : l === 'ko' ? 'ko-KR' : l === 'zh' ? 'zh-CN' : 'pl-PL'
 }
 
 /** Zakres dat w bieżącym języku (np. „4 September – 5 September 2026"). */

@@ -387,7 +387,9 @@ export function roomLabel(name: string | Record<string, string> | undefined | nu
   if (!name) return '';
   if (typeof name === 'string') return name;
   const l = (lng || 'pl').slice(0, 2);
-  return name[l] ?? name.pl ?? name.en ?? name.it ?? Object.values(name)[0] ?? '';
+  // Brak tłumaczenia: gość PL → wersja PL; każdy inny język → najpierw EN (KO/ZH/IT łatwiej zrozumie angielski).
+  if (l === 'pl') return name.pl ?? name.en ?? name.it ?? Object.values(name)[0] ?? '';
+  return name[l] ?? name.en ?? name.pl ?? Object.values(name)[0] ?? '';
 }
 
 /** Podział kwoty przy zaliczce u lidera: zaliczka (zaokrąglona do 1) + reszta na miejscu. */
@@ -409,7 +411,7 @@ export function formatZl(n: number): string {
  */
 export function formatMoney(n: number, currency: 'PLN' | 'EUR' | 'USD' = 'PLN', lng = 'pl'): string {
   const l = (lng || 'pl').slice(0, 2);
-  const locale = l === 'en' ? 'en-GB' : l === 'it' ? 'it-IT' : 'pl-PL';
+  const locale = l === 'en' ? 'en-GB' : l === 'it' ? 'it-IT' : l === 'ko' ? 'ko-KR' : l === 'zh' ? 'zh-CN' : 'pl-PL';
   try {
     return new Intl.NumberFormat(locale, {
       style: 'currency',

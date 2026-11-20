@@ -75,7 +75,13 @@ interface RoomRow {
 
 /** Tłumaczenia pola na języki obce: { en?, it? }. Wersja PL siedzi w polu podstawowym. */
 type Tr = Record<string, string>
-type ContentLang = 'pl' | 'en' | 'it'
+type ContentLang = 'pl' | 'en' | 'it' | 'ko' | 'zh'
+/** Języki dodatkowe (PL i EN są zawsze) i flaga w stanie kreatora, która je włącza. */
+const OPTIONAL_LANGS = [
+  { lang: 'it', flag: 'langIT' },
+  { lang: 'ko', flag: 'langKO' },
+  { lang: 'zh', flag: 'langZH' },
+] as const
 
 /** Wiersz progu wiekowego w formularzu — % zniżki osobno na nocleg i na wydarzenie. */
 type AgeBracketRow = AgeDiscountRow
@@ -131,6 +137,8 @@ interface WizardState {
   langPL: boolean
   langEN: boolean
   langIT: boolean
+  langKO: boolean
+  langZH: boolean
   // typ „na zaproszenie" — lista zaproszonych (surowy tekst, 1 osoba/wiersz)
   invitees: string
   // typ „na zaproszenie" — uczestnicy od razu potwierdzeni (rodzina w wierszu, format jak „Wklej listę" w panelu)
@@ -223,12 +231,13 @@ function colorFromHex(hex?: string): ColorSwatch {
 
 // ── Wersje językowe ───────────────────────────────────────────────────────────
 
-const LANG_LABEL: Record<ContentLang, string> = { pl: 'PL', en: 'EN', it: 'IT' }
-const LANG_NAME: Record<ContentLang, string> = { pl: 'polsku', en: 'angielsku', it: 'włosku' }
+const LANG_LABEL: Record<ContentLang, string> = { pl: 'PL', en: 'EN', it: 'IT', ko: 'KO', zh: 'ZH' }
+const LANG_NAME: Record<ContentLang, string> = { pl: 'polsku', en: 'angielsku', it: 'włosku', ko: 'koreańsku', zh: 'chińsku' }
 
-/** Aktualny język edycji (IT wraca do PL, gdy włoski został wyłączony). */
+/** Aktualny język edycji (IT / KO / ZH wraca do PL, gdy ten język został wyłączony). */
 function curLang(state: WizardState): ContentLang {
-  return state.editLang === 'it' && !state.langIT ? 'pl' : state.editLang
+  const opt = OPTIONAL_LANGS.find((o) => o.lang === state.editLang)
+  return opt && !state[opt.flag] ? 'pl' : state.editLang
 }
 
 /** Usuwa puste wpisy i przycina spacje. */
@@ -278,7 +287,7 @@ function hasContentIn(state: WizardState, l: ContentLang): boolean {
 /** Pasek „Język treści": PL / EN (zawsze) / IT (po włączeniu) z licznikiem braków. */
 function LangTabs({ state, update }: { state: WizardState; update: (p: Partial<WizardState>) => void }) {
   const lang = curLang(state)
-  const langs: ContentLang[] = ['pl', 'en', ...(state.langIT ? (['it'] as const) : [])]
+  const langs: ContentLang[] = ['pl', 'en', ...OPTIONAL_LANGS.filter((o) => state[o.flag]).map((o) => o.lang)]
   const missingHere = missingIn(state, lang)
   return (
     <div
@@ -315,23 +324,24 @@ function LangTabs({ state, update }: { state: WizardState; update: (p: Partial<W
             </button>
           )
         })}
-        {!state.langIT && (
+        {OPTIONAL_LANGS.filter((o) => !state[o.flag]).map((o) => (
           <button
+            key={o.lang}
             type="button"
-            onClick={() => update({ langIT: true, editLang: 'it' })}
+            onClick={() => update({ [o.flag]: true, editLang: o.lang })}
             className="flex items-center gap-1 text-xs font-semibold rounded-full px-3 py-1.5"
             style={{ background: 'transparent', color: 'var(--faint)', border: '1px dashed var(--border)', cursor: 'pointer' }}
           >
-            <Plus size={12} /> IT
+            <Plus size={12} /> {LANG_LABEL[o.lang]}
           </button>
-        )}
+        ))}
         <span className="text-xs ml-auto" style={{ color: 'var(--faint)' }}>edytujesz: {LANG_LABEL[lang]}</span>
       </div>
       <p className="text-xs" style={{ color: lang !== 'pl' && missingHere.length ? 'var(--warn)' : 'var(--faint)' }}>
         {lang === 'pl'
-          ? 'Wersja podstawowa. Po wpisaniu treści przełącz na EN (i IT) i wpisz tłumaczenia — goście widzą język wybrany na stronie.'
+          ? 'Wersja podstawowa. Po wpisaniu treści przełącz na EN (i IT / KO / ZH) i wpisz tłumaczenia — goście widzą język wybrany na stronie.'
           : missingHere.length
-            ? `Do przetłumaczenia: ${missingHere.join(', ')}. Puste pola goście zobaczą po polsku; oryginał widać w podpowiedzi pola.`
+            ? `Do przetłumaczenia: ${missingHere.join(', ')}. Puste pola goście zobaczą ${lang === 'en' ? 'po polsku' : 'po angielsku (a bez wersji EN — po polsku)'}; oryginał widać w podpowiedzi pola.`
             : `Wszystko przetłumaczone na ${LANG_NAME[lang]}. Pola, których nie wypełnisz (np. imiona), pokażą się jak po polsku.`}
       </p>
     </div>
@@ -398,6 +408,8 @@ function mapEditConfigToState(prev: WizardState, cfg: EventEditConfig, slug: str
     langPL: (cfg.locales ?? ['pl']).includes('pl'),
     langEN: (cfg.locales ?? []).includes('en'),
     langIT: (cfg.locales ?? []).includes('it'),
+    langKO: (cfg.locales ?? []).includes('ko'),
+    langZH: (cfg.locales ?? []).includes('zh'),
   }
 }
 
@@ -506,7 +518,7 @@ function LivePreview({ state }: { state: WizardState }) {
   const langs: string[] = [
     state.langPL && 'PL',
     (state.langEN || hasContentIn(state, 'en')) && 'EN',
-    (state.langIT || hasContentIn(state, 'it')) && 'IT',
+    ...OPTIONAL_LANGS.map((o) => (state[o.flag] || hasContentIn(state, o.lang)) && LANG_LABEL[o.lang]),
   ].filter(Boolean) as string[]
   // Tytuł w podglądzie — w edytowanym języku (pusty → wersja PL, jak na stronie).
   const lang = curLang(state)
@@ -1508,6 +1520,8 @@ function Step4Page({ state, update }: { state: WizardState; update: (p: Partial<
               { key: 'langPL', label: 'PL' },
               { key: 'langEN', label: 'EN' },
               { key: 'langIT', label: 'IT' },
+              { key: 'langKO', label: 'KO' },
+              { key: 'langZH', label: 'ZH' },
             ] as const
           ).map((l) => (
             <button
@@ -1686,6 +1700,8 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
     langPL: true,
     langEN: false,
     langIT: false,
+    langKO: false,
+    langZH: false,
     invitees: '',
     confirmedInvitees: '',
     confirmedSendMail: true,
@@ -1773,7 +1789,7 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
       const locales: string[] = []
       if (state.langPL) locales.push('pl')
       if (state.langEN || hasContentIn(state, 'en')) locales.push('en')
-      if (state.langIT || hasContentIn(state, 'it')) locales.push('it')
+      for (const o of OPTIONAL_LANGS) if (state[o.flag] || hasContentIn(state, o.lang)) locales.push(o.lang)
       if (locales.length === 0) locales.push('pl')
 
       // Mapy językowe {pl, en, it} — ten sam format, który zapisuje „Edytuj event".

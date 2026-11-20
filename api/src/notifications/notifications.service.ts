@@ -16,6 +16,8 @@ export interface MailAccommodation {
 }
 
 type MailLang = 'pl' | 'en';
+/** Maile są po polsku albo po angielsku: każdy język gościa poza PL (EN, IT, KO, ZH) dostaje wersję angielską. */
+const mailEn = (locale: string | undefined | null): boolean => !!locale && locale !== 'pl';
 
 /** Linie o noclegu do maila (puste, gdy event nie oferuje noclegów). */
 function accommodationLines(acc: MailAccommodation | undefined, lang: MailLang): string[] {
@@ -397,7 +399,7 @@ export class NotificationsService {
       m === 'ONLINE' ? 'płatność online' : m === 'CASH' ? 'gotówka na miejscu' : m === 'LEADER_DEPOSIT' ? 'zaliczka u lidera + reszta gotówką' : 'przelew bankowy';
 
     if (payload.type === 'CONFIRMATION') {
-      const lang: MailLang = payload.locale === 'en' ? 'en' : 'pl';
+      const lang: MailLang = mailEn(payload.locale) ? 'en' : 'pl';
       const en = lang === 'en';
       const title = String(d.eventTitle ?? (en ? 'the event' : 'wydarzenie'));
       const total = Number(d.totalPrice ?? 0);
@@ -503,7 +505,7 @@ export class NotificationsService {
 
     if (payload.type === 'COURSE_NEW_MATERIALS') {
       // Publikacja stopniowa: w panelu formacyjnym pojawiły się zaplanowane materiały.
-      const en = payload.locale === 'en';
+      const en = mailEn(payload.locale);
       const course = String(d.courseTitle ?? (en ? 'online course' : 'kurs online'));
       const name = String(d.firstName ?? '').trim();
       const hello = name ? `${name},` : en ? 'Hello,' : 'Dzień dobry,';
@@ -530,7 +532,7 @@ export class NotificationsService {
 
     if (payload.type === 'COURSE_WELCOME' || payload.type === 'COURSE_ACCESS' || payload.type === 'MEMBER_PASSWORD_RESET') {
       // Formacja online (panel kursanta) — PL/EN wg języka konta.
-      const en = payload.locale === 'en';
+      const en = mailEn(payload.locale);
       const course = String(d.courseTitle ?? (en ? 'online course' : 'kurs online'));
       const name = String(d.firstName ?? '').trim();
       const hello = name ? `${name},` : en ? 'Hello,' : 'Dzień dobry,';
@@ -595,7 +597,7 @@ export class NotificationsService {
 
     if (payload.type === 'ACCOMMODATION_CHANGED') {
       // Gość zmienił / domówił nocleg na stronie zgłoszenia — nowa kwota (i gotówka do przygotowania).
-      const lang: MailLang = payload.locale === 'en' ? 'en' : 'pl';
+      const lang: MailLang = mailEn(payload.locale) ? 'en' : 'pl';
       const en = lang === 'en';
       const title = String(d.eventTitle ?? (en ? 'the event' : 'wydarzenie'));
       const total = Number(d.totalPrice ?? 0);
@@ -643,7 +645,7 @@ export class NotificationsService {
 
     if (payload.type === 'REGISTRATION_REMINDER') {
       // Jedno przypomnienie 3 h po porzuceniu formularza (LeadsService).
-      const en = payload.locale === 'en' || payload.locale === 'it';
+      const en = mailEn(payload.locale);
       const title = String(d.eventTitle ?? (en ? 'the event' : 'wydarzenie'));
       const name = String(d.firstName ?? '').trim();
       const when = String(d.when ?? '').trim();

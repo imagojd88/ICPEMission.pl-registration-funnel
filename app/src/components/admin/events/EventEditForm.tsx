@@ -30,6 +30,10 @@ import { SUPERTITLE_PRESETS, isPresetSupertitle } from '@/lib/supertitles'
 import { DEFAULT_PRICING } from '@icpe/shared'
 import type { PricingConfig } from '@icpe/shared'
 
+/** Języki dodatkowe eventu (PL i EN są zawsze). */
+const OPTIONAL_LANGS = ['it', 'ko', 'zh'] as const
+const OPTIONAL_LANG_TITLE: Record<string, string> = { it: 'Włoski', ko: 'Koreański', zh: 'Chiński (uproszczony)' }
+
 interface EditTarget {
   instanceId: string
   seriesId: string
@@ -184,25 +188,26 @@ export default function EventEditForm({
       setError(e instanceof Error ? e.message : String(e))
     }
   }
-  const [langIT, setLangIT] = useState(false)
+  /** Języki dodatkowe (poza zawsze dostępnymi PL/EN) zaznaczone w „Języki strony”. */
+  const [extraLangs, setExtraLangs] = useState<string[]>([])
 
   // Zakładki języka treści. PL i EN są zawsze — strony publiczne (zapisy, zaproszenia)
   // zawsze oferują gościom PL i EN (LanguageSwitch.ALWAYS), więc wersję EN trzeba móc wpisać
   // niezależnie od ustawień. IT — gdy zaznaczony w „Języki strony".
-  const activeLocales = ['pl', 'en', ...(langIT ? ['it'] : [])]
+  const activeLocales = ['pl', 'en', ...OPTIONAL_LANGS.filter((l) => extraLangs.includes(l))]
   const multi = activeLocales.length > 1
   useEffect(() => {
     if (!activeLocales.includes(editLang)) setEditLang('pl')
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [langIT])
+  }, [extraLangs.join(',')])
 
   /** Nadtytuł w aktualnie edytowanym języku. */
   const superTitle = superMap[editLang] ?? ''
   // Przełączenie języka zaczyna wybór od nowa (druga wersja może być z listy).
   useEffect(() => { setSuperCustom(false) }, [editLang])
 
-  const LANG_LABEL: Record<string, string> = { pl: 'PL', en: 'EN', it: 'IT' }
-  const LANG_NAME: Record<string, string> = { pl: 'polsku', en: 'angielsku', it: 'włosku' }
+  const LANG_LABEL: Record<string, string> = { pl: 'PL', en: 'EN', it: 'IT', ko: 'KO', zh: 'ZH' }
+  const LANG_NAME: Record<string, string> = { pl: 'polsku', en: 'angielsku', it: 'włosku', ko: 'koreańsku', zh: 'chińsku' }
   /** Placeholder w zakładce obcego języka: pokazuje polski oryginał do przetłumaczenia. */
   const srcPh = (pl: string | undefined, fallback: string) =>
     editLang !== 'pl' && pl?.trim() ? `PL: ${pl.trim()}` : fallback
@@ -311,8 +316,8 @@ export default function EventEditForm({
         setDiets(Array.isArray(cfg.customFields?.diets) ? cfg.customFields!.diets! : [])
         setGuestInvitesMax(String(cfg.customFields?.guestInvites?.maxPerInviter ?? 2))
         const loc = cfg.locales ?? ['pl']
-        // PL i EN zawsze aktywne (patrz activeLocales); IT według ustawień.
-        setLangIT(loc.includes('it'))
+        // PL i EN zawsze aktywne (patrz activeLocales); IT / KO / ZH według ustawień.
+        setExtraLangs(OPTIONAL_LANGS.filter((l) => loc.includes(l)))
       })
       .catch((e: unknown) => { if (!cancelled) setError(e instanceof Error ? e.message : String(e)) })
       .finally(() => { if (!cancelled) setLoading(false) })
@@ -581,8 +586,8 @@ export default function EventEditForm({
               {editLang === 'pl'
                 ? 'Wersja podstawowa. Po wpisaniu treści przełącz na EN i przetłumacz — goście wybierają język na stronie.'
                 : missingHere.length
-                  ? `Do przetłumaczenia: ${missingHere.join(', ')}. Puste pola goście zobaczą po polsku; polski oryginał widać w podpowiedzi pola.`
-                  : `Wszystko przetłumaczone na ${LANG_NAME[editLang]}. Pola, których nie wypełnisz (np. imiona), pokażą się jak po polsku.`}
+                  ? `Do przetłumaczenia: ${missingHere.join(', ')}. Puste pola goście zobaczą ${editLang === 'en' ? 'po polsku' : 'po angielsku (a bez wersji EN — po polsku)'}; polski oryginał widać w podpowiedzi pola.`
+                  : `Wszystko przetłumaczone na ${LANG_NAME[editLang]}. Pola, których nie wypełnisz (np. imiona), pokażą się ${editLang === 'en' ? 'jak po polsku' : 'jak po angielsku (albo po polsku)'}.`}
             </p>
           </div>
         )
@@ -872,10 +877,20 @@ export default function EventEditForm({
             <div className="flex items-center gap-4 text-sm" style={{ color: 'var(--ink)' }}>
               <label className="flex items-center gap-1.5" title="Zawsze dostępny"><input type="checkbox" checked disabled className="accent-[var(--brand)] w-4 h-4" /> PL</label>
               <label className="flex items-center gap-1.5" title="Zawsze dostępny"><input type="checkbox" checked disabled className="accent-[var(--brand)] w-4 h-4" /> EN</label>
-              <label className="flex items-center gap-1.5"><input type="checkbox" checked={langIT} onChange={(e) => setLangIT(e.target.checked)} className="accent-[var(--brand)] w-4 h-4" /> IT</label>
+              {OPTIONAL_LANGS.map((l) => (
+                <label key={l} className="flex items-center gap-1.5" title={OPTIONAL_LANG_TITLE[l]}>
+                  <input
+                    type="checkbox"
+                    checked={extraLangs.includes(l)}
+                    onChange={(e) => setExtraLangs((cur) => (e.target.checked ? [...cur, l] : cur.filter((x) => x !== l)))}
+                    className="accent-[var(--brand)] w-4 h-4"
+                  />{' '}
+                  {l.toUpperCase()}
+                </label>
+              ))}
             </div>
             <p className="text-xs" style={{ color: 'var(--faint)' }}>
-              PL i EN są zawsze dostępne dla gości (interfejs jest w nich przetłumaczony). Zaznacz IT, żeby dodać wersję włoską — pojawi się zakładka IT w „Język treści" u góry.
+              PL i EN są zawsze dostępne dla gości. Zaznacz IT (włoski), KO (koreański) lub ZH (chiński uproszczony), żeby dodać tę wersję — interfejs zapisów jest już przetłumaczony, a u góry pojawi się zakładka do tłumaczenia treści eventu. Nieprzetłumaczoną treść goście KO / ZH zobaczą po angielsku.
             </p>
           </div>
         </Field>
@@ -964,7 +979,7 @@ export default function EventEditForm({
           <SpecialGuestsEditor
             rows={guests}
             onChange={setGuests}
-            lang={editLang as 'pl' | 'en' | 'it'}
+            lang={editLang as 'pl' | 'en' | 'it' | 'ko' | 'zh'}
             onError={setError}
           />
         </div>

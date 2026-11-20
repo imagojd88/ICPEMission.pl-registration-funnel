@@ -116,6 +116,12 @@ export class CoursesAdminController {
     return this.courses.createModule(id, body);
   }
 
+  @Post(':id/modules/bulk')
+  @ApiOperation({ summary: 'Utwórz kilka modułów naraz i przypisz do nich istniejące materiały' })
+  createModulesBulk(@Param('id') id: string, @Body() body: { modules?: unknown }) {
+    return this.courses.createModulesBulk(id, body ?? {});
+  }
+
   @Patch(':id/modules/:moduleId')
   updateModule(@Param('id') id: string, @Param('moduleId') moduleId: string, @Body() body: { title?: unknown; description?: unknown }) {
     return this.courses.updateModule(id, moduleId, body);

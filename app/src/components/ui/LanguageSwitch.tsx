@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { resolveLang, saveLang, type Lang } from '../../lib/langPref'
 
-const LABELS: Record<string, string> = { pl: 'PL', en: 'EN', it: 'IT' }
-const ORDER = ['pl', 'en', 'it']
+const LABELS: Record<string, string> = { pl: 'PL', en: 'EN', it: 'IT', ko: '한국어', zh: '中文' }
+const ORDER = ['pl', 'en', 'it', 'ko', 'zh']
 
 /** Języki, w których zawsze jest przetłumaczony interfejs — oferowane niezależnie od ustawień eventu. */
 const ALWAYS = ['pl', 'en']
@@ -93,7 +93,7 @@ export default function LanguageSwitch({ locales }: { locales?: string[] }) {
             style={{
               height: 36,
               minWidth: 34,
-              padding: '0 4px',
+              padding: l === 'ko' || l === 'zh' ? '0 8px' : '0 4px',
               background: active ? 'var(--brand)' : 'transparent',
               color: active ? '#fff' : 'var(--muted)',
               border: 'none',

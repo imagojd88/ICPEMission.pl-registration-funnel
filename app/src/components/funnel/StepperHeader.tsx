@@ -16,8 +16,8 @@ export default function StepperHeader({ step, totalSteps = TOTAL, onBack }: Prop
       className="sticky top-0 z-20"
       style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)' }}
     >
-      {/* Top row */}
-      <div className="flex items-center justify-between px-4 py-3">
+      {/* Top row — licznik kroków po lewej, bo prawy róg zajmuje pływający przełącznik języka i motywu */}
+      <div className="flex items-center gap-3 px-4 py-3">
         <button
           onClick={onBack}
           className="text-sm font-medium transition-colors duration-150 hover:opacity-70"
@@ -25,7 +25,7 @@ export default function StepperHeader({ step, totalSteps = TOTAL, onBack }: Prop
         >
           {t('nav.back')}
         </button>
-        <span className="text-sm" style={{ color: 'var(--muted)' }}>
+        <span className="text-sm whitespace-nowrap" style={{ color: 'var(--muted)' }}>
           {t('nav.step', { n: step + 1, total: totalSteps })}
         </span>
       </div>

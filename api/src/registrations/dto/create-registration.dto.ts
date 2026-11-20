@@ -37,7 +37,7 @@ export class RoomCompositionEntryDto {
 
 export class CreateRegistrationDto {
   @IsString() @ApiProperty() instanceId!: string;
-  @IsIn(['pl', 'en', 'it']) @ApiProperty() locale!: 'pl' | 'en' | 'it';
+  @IsIn(['pl', 'en', 'it', 'ko', 'zh']) @ApiProperty() locale!: 'pl' | 'en' | 'it' | 'ko' | 'zh';
   @ValidateNested() @Type(() => ContactDto) @ApiProperty() contact!: ContactDto;
   @IsArray() @ValidateNested({ each: true }) @Type(() => ParticipantInputDto) @ApiProperty({ type: [ParticipantInputDto] }) participants!: ParticipantInputDto[];
   /** Komponowane pokoje — każdy z typem i listą indeksów uczestników z tablicy participants. */

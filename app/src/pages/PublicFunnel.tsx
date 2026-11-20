@@ -798,7 +798,7 @@ export default function PublicFunnel() {
       const dto: CreateRegistrationDto = {
         instanceId: event.id,
         // Język gościa → mail z potwierdzeniem w jego języku (API ma PL i EN; inne → PL).
-        locale: (['pl', 'en', 'it'].includes(lng) ? lng : 'pl') as CreateRegistrationDto['locale'],
+        locale: (['pl', 'en', 'it', 'ko', 'zh'].includes(lng) ? lng : 'pl') as CreateRegistrationDto['locale'],
         contact: {
           firstName: stepper.applicant.firstName,
           lastName: stepper.applicant.lastName,
@@ -895,7 +895,7 @@ export default function PublicFunnel() {
       firstName: stepper.applicant.firstName,
       lastName: stepper.applicant.lastName,
       phone: stepper.applicant.phone || undefined,
-      locale: ['pl', 'en', 'it'].includes(lng) ? lng : 'pl',
+      locale: ['pl', 'en', 'it', 'ko', 'zh'].includes(lng) ? lng : 'pl',
     })
   }
 

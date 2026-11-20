@@ -592,6 +592,40 @@ export class CoursesService {
     return { ok: true };
   }
 
+  /**
+   * Hurtowe utworzenie modułów z przypisaniem istniejących materiałów (np. „Podziel na moduły automatycznie”).
+   * Moduły dochodzą na końcu (po istniejących), materiały tylko zmieniają moduł — pliki zostają bez zmian.
+   */
+  async createModulesBulk(courseId: string, body: { modules?: unknown }) {
+    await this.mustGet(courseId);
+    const list = Array.isArray(body.modules) ? (body.modules as Array<{ title?: unknown; itemIds?: unknown }>) : [];
+    if (!list.length || list.length > 100) throw new BadRequestException('Podaj od 1 do 100 modułów.');
+    const own = new Set(
+      ((await this.prisma.courseItem.findMany({ where: { courseId }, select: { id: true } })) as Array<{ id: string }>).map((i) => i.id),
+    );
+    const seen = new Set<string>();
+    const parsed = list.map((m, i) => {
+      const title = normLangText(m.title);
+      if (!title) throw new BadRequestException(`Moduł ${i + 1}: brak nazwy.`);
+      const itemIds = (Array.isArray(m.itemIds) ? m.itemIds : []).map(String);
+      for (const id of itemIds) {
+        if (!own.has(id)) throw new BadRequestException('Materiał spoza tego kursu.');
+        if (seen.has(id)) throw new BadRequestException('Ten sam materiał w dwóch modułach.');
+        seen.add(id);
+      }
+      return { title, itemIds };
+    });
+    const last = await this.prisma.courseModule.findFirst({ where: { courseId }, orderBy: { order: 'desc' }, select: { order: true } });
+    let order = (last?.order ?? -1) + 1;
+    const created: string[] = [];
+    for (const m of parsed) {
+      const mod = (await this.prisma.courseModule.create({ data: { courseId, title: m.title, order: order++ } })) as { id: string };
+      created.push(mod.id);
+      if (m.itemIds.length) await this.prisma.courseItem.updateMany({ where: { courseId, id: { in: m.itemIds } }, data: { moduleId: mod.id } });
+    }
+    return { created: created.length, moduleIds: created };
+  }
+
   async reorderModules(courseId: string, ids: string[]) {
     if (!Array.isArray(ids)) throw new BadRequestException('ids musi być listą');
     await this.prisma.$transaction(

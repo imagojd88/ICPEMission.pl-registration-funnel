@@ -51,6 +51,16 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — panel admina (kreator eventów)
 
+### Języki KO (koreański) i ZH (chiński uproszczony) w rejestracji (2026-11-20)
+- **Interfejs:** `app/src/locales/ko.json`, `zh.json` (pełne, 415 kluczy jak EN; tłumaczenie Claude — warto dać do przejrzenia native speakerowi). i18n: `supportedLngs` + `fallbackLng: { ko: ['en','pl'], zh: ['en','pl'], default: ['pl'] }`; `<html lang>` synchronizowany z językiem (`zh-Hans`), dla KO `word-break: keep-all`.
+- **Przełącznik:** etykiety „한국어” / „中文”; pokazywane tylko, gdy event ma ten język w `locales` (jak IT). Wykrywanie z przeglądarki (`langPref`): ko → KO, zh-CN/zh-TW → ZH (gdy event je ma), inaczej EN. Licznik kroków w nagłówku lejka przeniesiony na lewo (wcześniej chował się pod przełącznikiem).
+- **Treść eventu bez tłumaczenia:** `pickLang` / `roomLabel` / `titleFor` — dla PL: pl→en; dla innych języków (IT/KO/ZH): język → **EN** → PL (zmiana także dla IT, wcześniej spadało do PL).
+- **Panel:** „Edytuj event” → Języki strony: checkboxy IT / KO / ZH (`OPTIONAL_LANGS`), zakładki KO/ZH w „Język treści”; kreator: przyciski KO/ZH i „+ KO / + ZH”. Diety mają etykiety ko/zh.
+- **Maile:** dalej PL albo EN — każdy język gościa poza PL dostaje **angielski** (`mailEn` w notifications, `mailLang` w registrations.service). Przy okazji naprawione: goście IT dostawali potwierdzenie po polsku. Tytuł eventu i nazwy pokoi w mailu w języku maila.
+- **API:** `CreateRegistrationDto.locale` przyjmuje ko/zh; `Locale` w shared + `Localized` (ko/zh opcjonalne); leady przyjmują ko/zh; `formatMoney` ko-KR / zh-CN.
+- Test (kontener, Playwright): przejście całego lejka po KO i ZH (POST `locale: ko/zh`), fallback tytułu ZH → EN, panel: zaznaczenie ZH → zapis `locales: [pl,en,ko,zh]`, podpowiedź „puste pola po angielsku”. tsc app/api czyste, pricing 16/16.
+- **Po pushu:** Manual Deploy `icpe-api` (walidacja locale, maile).
+
 ### Przypomnienie o niedokończonym zgłoszeniu (2026-11-20)
 - **Decyzje Jacka:** jedno przypomnienie **3 h** po ostatniej aktywności; **zawsze włączone** (bez przełącznika w evencie); lista „Rozpoczęte, niedokończone” w panelu — tak.
 - **Model:** `RegistrationLead` (instanceId+email unikalne; imię, nazwisko, e-mail małymi literami, język, krok, `token`, `lastActivityAt`, `reminderSentAt`, `reminderStatus` SENT/FAILED/SKIPPED_CLOSED/SKIPPED_FULL, `convertedAt`, `registrationId`). Tylko te dane — bez uczestników i diet.
@@ -314,6 +324,13 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 ---
 
 ## Dziennik prac — panel kursanta (kurs online)
+
+### Automatyczny podział na moduły + przeciąganie materiałów (2026-11-20, 13:30)
+- **Prośba Jacka:** kurs „Przygotowanie do Przymierza” ma być sekwencyjny (4 moduły; każdy zaczyna się filmem z numerem w tytule), bez ponownego wgrywania materiałów. Alternatywnie przeciąganie materiałów między modułami. Zrobione oba.
+- **„Podziel na moduły automatycznie”** (Zawartość, `AutoSplit`): pojawia się, gdy wśród materiałów bez modułu są ≥2 filmy z liczbą w tytule. Każdy taki film zaczyna moduł (nazwa modułu = tytuł filmu PL/EN), materiały pod nim należą do tego modułu, materiały przed pierwszym filmem zostają bez modułu. Najpierw podgląd, zapis po kliknięciu „Utwórz N modułów”. Ostrzeżenie, gdy numery nie idą po kolei. API: `POST /admin/courses/:id/modules/bulk` `{modules:[{title,itemIds}]}`, z walidacją przed zapisem (materiał spoza kursu albo w dwóch modułach → błąd, bez zmian w bazie). Pliki bez zmian.
+- **Przeciąganie (HTML5 drag and drop):** wiersz materiału jest przeciągalny (uchwyt ⋮⋮; wyłączone w trybie edycji i nad polami/listami). Górna połowa wiersza = przed nim, dolna = po nim; puste miejsce modułu = na koniec (także pusty moduł i „Materiały bez modułu”). Linia wstawienia i przerywana ramka modułu. Zapis: `PATCH item {moduleId}` (gdy moduł się zmienił) + `PUT items-order`.
+- Weryfikacja: tsc api/app ✓, vite build ✓, testy logiki 48/48 ✓, E2E Chrome na kursie podobnym do „Przymierza” (11 materiałów, 4 filmy „Spotkanie N”) ✓: podgląd → 4 moduły, przeciąganie między modułami / w module / do „bez modułu” ✓.
+- **Uwaga przy pushu:** w kopii lokalnej były w tym czasie niezatwierdzone zmiany z innej pracy (rejestracja, locales ko/zh), więc commit tylko na plikach kursów.
 
 ### Rozmiar plików kursu + absolwenci (2026-11-20, popołudnie)
 - **Rozmiar plików (prośba Jacka):** `CoursesService.storageByCourse()` liczy filmy z plikiem w R2 (`videoSizeMb`) oraz PDF-y (rozmiary `PrivateFile`, obie wersje językowe; bez pobierania treści). Wynik jest w `list()` (każdy kurs: `storage`) i w `get()`. Panel: na liście kursów pasek „Filmy w Cloudflare R2: X z 10 GB darmowych (N%)” (pomarańczowy od 70%, czerwony od 90%, z informacją o kosztach powyżej limitu) i rozmiar przy każdym kursie (ikona dysku, w podpowiedzi podział na filmy i PDF). W kursie, nad Zawartością: „Pliki kursu razem / Filmy: n · GB (% z 10 GB) / PDF: n plików · MB”.
