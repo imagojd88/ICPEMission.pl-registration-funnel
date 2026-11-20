@@ -641,6 +641,29 @@ export class NotificationsService {
       return { subject, text, html };
     }
 
+    if (payload.type === 'REGISTRATION_REMINDER') {
+      // Jedno przypomnienie 3 h po porzuceniu formularza (LeadsService).
+      const en = payload.locale === 'en' || payload.locale === 'it';
+      const title = String(d.eventTitle ?? (en ? 'the event' : 'wydarzenie'));
+      const name = String(d.firstName ?? '').trim();
+      const when = String(d.when ?? '').trim();
+      const subject = en ? `Don't forget to finish your registration — ${title}` : `Nie zapomnij dokończyć zgłoszenia — ${title}`;
+      const { text, html } = buttonMail(
+        en
+          ? [name ? `${name},` : 'Hello,', '', `you started registering for ${title}${when ? ` (${when})` : ''}, but the registration was not completed.`, 'Your place is not booked until you send the form. You can finish it here:']
+          : [name ? `${name},` : 'Dzień dobry,', '', `rozpoczęłaś/rozpocząłeś zapis na wydarzenie: ${title}${when ? ` (${when})` : ''}, ale zgłoszenie nie zostało wysłane.`, 'Miejsce nie jest zarezerwowane, dopóki nie wyślesz formularza. Dokończysz go tutaj:'],
+        { label: en ? 'Finish registration' : 'Dokończ zgłoszenie', href: String(d.link ?? '') },
+        [
+          en
+            ? "If you're not planning to come, just ignore this message — we won't write about it again."
+            : 'Jeśli nie planujesz przyjechać, zignoruj tę wiadomość — nie będziemy już o tym pisać.',
+          '',
+          ...(en ? ['God bless,', 'ICPE Mission Poland'] : SIGNATURE),
+        ],
+      );
+      return { subject, text, html };
+    }
+
     if (payload.type === 'PAYMENT_REMINDER') {
       const subject = `Przypomnienie o płatności — ${String(d.transferTitle ?? '')}`;
       const text = `Dzień dobry,\n\nPrzypominamy o płatności na kwotę ${money(d.amount, 'PLN')} (tytuł: ${String(

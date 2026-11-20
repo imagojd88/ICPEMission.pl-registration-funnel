@@ -10,6 +10,7 @@ import { guestInviteConfig, guestInvitePageLink, publicAppUrl } from '../invitat
 import { buildPriceInput, hasAccommodation, roomLabel, leaderDepositSplit, PricingConfig, PriceAdjustment } from '../shared';
 import type { MailAccommodation } from '../notifications/notifications.service';
 import { assertRoomStock, instanceRoomAvailability } from './room-stock';
+import { LeadsService } from './leads.service';
 
 type RoomsInput = Array<{ roomId: string; participantIndexes: number[] }>;
 
@@ -109,6 +110,7 @@ export class RegistrationsService {
     private readonly pricing: PricingService,
     private readonly notifications: NotificationsService,
     private readonly courseAccess: CourseAccessService,
+    private readonly leads: LeadsService,
   ) {}
 
   async create(dto: CreateRegistrationDto) {
@@ -238,6 +240,9 @@ export class RegistrationsService {
 
     // Formacja online: kurs z `grantOn = ANY_ACTIVE` daje dostęp już od zapisu.
     this.courseAccess.syncRegistrationSafe(registration.id);
+
+    // Rozpoczęte zgłoszenie (lead) → dokończone: bez przypomnienia.
+    void this.leads.markConverted(dto.instanceId, (dto.contact as { email: string }).email, registration.id);
 
     return {
       registration: this.mapToDto(registration),

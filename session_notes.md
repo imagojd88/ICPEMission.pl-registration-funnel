@@ -51,6 +51,17 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — panel admina (kreator eventów)
 
+### Przypomnienie o niedokończonym zgłoszeniu (2026-11-20)
+- **Decyzje Jacka:** jedno przypomnienie **3 h** po ostatniej aktywności; **zawsze włączone** (bez przełącznika w evencie); lista „Rozpoczęte, niedokończone” w panelu — tak.
+- **Model:** `RegistrationLead` (instanceId+email unikalne; imię, nazwisko, e-mail małymi literami, język, krok, `token`, `lastActivityAt`, `reminderSentAt`, `reminderStatus` SENT/FAILED/SKIPPED_CLOSED/SKIPPED_FULL, `convertedAt`, `registrationId`). Tylko te dane — bez uczestników i diet.
+- **API (`registrations/leads.service.ts`):** `POST /registrations/leads` (lejek, po każdym kroku od „Dane”), `GET /registrations/leads/:token` (prefill z linku), `GET /admin/instances/:id/leads`, `GET /cron/registration-reminders` (`?key=` gdy `CRON_SECRET`). Job co 5 min w procesie API: przypomina, gdy brak zgłoszenia na ten e-mail, event OPEN, jeszcze się nie zaczął, są miejsca; leady starsze niż 7 dni pomijane; 600 ms między mailami; leady kasowane dzień po `endsAt`. `RegistrationsService.create` oznacza lead jako dokończony.
+- **Mail `REGISTRATION_REMINDER`** (PL; EN dla en/it): „Nie zapomnij dokończyć zgłoszenia — {tytuł}”, przycisk „Dokończ zgłoszenie” → `/r/<slug>?lead=<token>` (imię, nazwisko i e-mail wpisane), dopisek „nie będziemy już o tym pisać”. Etykieta w Ustawieniach → Maile.
+- **Lejek:** pod e-mailem „Jeśli nie dokończysz zapisu, wyślemy Ci jedno przypomnienie na ten adres.” (PL/EN/IT); w podglądzie admina nic nie zapisuje.
+- **PostHog:** `?lead=` wycinany z adresów; **nowe zdarzenie `reminder_link_opened`** (bez właściwości) — do przekazania wątkowi Jacek OS.
+- **Panel:** Zgłoszenia → pod tabelą zwijana sekcja „Rozpoczęte, niedokończone” (osoba, krok, ostatnia aktywność, status przypomnienia, „Pokaż też dokończone”).
+- Test (kontener, Playwright): prefill z `?lead=`, POST leadu po krokach 0 i 1 (step 1, 2), lista w panelu. tsc app/api czyste.
+- **Po pushu:** Manual Deploy `icpe-api` (nowa tabela przez `prisma db push`). Opcjonalnie UptimeRobot: `https://icpe-api.onrender.com/cron/registration-reminders` co 5–15 min (bez tego przypomnienia wychodzą, gdy API nie śpi).
+
 ### Zniżki dzieci: trzy osobne pola — nocleg / opłata formacyjna / wyżywienie (2026-11-19)
 - **Zasada Jacka (foundation-day-2027):** dzieci do 3 lat włącznie: nocleg gratis, obiady bez zniżki, opłata formacyjna −50% → próg „do 4 lat · nocleg −100% · formacja −50% · wyżywienie −0%”.
 - **Model:** `AgeBracket.mealsMultiplier?` (wyżywienie dzienne); `eventMultiplier` = teraz opłata formacyjna (dla wyżywienia tylko, gdy brak `mealsMultiplier` — progi zapisane w poprzedniej wersji liczą się bez zmian). Posiłki dla nocujących dalej wg zniżki na nocleg. Test 16/16.

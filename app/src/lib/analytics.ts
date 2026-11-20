@@ -7,7 +7,7 @@
  *  - Tylko publiczna część (strony eventów, strona zgłoszenia) — panel admina nie jest śledzony.
  *  - Bez autocapture i bez nagrań sesji; własne zdarzenia bez danych osobowych
  *    (żadnych imion, maili, diet — tylko slug eventu, krok, liczby, metoda płatności).
- *  - Tokeny z linków (`/z/…`, `/g/…`, `/i/…`, `?inv=`) są wycinane z adresów przed wysyłką.
+ *  - Tokeny z linków (`/z/…`, `/g/…`, `/i/…`, `?inv=`, `?lead=`) są wycinane z adresów przed wysyłką.
  *
  * Klucz projektu (publiczny „Project API key", phc_…): zmienna `VITE_POSTHOG_KEY` przy buildzie
  * (Render ▸ icpe-frontend ▸ Environment) albo stała POSTHOG_KEY poniżej. Pusty = analityka wyłączona.
@@ -43,7 +43,7 @@ function isAdminPath(path: string): boolean {
 export function scrubUrl(value: unknown): unknown {
   if (typeof value !== 'string' || !value) return value
   let out = value.replace(/\/(z|g|i)\/[^/?#]+/g, '/$1/[token]')
-  out = out.replace(/([?&])(inv|token)=[^&#]*/g, '$1$2=[token]')
+  out = out.replace(/([?&])(inv|token|lead)=[^&#]*/g, '$1$2=[token]')
   return out
 }
 

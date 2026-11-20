@@ -1444,3 +1444,39 @@ export function updateManagedAccommodation(
     body: JSON.stringify({ rooms }),
   })
 }
+
+// ---------------------------------------------------------------------------
+// Niedokończone zgłoszenia (lead) + jedno przypomnienie mailem po 3 h
+// ---------------------------------------------------------------------------
+
+/** Publiczne: lejek zapisuje rozpoczęte zgłoszenie (imię + e-mail po kroku „Dane"). */
+export function saveRegistrationLead(input: {
+  instanceId: string; email: string; firstName: string; lastName?: string; locale: string; step: number
+}): Promise<{ ok: boolean }> {
+  return apiFetch<{ ok: boolean }>('/registrations/leads', { method: 'POST', body: JSON.stringify(input) })
+}
+
+/** Publiczne: link z przypomnienia (`?lead=`) → dane do wpisania w formularz. */
+export function getRegistrationLead(token: string): Promise<{ firstName: string; lastName: string; email: string; instanceId: string }> {
+  return apiFetch(`/registrations/leads/${encodeURIComponent(token)}`)
+}
+
+export interface RegistrationLeadItem {
+  id: string
+  email: string
+  firstName: string
+  lastName: string
+  locale: string
+  step: number
+  lastActivityAt: string
+  reminderSentAt: string | null
+  /** SENT | SKIPPED_CLOSED | SKIPPED_FULL | FAILED */
+  reminderStatus: string | null
+  convertedAt: string | null
+  createdAt: string
+}
+
+/** Admin: rozpoczęte zgłoszenia eventu (niedokończone i dokończone). */
+export function getAdminLeads(instanceId: string, token?: string): Promise<RegistrationLeadItem[]> {
+  return apiFetch<RegistrationLeadItem[]>(`/admin/instances/${instanceId}/leads`, { headers: authHeaders(token) })
+}

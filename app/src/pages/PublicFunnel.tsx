@@ -4,7 +4,7 @@ import { useParams, useSearchParams } from 'react-router-dom'
 import type { EventInstanceDto, CreateRegistrationDto, RegistrationStatus, PaymentMethod } from '@icpe/shared'
 import { computePrice, DEFAULT_PRICING, validateRoomCapacity, roomLabel, hasAccommodation, roomStockShortages } from '@icpe/shared'
 import type { PricingConfig } from '@icpe/shared'
-import { getEventBySlug, getEventConfig, createRegistration, registerGuest, getInvitation, pickLang, type EventConfig } from '../lib/api'
+import { getEventBySlug, getEventConfig, createRegistration, registerGuest, getInvitation, getRegistrationLead, saveRegistrationLead, pickLang, type EventConfig } from '../lib/api'
 import { funnelPriceInput, isAccommodationOptional } from '../lib/funnelPrice'
 import { setAnalyticsContext, track } from '../lib/analytics'
 
@@ -463,6 +463,35 @@ export default function PublicFunnel() {
       )
       .catch(() => setInvite(null)) // nieważny link = zwykła rejestracja, bez blokowania
   }, [invToken])
+
+  // Link z przypomnienia o niedokończonym zgłoszeniu (`?lead=token`): imię i e-mail wpisujemy w formularz.
+  const leadToken = searchParams.get('lead')
+  const [leadPrefill, setLeadPrefill] = useState<{ firstName: string; lastName: string; email: string } | null>(null)
+  useEffect(() => {
+    if (!leadToken || preview) return
+    getRegistrationLead(leadToken)
+      .then((v) => {
+        setLeadPrefill({ firstName: v.firstName, lastName: v.lastName, email: v.email })
+        track('reminder_link_opened')
+      })
+      .catch(() => setLeadPrefill(null))
+  }, [leadToken, preview])
+
+  /** Zapis rozpoczętego zgłoszenia — podstawa jednego przypomnienia po 3 h. Ciche, bez blokowania. */
+  const saveLead = (step: number) => {
+    if (preview || !event?.id) return
+    const a = stepper.applicant
+    const email = a.email.trim()
+    if (!a.firstName.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return
+    void saveRegistrationLead({
+      instanceId: event.id,
+      email,
+      firstName: a.firstName.trim(),
+      lastName: a.lastName.trim() || undefined,
+      locale: (i18n.language || 'pl').slice(0, 2),
+      step,
+    }).catch(() => undefined)
+  }
   // Niedokończone zgłoszenie z poprzedniej wizyty (localStorage) — pokazujemy je jako
   // propozycję na ekranie startowym, nie wskakujemy w lejek bez pytania.
   const [draft, setDraft] = useState<{ screen: ResumableScreen; stepper: StepperState } | null>(null)
@@ -608,6 +637,9 @@ export default function PublicFunnel() {
     if (invite) {
       base.applicant = { ...base.applicant, firstName: invite.firstName, lastName: invite.lastName, email: invite.email, phone: invite.phone }
       base.participants = [{ ...base.participants[0], name: `${invite.firstName} ${invite.lastName}`.trim() }]
+    } else if (leadPrefill) {
+      base.applicant = { ...base.applicant, firstName: leadPrefill.firstName, lastName: leadPrefill.lastName, email: leadPrefill.email }
+      base.participants = [{ ...base.participants[0], name: `${leadPrefill.firstName} ${leadPrefill.lastName}`.trim() }]
     }
     setStepper(base)
     setScreen('stepper')
@@ -718,6 +750,7 @@ export default function PublicFunnel() {
       }
     }
     track('registration_step_completed', { step: stepper.step, step_name: STEP_NAMES[stepper.step] })
+    saveLead(stepper.step + 1)
     if (stepper.step < STEPS - 1) {
       patchStepper({ step: stepper.step + 1 })
     } else if (pricingConfig.free) {

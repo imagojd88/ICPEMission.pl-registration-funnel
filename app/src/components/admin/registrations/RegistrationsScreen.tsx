@@ -12,6 +12,7 @@ import {
 import type { RegistrationDto, EventInstanceDto, PricingConfig } from '@icpe/shared'
 import { DEFAULT_PRICING } from '@icpe/shared'
 import RegistrationEditForm from './RegistrationEditForm'
+import UnfinishedRegistrations from './UnfinishedRegistrations'
 import { useAutoRefresh } from '@/hooks/useAutoRefresh'
 import { communityDisplay } from '@/lib/communities'
 
@@ -657,6 +658,9 @@ export default function RegistrationsScreen() {
           </button>
         </div>
       </div>
+
+      {/* Rozpoczęte, niedokończone (przypomnienie po 3 h) */}
+      {selectedInstanceId && <UnfinishedRegistrations instanceId={selectedInstanceId} refreshKey={lastUpdatedAt} />}
 
       {/* Drawer */}
       {openDrawer && (

@@ -136,6 +136,7 @@
     "lastName": "Cognome",
     "email": "Indirizzo e-mail",
     "email_hint": "✓ L'indirizzo sembra corretto",
+    "reminder_note": "Se non completi l'iscrizione, ti invieremo un solo promemoria a questo indirizzo.",
     "phone": "Telefono",
     "address": "Indirizzo di residenza",
     "address_ph": "es. Via Esempio 1, 00100 Roma",

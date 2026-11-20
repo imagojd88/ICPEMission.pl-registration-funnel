@@ -140,6 +140,7 @@
     "lastName": "Nazwisko",
     "email": "Adres e-mail",
     "email_hint": "✓ Adres wygląda poprawnie",
+    "reminder_note": "Jeśli nie dokończysz zapisu, wyślemy Ci jedno przypomnienie na ten adres.",
     "phone": "Telefon",
     "address": "Adres zamieszkania",
     "address_ph": "ul. Przykładowa 1, 00-001 Warszawa",

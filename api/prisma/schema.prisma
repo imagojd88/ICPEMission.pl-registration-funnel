@@ -190,6 +190,7 @@ model EventInstance {
   roomTypes            RoomType[]
   rooms                Room[]
   registrations        Registration[]
+  leads                RegistrationLead[]
   rsvps                EventRsvp[]
   invitations          Invitation[]
   createdAt            DateTime        @default(now())
@@ -678,4 +679,32 @@ model VideoProgress {
 
   @@unique([itemId, guestId])
   @@index([courseId])
+}
+
+/// Rozpoczęte, niedokończone zgłoszenie (gość przeszedł krok „Dane”, ale nie wysłał formularza).
+/// Tylko dane potrzebne do JEDNEGO przypomnienia po 3 h — bez uczestników, diet i wieku.
+/// Usuwane dzień po zakończeniu eventu.
+model RegistrationLead {
+  id             String        @id @default(cuid())
+  instanceId     String
+  instance       EventInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  email          String        // małe litery
+  firstName      String
+  lastName       String?
+  locale         String        @default("pl")
+  /// najdalszy osiągnięty krok formularza (1 = po „Dane”, …)
+  step           Int           @default(1)
+  /// token do linku „Dokończ zgłoszenie” (wypełnia imię i e-mail)
+  token          String        @unique @default(cuid())
+  lastActivityAt DateTime      @default(now())
+  reminderSentAt DateTime?
+  /// SENT | SKIPPED_CLOSED | SKIPPED_FULL | FAILED
+  reminderStatus String?
+  convertedAt    DateTime?
+  registrationId String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@unique([instanceId, email])
+  @@index([reminderSentAt, convertedAt, lastActivityAt])
 }

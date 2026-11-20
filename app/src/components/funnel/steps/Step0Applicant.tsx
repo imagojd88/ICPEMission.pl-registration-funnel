@@ -53,6 +53,9 @@ export default function Step0Applicant({ value, onChange, affiliation }: Props) 
         placeholder={t('applicant.email_ph')}
         hint={emailLooksValid ? t('applicant.email_hint') : undefined}
       />
+      <p className="-mt-2 text-xs" style={{ color: 'var(--faint)' }}>
+        {t('applicant.reminder_note')}
+      </p>
 
       {/* Phone */}
       <Input

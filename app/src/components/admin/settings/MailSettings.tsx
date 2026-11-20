@@ -20,6 +20,7 @@ const TYPE_LABEL: Record<string, string> = {
   PAYMENT_REMINDER: 'Przypomnienie o płatności',
   ACCOMMODATION_CHANGED: 'Zmiana noclegu (do gościa)',
   ACCOMMODATION_CHANGED_ADMIN: 'Zmiana noclegu (kopia dla organizatora)',
+  REGISTRATION_REMINDER: 'Przypomnienie o niedokończonym zgłoszeniu',
   COURSE_WELCOME: 'Kurs: powitanie (ustaw hasło)',
   COURSE_ACCESS: 'Kurs: nowy dostęp',
   MEMBER_PASSWORD_RESET: 'Kurs: reset hasła',

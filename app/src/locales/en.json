@@ -134,6 +134,7 @@
     "lastName": "Last name",
     "email": "Email address",
     "email_hint": "✓ Address looks correct",
+    "reminder_note": "If you don't finish registering, we'll send you one reminder to this address.",
     "phone": "Phone",
     "address": "Home address",
     "address_ph": "e.g. 1 Example Street, 00-001 Warsaw",
