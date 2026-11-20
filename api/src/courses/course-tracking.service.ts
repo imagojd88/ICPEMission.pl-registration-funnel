@@ -164,6 +164,7 @@ export class CourseTrackingService {
         lastActivityAt: last ?? e.lastSeenAt,
         items: perItem,
         modulesDone: mstates.filter((x) => x.done).length,
+        graduated: !!(e as { graduatedAt?: Date | null }).graduatedAt,
       };
     });
     return {
@@ -228,6 +229,36 @@ export class CourseTrackingService {
       lines.push(line.map(esc).join(';'));
     }
     return '﻿' + lines.join('\r\n') + '\r\n';
+  }
+
+  /**
+   * Czy kursanci ukończyli kurs: w kursie z modułami — wszystkie moduły ukończone,
+   * bez modułów — wszystkie widoczne materiały ukończone. Klucz mapy: guestId.
+   */
+  async courseCompletion(courseId: string): Promise<Map<string, { done: number; total: number; complete: boolean }>> {
+    const { items, events, progress, completions, modules } = await this.loadCourseData(courseId);
+    const now = Date.now();
+    const visible = (items as Array<{ id: string; moduleId: string | null; published: boolean; publishAt: Date | null }>).filter(
+      (i) => i.published && (!i.publishAt || i.publishAt.getTime() <= now),
+    );
+    const guests = new Set<string>([...completions.map((c) => c.guestId), ...progress.map((p) => p.guestId), ...events.map((e) => e.guestId)]);
+    const out = new Map<string, { done: number; total: number; complete: boolean }>();
+    for (const g of guests) {
+      const done = completedSet(
+        completions.filter((x) => x.guestId === g),
+        progress.filter((x) => x.guestId === g),
+        events.filter((x) => x.guestId === g && (x.type === 'PDF_OPEN' || x.type === 'PDF_DOWNLOAD')),
+      );
+      if (modules.length) {
+        const st = moduleStates(modules, visible, done, false);
+        const n = st.filter((x) => x.done).length;
+        out.set(g, { done: n, total: modules.length, complete: n === modules.length });
+      } else {
+        const n = visible.filter((i) => done.has(i.id)).length;
+        out.set(g, { done: n, total: visible.length, complete: visible.length > 0 && n === visible.length });
+      }
+    }
+    return out;
   }
 
   /** Sprzątanie przy usuwaniu kursu / pozycji. */

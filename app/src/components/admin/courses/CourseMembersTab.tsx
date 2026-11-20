@@ -1,11 +1,11 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
-import { RefreshCw, UserPlus, Mail, Ban, RotateCcw, Upload, KeyRound, Copy } from 'lucide-react'
+import { RefreshCw, UserPlus, Mail, Ban, RotateCcw, Upload, KeyRound, Copy, GraduationCap, Undo2, CheckCircle2 } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Textarea from '@/components/ui/Textarea'
 import Badge from '@/components/ui/Badge'
 import {
-  addEnrollment, generatePassword, importEnrollments, listEnrollments, resendWelcome, sendResetLink, setEnrollmentRevoked,
+  addEnrollment, generatePassword, importEnrollments, listEnrollments, resendWelcome, sendResetLink, setEnrollmentRevoked, setGraduated,
   setMemberPassword, syncCourseAccess,
   type CourseDetail, type Enrollment,
 } from '@/lib/courses'
@@ -26,6 +26,7 @@ export default function CourseMembersTab({ course, onChanged }: { course: Course
   const [showAdd, setShowAdd] = useState(false)
   const [showImport, setShowImport] = useState(false)
   const [pwFor, setPwFor] = useState<string | null>(null)
+  const [view, setView] = useState<'current' | 'graduates'>('current')
 
   const load = useCallback(async () => {
     try {
@@ -54,12 +55,16 @@ export default function CourseMembersTab({ course, onChanged }: { course: Course
     }
   }
 
+  const current = useMemo(() => (rows ?? []).filter((r) => !r.graduatedAt), [rows])
+  const graduates = useMemo(() => (rows ?? []).filter((r) => !!r.graduatedAt), [rows])
   const visible = useMemo(() => {
     const q = filter.trim().toLowerCase()
-    return (rows ?? []).filter((r) => !q || `${r.email} ${r.firstName} ${r.lastName}`.toLowerCase().includes(q))
-  }, [rows, filter])
+    return (view === 'current' ? current : graduates).filter((r) => !q || `${r.email} ${r.firstName} ${r.lastName}`.toLowerCase().includes(q))
+  }, [current, graduates, view, filter])
 
-  const active = rows?.filter((r) => r.active).length ?? 0
+  const active = current.filter((r) => r.active).length
+  const readyToGraduate = current.filter((r) => r.progress?.complete).length
+  const unit = course.modules.length ? 'modułów' : 'materiałów'
 
   return (
     <div className="flex flex-col gap-5">
@@ -105,10 +110,63 @@ export default function CourseMembersTab({ course, onChanged }: { course: Course
         return `Dodano: ${r.added}, już miało dostęp: ${r.existing}${r.invalid.length ? `, pominięte (błędny e-mail): ${r.invalid.length} — ${r.invalid.slice(0, 3).join(' | ')}` : ''}.`
       })} />}
 
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="inline-flex rounded-[10px] border p-0.5" style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}>
+          {([['current', `Bieżący (${current.length})`], ['graduates', `Absolwenci (${graduates.length})`]] as const).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setView(id)}
+              className="px-3 py-1.5 text-sm font-semibold rounded-[8px]"
+              style={{
+                background: view === id ? 'var(--brand-soft)' : 'transparent',
+                color: view === id ? 'var(--brand)' : 'var(--muted)',
+                border: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              {id === 'graduates' && <GraduationCap size={14} className="inline -mt-0.5 mr-1" />}
+              {label}
+            </button>
+          ))}
+        </div>
+        {view === 'current' && readyToGraduate > 0 && (
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={busy}
+            onClick={() => {
+              if (window.confirm(`Przenieść do absolwentów ${readyToGraduate} ${readyToGraduate === 1 ? 'osobę, która ukończyła' : 'osób, które ukończyły'} kurs? Dostęp do materiałów zostaje.`))
+                void act(async () => {
+                  const r = await setGraduated(course.id, { completed: true, graduated: true })
+                  return `Przeniesiono do absolwentów: ${r.updated}.`
+                })
+            }}
+          >
+            <GraduationCap size={15} /> Przenieś do absolwentów wszystkich, którzy ukończyli kurs ({readyToGraduate})
+          </Button>
+        )}
+      </div>
+
       <Panel
-        title={`Kursanci — aktywni: ${active}${rows && rows.length !== active ? ` / wszyscy: ${rows.length}` : ''}`}
+        title={
+          view === 'current'
+            ? `Bieżący kursanci — aktywni: ${active}${current.length !== active ? ` / wszyscy: ${current.length}` : ''}`
+            : `Absolwenci: ${graduates.length}`
+        }
         action={<div className="w-[220px]"><Input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Szukaj…" className="py-1.5" /></div>}
       >
+        {view === 'graduates' && (
+          <p className="text-xs" style={{ color: 'var(--faint)' }}>
+            Absolwenci zachowują dostęp do materiałów (mogą wracać do nagrań). Jeśli dostęp ma wygasnąć, odbierz go ikoną ⊘ albo ustaw
+            datę „Dostęp wygasa” w Ustawieniach kursu.
+          </p>
+        )}
+        {rows && view === 'graduates' && graduates.length === 0 && (
+          <p className="text-sm" style={{ color: 'var(--muted)' }}>
+            Brak absolwentów. Przenieś kursanta ikoną 🎓 w zakładce „Bieżący” albo przyciskiem dla wszystkich, którzy ukończyli kurs.
+          </p>
+        )}
         {rows === null && <p className="text-sm" style={{ color: 'var(--faint)' }}>Wczytuję…</p>}
         {rows && rows.length === 0 && (
           <p className="text-sm" style={{ color: 'var(--muted)' }}>
@@ -122,6 +180,7 @@ export default function CourseMembersTab({ course, onChanged }: { course: Course
                 <tr className="text-left text-xs uppercase tracking-wider" style={{ color: 'var(--faint)' }}>
                   <th className="px-5 py-2 font-semibold">Osoba</th>
                   <th className="px-2 py-2 font-semibold">Źródło</th>
+                  <th className="px-2 py-2 font-semibold">Postęp</th>
                   <th className="px-2 py-2 font-semibold">Konto</th>
                   <th className="px-2 py-2 font-semibold">Ostatnio</th>
                   <th className="px-5 py-2" />
@@ -139,12 +198,46 @@ export default function CourseMembersTab({ course, onChanged }: { course: Course
                       <Badge variant={r.source === 'AUTO' ? 'brand' : 'muted'}>{r.source === 'AUTO' ? 'Z eventu' : 'Ręcznie'}</Badge>
                       {!r.active && <p className="text-xs mt-1" style={{ color: 'var(--err)' }}>{r.revokedReason === 'AUTO' ? 'Zgłoszenie anulowane' : 'Dostęp odebrany'}</p>}
                     </td>
+                    <td className="px-2 py-2 text-xs whitespace-nowrap" title={`Ukończone ${unit}: ${r.progress?.done ?? 0} z ${r.progress?.total ?? 0}`}>
+                      {r.progress?.complete ? (
+                        <span className="inline-flex items-center gap-1 font-semibold" style={{ color: 'var(--ok)' }}>
+                          <CheckCircle2 size={13} /> Ukończył(a)
+                        </span>
+                      ) : (
+                        <span style={{ color: 'var(--muted)' }}>{r.progress?.total ? `${r.progress.done} / ${r.progress.total}` : '—'}</span>
+                      )}
+                      {r.graduatedAt && <p className="mt-0.5" style={{ color: 'var(--faint)' }}>absolwent od {fmtDate(r.graduatedAt).slice(0, 10)}</p>}
+                    </td>
                     <td className="px-2 py-2 text-xs" style={{ color: 'var(--muted)' }}>
                       {r.passwordSet ? 'Hasło ustawione' : r.welcomeSentAt ? `Zaproszony ${fmtDate(r.welcomeSentAt)}` : 'Powitanie niewysłane'}
                     </td>
                     <td className="px-2 py-2 text-xs" style={{ color: 'var(--muted)' }}>{fmtDate(r.lastSeenAt ?? r.lastLoginAt)}</td>
                     <td className="px-5 py-2">
                       <div className="flex gap-1 justify-end">
+                        {r.graduatedAt ? (
+                          <button
+                            type="button"
+                            title="Przywróć do bieżących kursantów"
+                            disabled={busy}
+                            onClick={() => void act(async () => { await setGraduated(course.id, { ids: [r.id], graduated: false }); return `${r.email} — przywrócono do bieżących.` })}
+                            style={iconBtn}
+                          >
+                            <Undo2 size={15} />
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            title={r.progress?.complete ? 'Przenieś do absolwentów (ukończył kurs)' : `Przenieś do absolwentów (ukończone ${unit}: ${r.progress?.done ?? 0} z ${r.progress?.total ?? 0})`}
+                            disabled={busy}
+                            onClick={() => {
+                              if (r.progress?.complete || window.confirm(`${r.email} nie ukończył(a) jeszcze kursu (${r.progress?.done ?? 0} z ${r.progress?.total ?? 0} ${unit}). Przenieść mimo to do absolwentów?`))
+                                void act(async () => { await setGraduated(course.id, { ids: [r.id], graduated: true }); return `${r.email} — przeniesiono do absolwentów.` })
+                            }}
+                            style={{ ...iconBtn, color: r.progress?.complete ? 'var(--ok)' : 'var(--muted)' }}
+                          >
+                            <GraduationCap size={15} />
+                          </button>
+                        )}
                         {r.active && (
                           <button
                             type="button"
@@ -197,7 +290,7 @@ export default function CourseMembersTab({ course, onChanged }: { course: Course
                   </tr>
                   {pwFor === r.id && (
                     <tr>
-                      <td colSpan={5} className="px-5 pb-4" style={{ background: 'var(--surface-2)' }}>
+                      <td colSpan={6} className="px-5 pb-4" style={{ background: 'var(--surface-2)' }}>
                         <PasswordPanel
                           person={r}
                           courseStatus={course.status}

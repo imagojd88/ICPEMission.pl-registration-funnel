@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import { uploadStore } from '@/lib/uploadStore'
-import { GraduationCap, Plus, ExternalLink, Users, Film, AlertTriangle } from 'lucide-react'
+import { GraduationCap, Plus, ExternalLink, Users, Film, AlertTriangle, HardDrive } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import {
-  checkCourseSlug, createCourse, getCoursesConfig, getPreviewUrl, listCourses, setupVideoCors, slugify,
+  checkCourseSlug, createCourse, formatBytes, getCoursesConfig, getPreviewUrl, listCourses, setupVideoCors, slugify, R2_FREE_BYTES,
   type CourseListItem, type CoursesConfig,
 } from '@/lib/courses'
 import CourseEditor from './CourseEditor'
@@ -61,6 +61,7 @@ export default function CoursesScreen() {
         </div>
       )}
       {config?.video.configured && <VideoCorsFix />}
+      {courses && courses.length > 0 && <StorageOverview courses={courses} />}
 
       <div className="flex items-center justify-between">
         <p className="text-sm" style={{ color: 'var(--muted)' }}>
@@ -127,6 +128,12 @@ export default function CoursesScreen() {
             <div className="flex items-center gap-4 text-xs shrink-0" style={{ color: 'var(--muted)' }}>
               <span className="flex items-center gap-1"><Film size={14} /> {c.items}</span>
               <span className="flex items-center gap-1"><Users size={14} /> {c.members}</span>
+              <span
+                className="flex items-center gap-1"
+                title={`Filmy: ${c.storage.videos} · ${formatBytes(c.storage.videoBytes)}\nPDF: ${c.storage.pdfFiles} · ${formatBytes(c.storage.pdfBytes)}`}
+              >
+                <HardDrive size={14} /> {formatBytes(c.storage.videoBytes + c.storage.pdfBytes)}
+              </span>
               <a
                 href={c.url}
                 onClick={(e) => {
@@ -254,6 +261,32 @@ function VideoCorsFix() {
         {state === 'loading' ? 'Ustawiam…' : 'Napraw ustawienia wysyłki (CORS)'}
       </button>
       {state && state !== 'loading' && <span style={{ color: state.ok ? 'var(--ok)' : 'var(--err)' }}>{state.message}</span>}
+    </div>
+  )
+}
+
+/** Zużycie miejsca: filmy wszystkich kursów w R2 (darmowe 10 GB) + PDF-y w bazie. */
+function StorageOverview({ courses }: { courses: CourseListItem[] }) {
+  const video = courses.reduce((s, c) => s + c.storage.videoBytes, 0)
+  const pdf = courses.reduce((s, c) => s + c.storage.pdfBytes, 0)
+  const pct = Math.min(100, Math.round((video / R2_FREE_BYTES) * 100))
+  const color = pct >= 90 ? 'var(--err)' : pct >= 70 ? 'var(--warn)' : 'var(--brand)'
+  return (
+    <div className="rounded-[12px] border px-4 py-3 flex flex-col gap-2" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
+      <div className="flex items-center justify-between gap-3 flex-wrap text-sm" style={{ color: 'var(--ink)' }}>
+        <span className="flex items-center gap-2 font-semibold">
+          <HardDrive size={15} /> Filmy w Cloudflare R2: {formatBytes(video)} z 10 GB darmowych ({pct}%)
+        </span>
+        <span className="text-xs" style={{ color: 'var(--faint)' }}>PDF-y (w bazie danych): {formatBytes(pdf)}</span>
+      </div>
+      <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--surface-2)' }}>
+        <div className="h-full" style={{ width: `${Math.max(pct, video ? 1 : 0)}%`, background: color }} />
+      </div>
+      {pct >= 90 && (
+        <p className="text-xs" style={{ color: 'var(--err)' }}>
+          Blisko limitu darmowego — powyżej 10 GB R2 nalicza ok. 0,015 USD za GB miesięcznie (np. 20 GB ≈ 0,15 USD/mies.).
+        </p>
+      )}
     </div>
   )
 }

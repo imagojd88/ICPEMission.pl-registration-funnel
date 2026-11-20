@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { ArrowDown, ArrowUp, Eye, EyeOff, FileText, Film, Layers, Lock, Pencil, PlayCircle, Plus, Trash2, Upload, Wrench, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, Eye, EyeOff, FileText, Film, HardDrive, Layers, Lock, Pencil, PlayCircle, Plus, Trash2, Upload, Wrench, X } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import {
   createCourseModule, createVideoItem, deleteCourseItem, deleteCourseModule, diagnoseVideo, formatBytes, formatDuration, removeItemPdf,
   reorderCourseItems, reorderCourseModules, setItemPdf, setupVideoCors, updateCourseItem, updateCourseModule, uploadPdfItem,
-  isoToLocalInput, localInputToIso, fmtWhen,
+  isoToLocalInput, localInputToIso, fmtWhen, R2_FREE_BYTES,
   type CourseDetail, type CourseItem, type CourseModule, type CoursesConfig, type LangText, type PdfLang,
 } from '@/lib/courses'
 import { probeVideo } from '@/lib/r2Upload'
@@ -72,6 +72,7 @@ export default function CourseContentTab({ course, config, uploads, onStartUploa
     <div className="flex flex-col gap-5">
       {error && <Notice kind="err">{error}</Notice>}
 
+      <StorageSummary course={course} />
       <SequenceInfo course={course} onOpenSettings={onOpenSettings} />
 
       {groups.map((g) => {
@@ -139,6 +140,29 @@ export default function CourseContentTab({ course, config, uploads, onStartUploa
         <AddVideo course={course} disabled={!videoReady} onStartUpload={onStartUpload} onChanged={onChanged} />
         <AddPdf course={course} onChanged={onChanged} />
       </div>
+    </div>
+  )
+}
+
+/** Suma rozmiarów plików kursu: filmy (Cloudflare R2) i PDF-y (baza danych, obie wersje językowe). */
+function StorageSummary({ course }: { course: CourseDetail }) {
+  const st = course.storage
+  if (!st || (!st.videos && !st.pdfFiles)) return null
+  const pctOfFree = (st.videoBytes / R2_FREE_BYTES) * 100
+  return (
+    <div className="flex items-center gap-x-5 gap-y-1 flex-wrap text-xs px-1" style={{ color: 'var(--muted)' }}>
+      <span className="flex items-center gap-1.5 font-semibold" style={{ color: 'var(--ink)' }}>
+        <HardDrive size={14} /> Pliki kursu razem: {formatBytes(st.videoBytes + st.pdfBytes)}
+      </span>
+      <span>
+        <Film size={12} className="inline -mt-0.5 mr-1" />
+        Filmy: {st.videos} · {formatBytes(st.videoBytes)}
+        {st.videoBytes > 0 && ` (${pctOfFree < 1 ? '<1' : Math.round(pctOfFree)}% darmowych 10 GB R2)`}
+      </span>
+      <span>
+        <FileText size={12} className="inline -mt-0.5 mr-1" />
+        PDF: {st.pdfFiles} {st.pdfFiles === 1 ? 'plik' : st.pdfFiles >= 2 && st.pdfFiles <= 4 ? 'pliki' : 'plików'} · {formatBytes(st.pdfBytes)}
+      </span>
     </div>
   )
 }

@@ -14,8 +14,20 @@ export interface CourseListItem {
   url: string
   items: number
   members: number
+  storage: CourseStorage
   createdAt: string
 }
+
+/** Rozmiar plików kursu: filmy w Cloudflare R2, PDF-y w bazie danych. */
+export interface CourseStorage {
+  videos: number
+  videoBytes: number
+  pdfFiles: number
+  pdfBytes: number
+}
+
+/** Darmowy limit Cloudflare R2. */
+export const R2_FREE_BYTES = 10 * 1024 * 1024 * 1024
 
 export type PdfLang = 'pl' | 'en'
 export interface PdfFileMeta {
@@ -77,6 +89,7 @@ export interface CourseDetail {
   url: string
   members: number
   pendingWelcome: number
+  storage: CourseStorage
   modules: CourseModule[]
   items: CourseItem[]
   welcome?: { sent: number; failed: number }
@@ -98,6 +111,10 @@ export interface Enrollment {
   lastLoginAt: string | null
   lastSeenAt: string | null
   createdAt: string
+  /** Absolwent (przeniesiony z bieżących) — dostęp do kursu bez zmian. */
+  graduatedAt: string | null
+  /** Postęp: ukończone moduły (albo materiały w kursie bez modułów). */
+  progress: { done: number; total: number; complete: boolean }
 }
 
 export interface CoursesConfig {
@@ -260,6 +277,9 @@ export const setEnrollmentRevoked = (courseId: string, eid: string, revoked: boo
   apiFetch<{ ok: true }>(`/admin/courses/${courseId}/enrollments/${eid}`, json('PATCH', { revoked }))
 export const resendWelcome = (courseId: string, eid: string) =>
   apiFetch<{ status: string }>(`/admin/courses/${courseId}/enrollments/${eid}/resend`, json('POST'))
+/** Absolwenci: przenieś wskazanych (albo wszystkich, którzy ukończyli kurs) / przywróć do bieżących. */
+export const setGraduated = (courseId: string, body: { ids?: string[]; completed?: boolean; graduated: boolean }) =>
+  apiFetch<{ updated: number }>(`/admin/courses/${courseId}/enrollments/graduate`, json('POST', body))
 export const syncCourseAccess = (courseId: string) =>
   apiFetch<{ processed: number; active: number }>(`/admin/courses/${courseId}/sync`, json('POST'))
 
@@ -328,6 +348,7 @@ export interface ActivityRow {
   lastActivityAt: string | null
   items: Record<string, ActivityVideoCell | ActivityPdfCell | null>
   modulesDone: number
+  graduated?: boolean
 }
 export interface ActivityReport {
   items: { id: string; kind: 'VIDEO' | 'PDF'; title: LangText; durationSec: number | null; moduleId: string | null }[]

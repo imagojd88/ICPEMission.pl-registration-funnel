@@ -60,7 +60,7 @@ export class CoursesService {
   ) {}
 
   config() {
-    return { video: this.r2.status(), siteCourseBase: courseUrl('').replace(/\/$/, '') };
+    return { video: this.r2.status(), siteCourseBase: courseUrl('').replace(/\/+$/, '') };
   }
 
   // ── Kursy ────────────────────────────────────────────────────────────────────
@@ -76,6 +76,7 @@ export class CoursesService {
       _count: { _all: true },
     });
     const byCourse = new Map(counts.map((c: { courseId: string; _count: { _all: number } }) => [c.courseId, c._count._all]));
+    const storage = await this.storageByCourse();
     return rows.map((c: { id: string; slug: string; title: unknown; status: string; createdAt: Date; _count: { items: number } }) => ({
       id: c.id,
       slug: c.slug,
@@ -84,8 +85,40 @@ export class CoursesService {
       url: courseUrl(c.slug),
       items: c._count.items,
       members: byCourse.get(c.id) ?? 0,
+      storage: storage.get(c.id) ?? emptyStorage(),
       createdAt: c.createdAt,
     }));
+  }
+
+  /**
+   * Rozmiar plików kursów: filmy (R2, rozmiar zapisany przy wysyłce) i PDF-y (baza danych, obie wersje językowe).
+   * Bez `courseId` — wszystkie kursy (lista). Treści plików nie pobieramy, tylko ich rozmiary.
+   */
+  private async storageByCourse(courseId?: string): Promise<Map<string, CourseStorage>> {
+    const items = (await this.prisma.courseItem.findMany({
+      where: courseId ? { courseId } : {},
+      select: { courseId: true, kind: true, videoKey: true, videoSizeMb: true, fileId: true, fileIdEn: true },
+    })) as Array<{ courseId: string; kind: string; videoKey: string | null; videoSizeMb: number | null; fileId: string | null; fileIdEn: string | null }>;
+    const fileIds = items.flatMap((i) => [i.fileId, i.fileIdEn]).filter((x): x is string => !!x);
+    const files = fileIds.length
+      ? ((await this.prisma.privateFile.findMany({ where: { id: { in: fileIds } }, select: { id: true, size: true } })) as Array<{ id: string; size: number }>)
+      : [];
+    const size = new Map(files.map((f) => [f.id, f.size]));
+    const out = new Map<string, CourseStorage>();
+    for (const i of items) {
+      const st = out.get(i.courseId) ?? emptyStorage();
+      if (i.kind === 'VIDEO' && i.videoKey) {
+        st.videos++;
+        st.videoBytes += (i.videoSizeMb ?? 0) * 1024 * 1024;
+      }
+      if (i.kind === 'PDF') {
+        const n = [i.fileId, i.fileIdEn].filter((x): x is string => !!x);
+        st.pdfFiles += n.length;
+        st.pdfBytes += n.reduce((sum, id) => sum + (size.get(id) ?? 0), 0);
+      }
+      out.set(i.courseId, st);
+    }
+    return out;
   }
 
   async slugCheck(slug: string, excludeId?: string) {
@@ -161,6 +194,7 @@ export class CoursesService {
       url: courseUrl(c.slug),
       members,
       pendingWelcome,
+      storage: (await this.storageByCourse(id)).get(id) ?? emptyStorage(),
       modules: sortModules(modules as Array<{ id: string; order: number; createdAt: Date; title: unknown; description: unknown }>).map((m) => ({
         id: m.id, title: m.title, description: m.description, order: m.order,
       })),
@@ -575,9 +609,10 @@ export class CoursesService {
       include: { guest: true },
       orderBy: { createdAt: 'desc' },
     });
+    const completion = await this.tracking.courseCompletion(courseId);
     return rows.map((e: {
-      id: string; source: string; registrationId: string | null; revokedAt: Date | null; revokedReason: string | null;
-      welcomeSentAt: Date | null; lastSeenAt: Date | null; createdAt: Date;
+      id: string; guestId: string; source: string; registrationId: string | null; revokedAt: Date | null; revokedReason: string | null;
+      welcomeSentAt: Date | null; lastSeenAt: Date | null; createdAt: Date; graduatedAt: Date | null;
       guest: { email: string; firstName: string; lastName: string; passwordHash: string | null; lastLoginAt: Date | null; locale: string };
     }) => ({
       id: e.id,
@@ -595,7 +630,37 @@ export class CoursesService {
       lastLoginAt: e.guest.lastLoginAt,
       lastSeenAt: e.lastSeenAt,
       createdAt: e.createdAt,
+      graduatedAt: e.graduatedAt,
+      // Postęp w kursie: moduły (albo materiały, gdy kurs nie ma modułów) — do decyzji „przenieś do absolwentów”.
+      progress: completion.get(e.guestId) ?? { done: 0, total: 0, complete: false },
     }));
+  }
+
+  /**
+   * Absolwenci: przeniesienie z „bieżących” (graduated = true) albo z powrotem.
+   * `completed: true` zamiast listy = wszyscy bieżący, którzy ukończyli kurs. Dostęp do kursu się nie zmienia.
+   */
+  async setGraduated(courseId: string, body: { ids?: unknown; completed?: unknown; graduated?: unknown }) {
+    await this.mustGet(courseId);
+    const graduated = body.graduated !== false;
+    let ids: string[];
+    if (body.completed === true) {
+      const completion = await this.tracking.courseCompletion(courseId);
+      const rows = (await this.prisma.courseEnrollment.findMany({
+        where: { courseId, graduatedAt: null },
+        select: { id: true, guestId: true },
+      })) as Array<{ id: string; guestId: string }>;
+      ids = rows.filter((r) => completion.get(r.guestId)?.complete).map((r) => r.id);
+    } else {
+      if (!Array.isArray(body.ids) || !body.ids.length) throw new BadRequestException('Brak kursantów do przeniesienia.');
+      ids = body.ids.map(String).slice(0, 2000);
+    }
+    if (!ids.length) return { updated: 0 };
+    const r = await this.prisma.courseEnrollment.updateMany({
+      where: { courseId, id: { in: ids } },
+      data: { graduatedAt: graduated ? new Date() : null },
+    });
+    return { updated: r.count };
   }
 
   async addManual(courseId: string, body: { email?: string; firstName?: string; lastName?: string; locale?: string; sendWelcome?: boolean }) {
@@ -707,6 +772,16 @@ export class CoursesService {
     };
   }
 }
+
+export interface CourseStorage {
+  /** Filmy z plikiem w R2. */
+  videos: number;
+  videoBytes: number;
+  /** Pliki PDF (każda wersja językowa osobno). */
+  pdfFiles: number;
+  pdfBytes: number;
+}
+const emptyStorage = (): CourseStorage => ({ videos: 0, videoBytes: 0, pdfFiles: 0, pdfBytes: 0 });
 
 /** Rozmiar wysyłanego filmu (bajty) — do 20 GB. */
 function videoSize(raw: unknown): number {

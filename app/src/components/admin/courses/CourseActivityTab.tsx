@@ -130,7 +130,10 @@ export default function CourseActivityTab({ course }: { course: CourseDetail }) 
                         <div className="flex items-center gap-1.5">
                           {open === r.enrollmentId ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                           <div className="min-w-0">
-                            <p className="font-medium truncate" style={{ color: 'var(--ink)' }}>{`${r.firstName} ${r.lastName}`.trim() || r.email}</p>
+                            <p className="font-medium truncate" style={{ color: 'var(--ink)' }}>
+                              {`${r.firstName} ${r.lastName}`.trim() || r.email}
+                              {r.graduated && <span className="ml-1.5 text-xs font-normal" style={{ color: 'var(--faint)' }}>🎓 absolwent</span>}
+                            </p>
                             <p className="text-xs truncate" style={{ color: 'var(--faint)' }}>
                               {r.email} · {r.passwordSet ? `logowania: ${r.logins}` : 'nie ustawił(a) hasła'}
                             </p>

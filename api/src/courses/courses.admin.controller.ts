@@ -206,6 +206,12 @@ export class CoursesAdminController {
     return this.courses.importList(id, body.text ?? '', body.sendWelcome !== false);
   }
 
+  @Post(':id/enrollments/graduate')
+  @ApiOperation({ summary: 'Absolwenci: przenieś (graduated=true) albo przywróć do bieżących; completed=true → wszyscy, którzy ukończyli kurs' })
+  graduate(@Param('id') id: string, @Body() body: { ids?: unknown; completed?: unknown; graduated?: unknown }) {
+    return this.courses.setGraduated(id, body ?? {});
+  }
+
   @Patch(':id/enrollments/:eid')
   setRevoked(@Param('id') id: string, @Param('eid') eid: string, @Body() body: { revoked?: boolean }) {
     return this.courses.setRevoked(id, eid, !!body.revoked);

@@ -668,6 +668,7 @@ model CourseEnrollment {
   revokedReason  String? // 'ADMIN' (ręcznie — auto-sync nie przywraca) | 'AUTO' (anulowane zgłoszenie)
   welcomeSentAt  DateTime?
   lastSeenAt     DateTime?
+  graduatedAt    DateTime? // absolwent: przeniesiony z „bieżących” po ukończeniu kursu (dostęp zostaje)
   createdAt      DateTime     @default(now())
 
   @@unique([courseId, guestId])
