@@ -77,15 +77,15 @@ services:
         sync: false
       - key: PUBLIC_SITE_URL        # linki w mailach: <PUBLIC_SITE_URL>/formacja/<slug>/
         value: https://icpemission.pl
-      - key: BUNNY_STREAM_LIBRARY_ID    # Bunny ▸ Stream ▸ biblioteka ▸ API ▸ Video Library ID
+      - key: R2_ACCOUNT_ID             # Cloudflare ▸ R2 ▸ Overview ▸ Account ID (hosting filmów kursów)
         sync: false
-      - key: BUNNY_STREAM_API_KEY       # Bunny ▸ Stream ▸ biblioteka ▸ API ▸ API Key
+      - key: R2_BUCKET                 # nazwa bucketu R2, np. icpe-kursy
         sync: false
-      - key: BUNNY_STREAM_TOKEN_KEY     # Bunny ▸ Stream ▸ biblioteka ▸ Security ▸ Token authentication key
+      - key: R2_ACCESS_KEY_ID          # Cloudflare ▸ R2 ▸ Manage API tokens ▸ Access Key ID
         sync: false
-      - key: BUNNY_STREAM_CDN_HOSTNAME  # Bunny ▸ Stream ▸ biblioteka ▸ API ▸ CDN Hostname (miniatury), np. vz-xxxx.b-cdn.net
+      - key: R2_SECRET_ACCESS_KEY      # Cloudflare ▸ R2 ▸ Manage API tokens ▸ Secret Access Key
         sync: false
-      - key: BUNNY_STREAM_WEBHOOK_KEY   # opcjonalnie: Read-only API key — weryfikacja podpisu webhooka
+      - key: R2_ENDPOINT               # opcjonalnie: tylko dla bucketu z jurysdykcją UE, np. https://<konto>.eu.r2.cloudflarestorage.com
         sync: false
       - key: CRON_SECRET               # opcjonalnie: wymagany ?key= dla GET /cron/course-releases (publikacja zaplanowanych materiałów)
         sync: false

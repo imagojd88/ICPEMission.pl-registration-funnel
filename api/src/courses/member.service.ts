@@ -1,10 +1,11 @@
 import {
-  BadRequestException, ForbiddenException, HttpException, HttpStatus, Injectable, NotFoundException, UnauthorizedException,
+  BadRequestException, ConflictException, ForbiddenException, HttpException, HttpStatus, Injectable, NotFoundException, UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
 import { PrismaService } from '../prisma/prisma.service';
-import { BunnyStreamService } from './bunny-stream.service';
+import { R2StorageService } from './r2-storage.service';
+import { completedSet, isItemLocked, moduleStates, sortModules, type ModuleState } from './course-progress';
 import { CourseAccessService } from './course-access.service';
 import { CourseTrackingService } from './course-tracking.service';
 import { CourseReleaseService } from './course-release.service';
@@ -14,7 +15,17 @@ import { courseUrl, memberJwtSecret, normEmail, rateLimit, sha256hex, signedFile
 const GENERIC_LOGIN_ERROR =
   'Nieprawidłowy e-mail lub hasło. Jeśli logujesz się pierwszy raz, użyj linku z maila powitalnego albo „Nie pamiętam hasła".';
 
-type CourseRow = { id: string; slug: string; title: unknown; description: unknown; status: string; accessUntil: Date | null; slugHistory: string[] };
+type CourseRow = {
+  id: string; slug: string; title: unknown; description: unknown; status: string; accessUntil: Date | null; slugHistory: string[]; sequential?: boolean;
+};
+
+type MemberItemRow = {
+  id: string; kind: string; title: unknown; description: unknown; durationSec: number | null; moduleId: string | null;
+  videoKey: string | null; videoState: string | null; thumbKey: string | null; fileId: string | null; fileIdEn: string | null;
+  publishAt?: Date | null; courseId: string;
+};
+
+const LOCKED_MSG = 'Ten moduł odblokuje się po ukończeniu poprzedniego.';
 
 /** Logowanie kursantów i treść kursu dla zalogowanych. */
 @Injectable()
@@ -23,7 +34,7 @@ export class MemberService {
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly access: CourseAccessService,
-    private readonly bunny: BunnyStreamService,
+    private readonly r2: R2StorageService,
     private readonly tracking: CourseTrackingService,
     private readonly release: CourseReleaseService,
   ) {}
@@ -177,7 +188,7 @@ export class MemberService {
     return { valid: !rec.usedAt && rec.expiresAt.getTime() > Date.now() };
   }
 
-  /** Kurs + pozycje widoczne dla kursanta. */
+  /** Kurs + pozycje widoczne dla kursanta (z modułami i stanem trybu sekwencyjnego). */
   async course(slug: string, m: MemberCtx) {
     const { course, enrollment } = await this.requireAccess(slug, m);
     if (enrollment && (!enrollment.lastSeenAt || Date.now() - enrollment.lastSeenAt.getTime() > 5 * 60 * 1000)) {
@@ -185,36 +196,93 @@ export class MemberService {
     }
     if (!m.admin) await this.tracking.logCourseView(course.id, m.guestId).catch(() => undefined);
     this.release.kick(); // przy okazji: zaległe maile „nowe materiały"
-    const items = await this.prisma.courseItem.findMany({
-      where: this.visibleWhere(course.id, m.admin),
+    return this.buildCourse(course, m);
+  }
+
+  /** Widoczne materiały kursanta (film bez pliku = zaślepka „wkrótce", PDF bez pliku = pominięty). */
+  private async visibleItems(courseId: string, admin?: boolean): Promise<MemberItemRow[]> {
+    const items = (await this.prisma.courseItem.findMany({
+      where: this.visibleWhere(courseId, admin),
       orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
-    });
+    })) as MemberItemRow[];
+    // Film w trakcie wysyłki / bez pliku też jest pokazywany — jako zaślepka „wkrótce dostępny".
+    return items.filter((i) => i.kind === 'VIDEO' || !!(i.fileId || i.fileIdEn));
+  }
+
+  /** Stan postępu jednego kursanta: ukończone materiały + stan modułów. Podgląd admina: wszystko otwarte. */
+  private async progressState(course: CourseRow, items: MemberItemRow[], m: MemberCtx) {
+    const modules = sortModules(
+      (await this.prisma.courseModule.findMany({ where: { courseId: course.id } })) as Array<{
+        id: string; order: number; createdAt: Date; title: unknown; description: unknown;
+      }>,
+    );
+    let done = new Set<string>();
+    if (!m.admin) {
+      const [completions, progress, pdfEvents] = await Promise.all([
+        this.prisma.courseItemCompletion.findMany({ where: { courseId: course.id, guestId: m.guestId }, select: { itemId: true } }),
+        this.prisma.videoProgress.findMany({ where: { courseId: course.id, guestId: m.guestId }, select: { itemId: true, completedAt: true } }),
+        this.prisma.courseEvent.findMany({
+          where: { courseId: course.id, guestId: m.guestId, type: { in: ['PDF_OPEN', 'PDF_DOWNLOAD'] } },
+          select: { itemId: true },
+        }),
+      ]);
+      done = completedSet(completions, progress, pdfEvents);
+    }
+    const states = moduleStates(modules, items, done, !!course.sequential && !m.admin);
+    return { modules, states, done };
+  }
+
+  private async buildCourse(course: CourseRow, m: MemberCtx) {
+    const items = await this.visibleItems(course.id, m.admin);
+    const { modules, states, done } = await this.progressState(course, items, m);
     const guest = m.admin
       ? { firstName: '', email: m.email }
       : await this.prisma.guestAccount.findUnique({ where: { id: m.guestId }, select: { firstName: true, email: true } });
+
+    const view = (i: MemberItemRow) => ({
+      // Podgląd admina: materiał zaplanowany (kursanci jeszcze go nie widzą).
+      ...(m.admin && i.publishAt && i.publishAt.getTime() > Date.now() ? { scheduledAt: i.publishAt } : {}),
+      id: i.id, kind: i.kind, title: i.title, description: i.description, durationSec: i.durationSec,
+      thumbnailUrl: i.kind === 'VIDEO' ? this.r2.thumbUrl(i.thumbKey) : null,
+      done: done.has(i.id),
+      ...(i.kind === 'VIDEO' && (i.videoState !== 'READY' || !i.videoKey) ? { pending: true } : {}),
+      // PDF: dostępne wersje językowe — strona pokaże „tylko po polsku / English only".
+      ...(i.kind === 'PDF' ? { langs: [...(i.fileId ? ['pl'] : []), ...(i.fileIdEn ? ['en'] : [])] } : {}),
+    });
+
+    // Moduły: otwarte z materiałami; z zablokowanych pokazujemy tylko pierwszy (jako zapowiedź), resztę liczymy.
+    const outModules: unknown[] = [];
+    let lockedShown = false;
+    let lockedRemaining = 0;
+    for (const mod of modules) {
+      const st = states.find((x) => x.id === mod.id) as ModuleState;
+      if (st.locked) {
+        if (lockedShown) {
+          lockedRemaining++;
+          continue;
+        }
+        lockedShown = true;
+        outModules.push({ id: mod.id, title: mod.title, description: mod.description, locked: true, done: false, total: st.total, doneCount: 0, items: [] });
+        continue;
+      }
+      outModules.push({
+        id: mod.id, title: mod.title, description: mod.description, locked: false, done: st.done, total: st.total, doneCount: st.doneCount,
+        items: items.filter((i) => i.moduleId === mod.id).map(view),
+      });
+    }
+    const moduleIds = new Set(modules.map((x) => x.id));
     return {
       preview: m.admin ? { status: course.status } : null,
       slug: course.slug,
       title: course.title,
       description: course.description,
       accessUntil: course.accessUntil,
+      sequential: !!course.sequential,
       member: guest,
-      items: items
-        .filter((i: { kind: string; videoId: string | null; videoState: string | null; fileId: string | null; fileIdEn: string | null }) =>
-          // Film w trakcie wysyłki/kodowania też jest pokazywany — jako zaślepka „wkrótce dostępny".
-          i.kind === 'VIDEO' ? !!i.videoId : !!(i.fileId || i.fileIdEn),
-        )
-        .map((i: {
-          id: string; kind: string; title: unknown; description: unknown; durationSec: number | null; thumbnailUrl: string | null;
-          fileId: string | null; fileIdEn: string | null; videoState: string | null; publishAt?: Date | null;
-        }) => ({
-          // Podgląd admina: materiał zaplanowany (kursanci jeszcze go nie widzą).
-          ...(m.admin && i.publishAt && i.publishAt.getTime() > Date.now() ? { scheduledAt: i.publishAt } : {}),
-          id: i.id, kind: i.kind, title: i.title, description: i.description, durationSec: i.durationSec, thumbnailUrl: i.thumbnailUrl,
-          // PDF: dostępne wersje językowe — strona pokaże „tylko po polsku / English only".
-          ...(i.kind === 'VIDEO' && i.videoState !== 'READY' ? { pending: true } : {}),
-          ...(i.kind === 'PDF' ? { langs: [...(i.fileId ? ['pl'] : []), ...(i.fileIdEn ? ['en'] : [])] } : {}),
-        })),
+      modules: outModules,
+      lockedRemaining,
+      // Materiały bez modułu (w kursie bez modułów — wszystkie): zawsze dostępne.
+      items: items.filter((i) => !i.moduleId || !moduleIds.has(i.moduleId)).map(view),
     };
   }
 
@@ -240,33 +308,53 @@ export class MemberService {
     return { course, enrollment };
   }
 
+  /** Materiał widoczny dla kursanta; w trybie sekwencyjnym — tylko z odblokowanego modułu. */
   private async requireItem(slug: string, itemId: string, m: MemberCtx) {
     const { course } = await this.requireAccess(slug, m);
-    const item = await this.prisma.courseItem.findFirst({ where: { id: itemId, ...this.visibleWhere(course.id, m.admin) } });
+    const item = (await this.prisma.courseItem.findFirst({ where: { id: itemId, ...this.visibleWhere(course.id, m.admin) } })) as MemberItemRow | null;
     if (!item) throw new NotFoundException('Nie znaleziono materiału');
-    return item;
+    if (course.sequential && !m.admin && item.moduleId) {
+      const items = await this.visibleItems(course.id, false);
+      const { states } = await this.progressState(course, items, m);
+      // 409, nie 403 — strona traktuje 403 jako utratę dostępu (wylogowanie).
+      if (isItemLocked(item, states)) throw new ConflictException(LOCKED_MSG);
+    }
+    return { course, item };
   }
 
+  /** Podpisany link do pliku filmu w R2 (ważny 6 h; strona sama pobierze nowy, gdy wygaśnie). */
   async play(slug: string, itemId: string, m: MemberCtx) {
-    const item = await this.requireItem(slug, itemId, m);
-    if (item.kind !== 'VIDEO' || !item.videoId || item.videoState !== 'READY') throw new NotFoundException('Film nie jest dostępny');
-    const { url, expiresAt } = this.bunny.embedUrl(item.videoId);
+    const { item } = await this.requireItem(slug, itemId, m);
+    if (item.kind !== 'VIDEO' || !item.videoKey || item.videoState !== 'READY') throw new NotFoundException('Film nie jest dostępny');
+    const { url, expiresAt } = this.r2.playUrl(item.videoKey);
     if (!m.admin) this.tracking.log(item.courseId, m.guestId, 'VIDEO_PLAY', item.id);
     // `track: false` dla podglądu admina — strona nie wysyła wtedy postępu oglądania.
-    return { embedUrl: url, expiresAt, track: !m.admin };
+    return { videoUrl: url, expiresAt, track: !m.admin, poster: this.r2.thumbUrl(item.thumbKey) };
   }
 
   /** Heartbeat postępu oglądania (co ~15 s z odtwarzacza). */
   async progress(slug: string, itemId: string, m: MemberCtx, body: { buckets?: unknown; position?: unknown; duration?: unknown }) {
     if (m.admin) return { ok: true, skipped: true };
-    const item = await this.requireItem(slug, itemId, m);
+    const { item } = await this.requireItem(slug, itemId, m);
     if (item.kind !== 'VIDEO') throw new BadRequestException('To nie jest film');
     return this.tracking.recordProgress(item.courseId, item.id, m.guestId, body);
   }
 
+  /**
+   * „Oznaczam jako ukończone" — ręczne ukończenie materiału. Zwraca odświeżony kurs
+   * (w trybie sekwencyjnym może odblokować się kolejny moduł).
+   */
+  async complete(slug: string, itemId: string, m: MemberCtx) {
+    const { course, item } = await this.requireItem(slug, itemId, m);
+    // Filmu, którego jeszcze nie ma (wysyła się), nie da się obejrzeć — więc ani „ukończyć".
+    if (item.kind === 'VIDEO' && (!item.videoKey || item.videoState !== 'READY')) throw new ConflictException('Ten film nie jest jeszcze dostępny.');
+    if (!m.admin) await this.tracking.markComplete(course.id, item.id, m.guestId, 'MANUAL');
+    return this.buildCourse(course, m);
+  }
+
   /** Link do PDF w języku kursanta; gdy brak tej wersji — druga dostępna. */
   async fileLink(slug: string, itemId: string, m: MemberCtx, lang?: string, action?: string) {
-    const item = await this.requireItem(slug, itemId, m);
+    const { item } = await this.requireItem(slug, itemId, m);
     const fileId = lang === 'en' ? item.fileIdEn ?? item.fileId : item.fileId ?? item.fileIdEn;
     if (item.kind !== 'PDF' || !fileId) throw new NotFoundException('Plik nie jest dostępny');
     const view = signedFilePath(fileId, 600, false);
@@ -275,6 +363,7 @@ export class MemberService {
       this.tracking.log(item.courseId, m.guestId, action === 'open' ? 'PDF_OPEN' : 'PDF_DOWNLOAD', item.id, {
         lang: fileId === item.fileIdEn ? 'en' : 'pl',
       });
+      await this.tracking.markComplete(item.courseId, item.id, m.guestId, 'PDF');
     }
     return { path: view.path, downloadPath: dl.path, expiresAt: view.expiresAt, lang: fileId === item.fileIdEn ? 'en' : 'pl' };
   }

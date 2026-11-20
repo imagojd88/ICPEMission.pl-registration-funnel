@@ -1,10 +1,9 @@
-import { Body, Controller, Get, Headers, HttpCode, Logger, NotFoundException, Param, Post, Query, Req, Res, UnauthorizedException, UseGuards, type RawBodyRequest } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Logger, NotFoundException, Param, Post, Query, Req, Res, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { CoursesService } from './courses.service';
 import { MemberService } from './member.service';
 import { MemberAuthGuard, type MemberRequest } from './member-auth.guard';
-import { BunnyStreamService } from './bunny-stream.service';
 import { CourseReleaseService } from './course-release.service';
 import { verifyFileSignature } from './course-utils';
 
@@ -22,7 +21,6 @@ export class CoursesPublicController {
   constructor(
     private readonly courses: CoursesService,
     private readonly member: MemberService,
-    private readonly bunny: BunnyStreamService,
     private readonly release: CourseReleaseService,
   ) {}
 
@@ -47,23 +45,6 @@ export class CoursesPublicController {
   @Get('courses/public/:slug')
   publicCourse(@Param('slug') slug: string) {
     return this.member.publicCourse(slug);
-  }
-
-  @Post('webhooks/bunny-stream')
-  @HttpCode(200)
-  async bunnyWebhook(
-    @Req() req: RawBodyRequest<Request>,
-    @Headers('x-bunnystream-signature') signature: string | undefined,
-    @Body() body: { VideoGuid?: string; Status?: number },
-  ) {
-    const verified = this.bunny.verifyWebhook(req.rawBody, signature);
-    if (verified === false) throw new UnauthorizedException('Invalid signature');
-    if (!body?.VideoGuid) return { ok: true };
-    // Stan i tak pobieramy z API Bunny — webhook to tylko sygnał.
-    return this.courses.onVideoWebhook(String(body.VideoGuid)).catch((e: Error) => {
-      this.logger.warn(`webhook ${body.VideoGuid}: ${e.message}`);
-      return { ok: true };
-    });
   }
 
   // ── Kursant: logowanie ──
@@ -117,6 +98,15 @@ export class CoursesPublicController {
     @Body() body: { buckets?: unknown; position?: unknown; duration?: unknown },
   ) {
     return this.member.progress(slug, itemId, req.member!, body);
+  }
+
+  @UseGuards(MemberAuthGuard)
+  @ApiBearerAuth()
+  @Post('member/courses/:slug/items/:itemId/complete')
+  @HttpCode(200)
+  @ApiOperation({ summary: '„Oznaczam jako ukończone" — zwraca odświeżony kurs (może odblokować kolejny moduł)' })
+  complete(@Param('slug') slug: string, @Param('itemId') itemId: string, @Req() req: MemberRequest) {
+    return this.member.complete(slug, itemId, req.member!);
   }
 
   @UseGuards(MemberAuthGuard)

@@ -56,6 +56,7 @@ export default function CourseActivityTab({ course }: { course: CourseDetail }) 
   const rows = (report?.rows ?? []).filter((r) => !onlyActive || r.active)
   const items = report?.items ?? []
   const videos = items.filter((i) => i.kind === 'VIDEO')
+  const moduleCount = report?.modules.length ?? 0
 
   return (
     <div className="flex flex-col gap-5">
@@ -106,6 +107,7 @@ export default function CourseActivityTab({ course }: { course: CourseDetail }) 
                 <tr className="text-left text-xs" style={{ color: 'var(--faint)' }}>
                   <th className="px-5 py-2 font-semibold sticky left-0" style={{ background: 'var(--surface)', minWidth: 220 }}>Kursant</th>
                   <th className="px-2 py-2 font-semibold whitespace-nowrap">Ostatnio</th>
+                  {moduleCount > 0 && <th className="px-2 py-2 font-semibold whitespace-nowrap">Moduły</th>}
                   {items.map((i) => (
                     <th key={i.id} className="px-2 py-2 font-semibold" style={{ minWidth: 120, maxWidth: 180 }} title={t(i.title)}>
                       <span className="flex items-center gap-1">
@@ -136,6 +138,16 @@ export default function CourseActivityTab({ course }: { course: CourseDetail }) 
                         </div>
                       </td>
                       <td className="px-2 py-2 text-xs whitespace-nowrap" style={{ color: 'var(--muted)' }}>{fmtDate(r.lastActivityAt)}</td>
+                      {moduleCount > 0 && (
+                        <td
+                          className="px-2 py-2 text-xs font-semibold whitespace-nowrap"
+                          style={{ color: r.modulesDone === moduleCount ? 'var(--ok)' : 'var(--ink)' }}
+                          title="Ukończone moduły (wszystkie widoczne materiały modułu ukończone)"
+                        >
+                          {r.modulesDone === moduleCount && <CheckCircle2 size={12} className="inline mr-1" />}
+                          {r.modulesDone} / {moduleCount}
+                        </td>
+                      )}
                       {items.map((i) => (
                         <td key={i.id} className="px-2 py-2">
                           {i.kind === 'VIDEO' ? <VideoCell c={r.items[i.id] as ActivityVideoCell | null} /> : <PdfCell c={r.items[i.id] as ActivityPdfCell | null} />}
@@ -144,7 +156,7 @@ export default function CourseActivityTab({ course }: { course: CourseDetail }) 
                     </tr>
                     {open === r.enrollmentId && (
                       <tr>
-                        <td colSpan={items.length + 2} className="px-5 pb-4" style={{ background: 'var(--surface-2)' }}>
+                        <td colSpan={items.length + 2 + (moduleCount > 0 ? 1 : 0)} className="px-5 pb-4" style={{ background: 'var(--surface-2)' }}>
                           <HistoryView h={history[r.enrollmentId]} />
                         </td>
                       </tr>
@@ -157,6 +169,7 @@ export default function CourseActivityTab({ course }: { course: CourseDetail }) 
         )}
         <p className="text-xs" style={{ color: 'var(--faint)' }}>
           % obejrzenia liczony z unikalnie obejrzanych fragmentów (przewijanie i powtórki nie zawyżają). Film „obejrzany" = co najmniej 90%.
+          ✓ = materiał ukończony (90% filmu, otwarty PDF albo „Oznaczam jako ukończone” — wtedy z dopiskiem „ręcznie”).
           Kliknij kursanta, aby zobaczyć historię. Twój podgląd jako admin nie jest liczony.
         </p>
       </Panel>
@@ -170,6 +183,7 @@ function VideoCell({ c }: { c: ActivityVideoCell | null }) {
     <div className="flex flex-col gap-1" title={`Odtworzenia: ${c.plays} · ostatnia pozycja ${formatDuration(c.positionSec) || '0:00'}`}>
       <div className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: c.completed ? 'var(--ok)' : 'var(--ink)' }}>
         {c.completed && <CheckCircle2 size={13} />} {c.percent}%
+        {c.manual && <span className="font-normal" style={{ color: 'var(--faint)' }}>· ręcznie</span>}
       </div>
       <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--border)', width: 90 }}>
         <div className="h-full" style={{ width: `${c.percent}%`, background: c.completed ? 'var(--ok)' : 'var(--brand)' }} />
@@ -181,7 +195,9 @@ function VideoCell({ c }: { c: ActivityVideoCell | null }) {
 function PdfCell({ c }: { c: ActivityPdfCell | null }) {
   if (!c) return <span className="text-xs" style={{ color: 'var(--faint)' }}>—</span>
   return (
-    <span className="text-xs" style={{ color: 'var(--ink)' }}>
+    <span className="text-xs inline-flex items-center gap-1" style={{ color: c.completed ? 'var(--ok)' : 'var(--ink)' }}>
+      {c.completed && <CheckCircle2 size={12} />}
+      {c.manual && !c.opened && !c.downloaded ? 'ręcznie' : ''}
       {c.opened ? `otw. ${c.opened}` : ''}
       {c.opened && c.downloaded ? ' · ' : ''}
       {c.downloaded ? `pobr. ${c.downloaded}` : ''}

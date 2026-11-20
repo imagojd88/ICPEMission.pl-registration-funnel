@@ -582,7 +582,9 @@ model Course {
   sourceInstanceIds String[]           @default([]) // eventy, których zgłoszenia dają dostęp
   grantOn           String             @default("CONFIRMED") // 'CONFIRMED' | 'ANY_ACTIVE'
   accessUntil       DateTime?
+  sequential        Boolean            @default(false) // tryb sekwencyjny: kolejny moduł widoczny po ukończeniu poprzedniego
   items             CourseItem[]
+  modules           CourseModule[]
   enrollments       CourseEnrollment[]
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
@@ -596,11 +598,18 @@ model CourseItem {
   title        Json
   description  Json?
   order        Int            @default(0)
+  moduleId     String? // → CourseModule (null = materiał bez modułu, zawsze dostępny)
+  module       CourseModule?  @relation(fields: [moduleId], references: [id], onDelete: SetNull)
   published    Boolean        @default(true)
   publishAt         DateTime? // publikacja zaplanowana: materiał widoczny dla kursantów od tej chwili
   releaseNotifiedAt DateTime? // kiedy wysłano maile „nowe materiały" (null + publishAt w przyszłości = czeka)
   releaseMails      Int? // ilu kursantom wysłano mail przy publikacji (null = bez maila)
-  videoId      String? // GUID w Bunny Stream
+  videoId      String? // GUID w Bunny Stream (stary hosting, do 2026-11 — nieużywany)
+  videoKey     String? // klucz obiektu w Cloudflare R2 (plik MP4)
+  videoSizeMb  Int?
+  uploadId     String? // trwający upload wieloczęściowy do R2 (null = zakończony)
+  uploadKey    String? // klucz obiektu trwającego uploadu (przy podmianie pliku stary videoKey działa do końca wysyłki)
+  thumbKey     String? // miniatura w R2 (JPEG z klatki filmu, robiona w przeglądarce admina)
   videoState   String? // UPLOADING | PROCESSING | READY | FAILED
   durationSec  Int?
   thumbnailUrl String?
@@ -617,6 +626,34 @@ model PrivateFile {
   originalName String?
   data         Bytes
   createdAt    DateTime @default(now())
+}
+
+/// Moduł kursu = grupa materiałów (np. „Konferencja 1" = film + PDF). Kolejność modułów = `order`.
+model CourseModule {
+  id          String       @id @default(cuid())
+  courseId    String
+  course      Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  title       Json // { pl, en? }
+  description Json?
+  order       Int          @default(0)
+  items       CourseItem[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([courseId])
+}
+
+/// Ukończenie materiału przez kursanta: MANUAL (przycisk „Oznaczam jako ukończone"), VIDEO (≥90% obejrzane), PDF (otwarty/pobrany).
+model CourseItemCompletion {
+  id        String   @id @default(cuid())
+  courseId  String
+  itemId    String
+  guestId   String
+  source    String // MANUAL | VIDEO | PDF
+  createdAt DateTime @default(now())
+
+  @@unique([itemId, guestId])
+  @@index([courseId, guestId])
 }
 
 model CourseEnrollment {

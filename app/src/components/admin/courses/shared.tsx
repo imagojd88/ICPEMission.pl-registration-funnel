@@ -13,7 +13,8 @@ export function StatusBadge({ status }: { status: CourseStatus }) {
   return <Badge variant={v}>{STATUS_LABEL[status]}</Badge>
 }
 
-export function VideoStateBadge({ state, uploading }: { state: VideoState | null; uploading?: boolean }) {
+export function VideoStateBadge({ state, uploading, finishing }: { state: VideoState | null; uploading?: boolean; finishing?: boolean }) {
+  if (finishing) return <Badge variant="brand">Kończę…</Badge>
   if (uploading) return <Badge variant="brand">Wysyłanie…</Badge>
   switch (state) {
     case 'READY':
@@ -23,7 +24,7 @@ export function VideoStateBadge({ state, uploading }: { state: VideoState | null
     case 'FAILED':
       return <Badge variant="err">Błąd kodowania</Badge>
     default:
-      return <Badge variant="warn">Czeka na plik</Badge>
+      return <Badge variant="warn">Brak pliku</Badge>
   }
 }
 

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { ArrowLeft, Eye, ExternalLink, Send } from 'lucide-react'
 import Button from '@/components/ui/Button'
-import { getCourse, getPreviewUrl, updateCourse, type CourseDetail, type CoursesConfig } from '@/lib/courses'
+import { getCourse, getPreviewUrl, updateCourse, type CourseDetail, type CoursesConfig, type VideoUploadInit } from '@/lib/courses'
 import { uploadStore, type UploadState } from '@/lib/uploadStore'
 import CourseSettingsTab from './CourseSettingsTab'
 import CourseContentTab from './CourseContentTab'
@@ -35,31 +35,20 @@ export default function CourseEditor({ id, config, onBack }: { id: string; confi
     void reload()
   }, [reload])
 
-  // Po zakończeniu wysyłki odśwież stan filmu (Bunny zaczyna kodowanie).
+  // Po zakończeniu wysyłki odśwież kurs (film gotowy, miniatura).
   const doneCount = Object.values(uploads).filter((u) => u.done).length
   const prevDone = useRef(doneCount)
   useEffect(() => {
     if (doneCount > prevDone.current) {
-      const h = setTimeout(() => void reload(), 3000)
+      const h = setTimeout(() => void reload(), 1500)
       prevDone.current = doneCount
       return () => clearTimeout(h)
     }
     prevDone.current = doneCount
   }, [doneCount, reload])
 
-  // Filmy w kodowaniu — odświeżaj co 10 s (API dociąga stan z Bunny).
-  const processing = course?.items.some(
-    (i) => i.kind === 'VIDEO' && i.videoState !== 'READY' && i.videoState !== 'FAILED' && !uploadStore.isActive(uploads[i.id]),
-  )
-  useEffect(() => {
-    if (!processing) return
-    const h = setInterval(() => void reload(), 10000)
-    return () => clearInterval(h)
-  }, [processing, reload])
-
   const startUpload = useCallback(
-    (itemId: string, file: File, upload: { endpoint: string; headers: Record<string, string> }) =>
-      uploadStore.start(id, itemId, file, upload),
+    (itemId: string, file: File, init?: VideoUploadInit) => uploadStore.start(id, itemId, file, init),
     [id],
   )
   const cancelUpload = (itemId: string) => uploadStore.cancel(itemId)
@@ -109,7 +98,7 @@ export default function CourseEditor({ id, config, onBack }: { id: string; confi
   }
 
   const tabs: { id: Tab; label: string }[] = [
-    { id: 'content', label: `Zawartość (${course.items.length})` },
+    { id: 'content', label: `Zawartość (${course.items.length})${course.modules.length ? ` · ${course.modules.length} mod.` : ''}` },
     { id: 'members', label: `Kursanci (${course.members})` },
     { id: 'activity', label: 'Aktywność' },
     { id: 'settings', label: 'Ustawienia' },
@@ -193,6 +182,7 @@ export default function CourseEditor({ id, config, onBack }: { id: string; confi
           onStartUpload={startUpload}
           onCancelUpload={cancelUpload}
           onChanged={reload}
+          onOpenSettings={() => setTab('settings')}
         />
       )}
       {tab === 'members' && <CourseMembersTab course={course} onChanged={reload} />}

@@ -31,8 +31,17 @@ export interface CourseItem {
   description: LangText | null
   order: number
   published: boolean
+  /** Moduł (null = materiał bez modułu — zawsze dostępny). */
+  moduleId: string | null
   videoId: string | null
   videoState: VideoState | null
+  /** Plik filmu jest w R2. */
+  hasFile?: boolean
+  /** Trwa (albo przerwano) wysyłkę pliku — można ją wznowić tym samym plikiem. */
+  uploading?: boolean
+  /** Film ze starego hostingu (Bunny) — plik trzeba wgrać ponownie. */
+  legacyVideo?: boolean
+  videoSizeMb?: number | null
   durationSec: number | null
   thumbnailUrl: string | null
   fileId: string | null
@@ -43,9 +52,14 @@ export interface CourseItem {
   publishAt: string | null
   releaseNotifiedAt: string | null
   releaseMails: number | null
-  /** Stan z Bunny dla filmów w toku (tylko w szczegółach kursu). */
-  live?: { encodeProgress?: number | null; rawStatus?: number; error?: string } | null
   createdAt: string
+}
+
+export interface CourseModule {
+  id: string
+  title: LangText
+  description: LangText | null
+  order: number
 }
 
 export interface CourseDetail {
@@ -58,9 +72,12 @@ export interface CourseDetail {
   sourceInstanceIds: string[]
   grantOn: 'CONFIRMED' | 'ANY_ACTIVE'
   accessUntil: string | null
+  /** Tryb sekwencyjny: kolejny moduł widoczny po ukończeniu poprzedniego. */
+  sequential: boolean
   url: string
   members: number
   pendingWelcome: number
+  modules: CourseModule[]
   items: CourseItem[]
   welcome?: { sent: number; failed: number }
 }
@@ -84,14 +101,23 @@ export interface Enrollment {
 }
 
 export interface CoursesConfig {
-  video: { configured: boolean; libraryId: string | null; tokenAuth: boolean; thumbnails: boolean; webhookSignature: boolean }
+  video: { provider: 'r2'; configured: boolean; bucket: string | null; missing: string[] }
   siteCourseBase: string
 }
 
-export interface TusUploadInfo {
-  endpoint: string
-  headers: Record<string, string>
-  expiresAt: string
+/** Dane rozpoczętej (lub wznawianej) wysyłki filmu do Cloudflare R2. */
+export interface VideoUploadInit {
+  uploadId: string
+  partSize: number
+  partCount: number
+  /** Części już wgrane (wznowienie). */
+  doneParts: number[]
+}
+
+export interface VideoFileMeta {
+  size: number
+  contentType: string
+  fileName: string
 }
 
 function auth(): Record<string, string> {
@@ -124,19 +150,47 @@ export const updateCourse = (
     sourceInstanceIds: string[]
     grantOn: 'CONFIRMED' | 'ANY_ACTIVE'
     accessUntil: string | null
+    sequential: boolean
   }>,
 ) => apiFetch<CourseDetail>(`/admin/courses/${id}`, json('PATCH', body))
 export const deleteCourse = (id: string) => apiFetch<{ ok: true }>(`/admin/courses/${id}`, json('DELETE'))
 
-export const createVideoItem = (courseId: string, title: LangText, publishAt?: string | null) =>
-  apiFetch<{ item: CourseItem; upload: TusUploadInfo }>(`/admin/courses/${courseId}/items/video`, json('POST', { title, publishAt: publishAt ?? null }))
-export const renewVideoUpload = (courseId: string, itemId: string) =>
-  apiFetch<{ item: CourseItem; upload: TusUploadInfo }>(`/admin/courses/${courseId}/items/${itemId}/upload`, json('POST'))
+export const createVideoItem = (
+  courseId: string,
+  body: { title: LangText; publishAt?: string | null; moduleId?: string | null } & VideoFileMeta,
+) => apiFetch<{ item: CourseItem; upload: VideoUploadInit }>(`/admin/courses/${courseId}/items/video`, json('POST', { ...body, publishAt: body.publishAt ?? null }))
+/** Nowa wysyłka do istniejącego filmu (podmiana pliku) albo wznowienie przerwanej (`resumeUploadId`). */
+export const renewVideoUpload = (courseId: string, itemId: string, body: VideoFileMeta & { resumeUploadId?: string | null }) =>
+  apiFetch<{ item: CourseItem; upload: VideoUploadInit }>(`/admin/courses/${courseId}/items/${itemId}/upload`, json('POST', body))
+export const getUploadPartUrls = (courseId: string, itemId: string, uploadId: string, partNumbers: number[]) =>
+  apiFetch<{ urls: Record<string, string> }>(`/admin/courses/${courseId}/items/${itemId}/upload/parts`, json('POST', { uploadId, partNumbers }))
+export const completeVideoUpload = (
+  courseId: string,
+  itemId: string,
+  body: { uploadId: string; size: number; durationSec: number | null; thumbnail: boolean },
+) =>
+  apiFetch<{ item: CourseItem; thumbnailUpload: { url: string; contentType: string } | null }>(
+    `/admin/courses/${courseId}/items/${itemId}/upload/complete`,
+    json('POST', body),
+  )
+export const abortVideoUpload = (courseId: string, itemId: string) =>
+  apiFetch<CourseItem>(`/admin/courses/${courseId}/items/${itemId}/upload`, json('DELETE'))
+export const setupVideoCors = () => apiFetch<{ ok: boolean; message: string }>('/admin/courses/video-cors', json('POST'))
 export const updateCourseItem = (
   courseId: string,
   itemId: string,
-  body: Partial<{ title: LangText; description: LangText | null; published: boolean; publishAt: string | null }>,
+  body: Partial<{ title: LangText; description: LangText | null; published: boolean; publishAt: string | null; moduleId: string | null }>,
 ) => apiFetch<CourseItem>(`/admin/courses/${courseId}/items/${itemId}`, json('PATCH', body))
+
+// ── Moduły ──
+export const createCourseModule = (courseId: string, body: { title: LangText; description?: LangText | null }) =>
+  apiFetch<CourseModule>(`/admin/courses/${courseId}/modules`, json('POST', body))
+export const updateCourseModule = (courseId: string, moduleId: string, body: { title?: LangText; description?: LangText | null }) =>
+  apiFetch<CourseModule>(`/admin/courses/${courseId}/modules/${moduleId}`, json('PATCH', body))
+export const deleteCourseModule = (courseId: string, moduleId: string) =>
+  apiFetch<{ ok: true }>(`/admin/courses/${courseId}/modules/${moduleId}`, json('DELETE'))
+export const reorderCourseModules = (courseId: string, ids: string[]) =>
+  apiFetch<{ ok: true }>(`/admin/courses/${courseId}/modules-order`, json('PUT', { ids }))
 export const refreshCourseItem = (courseId: string, itemId: string) =>
   apiFetch<CourseItem>(`/admin/courses/${courseId}/items/${itemId}/refresh`, json('POST'))
 export const diagnoseVideo = (courseId: string, itemId: string) =>
@@ -168,12 +222,13 @@ async function postMultipart<T>(path: string, form: FormData): Promise<T> {
 }
 
 /** Nowy materiał PDF; `lang` = język wgrywanego pliku. */
-export function uploadPdfItem(courseId: string, file: File, title: LangText, lang: PdfLang = 'pl', publishAt?: string | null) {
+export function uploadPdfItem(courseId: string, file: File, title: LangText, lang: PdfLang = 'pl', publishAt?: string | null, moduleId?: string | null) {
   const form = new FormData()
   form.append('file', file)
   form.append('title', JSON.stringify(title))
   form.append('lang', lang)
   if (publishAt) form.append('publishAt', publishAt)
+  if (moduleId) form.append('moduleId', moduleId)
   return postMultipart<{ item: CourseItem }>(`/admin/courses/${courseId}/items/pdf`, form)
 }
 
@@ -249,6 +304,8 @@ export const getPreviewUrl = (courseId: string) =>
 export interface ActivityVideoCell {
   percent: number
   completed: boolean
+  /** Kursant sam oznaczył jako ukończony. */
+  manual?: boolean
   positionSec: number
   plays: number
   lastAt: string | null
@@ -256,6 +313,8 @@ export interface ActivityVideoCell {
 export interface ActivityPdfCell {
   opened: number
   downloaded: number
+  completed?: boolean
+  manual?: boolean
 }
 export interface ActivityRow {
   enrollmentId: string
@@ -268,10 +327,13 @@ export interface ActivityRow {
   logins: number
   lastActivityAt: string | null
   items: Record<string, ActivityVideoCell | ActivityPdfCell | null>
+  modulesDone: number
 }
 export interface ActivityReport {
-  items: { id: string; kind: 'VIDEO' | 'PDF'; title: LangText; durationSec: number | null }[]
+  items: { id: string; kind: 'VIDEO' | 'PDF'; title: LangText; durationSec: number | null; moduleId: string | null }[]
   rows: ActivityRow[]
+  sequential: boolean
+  modules: { id: string; title: LangText }[]
 }
 export interface ActivityHistory {
   person: { email: string; firstName: string; lastName: string }

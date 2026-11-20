@@ -25,6 +25,7 @@ export default function CourseSettingsTab({
   const [sources, setSources] = useState<string[]>(course.sourceInstanceIds)
   const [grantOn, setGrantOn] = useState(course.grantOn)
   const [accessUntil, setAccessUntil] = useState(course.accessUntil ? course.accessUntil.slice(0, 10) : '')
+  const [sequential, setSequential] = useState(course.sequential)
   const [instances, setInstances] = useState<Instance[] | null>(null)
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
@@ -67,6 +68,7 @@ export default function CourseSettingsTab({
         sourceInstanceIds: sources,
         grantOn,
         accessUntil: accessUntil ? new Date(`${accessUntil}T23:59:59`).toISOString() : null,
+        sequential,
         ...extra,
       })
       onSaved(updated)
@@ -154,6 +156,26 @@ export default function CourseSettingsTab({
               : ''}
           </p>
         </div>
+      </Panel>
+
+      <Panel title="Kolejność przechodzenia">
+        <label className="flex items-start gap-3 cursor-pointer" style={{ color: 'var(--ink)' }}>
+          <input type="checkbox" checked={sequential} onChange={(e) => setSequential(e.target.checked)} className="mt-1" />
+          <span className="text-sm">
+            <strong>Tryb sekwencyjny</strong> — kursant widzi kolejny moduł dopiero po ukończeniu poprzedniego
+            <span className="block text-xs mt-1" style={{ color: 'var(--faint)' }}>
+              Materiał jest ukończony, gdy kursant obejrzy film w 90%, otworzy PDF albo kliknie „Oznaczam jako ukończone”. Moduł jest
+              ukończony, gdy ukończono wszystkie jego widoczne materiały. Pierwszy moduł i materiały bez modułu są zawsze dostępne; z
+              zablokowanych kursant widzi tylko nazwę najbliższego. Ukryty materiał (oko w Zawartości) przestaje być wymagany, ale moduł bez żadnego widocznego materiału (np. wszystko zaplanowane na później) blokuje kolejne, dopóki coś się w nim nie pojawi.
+            </span>
+          </span>
+        </label>
+        {sequential && course.modules.length === 0 && (
+          <Notice kind="err">Kurs nie ma jeszcze modułów — dodaj je w zakładce Zawartość, inaczej tryb sekwencyjny nic nie zmienia.</Notice>
+        )}
+        {sequential !== course.sequential && (
+          <p className="text-xs" style={{ color: 'var(--warn)' }}>Zmiana zacznie działać po kliknięciu „Zapisz ustawienia”.</p>
+        )}
       </Panel>
 
       <Panel title="Kto ma dostęp automatycznie">

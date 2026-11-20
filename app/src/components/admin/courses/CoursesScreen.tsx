@@ -4,7 +4,7 @@ import { GraduationCap, Plus, ExternalLink, Users, Film, AlertTriangle } from 'l
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import {
-  checkCourseSlug, createCourse, getCoursesConfig, getPreviewUrl, listCourses, slugify,
+  checkCourseSlug, createCourse, getCoursesConfig, getPreviewUrl, listCourses, setupVideoCors, slugify,
   type CourseListItem, type CoursesConfig,
 } from '@/lib/courses'
 import CourseEditor from './CourseEditor'
@@ -54,12 +54,13 @@ export default function CoursesScreen() {
         <div className="flex items-start gap-3 px-4 py-3 rounded-[12px]" style={{ background: 'var(--warn-soft)', color: 'var(--warn)' }}>
           <AlertTriangle size={18} className="shrink-0 mt-0.5" />
           <p className="text-sm">
-            Hosting wideo (Bunny Stream) nie jest jeszcze skonfigurowany — PDF-y i kursantów możesz dodawać już teraz, filmy po
-            ustawieniu <code>BUNNY_STREAM_LIBRARY_ID</code> i <code>BUNNY_STREAM_API_KEY</code> na Renderze (instrukcja:
-            docs/13-handoff-formacja-online.md).
+            Hosting wideo (Cloudflare R2) nie jest jeszcze skonfigurowany — PDF-y, moduły i kursantów możesz dodawać już teraz, filmy po
+            ustawieniu na Renderze (icpe-api ▸ Environment): <code>{config.video.missing.join(', ')}</code>. Instrukcja: session_notes.md ▸
+            „Hosting wideo: Cloudflare R2”.
           </p>
         </div>
       )}
+      {config?.video.configured && <VideoCorsFix />}
 
       <div className="flex items-center justify-between">
         <p className="text-sm" style={{ color: 'var(--muted)' }}>
@@ -230,5 +231,29 @@ function CreateCourseForm({ base, onCancel, onCreated }: { base: string; onCance
         Kurs powstaje jako <strong>szkic</strong> — kursanci nie dostaną maili, dopóki go nie opublikujesz.
       </p>
     </Panel>
+  )
+}
+
+/** Ustawienie reguły CORS bucketu R2 jednym kliknięciem (potrzebne do wysyłki filmów z przeglądarki). */
+function VideoCorsFix() {
+  const [state, setState] = useState<{ ok: boolean; message: string } | 'loading' | null>(null)
+  return (
+    <div className="flex items-center gap-3 flex-wrap text-xs" style={{ color: 'var(--faint)' }}>
+      <span>Hosting wideo: Cloudflare R2 ✓</span>
+      <button
+        type="button"
+        disabled={state === 'loading'}
+        onClick={() => {
+          setState('loading')
+          setupVideoCors()
+            .then(setState)
+            .catch((e: unknown) => setState({ ok: false, message: e instanceof Error ? e.message : String(e) }))
+        }}
+        style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--brand)', textDecoration: 'underline' }}
+      >
+        {state === 'loading' ? 'Ustawiam…' : 'Napraw ustawienia wysyłki (CORS)'}
+      </button>
+      {state && state !== 'loading' && <span style={{ color: state.ok ? 'var(--ok)' : 'var(--err)' }}>{state.message}</span>}
+    </div>
   )
 }

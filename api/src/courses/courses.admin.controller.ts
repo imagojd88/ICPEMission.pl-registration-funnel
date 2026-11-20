@@ -25,9 +25,15 @@ export class CoursesAdminController {
   }
 
   @Get('config')
-  @ApiOperation({ summary: 'Stan konfiguracji (Bunny Stream, adres strony)' })
+  @ApiOperation({ summary: 'Stan konfiguracji (hosting wideo Cloudflare R2, adres strony)' })
   config() {
     return this.courses.config();
+  }
+
+  @Post('video-cors')
+  @ApiOperation({ summary: 'Ustaw regułę CORS bucketu R2 (wysyłanie filmów z przeglądarki)' })
+  videoCors() {
+    return this.courses.setupCors();
   }
 
   @Get('slug-check')
@@ -58,15 +64,72 @@ export class CoursesAdminController {
 
   // ── Pozycje ──
   @Post(':id/items/video')
-  @ApiOperation({ summary: 'Utwórz film w Bunny — zwraca dane do uploadu TUS z przeglądarki' })
-  createVideo(@Param('id') id: string, @Body() body: { title?: unknown; publishAt?: unknown }) {
+  @ApiOperation({ summary: 'Nowy film: pozycja + rozpoczęty upload do R2 (części wysyła przeglądarka)' })
+  createVideo(
+    @Param('id') id: string,
+    @Body() body: { title?: unknown; publishAt?: unknown; moduleId?: unknown; fileName?: unknown; size?: unknown; contentType?: unknown },
+  ) {
     return this.courses.createVideo(id, body);
   }
 
   @Post(':id/items/:itemId/upload')
-  @ApiOperation({ summary: 'Nowe dane uploadu TUS dla istniejącego filmu (wznowienie)' })
-  videoUpload(@Param('id') id: string, @Param('itemId') itemId: string) {
-    return this.courses.videoUpload(id, itemId);
+  @ApiOperation({ summary: 'Wznów wysyłkę (resumeUploadId) albo zacznij nową — także podmiana pliku filmu' })
+  videoUpload(
+    @Param('id') id: string,
+    @Param('itemId') itemId: string,
+    @Body() body: { fileName?: unknown; size?: unknown; contentType?: unknown; resumeUploadId?: unknown },
+  ) {
+    return this.courses.videoUpload(id, itemId, body ?? {});
+  }
+
+  @Post(':id/items/:itemId/upload/parts')
+  @ApiOperation({ summary: 'Podpisane linki PUT do części pliku (maks. 50 naraz)' })
+  uploadParts(@Param('id') id: string, @Param('itemId') itemId: string, @Body() body: { uploadId?: unknown; partNumbers?: unknown }) {
+    return this.courses.uploadParts(id, itemId, body);
+  }
+
+  @Post(':id/items/:itemId/upload/complete')
+  @ApiOperation({ summary: 'Zakończ wysyłkę (złożenie części w R2) + link do miniatury' })
+  completeUpload(
+    @Param('id') id: string,
+    @Param('itemId') itemId: string,
+    @Body() body: { uploadId?: unknown; size?: unknown; durationSec?: unknown; thumbnail?: unknown },
+  ) {
+    return this.courses.completeUpload(id, itemId, body);
+  }
+
+  @Delete(':id/items/:itemId/upload')
+  @ApiOperation({ summary: 'Przerwij wysyłkę filmu' })
+  abortUpload(@Param('id') id: string, @Param('itemId') itemId: string) {
+    return this.courses.abortUpload(id, itemId);
+  }
+
+  @Post(':id/items/:itemId/thumbnail')
+  @ApiOperation({ summary: 'Link PUT do nowej miniatury filmu' })
+  thumbnailUpload(@Param('id') id: string, @Param('itemId') itemId: string) {
+    return this.courses.thumbnailUpload(id, itemId);
+  }
+
+  // ── Moduły ──
+  @Post(':id/modules')
+  createModule(@Param('id') id: string, @Body() body: { title?: unknown; description?: unknown }) {
+    return this.courses.createModule(id, body);
+  }
+
+  @Patch(':id/modules/:moduleId')
+  updateModule(@Param('id') id: string, @Param('moduleId') moduleId: string, @Body() body: { title?: unknown; description?: unknown }) {
+    return this.courses.updateModule(id, moduleId, body);
+  }
+
+  @Delete(':id/modules/:moduleId')
+  @ApiOperation({ summary: 'Usuń moduł (materiały zostają w kursie jako „bez modułu")' })
+  removeModule(@Param('id') id: string, @Param('moduleId') moduleId: string) {
+    return this.courses.removeModule(id, moduleId);
+  }
+
+  @Put(':id/modules-order')
+  reorderModules(@Param('id') id: string, @Body() body: { ids: string[] }) {
+    return this.courses.reorderModules(id, body.ids);
   }
 
   @Post(':id/items/pdf')
@@ -78,8 +141,9 @@ export class CoursesAdminController {
     @Body('title') title?: string,
     @Body('lang') lang?: string,
     @Body('publishAt') publishAt?: string,
+    @Body('moduleId') moduleId?: string,
   ) {
-    return this.courses.createPdf(id, file, title, lang, publishAt);
+    return this.courses.createPdf(id, file, title, lang, publishAt, moduleId);
   }
 
   @Post(':id/items/:itemId/file')
@@ -105,13 +169,13 @@ export class CoursesAdminController {
   updateItem(
     @Param('id') id: string,
     @Param('itemId') itemId: string,
-    @Body() body: { title?: unknown; description?: unknown; published?: boolean; publishAt?: unknown },
+    @Body() body: { title?: unknown; description?: unknown; published?: boolean; publishAt?: unknown; moduleId?: unknown },
   ) {
     return this.courses.updateItem(id, itemId, body);
   }
 
   @Post(':id/items/:itemId/diagnose')
-  @ApiOperation({ summary: 'Sprawdź, czy film da się odtworzyć ze strony (diagnoza 403 z Bunny)' })
+  @ApiOperation({ summary: 'Sprawdź, czy film jest w R2 i link do odtwarzania działa' })
   diagnose(@Param('id') id: string, @Param('itemId') itemId: string) {
     return this.courses.diagnoseVideo(id, itemId);
   }

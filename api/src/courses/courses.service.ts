@@ -2,7 +2,9 @@ import { BadRequestException, ConflictException, Injectable, Logger, NotFoundExc
 import * as argon2 from 'argon2';
 import { PrismaService } from '../prisma/prisma.service';
 import { DeployHookService } from '../content/deploy-hook.service';
-import { BunnyStreamService } from './bunny-stream.service';
+import { randomBytes } from 'crypto';
+import { R2StorageService, PART_SIZE } from './r2-storage.service';
+import { sortModules } from './course-progress';
 import { CourseAccessService } from './course-access.service';
 import { CourseTrackingService } from './course-tracking.service';
 import { resumeUptimeMonitor } from '../integrations/uptime-keepalive';
@@ -20,6 +22,8 @@ const MAX_PDF = 25 * 1024 * 1024;
 type ItemRow = {
   id: string; kind: string; title: unknown; description: unknown; order: number; published: boolean;
   videoId: string | null; videoState: string | null; durationSec: number | null; thumbnailUrl: string | null;
+  videoKey?: string | null; videoSizeMb?: number | null; uploadId?: string | null; uploadKey?: string | null; thumbKey?: string | null;
+  moduleId?: string | null; courseId?: string;
   fileId: string | null; fileIdEn: string | null; createdAt: Date;
   publishAt?: Date | null; releaseNotifiedAt?: Date | null;
 };
@@ -49,14 +53,14 @@ export class CoursesService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly bunny: BunnyStreamService,
+    private readonly r2: R2StorageService,
     private readonly access: CourseAccessService,
     private readonly deployHook: DeployHookService,
     private readonly tracking: CourseTrackingService,
   ) {}
 
   config() {
-    return { video: this.bunny.status(), siteCourseBase: courseUrl('').replace(/\/$/, '') };
+    return { video: this.r2.status(), siteCourseBase: courseUrl('').replace(/\/$/, '') };
   }
 
   // ── Kursy ────────────────────────────────────────────────────────────────────
@@ -136,27 +140,13 @@ export class CoursesService {
     return c;
   }
 
-  /** Szczegóły kursu dla panelu. Odświeża stan wideo, które jeszcze się przetwarzają. */
+  /** Szczegóły kursu dla panelu (materiały, moduły, pliki). */
   async get(id: string) {
     const c = await this.mustGet(id);
-    const items = (await this.prisma.courseItem.findMany({ where: { courseId: id }, orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] })) as ItemRow[];
-    // Stan „na żywo" z Bunny dla filmów w toku: % kodowania albo treść błędu (widoczne w panelu).
-    const live: Record<string, { encodeProgress?: number | null; rawStatus?: number; error?: string }> = {};
-    if (this.bunny.isConfigured()) {
-      await Promise.all(
-        items
-          .filter((i) => i.kind === 'VIDEO' && i.videoId && i.videoState !== 'READY' && i.videoState !== 'FAILED')
-          .map(async (i) => {
-            try {
-              const { updated, info } = await this.refreshVideoWithInfo(i);
-              if (updated) Object.assign(i, updated);
-              live[i.id] = { encodeProgress: info.encodeProgress, rawStatus: info.rawStatus };
-            } catch (e) {
-              live[i.id] = { error: (e as Error).message };
-            }
-          }),
-      );
-    }
+    const [items, modules] = await Promise.all([
+      this.prisma.courseItem.findMany({ where: { courseId: id }, orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] }) as Promise<ItemRow[]>,
+      this.prisma.courseModule.findMany({ where: { courseId: id } }),
+    ]);
     const files = await this.prisma.privateFile.findMany({
       where: { id: { in: items.flatMap((i) => [i.fileId, i.fileIdEn]).filter((x): x is string => !!x) } },
       select: { id: true, size: true, originalName: true },
@@ -171,12 +161,25 @@ export class CoursesService {
       url: courseUrl(c.slug),
       members,
       pendingWelcome,
-      items: items.map((i) => ({
-        ...i,
-        file: i.fileId ? fileMap.get(i.fileId) ?? null : null,
-        fileEn: i.fileIdEn ? fileMap.get(i.fileIdEn) ?? null : null,
-        live: live[i.id] ?? null,
+      modules: sortModules(modules as Array<{ id: string; order: number; createdAt: Date; title: unknown; description: unknown }>).map((m) => ({
+        id: m.id, title: m.title, description: m.description, order: m.order,
       })),
+      items: items.map((i) => this.adminItem(i, fileMap)),
+    };
+  }
+
+  /** Pozycja dla panelu: bez wewnętrznych kluczy R2, z podpisanym linkiem do miniatury. */
+  private adminItem(i: ItemRow, fileMap?: Map<string, unknown>) {
+    const { videoKey, uploadKey, thumbKey, uploadId, ...rest } = i;
+    return {
+      ...rest,
+      // Film ze starego hostingu (Bunny) bez pliku w R2 = trzeba wgrać ponownie.
+      legacyVideo: i.kind === 'VIDEO' && !videoKey && !!i.videoId,
+      hasFile: !!videoKey,
+      uploading: !!uploadId,
+      thumbnailUrl: this.r2.thumbUrl(thumbKey),
+      file: fileMap && i.fileId ? fileMap.get(i.fileId) ?? null : null,
+      fileEn: fileMap && i.fileIdEn ? fileMap.get(i.fileIdEn) ?? null : null,
     };
   }
 
@@ -184,7 +187,7 @@ export class CoursesService {
     id: string,
     body: {
       title?: unknown; description?: unknown; slug?: string; status?: string;
-      sourceInstanceIds?: string[]; grantOn?: string; accessUntil?: string | null;
+      sourceInstanceIds?: string[]; grantOn?: string; accessUntil?: string | null; sequential?: boolean;
     },
   ) {
     const c = await this.mustGet(id);
@@ -225,6 +228,7 @@ export class CoursesService {
       data.grantOn = body.grantOn;
       reconcile = true;
     }
+    if (body.sequential !== undefined) data.sequential = !!body.sequential;
     if (body.accessUntil !== undefined) {
       data.accessUntil = body.accessUntil ? new Date(body.accessUntil) : null;
       if (data.accessUntil && Number.isNaN((data.accessUntil as Date).getTime())) throw new BadRequestException('Nieprawidłowa data');
@@ -242,7 +246,7 @@ export class CoursesService {
     const c = await this.mustGet(id);
     const items = await this.prisma.courseItem.findMany({ where: { courseId: id } });
     for (const i of items as ItemRow[]) {
-      if (i.videoId) await this.bunny.deleteVideo(i.videoId);
+      await this.deleteVideoObjects(i);
       for (const fid of [i.fileId, i.fileIdEn]) if (fid) await this.prisma.privateFile.delete({ where: { id: fid } }).catch(() => null);
     }
     await this.tracking.purge({ courseId: id });
@@ -258,23 +262,158 @@ export class CoursesService {
     return (last?.order ?? -1) + 1;
   }
 
-  async createVideo(courseId: string, body: { title?: unknown; publishAt?: unknown }) {
+  /** Moduł z body: undefined = bez zmian, ''/null = bez modułu, id = musi należeć do kursu. */
+  private async moduleField(courseId: string, raw: unknown): Promise<string | null | undefined> {
+    if (raw === undefined) return undefined;
+    if (raw === null || raw === '') return null;
+    const m = await this.prisma.courseModule.findFirst({ where: { id: String(raw), courseId }, select: { id: true } });
+    if (!m) throw new BadRequestException('Nie znaleziono modułu w tym kursie.');
+    return m.id;
+  }
+
+  /** Klucz obiektu w R2: courses/<kurs>/<materiał>/<losowe>.<rozszerzenie> — nowy przy każdej podmianie pliku. */
+  private objectKey(courseId: string, itemId: string, prefix: string, ext: string) {
+    return `courses/${courseId}/${itemId}/${prefix}-${randomBytes(6).toString('hex')}.${ext}`;
+  }
+
+  /**
+   * Nowy film: pozycja w kursie + rozpoczęty upload wieloczęściowy do R2.
+   * Przeglądarka admina wysyła części prosto do R2 (podpisane linki z uploadParts), potem woła completeUpload.
+   */
+  async createVideo(
+    courseId: string,
+    body: { title?: unknown; publishAt?: unknown; moduleId?: unknown; fileName?: unknown; size?: unknown; contentType?: unknown },
+  ) {
     await this.mustGet(courseId);
     const pub = publishFields(body.publishAt);
     const title = normLangText(body.title);
     if (!title) throw new BadRequestException('Podaj tytuł filmu.');
-    const videoId = await this.bunny.createVideo(pickText(title, 'pl'));
+    const moduleId = await this.moduleField(courseId, body.moduleId);
+    this.r2.assertConfigured(); // czytelny błąd, gdy R2 nieskonfigurowany — zanim powstanie pusta pozycja
     const item = await this.prisma.courseItem.create({
-      data: { courseId, kind: 'VIDEO', title, videoId, videoState: 'UPLOADING', order: await this.nextOrder(courseId), ...(pub ?? {}) },
+      data: { courseId, kind: 'VIDEO', title, videoState: 'UPLOADING', order: await this.nextOrder(courseId), moduleId: moduleId ?? null, ...(pub ?? {}) },
     });
-    return { item, upload: this.bunny.tusUpload(videoId) };
+    try {
+      return { item: this.adminItem(item as ItemRow), upload: await this.beginUpload(item as ItemRow, body) };
+    } catch (e) {
+      await this.prisma.courseItem.delete({ where: { id: item.id } }).catch(() => null);
+      throw e;
+    }
   }
 
-  /** Ponowne dane do uploadu (np. wznowienie po zamknięciu karty / wymiana pliku). */
-  async videoUpload(courseId: string, itemId: string) {
+  /** Rozpoczęcie (lub wznowienie) wysyłki pliku do istniejącego filmu — także podmiana pliku. */
+  async videoUpload(courseId: string, itemId: string, body: { fileName?: unknown; size?: unknown; contentType?: unknown; resumeUploadId?: unknown }) {
     const item = await this.mustGetItem(courseId, itemId);
-    if (item.kind !== 'VIDEO' || !item.videoId) throw new BadRequestException('To nie jest film.');
-    return { item, upload: this.bunny.tusUpload(item.videoId) };
+    if (item.kind !== 'VIDEO') throw new BadRequestException('To nie jest film.');
+    const size = videoSize(body.size);
+    // Wznowienie przerwanej wysyłki: ten sam upload → lista już wgranych części.
+    if (body.resumeUploadId && item.uploadId && body.resumeUploadId === item.uploadId && item.uploadKey) {
+      const parts = await this.r2.listParts(item.uploadKey, item.uploadId);
+      return {
+        item: this.adminItem(item),
+        upload: { uploadId: item.uploadId, partSize: PART_SIZE, partCount: this.r2.partCount(size), doneParts: parts.filter((p) => p.size > 0).map((p) => p.partNumber) },
+      };
+    }
+    return { item: this.adminItem(item), upload: await this.beginUpload(item, body) };
+  }
+
+  private async beginUpload(item: ItemRow, body: { size?: unknown; contentType?: unknown }) {
+    const size = videoSize(body.size);
+    const contentType = /^video\/[a-z0-9.+-]+$/i.test(String(body.contentType ?? '')) ? String(body.contentType) : 'video/mp4';
+    // Poprzedni, niedokończony upload tej pozycji — porzucamy.
+    if (item.uploadId && item.uploadKey) await this.r2.abortMultipart(item.uploadKey, item.uploadId);
+    const ext = contentType === 'video/quicktime' ? 'mov' : contentType === 'video/webm' ? 'webm' : 'mp4';
+    const key = this.objectKey(item.courseId ?? '', item.id, 'video', ext);
+    const uploadId = await this.r2.createMultipart(key, contentType);
+    await this.prisma.courseItem.update({
+      where: { id: item.id },
+      data: { uploadId, uploadKey: key, ...(item.videoKey ? {} : { videoState: 'UPLOADING' }) },
+    });
+    return { uploadId, partSize: PART_SIZE, partCount: this.r2.partCount(size), doneParts: [] as number[] };
+  }
+
+  /** Podpisane linki PUT do części (najwyżej 50 naraz). */
+  async uploadParts(courseId: string, itemId: string, body: { uploadId?: unknown; partNumbers?: unknown }) {
+    const item = await this.mustGetItem(courseId, itemId);
+    if (!item.uploadId || !item.uploadKey || body.uploadId !== item.uploadId) {
+      throw new BadRequestException('Ta wysyłka została przerwana albo zastąpiona — wybierz plik ponownie.');
+    }
+    const nums = (Array.isArray(body.partNumbers) ? body.partNumbers : [])
+      .map(Number)
+      .filter((n) => Number.isInteger(n) && n >= 1 && n <= 10000)
+      .slice(0, 50);
+    if (!nums.length) throw new BadRequestException('Brak numerów części.');
+    return { urls: this.r2.partUrls(item.uploadKey, item.uploadId, nums) };
+  }
+
+  /**
+   * Zakończenie wysyłki: składamy części (ETagi bierzemy z R2 — przeglądarka nie musi ich widzieć),
+   * sprawdzamy plik, zapisujemy czas trwania z przeglądarki. Stary plik (przy podmianie) kasujemy.
+   * Zwraca link PUT do miniatury (klatka filmu z przeglądarki), gdy `thumbnail: true`.
+   */
+  async completeUpload(courseId: string, itemId: string, body: { uploadId?: unknown; size?: unknown; durationSec?: unknown; thumbnail?: unknown }) {
+    const item = await this.mustGetItem(courseId, itemId);
+    if (!item.uploadId || !item.uploadKey || body.uploadId !== item.uploadId) {
+      throw new BadRequestException('Ta wysyłka została przerwana albo zastąpiona — wybierz plik ponownie.');
+    }
+    const size = videoSize(body.size);
+    const expected = this.r2.partCount(size);
+    const parts = await this.r2.listParts(item.uploadKey, item.uploadId);
+    const missing: number[] = [];
+    for (let n = 1; n <= expected; n++) if (!parts.some((p) => p.partNumber === n)) missing.push(n);
+    if (missing.length) throw new BadRequestException(`Nie wszystkie części pliku dotarły (brakuje ${missing.length}). Wznów wysyłkę tym samym plikiem.`);
+    await this.r2.completeMultipart(item.uploadKey, item.uploadId, parts.filter((p) => p.partNumber <= expected));
+    const head = await this.r2.head(item.uploadKey);
+    if (!head || head.size !== size) {
+      throw new BadRequestException(`Plik w R2 ma inny rozmiar niż wysłany (${head?.size ?? 0} zamiast ${size} B) — wyślij go ponownie.`);
+    }
+    const dur = Math.round(Number(body.durationSec));
+    const oldKey = item.videoKey && item.videoKey !== item.uploadKey ? item.videoKey : null;
+    const thumbKey = body.thumbnail ? this.objectKey(courseId, item.id, 'thumb', 'jpg') : null;
+    const updated = await this.prisma.courseItem.update({
+      where: { id: item.id },
+      data: {
+        videoKey: item.uploadKey,
+        videoSizeMb: Math.max(1, Math.round(size / 1024 / 1024)),
+        uploadId: null,
+        uploadKey: null,
+        videoState: 'READY',
+        durationSec: Number.isFinite(dur) && dur > 0 && dur < 24 * 3600 ? dur : item.durationSec,
+        ...(thumbKey ? { thumbKey } : {}),
+      },
+    });
+    if (oldKey) await this.r2.deleteObject(oldKey);
+    if (thumbKey && item.thumbKey) await this.r2.deleteObject(item.thumbKey);
+    return { item: this.adminItem(updated as ItemRow), thumbnailUpload: thumbKey ? { url: this.r2.putUrl(thumbKey), contentType: 'image/jpeg' } : null };
+  }
+
+  /** Nowa miniatura (np. inna klatka) — link PUT. */
+  async thumbnailUpload(courseId: string, itemId: string) {
+    const item = await this.mustGetItem(courseId, itemId);
+    if (item.kind !== 'VIDEO' || !item.videoKey) throw new BadRequestException('Najpierw wgraj film.');
+    const thumbKey = this.objectKey(courseId, item.id, 'thumb', 'jpg');
+    await this.prisma.courseItem.update({ where: { id: item.id }, data: { thumbKey } });
+    if (item.thumbKey) await this.r2.deleteObject(item.thumbKey);
+    return { url: this.r2.putUrl(thumbKey), contentType: 'image/jpeg' };
+  }
+
+  /** Przerwanie wysyłki z panelu. */
+  async abortUpload(courseId: string, itemId: string) {
+    const item = await this.mustGetItem(courseId, itemId);
+    if (item.uploadId && item.uploadKey) await this.r2.abortMultipart(item.uploadKey, item.uploadId);
+    const updated = await this.prisma.courseItem.update({ where: { id: item.id }, data: { uploadId: null, uploadKey: null } });
+    return this.adminItem(updated as ItemRow);
+  }
+
+  private async deleteVideoObjects(i: ItemRow) {
+    if (i.uploadId && i.uploadKey) await this.r2.abortMultipart(i.uploadKey, i.uploadId);
+    await this.r2.deleteObject(i.videoKey);
+    await this.r2.deleteObject(i.thumbKey);
+  }
+
+  /** Ustawia regułę CORS bucketu (przycisk w panelu, gdy wysyłka z przeglądarki jest blokowana). */
+  async setupCors() {
+    return this.r2.ensureCors();
   }
 
   /** Walidacja + zapis PDF-a jako PrivateFile. */
@@ -291,15 +430,16 @@ export class CoursesService {
   }
 
   /** Nowy materiał PDF. `lang` = język wgrywanego pliku (druga wersja językowa: setItemFile). */
-  async createPdf(courseId: string, file: UploadedFileLike | undefined, rawTitle: unknown, rawLang?: unknown, rawPublishAt?: unknown) {
+  async createPdf(courseId: string, file: UploadedFileLike | undefined, rawTitle: unknown, rawLang?: unknown, rawPublishAt?: unknown, rawModuleId?: unknown) {
     await this.mustGet(courseId);
+    const moduleId = await this.moduleField(courseId, rawModuleId);
     const pub = publishFields(rawPublishAt || undefined);
     const lang = parseLang(rawLang);
     let title = normLangText(typeof rawTitle === 'string' && rawTitle.trim().startsWith('{') ? safeJson(rawTitle) : rawTitle);
     if (!title) title = { [lang]: (fixLatin1(file?.originalname ?? null) ?? 'Materiał').replace(/\.pdf$/i, '') };
     const fileId = await this.savePdf(file);
     const item = await this.prisma.courseItem.create({
-      data: { courseId, kind: 'PDF', title, [fileField(lang)]: fileId, order: await this.nextOrder(courseId), ...(pub ?? {}) } as never,
+      data: { courseId, kind: 'PDF', title, [fileField(lang)]: fileId, order: await this.nextOrder(courseId), moduleId: moduleId ?? null, ...(pub ?? {}) } as never,
     });
     return { item };
   }
@@ -335,9 +475,11 @@ export class CoursesService {
     return item as ItemRow;
   }
 
-  async updateItem(courseId: string, itemId: string, body: { title?: unknown; description?: unknown; published?: boolean; publishAt?: unknown }) {
+  async updateItem(courseId: string, itemId: string, body: { title?: unknown; description?: unknown; published?: boolean; publishAt?: unknown; moduleId?: unknown }) {
     const current = await this.mustGetItem(courseId, itemId);
     const data: Record<string, unknown> = {};
+    const moduleId = await this.moduleField(courseId, body.moduleId);
+    if (moduleId !== undefined) data.moduleId = moduleId;
     if (body.title !== undefined) {
       const t = normLangText(body.title);
       if (!t) throw new BadRequestException('Tytuł nie może być pusty.');
@@ -351,14 +493,14 @@ export class CoursesService {
       // Bez zmiany daty nie ruszamy stanu powiadomienia (np. przy zmianie samego tytułu).
       if (!same) Object.assign(data, pub);
     }
-    return this.prisma.courseItem.update({ where: { id: itemId }, data: data as never });
+    return this.adminItem((await this.prisma.courseItem.update({ where: { id: itemId }, data: data as never })) as ItemRow);
   }
 
   async removeItem(courseId: string, itemId: string) {
     const item = await this.mustGetItem(courseId, itemId);
     await this.prisma.courseItem.delete({ where: { id: itemId } });
     await this.tracking.purge({ courseId, itemId });
-    if (item.videoId) await this.bunny.deleteVideo(item.videoId);
+    await this.deleteVideoObjects(item);
     for (const fid of [item.fileId, item.fileIdEn]) if (fid) await this.prisma.privateFile.delete({ where: { id: fid } }).catch(() => null);
     return { ok: true };
   }
@@ -371,43 +513,57 @@ export class CoursesService {
     return { ok: true };
   }
 
-  /** Pobiera stan wideo z Bunny i zapisuje. */
-  async refreshVideo(item: ItemRow) {
-    return (await this.refreshVideoWithInfo(item)).updated;
-  }
-
-  private async refreshVideoWithInfo(item: ItemRow) {
-    if (!item.videoId) return { updated: null, info: { encodeProgress: null, rawStatus: -1 } };
-    const info = await this.bunny.getVideo(item.videoId);
-    const updated = await this.prisma.courseItem.update({
-      where: { id: item.id },
-      data: {
-        videoState: info.state,
-        durationSec: info.durationSec ?? item.durationSec,
-        thumbnailUrl: info.thumbnailUrl ?? item.thumbnailUrl,
-      },
-    });
-    return { updated, info };
-  }
-
   async diagnoseVideo(courseId: string, itemId: string) {
     const item = await this.mustGetItem(courseId, itemId);
-    if (item.kind !== 'VIDEO' || !item.videoId) throw new BadRequestException('To nie jest film.');
-    return this.bunny.diagnosePlayback(item.videoId, siteBase());
+    if (item.kind !== 'VIDEO') throw new BadRequestException('To nie jest film.');
+    if (!item.videoKey) return { ok: false, verdict: 'Ten film nie ma jeszcze pliku w R2 — wgraj go (ikona wysyłania przy materiale).', details: {} };
+    return this.r2.diagnose(item.videoKey);
   }
 
   async refreshItem(courseId: string, itemId: string) {
-    const item = await this.mustGetItem(courseId, itemId);
-    const updated = await this.refreshVideo(item);
-    return updated ?? item;
+    return this.adminItem(await this.mustGetItem(courseId, itemId));
   }
 
-  /** Webhook Bunny = sygnał; stan zawsze pobieramy z API (sfałszowany webhook nic nie zmieni). */
-  async onVideoWebhook(videoId: string) {
-    const item = await this.prisma.courseItem.findFirst({ where: { videoId } });
-    if (!item) return { ok: true, known: false };
-    await this.refreshVideo(item as ItemRow);
-    return { ok: true, known: true };
+  // ── Moduły ───────────────────────────────────────────────────────────────────
+
+  async createModule(courseId: string, body: { title?: unknown; description?: unknown }) {
+    await this.mustGet(courseId);
+    const title = normLangText(body.title);
+    if (!title) throw new BadRequestException('Podaj nazwę modułu.');
+    const last = await this.prisma.courseModule.findFirst({ where: { courseId }, orderBy: { order: 'desc' }, select: { order: true } });
+    return this.prisma.courseModule.create({
+      data: { courseId, title, description: normLangText(body.description) ?? undefined, order: (last?.order ?? -1) + 1 },
+    });
+  }
+
+  async updateModule(courseId: string, moduleId: string, body: { title?: unknown; description?: unknown }) {
+    const m = await this.prisma.courseModule.findFirst({ where: { id: moduleId, courseId } });
+    if (!m) throw new NotFoundException('Nie znaleziono modułu');
+    const data: Record<string, unknown> = {};
+    if (body.title !== undefined) {
+      const t = normLangText(body.title);
+      if (!t) throw new BadRequestException('Nazwa modułu nie może być pusta.');
+      data.title = t;
+    }
+    if (body.description !== undefined) data.description = normLangText(body.description) ?? null;
+    return this.prisma.courseModule.update({ where: { id: moduleId }, data: data as never });
+  }
+
+  /** Usunięcie modułu — jego materiały zostają w kursie jako „bez modułu". */
+  async removeModule(courseId: string, moduleId: string) {
+    const m = await this.prisma.courseModule.findFirst({ where: { id: moduleId, courseId } });
+    if (!m) throw new NotFoundException('Nie znaleziono modułu');
+    await this.prisma.courseItem.updateMany({ where: { moduleId }, data: { moduleId: null } });
+    await this.prisma.courseModule.delete({ where: { id: moduleId } });
+    return { ok: true };
+  }
+
+  async reorderModules(courseId: string, ids: string[]) {
+    if (!Array.isArray(ids)) throw new BadRequestException('ids musi być listą');
+    await this.prisma.$transaction(
+      ids.map((id, idx) => this.prisma.courseModule.updateMany({ where: { id, courseId }, data: { order: idx } })),
+    );
+    return { ok: true };
   }
 
   // ── Kursanci ─────────────────────────────────────────────────────────────────
@@ -550,6 +706,14 @@ export class CoursesService {
       redirects: rows.flatMap((r: { slug: string; slugHistory: string[] }) => r.slugHistory.map((from) => ({ from, to: r.slug }))),
     };
   }
+}
+
+/** Rozmiar wysyłanego filmu (bajty) — do 20 GB. */
+function videoSize(raw: unknown): number {
+  const n = Math.round(Number(raw));
+  if (!Number.isFinite(n) || n <= 0) throw new BadRequestException('Brak rozmiaru pliku.');
+  if (n > 20 * 1024 * 1024 * 1024) throw new BadRequestException('Plik jest za duży (limit 20 GB) — wyeksportuj film w niższej jakości (720p/1080p).');
+  return n;
 }
 
 function safeJson(s: string): unknown {

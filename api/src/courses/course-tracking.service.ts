@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { pickText } from './course-utils';
+import { completedSet, moduleStates, sortModules } from './course-progress';
 
 export type CourseEventType =
   | 'LOGIN' | 'COURSE_VIEW' | 'VIDEO_PLAY' | 'PDF_OPEN' | 'PDF_DOWNLOAD' | 'EMAIL_LINK' | 'PASSWORD_SET' | 'RESET_REQUEST';
@@ -74,44 +75,81 @@ export class CourseTrackingService {
     const data = { buckets, durationSec: duration, positionSec: position, percent, completedAt };
     if (existing) await this.prisma.videoProgress.update({ where: { id: existing.id }, data });
     else await this.prisma.videoProgress.create({ data: { courseId, itemId, guestId, ...data } });
+    if (completedAt && !existing?.completedAt) await this.markComplete(courseId, itemId, guestId, 'VIDEO');
     return { percent, completed: !!completedAt };
+  }
+
+  /** Zapis ukończenia materiału (pierwsze ukończenie wygrywa; powtórki niczego nie zmieniają). */
+  async markComplete(courseId: string, itemId: string, guestId: string, source: 'MANUAL' | 'VIDEO' | 'PDF') {
+    try {
+      await this.prisma.courseItemCompletion.upsert({
+        where: { itemId_guestId: { itemId, guestId } },
+        create: { courseId, itemId, guestId, source },
+        update: {},
+      });
+    } catch (e) {
+      // Wyścig dwóch równoległych zapisów (unikalny klucz) — ukończenie i tak jest zapisane.
+      this.logger.warn(`markComplete ${itemId}: ${(e as Error).message}`);
+    }
   }
 
   // ── Raporty dla panelu ─────────────────────────────────────────────────────
 
   private async loadCourseData(courseId: string) {
-    const [items, enrollments, events, progress] = await Promise.all([
+    const [items, enrollments, events, progress, completions, modules, course] = await Promise.all([
       this.prisma.courseItem.findMany({ where: { courseId }, orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] }),
       this.prisma.courseEnrollment.findMany({ where: { courseId }, include: { guest: true }, orderBy: { createdAt: 'asc' } }),
       this.prisma.courseEvent.findMany({ where: { courseId }, select: { guestId: true, itemId: true, type: true, createdAt: true } }),
       this.prisma.videoProgress.findMany({ where: { courseId } }),
+      this.prisma.courseItemCompletion.findMany({ where: { courseId }, select: { itemId: true, guestId: true, source: true } }),
+      this.prisma.courseModule.findMany({ where: { courseId } }),
+      this.prisma.course.findUnique({ where: { id: courseId }, select: { sequential: true } }),
     ]);
-    return { items, enrollments, events: events as Ev[], progress: progress as Prog[] };
+    return {
+      items, enrollments, events: events as Ev[], progress: progress as Prog[],
+      completions: completions as Array<{ itemId: string; guestId: string; source: string }>,
+      modules: sortModules(modules as Array<{ id: string; order: number; createdAt: Date; title: unknown }>),
+      sequential: !!course?.sequential,
+    };
   }
 
   async activity(courseId: string) {
-    const { items, enrollments, events, progress } = await this.loadCourseData(courseId);
-    const cols = (items as Array<{ id: string; kind: string; title: unknown; durationSec: number | null }>).map((i) => ({
-      id: i.id, kind: i.kind, title: i.title, durationSec: i.durationSec,
+    const { items, enrollments, events, progress, completions, modules, sequential } = await this.loadCourseData(courseId);
+    const cols = (items as Array<{ id: string; kind: string; title: unknown; durationSec: number | null; moduleId: string | null }>).map((i) => ({
+      id: i.id, kind: i.kind, title: i.title, durationSec: i.durationSec, moduleId: i.moduleId,
     }));
+    // Do liczenia modułów: materiały opublikowane, już widoczne (jak u kursanta).
+    const now = Date.now();
+    const visible = (items as Array<{ id: string; moduleId: string | null; published: boolean; publishAt: Date | null }>).filter(
+      (i) => i.published && (!i.publishAt || i.publishAt.getTime() <= now),
+    );
     const rows = (enrollments as Array<{
       id: string; guestId: string; source: string; revokedAt: Date | null; createdAt: Date; lastSeenAt: Date | null;
       guest: { email: string; firstName: string; lastName: string; passwordHash: string | null; lastLoginAt: Date | null };
     }>).map((e) => {
       const ev = events.filter((x) => x.guestId === e.guestId);
+      const mine = completions.filter((x) => x.guestId === e.guestId);
+      const done = completedSet(
+        mine,
+        progress.filter((x) => x.guestId === e.guestId),
+        ev.filter((x) => x.type === 'PDF_OPEN' || x.type === 'PDF_DOWNLOAD'),
+      );
+      const mstates = moduleStates(modules, visible, done, sequential);
       const last = ev.reduce<Date | null>((m, x) => (!m || x.createdAt > m ? x.createdAt : m), null);
       const perItem: Record<string, unknown> = {};
       for (const c of cols) {
         if (c.kind === 'VIDEO') {
           const p = progress.find((x) => x.itemId === c.id && x.guestId === e.guestId);
           const plays = ev.filter((x) => x.itemId === c.id && x.type === 'VIDEO_PLAY').length;
-          perItem[c.id] = p || plays
-            ? { percent: p?.percent ?? 0, completed: !!p?.completedAt, positionSec: p?.positionSec ?? 0, plays, lastAt: p?.updatedAt ?? null }
+          const manual = mine.some((x) => x.itemId === c.id && x.source === 'MANUAL');
+          perItem[c.id] = p || plays || manual || done.has(c.id)
+            ? { percent: p?.percent ?? 0, completed: done.has(c.id), manual, positionSec: p?.positionSec ?? 0, plays, lastAt: p?.updatedAt ?? null }
             : null;
         } else {
           const opened = ev.filter((x) => x.itemId === c.id && x.type === 'PDF_OPEN').length;
           const downloaded = ev.filter((x) => x.itemId === c.id && x.type === 'PDF_DOWNLOAD').length;
-          perItem[c.id] = opened || downloaded ? { opened, downloaded } : null;
+          const manual = mine.some((x) => x.itemId === c.id && x.source === 'MANUAL');
+          perItem[c.id] = opened || downloaded || manual || done.has(c.id) ? { opened, downloaded, completed: done.has(c.id), manual } : null;
         }
       }
       return {
@@ -125,9 +163,15 @@ export class CourseTrackingService {
         logins: ev.filter((x) => x.type === 'LOGIN' || x.type === 'PASSWORD_SET').length,
         lastActivityAt: last ?? e.lastSeenAt,
         items: perItem,
+        modulesDone: mstates.filter((x) => x.done).length,
       };
     });
-    return { items: cols, rows };
+    return {
+      items: cols,
+      rows,
+      sequential,
+      modules: modules.map((m) => ({ id: m.id, title: m.title })),
+    };
   }
 
   async history(courseId: string, enrollmentId: string) {
@@ -156,17 +200,18 @@ export class CourseTrackingService {
 
   /** CSV (średniki + BOM — polski Excel otwiera bez kreatora importu). */
   async csv(courseId: string): Promise<string> {
-    const { items, rows } = await this.activity(courseId);
+    const { items, rows, modules } = await this.activity(courseId);
     const esc = (v: unknown) => {
       const s = v == null ? '' : String(v);
       return /[;"\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
     };
     const fmt = (d: unknown) => (d ? new Date(d as string).toLocaleString('pl-PL', { timeZone: 'Europe/Warsaw' }) : '');
     const header = ['Imię', 'Nazwisko', 'E-mail', 'Źródło', 'Dostęp aktywny', 'Hasło ustawione', 'Logowania', 'Ostatnia aktywność'];
+    if (modules.length) header.push(`Ukończone moduły (z ${modules.length})`);
     for (const c of items) {
       const tt = pickText(c.title, 'pl');
       if (c.kind === 'VIDEO') header.push(`${tt} — % obejrzenia`, `${tt} — ukończony`);
-      else header.push(`${tt} — otwarcia`, `${tt} — pobrania`);
+      else header.push(`${tt} — otwarcia`, `${tt} — pobrania`, `${tt} — ukończony`);
     }
     const lines = [header.map(esc).join(';')];
     for (const r of rows) {
@@ -174,10 +219,11 @@ export class CourseTrackingService {
         r.firstName, r.lastName, r.email, r.source === 'AUTO' ? 'z eventu' : 'ręcznie', r.active ? 'tak' : 'nie',
         r.passwordSet ? 'tak' : 'nie', r.logins, fmt(r.lastActivityAt),
       ];
+      if (modules.length) line.push(r.modulesDone);
       for (const c of items) {
         const v = r.items[c.id] as { percent?: number; completed?: boolean; opened?: number; downloaded?: number } | null;
         if (c.kind === 'VIDEO') line.push(v ? v.percent : 0, v?.completed ? 'tak' : 'nie');
-        else line.push(v?.opened ?? 0, v?.downloaded ?? 0);
+        else line.push(v?.opened ?? 0, v?.downloaded ?? 0, v?.completed ? 'tak' : 'nie');
       }
       lines.push(line.map(esc).join(';'));
     }
@@ -189,6 +235,7 @@ export class CourseTrackingService {
     await Promise.all([
       this.prisma.courseEvent.deleteMany({ where }),
       this.prisma.videoProgress.deleteMany({ where }),
+      this.prisma.courseItemCompletion.deleteMany({ where }),
     ]);
   }
 }
