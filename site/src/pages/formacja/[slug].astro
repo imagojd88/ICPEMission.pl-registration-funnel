@@ -36,7 +36,7 @@ const title = course ? `${pickLang(course.title, 'pl')} — Formacja online · I
     <body><a href={`/formacja/${redirectTo}/`}>Kurs przeniesiony — przejdź dalej</a></body>
   </html>
 ) : (
-  <LandingLayout title={title} description="Panel kursanta — Formacja online ICPE Mission." noindex>
+  <LandingLayout tracking={false} title={title} description="Panel kursanta — Formacja online ICPE Mission." noindex>
     <CourseApp course={course} />
   </LandingLayout>
 )}

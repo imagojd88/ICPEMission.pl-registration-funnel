@@ -8,6 +8,6 @@ import { getCourses } from '../../lib/api';
 const { courses } = await getCourses();
 ---
 
-<LandingLayout title="Formacja online · ICPE Mission" description="Kursy online ICPE Mission Warszawa — panel kursanta.">
+<LandingLayout tracking={false} title="Formacja online · ICPE Mission" description="Kursy online ICPE Mission Warszawa — panel kursanta.">
   <CourseApp courses={courses} />
 </LandingLayout>

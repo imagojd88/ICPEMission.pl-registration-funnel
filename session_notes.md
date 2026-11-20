@@ -242,6 +242,13 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — strona icpemission.pl (site/)
 
+### Google Tag Manager GTM-P2JDGP49 na stronie (2026-11-20)
+- Snippet od Jacka (gtm.js `GTM-P2JDGP49` + `dataLayer`/`gtag('js')`) w nowym `site/src/components/GtmHead.astro` (`is:inline`, bez zmian w treści), wstawiony w `LandingLayout.astro` zaraz po `<meta charset>` — prop `tracking` (domyślnie `true`).
+- Obejmuje: stronę główną, `/nowosci` (lista + wpisy — jedyne podstrony linkowane z home), `/promyk-swiatla`, `/aktualnosci` (przekierowanie).
+- **Wyłączone** w `/formacja` (`index.astro` i `[slug].astro`: `tracking={false}`) — w adresach panelu kursanta są tokeny (`?haslo=`, `#podglad=`). Stare strony CMS (`BaseLayout`, `/[slug]`) bez GTM — nielinkowane z home.
+- Brak banera zgody: zgody (Consent Mode / CMP) trzeba obsłużyć w samym kontenerze GTM. Rejestracja (app/) bez zmian — tam dalej tylko PostHog cookieless.
+- Weryfikacja: `astro build` w /tmp OK; GTM obecny w 5 stronach, brak w `/formacja/`. **Stan: czeka na push** (auto-deploy `icpe-site`).
+
 ### Sekcja Nowości + /nowosci/ (2026-10-20)
 - **Model treści: pliki w repo, nie CMS.** Wpis = katalog `site/src/content/nowosci/<adres>/` z `pl.md` (wymagany: title, date, excerpt, cover, coverAlt, coverPosition?, place?, gallery[{src, alt, caption?, captionEn?}], draft?) i opcjonalnym `en.md` (title, excerpt, coverAlt + treść). Zdjęcia: `site/public/nowosci/<adres>/` (cover.jpg, 01.jpg…; ~1600 px, EXIF obrócony). Kolekcja w `src/content/config.ts`, logika w `src/lib/news.ts` (sortowanie po dacie, wymiary zdjęć czytane z plików przy buildzie). Szablon: `src/content/nowosci/_SZABLON.md`. Tytuły z dwukropkiem brać w cudzysłów (YAML).
 - **Strona główna:** sekcja `#nowosci` (`components/NewsSection.astro`) zaraz pod paskiem miast: najnowszy wpis wyróżniony + do 3 skrótów (zdjęcie, data · miejsce, tytuł, skrót, „Czytaj dalej”). 1 wpis → układ zdjęcie obok tekstu. 0 wpisów → sekcja i link „Nowości” w menu ukryte.

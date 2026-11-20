@@ -1,16 +1,20 @@
 ---
 import '../styles/global.css';
+import GtmHead from '../components/GtmHead.astro';
 
 interface Props {
   title?: string;
   description?: string;
   noindex?: boolean;
   ogImage?: string;
+  /** Google Tag Manager — domyślnie włączony; false w panelu kursanta (/formacja). */
+  tracking?: boolean;
 }
 const {
   title = 'ICPE Mission Warszawa',
   noindex = false,
   ogImage,
+  tracking = true,
   description = 'Warszawska wspólnota ICPE Mission — międzynarodowa katolicka wspólnota misyjna ludzi świeckich. Formacja, ewangelizacja, uwielbienie.',
 } = Astro.props;
 const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site).toString() : Astro.url.pathname;
@@ -20,6 +24,7 @@ const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site).toString(
 <html lang="pl">
   <head>
     <meta charset="utf-8" />
+    {tracking && <GtmHead />}
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <title>{title}</title>
