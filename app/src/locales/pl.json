@@ -287,6 +287,8 @@
     "free_desc": "Nie pobieramy żadnych opłat.",
     "free_short": "Bezpłatne",
     "submit_error": "Nie udało się zapisać zgłoszenia: {{error}}. Spróbuj ponownie.",
+    "network_error": "Brak połączenia z internetem (albo z naszym serwerem). Twoje dane są zapisane — sprawdź połączenie i naciśnij przycisk poniżej jeszcze raz.",
+    "network_back": "Połączenie wróciło — naciśnij przycisk poniżej, aby wysłać zgłoszenie.",
     "sending": "Wysyłanie…",
     "submit_free": "Wyślij zgłoszenie →",
     "cash_title": "Płatność gotówką na miejscu",

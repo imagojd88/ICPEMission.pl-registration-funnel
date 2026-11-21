@@ -51,6 +51,12 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — panel admina (kreator eventów)
 
+### Lejek: czytelny komunikat przy braku internetu (2026-11-21)
+- **Zgłoszenie:** gość (Android/Chrome, foundation-day-2027) na podsumowaniu dostał „Your registration could not be saved: Nie udało się zapisać zgłoszenia. Failed to fetch Sprawdź dane…”. Na zrzucie „No internet connection”; PostHog: ostatnie zdarzenie sesji 13:29 (kroki 0–4 przejdone), potem cisza → telefon stracił sieć, zgłoszenie nie doszło do API (nie błąd systemu).
+- **Poprawka (PublicFunnel / SummaryScreen):** błąd sieci (`navigator.onLine === false`, `TypeError`, „Failed to fetch / Load failed / NetworkError”) → `summary.network_error` („Brak połączenia z internetem (albo z naszym serwerem). Twoje dane są zapisane — sprawdź połączenie i naciśnij przycisk jeszcze raz.”), po zdarzeniu `online` → `summary.network_back`. Inne błędy: tylko `summary.submit_error` w języku gościa (bez doklejanego polskiego zdania). PL/EN/IT/KO/ZH. Bez automatycznego ponawiania (ryzyko podwójnego zgłoszenia).
+- PostHog: `registration_submit_failed.reason` ma nową wartość **`network`** (nazwa zdarzenia/właściwości bez zmian) — do przekazania Jacek OS. Uwaga: przy braku sieci samo zdarzenie też może nie dojść.
+- Test (Playwright, offline/online): komunikat offline → po powrocie sieci podpowiedź → ponowne kliknięcie wysyła 1 zgłoszenie, ekran sukcesu.
+
 ### Maile do gości po koreańsku i chińsku (2026-11-20)
 - **Zasada Jacka:** zawsze terminologia **katolicka**, nie protestancka. KO: 하느님/주님 (nie 하나님), 미사, 피정, 성체 조배, 본당; powitanie „찬미 예수님!”, podpis „주님의 축복을 빕니다.”. ZH: 天主 (nie 上帝/神), 弥撒, 避静, 朝拜圣体, 堂区; podpis „愿天主祝福您！”. Sprawdzone grepem: brak 하나님/예배/목사/교회/上帝/礼拜/牧师/教会 w locale i mailach.
 - **notifications.service.ts:** `MailLang = pl | en | ko | zh`, `mailLangOf(locale)` (IT i inne → EN), helpery `signature(lang)`, `greetingLine(lang, name)`, `L(lang, {pl,en,ko,zh})`. Przetłumaczone: CONFIRMATION, ACCOMMODATION_CHANGED, REGISTRATION_REMINDER (+ linie noclegu i płatności, w ZH pełnoszerokie nawiasy/interpunkcja). `buttonMail(..., lang)` — dopisek „Gdyby przycisk nie działał…” w języku maila (wcześniej zawsze PL, także w EN).

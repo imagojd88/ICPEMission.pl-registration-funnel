@@ -383,7 +383,7 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
             className="px-4 py-3 rounded-[12px] text-sm"
             style={{ background: 'var(--err-soft)', color: 'var(--err)', border: '1px solid var(--err)' }}
           >
-            {t('summary.submit_error', { error: submitError })}
+            {submitError}
           </div>
         )}
 

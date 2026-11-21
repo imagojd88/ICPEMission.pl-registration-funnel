@@ -433,6 +433,14 @@ export default function PublicFunnel() {
   const [error, setError] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  // Ostatnia próba wysyłki padła na braku sieci → gdy połączenie wróci, podpowiadamy „wyślij jeszcze raz”.
+  const [submitNetworkError, setSubmitNetworkError] = useState(false)
+  useEffect(() => {
+    if (!submitNetworkError) return
+    const onOnline = () => setSubmitError(t('summary.network_back'))
+    window.addEventListener('online', onOnline)
+    return () => window.removeEventListener('online', onOnline)
+  }, [submitNetworkError, t])
   const [stepError, setStepError] = useState<string | null>(null)
   const [result, setResult] = useState<{ regId: string; status: RegistrationStatus; total: number; guestInviteHref?: string; manageHref?: string } | null>(null)
   // Osobiste zaproszenie z maila (`?inv=token`): dane gościa wpisujemy w formularz,
@@ -794,6 +802,7 @@ export default function PublicFunnel() {
     }
     setSubmitting(true)
     setSubmitError(null)
+    setSubmitNetworkError(false)
     try {
       const dto: CreateRegistrationDto = {
         instanceId: event.id,
@@ -869,11 +878,18 @@ export default function PublicFunnel() {
       }
     } catch (e: unknown) {
       const detail = e instanceof Error ? e.message : String(e)
+      // Brak sieci (telefon stracił zasięg) albo serwer nieosiągalny: fetch rzuca TypeError
+      // („Failed to fetch” / „Load failed” / „NetworkError…”) — dane formularza zostają, wystarczy ponowić.
+      const network =
+        (typeof navigator !== 'undefined' && navigator.onLine === false) ||
+        e instanceof TypeError ||
+        /failed to fetch|load failed|networkerror|network request failed/i.test(detail)
       track('registration_submit_failed', {
-        reason: /wolnych pokoi/i.test(detail) ? 'rooms_sold_out' : /zamknięte/i.test(detail) ? 'closed' : 'error',
+        reason: network ? 'network' : /wolnych pokoi/i.test(detail) ? 'rooms_sold_out' : /zamknięte/i.test(detail) ? 'closed' : 'error',
         payment_method: stepper.paymentMethod,
       })
-      setSubmitError(`Nie udało się zapisać zgłoszenia. ${detail} Sprawdź dane i spróbuj ponownie.`)
+      setSubmitNetworkError(network)
+      setSubmitError(network ? t('summary.network_error') : t('summary.submit_error', { error: detail.replace(/[.\s]+$/, '') }))
     } finally {
       setSubmitting(false)
     }

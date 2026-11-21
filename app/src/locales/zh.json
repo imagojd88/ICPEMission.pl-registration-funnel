@@ -277,6 +277,8 @@
     "free_desc": "无需任何费用。",
     "free_short": "免费",
     "submit_error": "无法保存您的报名：{{error}}。请重试。",
+    "network_error": "无法连接到网络（或我们的服务器）。您的信息已保存——请检查网络连接后再次点击下方按钮。",
+    "network_back": "网络已恢复——请点击下方按钮提交报名。",
     "sending": "正在发送…",
     "submit_free": "提交报名 →",
     "cash_title": "现场现金支付",

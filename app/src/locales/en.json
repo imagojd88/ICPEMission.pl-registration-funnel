@@ -277,6 +277,8 @@
     "free_desc": "There are no fees.",
     "free_short": "Free",
     "submit_error": "Your registration could not be saved: {{error}}. Please try again.",
+    "network_error": "No connection to the internet (or to our server). Your details are saved — check your connection and tap the button below again.",
+    "network_back": "You're back online — tap the button below to send your registration.",
     "sending": "Sending…",
     "submit_free": "Submit registration →",
     "cash_title": "Cash payment on site",

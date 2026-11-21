@@ -281,6 +281,8 @@
     "free_desc": "Non è previsto alcun pagamento.",
     "free_short": "Gratuito",
     "submit_error": "Non è stato possibile salvare l’iscrizione: {{error}}. Riprova.",
+    "network_error": "Nessuna connessione a internet (o al nostro server). I tuoi dati sono salvati: controlla la connessione e premi di nuovo il pulsante qui sotto.",
+    "network_back": "Connessione ripristinata: premi il pulsante qui sotto per inviare l'iscrizione.",
     "sending": "Invio…",
     "submit_free": "Invia l’iscrizione →",
     "cash_title": "Pagamento in contanti sul posto",
