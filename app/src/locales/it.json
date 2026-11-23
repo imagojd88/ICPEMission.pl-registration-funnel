@@ -128,7 +128,8 @@
     "step3": "Camera",
     "step4": "Opzioni",
     "next": "Avanti →",
-    "to_payment": "Vai al pagamento →",
+    "to_payment": "Scegli il metodo di pagamento →",
+    "to_summary": "Vai al riepilogo →",
     "total": "Totale"
   },
   "applicant": {
@@ -265,7 +266,7 @@
     "deadline": "Scadenza",
     "copy": "Copia",
     "copied": "Copiato ✓",
-    "submit_transfer": "Iscrizione con bonifico →",
+    "submit_transfer": "Conferma l'iscrizione →",
     "add_google": "Google Calendar",
     "download_ics": "Scarica .ics",
     "manage_title": "Gestisci la tua iscrizione",
@@ -284,11 +285,11 @@
     "network_error": "Nessuna connessione a internet (o al nostro server). I tuoi dati sono salvati: controlla la connessione e premi di nuovo il pulsante qui sotto.",
     "network_back": "Connessione ripristinata: premi il pulsante qui sotto per inviare l'iscrizione.",
     "sending": "Invio…",
-    "submit_free": "Invia l’iscrizione →",
+    "submit_free": "Conferma l'iscrizione →",
     "cash_title": "Pagamento in contanti sul posto",
     "cash_desc_1": "L’importo di",
     "cash_desc_2": "verrà pagato in contanti al momento della registrazione sul posto. Non è richiesto alcun pagamento anticipato online.",
-    "submit_cash": "Iscrizione con pagamento in contanti →",
+    "submit_cash": "Conferma l'iscrizione →",
     "ref_value": "Numero di iscrizione (lo riceverai dopo l’invio e via e-mail)",
     "abbr_formation": "form.",
     "abbr_accommodation": "alloggio",
@@ -296,7 +297,7 @@
     "diet": "Dieta",
     "leader_title": "Acconto tramite il responsabile della comunità",
     "leader_desc": "Consegna un acconto di {{deposit}} ({{pct}}%) al responsabile della tua comunità. Il saldo di {{rest}} lo paghi in contanti alla registrazione.",
-    "submit_leader": "Iscriviti con acconto al responsabile →"
+    "submit_leader": "Conferma l'iscrizione →"
   },
   "success": {
     "paid_title": "Grazie!",

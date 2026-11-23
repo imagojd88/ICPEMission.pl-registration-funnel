@@ -51,6 +51,14 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — panel admina (kreator eventów)
 
+### Lejek: przyciski na końcu bez mylącego „Przejdź do płatności” (2026-11-23)
+- **Zgłoszenie Jacka:** w ostatnim kroku (Opcje) przycisk „Proceed to payment / Przejdź do płatności” nawet przy płatności gotówką na miejscu.
+- **Zmiany (PublicFunnel, StickyPriceBar, locale ×5):**
+  - Jeden dostępny sposób płatności dla gościa (np. foundation-day-2027: sama gotówka; LEADER_DEPOSIT liczy się tylko przy wspólnocie z listy) → ekran wyboru płatności **pomijany**, metoda ustawiana automatycznie (`payment_method_selected` wysyłane jak dotąd), przycisk w ostatnim kroku: **„Przejdź do podsumowania →”** (`stepper.to_summary`). „Wstecz” z podsumowania wraca wtedy do kroku Opcje (także dla eventu bezpłatnego — wcześniej szło na ekran płatności).
+  - Kilka sposobów → przycisk **„Wybierz sposób płatności →”** (`stepper.to_payment`, wcześniej „Przejdź do płatności”).
+  - Podsumowanie: przycisk wysyłki przy gotówce / zaliczce u lidera / przelewie / evencie bezpłatnym → **„Potwierdź rejestrację →”** (online bez zmian: „Zapłać teraz”). Celowo nie na kroku Opcje — tam kliknięcie jeszcze nic nie wysyła, a „Potwierdź” sugerowałoby, że zapis jest gotowy.
+- Test (Playwright): tylko CASH → Opcje „Przejdź do podsumowania” → podsumowanie „Potwierdź rejestrację”, Wstecz → Opcje; CASH+LEADER ze wspólnotą → „Wybierz sposób płatności” → ekran wyboru → „Potwierdź rejestrację”.
+
 ### Lejek: czytelny komunikat przy braku internetu (2026-11-21)
 - **Zgłoszenie:** gość (Android/Chrome, foundation-day-2027) na podsumowaniu dostał „Your registration could not be saved: Nie udało się zapisać zgłoszenia. Failed to fetch Sprawdź dane…”. Na zrzucie „No internet connection”; PostHog: ostatnie zdarzenie sesji 13:29 (kroki 0–4 przejdone), potem cisza → telefon stracił sieć, zgłoszenie nie doszło do API (nie błąd systemu).
 - **Poprawka (PublicFunnel / SummaryScreen):** błąd sieci (`navigator.onLine === false`, `TypeError`, „Failed to fetch / Load failed / NetworkError”) → `summary.network_error` („Brak połączenia z internetem (albo z naszym serwerem). Twoje dane są zapisane — sprawdź połączenie i naciśnij przycisk jeszcze raz.”), po zdarzeniu `online` → `summary.network_back`. Inne błędy: tylko `summary.submit_error` w języku gościa (bez doklejanego polskiego zdania). PL/EN/IT/KO/ZH. Bez automatycznego ponawiania (ryzyko podwójnego zgłoszenia).

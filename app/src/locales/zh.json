@@ -126,7 +126,8 @@
     "step3": "房间",
     "step4": "选项",
     "next": "下一步 →",
-    "to_payment": "前往付款 →",
+    "to_payment": "选择付款方式 →",
+    "to_summary": "查看汇总 →",
     "total": "合计"
   },
   "applicant": {
@@ -261,7 +262,7 @@
     "deadline": "截止日期",
     "copy": "复制",
     "copied": "已复制 ✓",
-    "submit_transfer": "以银行转账方式提交 →",
+    "submit_transfer": "确认报名 →",
     "add_google": "Google 日历",
     "download_ics": "下载 .ics",
     "manage_title": "管理您的报名",
@@ -280,11 +281,11 @@
     "network_error": "无法连接到网络（或我们的服务器）。您的信息已保存——请检查网络连接后再次点击下方按钮。",
     "network_back": "网络已恢复——请点击下方按钮提交报名。",
     "sending": "正在发送…",
-    "submit_free": "提交报名 →",
+    "submit_free": "确认报名 →",
     "cash_title": "现场现金支付",
     "cash_desc_1": "您将在现场签到时以现金支付",
     "cash_desc_2": "。无需在线预付。",
-    "submit_cash": "以现金支付方式提交 →",
+    "submit_cash": "确认报名 →",
     "ref_value": "报名编号（提交后显示，并通过邮件发送给您）",
     "abbr_formation": "培育",
     "abbr_accommodation": "住宿",
@@ -292,7 +293,7 @@
     "diet": "饮食",
     "leader_title": "通过团体负责人交定金",
     "leader_desc": "请将定金 {{deposit}}（{{pct}}%）交给您的团体负责人，其余 {{rest}} 在报到处以现金支付。",
-    "submit_leader": "以负责人定金方式报名 →"
+    "submit_leader": "确认报名 →"
   },
   "success": {
     "paid_title": "谢谢！",

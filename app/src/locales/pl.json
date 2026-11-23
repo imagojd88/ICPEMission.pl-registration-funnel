@@ -132,7 +132,8 @@
     "step3": "Pokój",
     "step4": "Opcje",
     "next": "Dalej →",
-    "to_payment": "Przejdź do płatności →",
+    "to_payment": "Wybierz sposób płatności →",
+    "to_summary": "Przejdź do podsumowania →",
     "total": "Razem"
   },
   "applicant": {
@@ -271,7 +272,7 @@
     "deadline": "Termin",
     "copy": "Kopiuj",
     "copied": "Skopiowano ✓",
-    "submit_transfer": "Zgłoszenie z przelewem →",
+    "submit_transfer": "Potwierdź rejestrację →",
     "add_google": "Google Calendar",
     "download_ics": "Pobierz .ics",
     "manage_title": "Zarządzaj zgłoszeniem",
@@ -290,11 +291,11 @@
     "network_error": "Brak połączenia z internetem (albo z naszym serwerem). Twoje dane są zapisane — sprawdź połączenie i naciśnij przycisk poniżej jeszcze raz.",
     "network_back": "Połączenie wróciło — naciśnij przycisk poniżej, aby wysłać zgłoszenie.",
     "sending": "Wysyłanie…",
-    "submit_free": "Wyślij zgłoszenie →",
+    "submit_free": "Potwierdź rejestrację →",
     "cash_title": "Płatność gotówką na miejscu",
     "cash_desc_1": "Kwotę",
     "cash_desc_2": "zapłacisz gotówką przy rejestracji na miejscu. Nie jest wymagana żadna przedpłata online.",
-    "submit_cash": "Zgłoszenie z płatnością gotówką →",
+    "submit_cash": "Potwierdź rejestrację →",
     "ref_value": "Numer zgłoszenia (otrzymasz po wysłaniu i w e-mailu)",
     "abbr_formation": "form.",
     "abbr_accommodation": "nocl.",
@@ -302,7 +303,7 @@
     "diet": "Dieta",
     "leader_title": "Zaliczka u lidera wspólnoty",
     "leader_desc": "Zaliczkę {{deposit}} ({{pct}}%) przekaż liderowi swojej wspólnoty. Pozostałe {{rest}} zapłacisz gotówką przy rejestracji na miejscu.",
-    "submit_leader": "Zgłoszenie z zaliczką u lidera →"
+    "submit_leader": "Potwierdź rejestrację →"
   },
   "success": {
     "paid_title": "Dziękujemy!",

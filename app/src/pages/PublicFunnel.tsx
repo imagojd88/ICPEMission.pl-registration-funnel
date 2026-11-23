@@ -226,6 +226,7 @@ function StepperView({
   affiliation,
   roomAvailability,
   dietKeys,
+  lastStepLabel,
 }: {
   state: StepperState
   event: EventInstanceDto
@@ -240,6 +241,8 @@ function StepperView({
   roomAvailability?: Record<string, number>
   /** Diety włączone w evencie (`customFields.diets`). */
   dietKeys?: string[]
+  /** Napis przycisku w ostatnim kroku (zależny od tego, czy jest jeszcze wybór płatności). */
+  lastStepLabel?: string
 }) {
   const renderStep = () => {
     switch (state.step) {
@@ -317,7 +320,7 @@ function StepperView({
           {error}
         </div>
       )}
-      <StickyPriceBar state={state} pricingConfig={pricingConfig} onNext={onNext} />
+      <StickyPriceBar state={state} pricingConfig={pricingConfig} onNext={onNext} lastStepLabel={lastStepLabel} />
     </div>
   )
 }
@@ -765,6 +768,11 @@ export default function PublicFunnel() {
       // Wydarzenie bezpłatne → pomijamy wybór płatności.
       patchStepper({ paymentMethod: 'cash' })
       setScreen('summary')
+    } else if (onlyPaymentMethod) {
+      // Tylko jeden sposób płatności (np. sama gotówka na miejscu) → nie ma czego wybierać, od razu podsumowanie.
+      patchStepper({ paymentMethod: onlyPaymentMethod })
+      track('payment_method_selected', { payment_method: onlyPaymentMethod })
+      setScreen('summary')
     } else {
       if (stepper.paymentMethod === 'leader' && !leaderEligible) patchStepper({ paymentMethod: null })
       setScreen('payment_method')
@@ -789,6 +797,12 @@ export default function PublicFunnel() {
   }
 
   const handleSummaryBack = () => {
+    // Bez ekranu wyboru płatności (event bezpłatny / jeden sposób) → wracamy do ostatniego kroku.
+    if (pricingConfig.free || onlyPaymentMethod) {
+      setScreen('stepper')
+      patchStepper({ step: STEPS - 1 })
+      return
+    }
     setScreen('payment_method')
   }
 
@@ -932,6 +946,17 @@ export default function PublicFunnel() {
     !!stepper.applicant.community &&
     stepper.applicant.community !== COMMUNITY_OTHER
 
+  // Sposoby płatności, które ten gość faktycznie zobaczy (jak w PaymentMethodScreen).
+  const guestPaymentMethods = (
+    event?.paymentMethods && event.paymentMethods.length > 0 ? event.paymentMethods : (['ONLINE', 'BANK_TRANSFER'] as PaymentMethod[])
+  ).filter((m) => m !== 'LEADER_DEPOSIT' || leaderEligible)
+  const onlyPaymentMethod: StepperState['paymentMethod'] =
+    guestPaymentMethods.length === 1
+      ? ({ CASH: 'cash', BANK_TRANSFER: 'transfer', ONLINE: 'online', LEADER_DEPOSIT: 'leader' } as const)[guestPaymentMethods[0] as 'CASH']
+      : null
+  // Ostatni krok: „Wybierz sposób płatności” tylko, gdy jest z czego wybierać; inaczej „Przejdź do podsumowania”.
+  const lastStepLabel = pricingConfig.free || onlyPaymentMethod ? t('stepper.to_summary') : t('stepper.to_payment')
+
   if (loading) {
     return (
       <div className="min-h-screen" style={{ background: 'var(--bg)' }}>
@@ -1029,6 +1054,7 @@ export default function PublicFunnel() {
           onChange={patchStepper}
           onBack={handleStepperBack}
           onNext={handleStepperNext}
+          lastStepLabel={lastStepLabel}
           error={stepError}
           affiliation={affiliation}
           roomAvailability={eventConfig?.roomAvailability}

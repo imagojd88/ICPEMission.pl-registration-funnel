@@ -126,7 +126,8 @@
     "step3": "Room",
     "step4": "Options",
     "next": "Next →",
-    "to_payment": "Proceed to payment →",
+    "to_payment": "Choose payment method →",
+    "to_summary": "Go to summary →",
     "total": "Total"
   },
   "applicant": {
@@ -261,7 +262,7 @@
     "deadline": "Deadline",
     "copy": "Copy",
     "copied": "Copied ✓",
-    "submit_transfer": "Submit with bank transfer →",
+    "submit_transfer": "Confirm registration →",
     "add_google": "Google Calendar",
     "download_ics": "Download .ics",
     "manage_title": "Manage your registration",
@@ -280,11 +281,11 @@
     "network_error": "No connection to the internet (or to our server). Your details are saved — check your connection and tap the button below again.",
     "network_back": "You're back online — tap the button below to send your registration.",
     "sending": "Sending…",
-    "submit_free": "Submit registration →",
+    "submit_free": "Confirm registration →",
     "cash_title": "Cash payment on site",
     "cash_desc_1": "You will pay",
     "cash_desc_2": "in cash when you check in on site. No online prepayment is required.",
-    "submit_cash": "Submit with cash payment →",
+    "submit_cash": "Confirm registration →",
     "ref_value": "Registration number (you will receive it after submitting and by email)",
     "abbr_formation": "form.",
     "abbr_accommodation": "accom.",
@@ -292,7 +293,7 @@
     "diet": "Diet",
     "leader_title": "Deposit via your community leader",
     "leader_desc": "Hand a deposit of {{deposit}} ({{pct}}%) to your community leader. Pay the remaining {{rest}} in cash at the registration desk.",
-    "submit_leader": "Register with a leader deposit →"
+    "submit_leader": "Confirm registration →"
   },
   "success": {
     "paid_title": "Thank you!",

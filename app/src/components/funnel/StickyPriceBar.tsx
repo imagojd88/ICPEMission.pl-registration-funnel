@@ -9,9 +9,11 @@ interface Props {
   pricingConfig: PricingConfig
   onNext: () => void
   disabled?: boolean
+  /** Napis przycisku w ostatnim kroku (ustala PublicFunnel). */
+  lastStepLabel?: string
 }
 
-export default function StickyPriceBar({ state, pricingConfig, onNext, disabled }: Props) {
+export default function StickyPriceBar({ state, pricingConfig, onNext, disabled, lastStepLabel }: Props) {
   const { t, i18n } = useTranslation()
   const money = (n: number) => formatMoney(n, pricingConfig.currency, i18n.language)
 
@@ -26,7 +28,7 @@ export default function StickyPriceBar({ state, pricingConfig, onNext, disabled 
 
   const free = !!pricingConfig.free
   const isLastStep = state.step === 4
-  const label = isLastStep ? (free ? t('stepper.next') : t('stepper.to_payment')) : t('stepper.next')
+  const label = isLastStep ? lastStepLabel ?? (free ? t('stepper.to_summary') : t('stepper.to_payment')) : t('stepper.next')
 
   // Dodatkowe info: formacja + nocleg + wyżywienie
   const hasPrice = !free && priceResult.people > 0
