@@ -51,6 +51,15 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — panel admina (kreator eventów)
 
+### Lejek: okienko w kroku „Nocleg” przy niepełnym wyborze (2026-11-24)
+- **Zgłoszenie Jacka:** goście w pośpiechu nie zauważają, że nie wybrali pokoju / nie przypisali osób — komunikat błędu był na dole formularza.
+- **`components/funnel/RoomCheckDialog.tsx`** (okienko po „Dalej”, Escape / klik w tło zamyka):
+  - `missing` — brak pokoju i brak „Nie potrzebuję noclegu” albo pokój bez nikogo: „Nie wybrałeś/aś pokoju lub nie przypisałeś/aś nikogo do wybranego pokoju.” + podpowiedź; przycisk „Popraw wybór”. (Blokada była już wcześniej — doszło okienko.)
+  - `error` — inne błędy pokoi (pojemność, brak wolnych, nocleg obowiązkowy a ktoś bez pokoju) — treść błędu w okienku.
+  - `partial` — **nowe:** nocleg opcjonalny, pokój wybrany, ale część osób nieprzypisana → wcześniej przechodziło bez słowa; teraz lista imion „będą bez noclegu” i wybór „Przypiszę je do pokoju” / „Tak, bez noclegu dla nich” (`handleStepperNext({ partialConfirmed: true })`).
+- Teksty `room.dialog_*`, `room.partial_*` w PL/EN/IT/KO/ZH. Komunikat pod formularzem (`stepError`) zostaje.
+- Test (Playwright): nic nie wybrane → okienko; pusty pokój → okienko; 1 z 2 osób → okienko z „Anna Kowalska”, „Przypiszę” zostaje w kroku, „Tak, bez noclegu” przechodzi; wszyscy przypisani / „Nie potrzebujemy noclegu” → bez okienka.
+
 ### Lejek: krok „Dane głównego zgłaszającego” z podpowiedzią (2026-11-24)
 - Nagłówek kroku 1 (`stepper.step0`): „Dane zgłaszającego” → **„Dane głównego zgłaszającego”**; pod nim (`applicant.step_hint`): „W kolejnym kroku możesz dodać dane małżonka i dzieci.” PL/EN/IT/KO/ZH (EN „Main applicant's details”, KO „대표 신청자 정보”, ZH „主要报名人信息”).
 

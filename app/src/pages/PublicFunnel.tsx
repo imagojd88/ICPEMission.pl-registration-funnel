@@ -26,6 +26,7 @@ function toPaymentMethod(m: 'online' | 'transfer' | 'cash' | 'leader' | null): P
   return 'BANK_TRANSFER'
 }
 import { Skeleton } from '../components/ui/Skeleton'
+import RoomCheckDialog, { type RoomDialog } from '../components/funnel/RoomCheckDialog'
 import ThemeToggle from '../components/ui/ThemeToggle'
 import LanguageSwitch from '../components/ui/LanguageSwitch'
 
@@ -445,6 +446,8 @@ export default function PublicFunnel() {
     return () => window.removeEventListener('online', onOnline)
   }, [submitNetworkError, t])
   const [stepError, setStepError] = useState<string | null>(null)
+  // Krok „Nocleg”: okienko po „Dalej”, gdy wybór noclegu jest niepełny (łatwo przeoczyć komunikat na dole).
+  const [roomDialog, setRoomDialog] = useState<RoomDialog | null>(null)
   const [result, setResult] = useState<{ regId: string; status: RegistrationStatus; total: number; guestInviteHref?: string; manageHref?: string } | null>(null)
   // Osobiste zaproszenie z maila (`?inv=token`): dane gościa wpisujemy w formularz,
   // a token idzie z rejestracją, żeby zgłoszenie spięło się z listą gości w panelu.
@@ -733,7 +736,7 @@ export default function PublicFunnel() {
     return null
   }
 
-  const handleStepperNext = () => {
+  const handleStepperNext = (opts?: { partialConfirmed?: boolean }) => {
     setStepError(null)
     // Krok „Dane" (0): wspólnota jest wymagana, gdy event o nią pyta (lista ma opcję „Inna").
     if (stepper.step === 0 && affiliation === 'community') {
@@ -746,8 +749,30 @@ export default function PublicFunnel() {
       const err = validateRoomStep()
       if (err) {
         setStepError(err)
+        // Brak pokoju (bez „Nie potrzebuję noclegu”) albo pokój bez nikogo → okienko z jasnym komunikatem.
+        const missing =
+          !stepper.noAccommodation &&
+          (stepper.rooms.length === 0 || stepper.rooms.some((r) => r.participantIndexes.length === 0))
+        setRoomDialog(missing ? { kind: 'missing' } : { kind: 'error', detail: err })
         track('registration_step_blocked', { step: 3, step_name: 'accommodation' })
         return
+      }
+      // Nocleg opcjonalny, wybrany pokój, ale nie wszyscy w nim są → pytamy, czy to celowe.
+      if (
+        !opts?.partialConfirmed &&
+        isAccommodationOptional(pricingConfig) &&
+        !stepper.noAccommodation &&
+        stepper.rooms.length > 0
+      ) {
+        const assigned = new Set(stepper.rooms.flatMap((r) => r.participantIndexes))
+        const left = stepper.participants
+          .map((p, i) => ({ p, i }))
+          .filter(({ i }) => !assigned.has(i))
+          .map(({ p, i }) => p.name.trim() || `${p.type === 'child' ? t('participants.child') : t('participants.adult')} ${i + 1}`)
+        if (left.length > 0) {
+          setRoomDialog({ kind: 'partial', names: left })
+          return
+        }
       }
       if (hasAccommodation(pricingConfig)) {
         const inRooms = new Set(stepper.rooms.flatMap((r) => r.participantIndexes)).size
@@ -1053,12 +1078,22 @@ export default function PublicFunnel() {
           pricingConfig={pricingConfig}
           onChange={patchStepper}
           onBack={handleStepperBack}
-          onNext={handleStepperNext}
+          onNext={() => handleStepperNext()}
           lastStepLabel={lastStepLabel}
           error={stepError}
           affiliation={affiliation}
           roomAvailability={eventConfig?.roomAvailability}
           dietKeys={eventConfig?.customFields?.diets ?? []}
+        />
+      )}
+      {screen === 'stepper' && roomDialog && (
+        <RoomCheckDialog
+          dialog={roomDialog}
+          onClose={() => setRoomDialog(null)}
+          onConfirmPartial={() => {
+            setRoomDialog(null)
+            handleStepperNext({ partialConfirmed: true })
+          }}
         />
       )}
 

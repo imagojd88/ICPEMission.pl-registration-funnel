@@ -222,7 +222,15 @@
     "sold_out": "brak wolnych",
     "err_sold_out_one": "Brak wolnych pokoi typu „{{name}}” — wybierz inny typ.",
     "err_sold_out": "Brak wolnych pokoi typu „{{name}}” — wybierz inny typ lub usuń pokój.",
-    "per_room_night": "/ pokój / noc"
+    "per_room_night": "/ pokój / noc",
+    "dialog_title": "Sprawdź nocleg",
+    "dialog_missing": "Nie wybrałeś/aś pokoju lub nie przypisałeś/aś nikogo do wybranego pokoju.",
+    "dialog_missing_hint": "Wybierz pokój i zaznacz osoby, które będą w nim spać — albo zaznacz „Nie potrzebuję noclegu”.",
+    "dialog_fix": "Popraw wybór",
+    "partial_title": "Nie wszyscy mają nocleg",
+    "partial_desc": "Te osoby nie są przypisane do żadnego pokoju, więc będą bez noclegu:",
+    "partial_back": "Przypiszę je do pokoju",
+    "partial_ok": "Tak, bez noclegu dla nich"
   },
   "options": {
     "title": "Opcje i zgody",

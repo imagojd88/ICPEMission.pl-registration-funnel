@@ -216,7 +216,15 @@
     "sold_out": "esaurito",
     "err_sold_out_one": "Camere “{{name}}” esaurite — scegli un altro tipo.",
     "err_sold_out": "Camere “{{name}}” esaurite — scegli un altro tipo o rimuovi una camera.",
-    "per_room_night": "/ camera / notte"
+    "per_room_night": "/ camera / notte",
+    "dialog_title": "Controlla l'alloggio",
+    "dialog_missing": "Non hai scelto una camera oppure non hai assegnato nessuno alla camera scelta.",
+    "dialog_missing_hint": "Scegli una camera e seleziona le persone che vi dormiranno, oppure seleziona “Non ho bisogno di alloggio”.",
+    "dialog_fix": "Correggi la scelta",
+    "partial_title": "Non tutti hanno l'alloggio",
+    "partial_desc": "Queste persone non sono assegnate a nessuna camera, quindi saranno senza alloggio:",
+    "partial_back": "Le assegno a una camera",
+    "partial_ok": "Sì, senza alloggio per loro"
   },
   "options": {
     "title": "Opzioni e consensi",

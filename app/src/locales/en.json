@@ -212,7 +212,15 @@
     "sold_out": "sold out",
     "err_sold_out_one": "No “{{name}}” rooms left — please choose another type.",
     "err_sold_out": "No “{{name}}” rooms left — choose another type or remove a room.",
-    "per_room_night": "/ room / night"
+    "per_room_night": "/ room / night",
+    "dialog_title": "Check your accommodation",
+    "dialog_missing": "You haven't chosen a room, or you haven't assigned anyone to the room you chose.",
+    "dialog_missing_hint": "Choose a room and tick the people who will sleep in it — or tick “I don’t need accommodation”.",
+    "dialog_fix": "Fix my choice",
+    "partial_title": "Not everyone has accommodation",
+    "partial_desc": "These people aren't assigned to any room, so they will have no accommodation:",
+    "partial_back": "I'll assign them to a room",
+    "partial_ok": "Yes, no accommodation for them"
   },
   "options": {
     "title": "Options and consents",

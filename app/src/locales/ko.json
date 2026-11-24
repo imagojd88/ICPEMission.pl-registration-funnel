@@ -212,7 +212,15 @@
     "sold_out": "매진",
     "err_sold_out_one": "“{{name}}” 객실이 남아 있지 않습니다. 다른 종류를 선택해 주세요.",
     "err_sold_out": "“{{name}}” 객실이 남아 있지 않습니다. 다른 종류를 선택하시거나 객실을 삭제해 주세요.",
-    "per_room_night": "/ 객실 / 1박"
+    "per_room_night": "/ 객실 / 1박",
+    "dialog_title": "숙박을 확인해 주세요",
+    "dialog_missing": "객실을 선택하지 않았거나, 선택한 객실에 아무도 배정하지 않았습니다.",
+    "dialog_missing_hint": "객실을 선택하고 그 방에서 잘 사람을 체크해 주세요. 또는 “숙박이 필요 없습니다”에 체크해 주세요.",
+    "dialog_fix": "선택 수정하기",
+    "partial_title": "숙박이 없는 분이 있습니다",
+    "partial_desc": "다음 분들은 어느 객실에도 배정되지 않아 숙박 없이 참가하게 됩니다:",
+    "partial_back": "객실에 배정하겠습니다",
+    "partial_ok": "네, 이분들은 숙박 없이 참가합니다"
   },
   "options": {
     "title": "옵션 및 동의",

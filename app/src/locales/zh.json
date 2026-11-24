@@ -212,7 +212,15 @@
     "sold_out": "已订满",
     "err_sold_out_one": "“{{name}}”已无空房——请选择其他房型。",
     "err_sold_out": "“{{name}}”已无空房——请选择其他房型或删除一个房间。",
-    "per_room_night": "/ 间 / 晚"
+    "per_room_night": "/ 间 / 晚",
+    "dialog_title": "请检查住宿",
+    "dialog_missing": "您还没有选择房间，或没有为所选房间分配任何人。",
+    "dialog_missing_hint": "请选择房间并勾选将住在该房间的人——或勾选“我不需要住宿”。",
+    "dialog_fix": "修改选择",
+    "partial_title": "并非所有人都有住宿",
+    "partial_desc": "以下人员未分配到任何房间，将不安排住宿：",
+    "partial_back": "我来为他们分配房间",
+    "partial_ok": "是的，他们不需要住宿"
   },
   "options": {
     "title": "选项和同意",
