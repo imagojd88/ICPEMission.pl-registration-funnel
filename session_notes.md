@@ -51,6 +51,9 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — panel admina (kreator eventów)
 
+### Lejek: krok „Dane głównego zgłaszającego” z podpowiedzią (2026-11-24)
+- Nagłówek kroku 1 (`stepper.step0`): „Dane zgłaszającego” → **„Dane głównego zgłaszającego”**; pod nim (`applicant.step_hint`): „W kolejnym kroku możesz dodać dane małżonka i dzieci.” PL/EN/IT/KO/ZH (EN „Main applicant's details”, KO „대표 신청자 정보”, ZH „主要报名人信息”).
+
 ### Lejek: przyciski na końcu bez mylącego „Przejdź do płatności” (2026-11-23)
 - **Zgłoszenie Jacka:** w ostatnim kroku (Opcje) przycisk „Proceed to payment / Przejdź do płatności” nawet przy płatności gotówką na miejscu.
 - **Zmiany (PublicFunnel, StickyPriceBar, locale ×5):**

@@ -120,7 +120,7 @@
     "see_program": "프로그램 보기"
   },
   "stepper": {
-    "step0": "연락처",
+    "step0": "대표 신청자 정보",
     "step1": "참가자",
     "step2": "선호 사항",
     "step3": "객실",
@@ -131,6 +131,7 @@
     "total": "합계"
   },
   "applicant": {
+    "step_hint": "다음 단계에서 배우자와 자녀 정보를 추가할 수 있습니다.",
     "firstName": "이름",
     "lastName": "성",
     "email": "이메일 주소",

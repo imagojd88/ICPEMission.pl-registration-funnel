@@ -126,7 +126,7 @@
     "see_program": "Zobacz program"
   },
   "stepper": {
-    "step0": "Dane zgłaszającego",
+    "step0": "Dane głównego zgłaszającego",
     "step1": "Uczestnicy",
     "step2": "Preferencje",
     "step3": "Pokój",
@@ -137,6 +137,7 @@
     "total": "Razem"
   },
   "applicant": {
+    "step_hint": "W kolejnym kroku możesz dodać dane małżonka i dzieci.",
     "firstName": "Imię",
     "lastName": "Nazwisko",
     "email": "Adres e-mail",

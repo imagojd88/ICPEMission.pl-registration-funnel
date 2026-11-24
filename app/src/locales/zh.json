@@ -120,7 +120,7 @@
     "see_program": "查看日程"
   },
   "stepper": {
-    "step0": "联系信息",
+    "step0": "主要报名人信息",
     "step1": "参加者",
     "step2": "偏好",
     "step3": "房间",
@@ -131,6 +131,7 @@
     "total": "合计"
   },
   "applicant": {
+    "step_hint": "下一步可以添加配偶和子女的信息。",
     "firstName": "名",
     "lastName": "姓",
     "email": "电子邮箱",

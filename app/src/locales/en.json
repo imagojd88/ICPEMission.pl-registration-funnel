@@ -120,7 +120,7 @@
     "see_program": "See the programme"
   },
   "stepper": {
-    "step0": "Contact details",
+    "step0": "Main applicant's details",
     "step1": "Participants",
     "step2": "Preferences",
     "step3": "Room",
@@ -131,6 +131,7 @@
     "total": "Total"
   },
   "applicant": {
+    "step_hint": "In the next step you can add your spouse and children.",
     "firstName": "First name",
     "lastName": "Last name",
     "email": "Email address",

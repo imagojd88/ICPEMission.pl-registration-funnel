@@ -122,7 +122,7 @@
     "see_program": "Vedi il programma"
   },
   "stepper": {
-    "step0": "Dati del richiedente",
+    "step0": "Dati del richiedente principale",
     "step1": "Partecipanti",
     "step2": "Preferenze",
     "step3": "Camera",
@@ -133,6 +133,7 @@
     "total": "Totale"
   },
   "applicant": {
+    "step_hint": "Nel passaggio successivo puoi aggiungere i dati del coniuge e dei figli.",
     "firstName": "Nome",
     "lastName": "Cognome",
     "email": "Indirizzo e-mail",

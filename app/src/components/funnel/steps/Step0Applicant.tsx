@@ -21,9 +21,14 @@ export default function Step0Applicant({ value, onChange, affiliation }: Props) 
 
   return (
     <div className="flex flex-col gap-4 px-[22px] py-5">
-      <h2 className="text-base font-semibold" style={{ color: 'var(--ink)' }}>
-        {t('stepper.step0')}
-      </h2>
+      <div className="flex flex-col gap-1">
+        <h2 className="text-base font-semibold" style={{ color: 'var(--ink)' }}>
+          {t('stepper.step0')}
+        </h2>
+        <p className="text-sm" style={{ color: 'var(--muted)' }}>
+          {t('applicant.step_hint')}
+        </p>
+      </div>
 
       {/* First name + Last name grid */}
       <div className="grid grid-cols-2 gap-3">
