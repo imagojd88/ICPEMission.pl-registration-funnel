@@ -13,6 +13,7 @@ import {
   num,
   iso,
 } from './personal-os.mapper';
+import { netPaidByPayment } from '../payments/refund-ledger';
 
 interface RegRow { totalPrice: { toString(): string } }
 interface CapRow { capacity: number | null; _count: { registrations: number } }
@@ -95,7 +96,9 @@ export class AdminService {
 
     // Księgujemy brakującą resztę: przy wpłatach częściowych (zadatek, raty) nie dublujemy całej kwoty.
     const total = parseFloat(reg.totalPrice.toString());
-    const paid = (reg.payments as Array<{ amount: { toString(): string } }>).reduce((s, p) => s + parseFloat(p.amount.toString()), 0);
+    // Suma netto: zwroty częściowe wpłat online pomniejszają „wpłacono”.
+    const net = await netPaidByPayment(this.prisma, reg.payments as Array<{ id: string; amount: unknown; provider: string }>);
+    const paid = [...net.values()].reduce((s, v) => s + v, 0);
     const rest = Math.round((total - paid) * 100) / 100;
     if (reg.payments.length === 0 || rest > 0) {
       await this.prisma.payment.create({

@@ -102,6 +102,8 @@ export interface RegistrationDto {
   paymentStatus: PaymentStatus;
   /** Suma zaksięgowanych wpłat (panel admina). */
   paidAmount?: number;
+  /** Dostawcy zaksięgowanych wpłat zgłoszenia, np. ['tpay', 'panel'] (panel admina; kolumna „Metoda”). */
+  paidProviders?: string[];
   /** Stan względem harmonogramu wpłat eventu (panel admina). */
   payment?: {
     total: number; paid: number; remaining: number; dueNow: number; overdue: number;

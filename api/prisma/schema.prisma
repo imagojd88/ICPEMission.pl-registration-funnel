@@ -404,6 +404,41 @@ model OnlinePayment {
   @@index([status, createdAt])
 }
 
+/// Zwrot wpłaty online (Tpay). Osobny wiersz na każdy zwrot — kwota wpłaty (`Payment.amount`) nie jest
+/// nadpisywana, historia zostaje czytelna. „Wpłacono” = wpłaty PAID minus zwroty DONE; wpłata zwrócona
+/// w całości ma `Payment.status = REFUNDED`. Bez relacji — tabela w pełni addytywna.
+model PaymentRefund {
+  id             String   @id @default(cuid())
+  /// zwracana wpłata (Payment.id)
+  paymentId      String
+  registrationId String
+  amount         Decimal  @db.Decimal(10, 2)
+  currency       String   @default("PLN")
+  /// powód podany przez admina (opcjonalny)
+  reason         String?
+  /// PENDING (zlecenie w toku) | DONE (przyjęty przez operatora) | UNCERTAIN (do wyjaśnienia) | FAILED (odrzucony)
+  status         String   @default("PENDING")
+  /// 'panel' (zlecony w panelu admina) | 'tpay-notification' (powiadomienie chargeback)
+  source         String   @default("panel")
+  /// blokada: id wpłaty, dopóki zwrot jest PENDING / UNCERTAIN; null po rozstrzygnięciu.
+  /// Unikalność gwarantuje, że operator nie dostanie dwóch równoległych zleceń zwrotu tej samej wpłaty.
+  lockKey        String?  @unique
+  /// identyfikator zwrotu u operatora (jeśli go zwrócił)
+  externalId     String?
+  /// kto zlecił (e-mail admina z JWT; 'tpay' dla powiadomień)
+  createdBy      String?
+  createdById    String?
+  testMode       Boolean  @default(false)
+  /// skrót wyniku operatora (status, kod błędu) — bez danych płatnika i bez pełnej odpowiedzi
+  raw            Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([paymentId])
+  @@index([registrationId, createdAt])
+  @@index([status, createdAt])
+}
+
 model MeetingSeries {
   id          String              @id @default(cuid())
   title       Json

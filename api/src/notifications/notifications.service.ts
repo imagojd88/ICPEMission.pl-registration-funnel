@@ -1049,6 +1049,60 @@ export class NotificationsService {
       return { subject, text, html };
     }
 
+    if (payload.type === 'PAYMENT_REFUNDED') {
+      // „Zwróciliśmy wpłatę” — po zwrocie wpłaty online zleconym w panelu i przyjętym przez operatora.
+      const lang = mailLangOf(payload.locale);
+      const cur = String(d.currency ?? 'PLN') as 'PLN' | 'EUR' | 'USD';
+      const f = (n: unknown) => formatMoney(Number(n ?? 0), cur, lang);
+      const title = String(d.eventTitle ?? L(lang, { pl: 'wydarzenie', en: 'the event', ko: '행사', zh: '活动' }));
+      const regNo = String(payload.registrationId ?? '');
+      const remaining = Number(d.remaining ?? 0);
+      const subject = L(lang, {
+        pl: `Zwróciliśmy wpłatę — ${title}`,
+        en: `Payment refunded — ${title}`,
+        ko: `환불 안내 — ${title}`,
+        zh: `已退款 — ${title}`,
+      });
+      const intro = [
+        greetingLine(lang),
+        '',
+        L(lang, {
+          pl: `Zwróciliśmy ${f(d.amount)} z Twojej wpłaty za udział w wydarzeniu „${title}”. Pieniądze wrócą tą samą drogą, którą zapłacono; zwykle trwa to kilka dni roboczych.`,
+          en: `We have refunded ${f(d.amount)} of your payment for "${title}". The money will be returned the same way it was paid; this usually takes a few business days.`,
+          ko: `「${title}」 참가비 중 ${f(d.amount)}을(를) 환불해 드렸습니다. 환불금은 결제하신 수단으로 반환되며, 보통 영업일 기준 며칠이 걸립니다.`,
+          zh: `我们已退还您为「${title}」支付的款项中的 ${f(d.amount)}。款项将按原支付方式退回，通常需要几个工作日。`,
+        }),
+        L(lang, {
+          pl: `Po zwrocie wpłacono ${f(d.paid)} z ${f(d.total)}.`,
+          en: `Paid after the refund: ${f(d.paid)} of ${f(d.total)}.`,
+          ko: `환불 후 납부액: ${f(d.total)} 중 ${f(d.paid)}.`,
+          zh: `退款后已付：${f(d.paid)}，总额 ${f(d.total)}。`,
+        }),
+        ...(remaining > 0.005
+          ? [L(lang, { pl: `Pozostało do zapłaty: ${f(remaining)}.`, en: `Remaining: ${f(remaining)}.`, ko: `남은 금액: ${f(remaining)}.`, zh: `待付金额：${f(remaining)}。` })]
+          : []),
+        '',
+        L(lang, { pl: `Numer zgłoszenia: ${regNo}`, en: `Registration number: ${regNo}`, ko: `신청 번호: ${regNo}`, zh: `报名编号：${regNo}` }),
+        ...(d.transactionTitle
+          ? [L(lang, {
+              pl: `Numer transakcji: ${String(d.transactionTitle)}`,
+              en: `Transaction number: ${String(d.transactionTitle)}`,
+              ko: `거래 번호: ${String(d.transactionTitle)}`,
+              zh: `交易编号：${String(d.transactionTitle)}`,
+            })]
+          : []),
+        '',
+      ];
+      const link = String(d.manageLink ?? '');
+      const { text, html } = buttonMail(
+        intro,
+        link ? { label: L(lang, { pl: 'Zobacz zgłoszenie', en: 'View registration', ko: '신청 내역 보기', zh: '查看报名' }), href: link } : null,
+        signature(lang),
+        lang,
+      );
+      return { subject, text, html };
+    }
+
     if (payload.type === 'ONLINE_PAYMENT_ALERT') {
       // Do organizatora: zdarzenie płatności online wymagające uwagi (rozbieżność kwoty, zwrot, nieznana transakcja…).
       const reasons: Record<string, string> = {
@@ -1059,6 +1113,8 @@ export class NotificationsService {
         BAD_AMOUNT: 'Powiadomienie bez poprawnej kwoty wpłaty. Wpłata NIE została zaksięgowana automatycznie.',
         REFUND: 'Tpay zgłosił pełny zwrot transakcji. Wpłata została oznaczona jako zwrócona; status zgłoszenia NIE został zmieniony.',
         REFUND_UNMATCHED: 'Tpay zgłosił zwrot transakcji, dla której nie mamy zaksięgowanej wpłaty. Sprawdź w panelu Tpay.',
+        REFUND_UNCERTAIN: 'Zwrot zlecony w panelu NIE został potwierdzony przez Tpay (przekroczony czas albo błąd połączenia). Nie wiadomo, czy się wykonał. System NIE ponowił zlecenia i NIE pomniejszył wpłat. Sprawdź transakcję w panelu Tpay, a potem w panelu ▸ Płatności oznacz zwrot jako wykonany albo niewykonany — do tego czasu kolejne zwroty tej wpłaty są zablokowane.',
+        REFUND_BOOKING_FAILED: 'Tpay PRZYJĄŁ zwrot zlecony w panelu, ale nie udało się go zapisać w systemie. NIE zlecaj go ponownie. W panelu ▸ Płatności oznacz zwrot jako wykonany.',
         OVERPAID: 'Po tej wpłacie suma wpłat przekracza kwotę zgłoszenia (np. dwie opłacone próby). Rozważ zwrot nadpłaty z panelu Tpay.',
       };
       const reason = String(d.reason ?? '');
@@ -1075,6 +1131,7 @@ export class NotificationsService {
         d.transactionTitle ? `Transakcja Tpay: ${String(d.transactionTitle)}` : '',
         amountLine('Kwota wpłacona', d.paidAmount),
         amountLine('Kwota oczekiwana', d.expectedAmount),
+        amountLine('Kwota zwrotu', d.refundAmount),
         d.testMode ? 'Uwaga: transakcja w trybie testowym (sandbox).' : '',
         '',
         'Szczegóły: panel ▸ Płatności oraz panel Tpay.',
@@ -1281,13 +1338,22 @@ export class NotificationsService {
     return this.sendMail({ to: opts.to, type: 'PAYMENT_RECEIVED', locale: opts.locale, registrationId: opts.registrationId, data: opts });
   }
 
+  /** „Zwróciliśmy wpłatę” — po zwrocie wpłaty online zleconym w panelu. */
+  async sendPaymentRefunded(opts: {
+    to: string; locale: string; registrationId: string; eventTitle?: string;
+    amount: number; paid: number; total: number; remaining: number; currency: string;
+    transactionTitle?: string; manageLink?: string;
+  }) {
+    return this.sendMail({ to: opts.to, type: 'PAYMENT_REFUNDED', locale: opts.locale, registrationId: opts.registrationId, data: opts });
+  }
+
   /**
    * Powiadomienie organizatora o zdarzeniu płatności online wymagającym uwagi. Idzie na `MAIL_REPLY_TO`;
    * gdy adres nie jest ustawiony, zostaje tylko wpis w logach. W danych NIE MA e-maila płatnika.
    */
   async sendOnlinePaymentAlert(opts: {
     reason: string; registrationId?: string; eventTitle?: string; guestName?: string;
-    transactionTitle?: string; paidAmount?: number; expectedAmount?: number; currency?: string; testMode?: boolean;
+    transactionTitle?: string; paidAmount?: number; expectedAmount?: number; refundAmount?: number; currency?: string; testMode?: boolean;
   }): Promise<void> {
     const admin = this.replyTo();
     if (!admin) {

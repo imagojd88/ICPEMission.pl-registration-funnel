@@ -303,6 +303,8 @@ export class DeskService {
         paidAt: p.paidAt,
         note: p.note,
         by: p.by,
+        /** ile z tej wpłaty zwrócono (zwroty wpłat online zleca wyłącznie pełny admin w panelu) */
+        refundedAmount: p.refundedAmount,
         /** cofnąć można tylko wpłatę wpisaną ręcznie / z importu (i tylko pełny admin) */
         voidable: p.status === 'PAID' && (p.provider === 'panel' || p.provider === 'bank-import'),
       })),

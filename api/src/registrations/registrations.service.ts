@@ -9,6 +9,7 @@ import { v4 as uuid } from 'uuid';
 import { guestInviteConfig, guestInvitePageLink, publicAppUrl } from '../invitations/guest-invite-config';
 import { buildPriceInput, normalizeCountryCode, hasAccommodation, roomLabel, leaderDepositSplit, cleanDonation, buildSchedule, hasPaymentPlan, minDepositPctFor, normalizePaymentPlan, warsawDate, pricingAt, contactCountry, onlineProviderFor, PricingConfig, PriceAdjustment } from '../shared';
 import { configuredOnlineProviders } from '../payments/tpay-config';
+import { netPaidByPayment } from '../payments/refund-ledger';
 import type { MailAccommodation } from '../notifications/notifications.service';
 import { assertRoomStock, instanceRoomAvailability } from './room-stock';
 import { LeadsService } from './leads.service';
@@ -737,7 +738,9 @@ export class RegistrationsService {
     // Księgujemy brakującą resztę (wcześniejsze wpłaty częściowe zostają), a nie drugi raz całość.
     const reg = await this.prisma.registration.findUniqueOrThrow({ where: { id }, include: { payments: { where: { status: 'PAID' } } } });
     const total = parseFloat(reg.totalPrice.toString());
-    const paid = (reg.payments as Array<{ amount: { toString(): string } }>).reduce((s, p) => s + parseFloat(p.amount.toString()), 0);
+    // Suma netto: zwroty częściowe wpłat online pomniejszają „wpłacono”.
+    const net = await netPaidByPayment(this.prisma, reg.payments as Array<{ id: string; amount: unknown; provider: string }>);
+    const paid = [...net.values()].reduce((s, v) => s + v, 0);
     const rest = Math.round((total - paid) * 100) / 100;
     return this.prisma.payment.create({
       data: {

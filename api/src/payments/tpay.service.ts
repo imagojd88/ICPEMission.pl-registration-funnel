@@ -15,6 +15,18 @@ export interface TpayTransaction {
   paymentUrl: string;
 }
 
+/**
+ * Wynik zlecenia zwrotu:
+ *  - `ok`        — Tpay przyjął zwrot;
+ *  - `rejected`  — Tpay na pewno NIE wykonał zwrotu (odmowa z kodem błędu albo żądanie w ogóle nie wyszło);
+ *  - `uncertain` — nie wiadomo (przekroczony czas, zerwane połączenie, błąd 5xx): zwrot MÓGŁ zostać wykonany.
+ * Żadnych danych płatnika ani pełnej odpowiedzi — tylko status i kody błędów.
+ */
+export type TpayRefundResult =
+  | { outcome: 'ok'; status: string | null; refundId: string | null; httpStatus: number }
+  | { outcome: 'rejected'; codes: string[]; httpStatus: number | null }
+  | { outcome: 'uncertain'; why: string; httpStatus: number | null };
+
 const HTTP_TIMEOUT_MS = 15_000;
 const CERT_TTL_MS = 6 * 60 * 60_000;
 
@@ -114,6 +126,60 @@ export class TpayService {
     const paymentUrl = typeof json?.transactionPaymentUrl === 'string' ? json.transactionPaymentUrl : '';
     if (!transactionId || !this.isTpayUrl(paymentUrl)) throw new TpayError('utworzenie transakcji: niepełna odpowiedź');
     return { transactionId, title, paymentUrl };
+  }
+
+  /**
+   * Zleca zwrot transakcji: `POST /transactions/{transactionId}/refunds`.
+   * `transactionId` to identyfikator z API Tpay (zwrócony przy utworzeniu transakcji), NIE tytuł `TR-…`.
+   * Bez `amount` → zwrot pełny (puste ciało `{}`); z `amount` → zwrot częściowy.
+   * Wysyłane DOKŁADNIE RAZ: nie ponawiamy po błędzie sieci ani po 5xx (zwrot mógł się wykonać).
+   * Jedyny wyjątek to 401 (token unieważniony) — wtedy żądanie na pewno nie zostało wykonane.
+   */
+  async refund(transactionId: string, amount?: number): Promise<TpayRefundResult> {
+    const cfg = tpayConfig();
+    if (!cfg.ready) return { outcome: 'rejected', codes: ['not_configured'], httpStatus: null };
+    if (!/^[A-Za-z0-9_-]{6,64}$/.test(transactionId)) return { outcome: 'rejected', codes: ['bad_transaction_id'], httpStatus: null };
+    const body = JSON.stringify(amount === undefined ? {} : { amount: Math.round(amount * 100) / 100 });
+    const url = `${cfg.apiBase}/transactions/${encodeURIComponent(transactionId)}/refunds`;
+    let res: Response | null = null;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      let token: string;
+      try {
+        // Błąd przy pobieraniu tokenu = zlecenie zwrotu nie wyszło.
+        token = await this.accessToken();
+      } catch {
+        return { outcome: 'rejected', codes: ['auth_failed'], httpStatus: null };
+      }
+      try {
+        res = await this.http(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: `Bearer ${token}` },
+          body,
+        });
+      } catch (e) {
+        return { outcome: 'uncertain', why: e instanceof TpayError ? e.message : 'błąd połączenia', httpStatus: null };
+      }
+      if (res.status !== 401) break;
+      this.token = null;
+    }
+    if (!res) return { outcome: 'uncertain', why: 'brak odpowiedzi', httpStatus: null };
+    const status = res.status;
+    type RefundBody = { result?: unknown; status?: unknown; refundId?: unknown; id?: unknown; errors?: unknown };
+    const json = (await res.json().catch(() => null)) as RefundBody | null;
+    const codes = (Array.isArray(json?.errors) ? (json?.errors as unknown[]) : [])
+      .map((e) => String((e as { errorCode?: unknown })?.errorCode ?? '').toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 60))
+      .filter(Boolean)
+      .slice(0, 5);
+    const result = typeof json?.result === 'string' ? json.result.toLowerCase() : '';
+    if (status >= 200 && status < 300) {
+      if (result === 'failed' || codes.length > 0) return { outcome: 'rejected', codes: codes.length ? codes : ['refund_failed'], httpStatus: status };
+      const clean = (v: unknown) => (typeof v === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(v) ? v : null);
+      return { outcome: 'ok', status: clean(json?.status), refundId: clean(json?.refundId) ?? clean(json?.id), httpStatus: status };
+    }
+    if (status === 401 || status === 403) return { outcome: 'rejected', codes: ['auth_failed'], httpStatus: status };
+    // 4xx = Tpay odrzucił zlecenie (walidacja, brak środków, transakcja nie do zwrotu). 408 traktujemy jak przekroczenie czasu.
+    if (status >= 400 && status < 500 && status !== 408) return { outcome: 'rejected', codes: codes.length ? codes : [`http_${status}`], httpStatus: status };
+    return { outcome: 'uncertain', why: `odpowiedź HTTP ${status}`, httpStatus: status };
   }
 
   /** Przekierowujemy wyłącznie na `https://…tpay.com` — odpowiedź API nie może stać się otwartym przekierowaniem. */

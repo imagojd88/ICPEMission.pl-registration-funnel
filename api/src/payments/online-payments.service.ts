@@ -7,7 +7,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { PaymentPlanService, PaymentSummary, summarize } from '../registrations/payment-plan.service';
 import { manageRegistrationLink, mailLang, titleFor } from '../registrations/registrations.service';
 import {
-  contactCountry, onlinePayAmount, onlinePayBounds, onlineProviderFor, warsawDate,
+  applyChargeback, contactCountry, onlinePayAmount, onlinePayBounds, onlineProviderFor, refundedOfPayment, warsawDate,
   OnlinePayBounds, OnlinePayMode, PricingConfig,
 } from '../shared';
 import { configuredOnlineProviders, tpayConfig } from './tpay-config';
@@ -150,8 +150,15 @@ export class OnlinePaymentsService {
     const rows = (await this.db.payment.findMany({
       where: { registrationId: reg.id, status: { in: ['PAID', 'REFUNDED'] } },
       orderBy: { createdAt: 'desc' },
-      select: { id: true, amount: true, currency: true, status: true, provider: true, method: true, raw: true, createdAt: true },
-    })) as Array<{ id: string; amount: unknown; currency: string; status: string; provider: string; method: string; raw: unknown; createdAt: Date }>;
+      select: { id: true, amount: true, currency: true, status: true, provider: true, method: true, raw: true, createdAt: true, updatedAt: true },
+    })) as Array<{ id: string; amount: unknown; currency: string; status: string; provider: string; method: string; raw: unknown; createdAt: Date; updatedAt: Date }>;
+    const doneRefunds = (await this.db.paymentRefund.findMany({
+      where: { registrationId: reg.id, status: 'DONE' },
+      orderBy: { createdAt: 'asc' },
+      select: { paymentId: true, amount: true, createdAt: true },
+    })) as Array<{ paymentId: string; amount: unknown; createdAt: Date }>;
+    const refundsOf = (paymentId: string) =>
+      doneRefunds.filter((r) => r.paymentId === paymentId).map((r) => ({ amount: num(r.amount), status: 'DONE', date: warsawDate(r.createdAt) }));
     const last = (await this.db.onlinePayment.findFirst({
       where: { registrationId: reg.id },
       orderBy: { createdAt: 'desc' },
@@ -171,6 +178,14 @@ export class OnlinePaymentsService {
         status: p.status,
         source: p.provider === 'tpay' ? 'online' : p.method === 'CASH' ? 'cash' : p.method === 'ONLINE' ? 'online' : 'transfer',
         paidAt: String((p.raw as { paidAt?: unknown } | null)?.paidAt ?? '') || p.createdAt.toISOString().slice(0, 10),
+        // Zwroty: łączna zwrócona kwota i lista (dzień + kwota) — bez powodu i bez tego, kto zlecił.
+        refunded: refundedOfPayment({ amount: num(p.amount), status: p.status }, refundsOf(p.id)),
+        refunds:
+          refundsOf(p.id).length > 0
+            ? refundsOf(p.id).map((r) => ({ amount: r.amount, date: r.date }))
+            : p.status === 'REFUNDED'
+              ? [{ amount: num(p.amount), date: warsawDate(p.updatedAt) }]
+              : [],
       })),
       lastAttempt: last
         ? { status: last.status, amount: num(last.amount), paidAmount: last.paidAmount == null ? null : num(last.paidAmount), createdAt: last.createdAt.toISOString() }
@@ -380,8 +395,34 @@ export class OnlinePaymentsService {
       const claim = (await tx.onlinePayment.updateMany({ where: { id: attempt.id, status: { not: 'REFUNDED' } }, data: { status: 'REFUNDED' } })) as { count: number };
       if (claim.count === 0) return null;
       if (!attempt.paymentId) return 'UNMATCHED';
+      const pay = (await tx.payment.findUnique({ where: { id: attempt.paymentId }, select: { amount: true, status: true } })) as { amount: unknown; status: string } | null;
+      if (!pay) return 'UNMATCHED';
+      // Wpłata zwrócona już w całości z panelu (REFUNDED) → nic nie zmieniamy i nie pomniejszamy drugi raz.
+      if (pay.status === 'REFUNDED') return null;
       const upd = (await tx.payment.updateMany({ where: { id: attempt.paymentId, status: 'PAID' }, data: { status: 'REFUNDED' } })) as { count: number };
-      return upd.count > 0 ? 'REFUNDED' : 'UNMATCHED';
+      if (upd.count === 0) return 'UNMATCHED';
+      // Księga zwrotów: zwroty z panelu w toku / do wyjaśnienia uznajemy za wykonane (Tpay potwierdził zwrot
+      // całości), a brakującą resztę dopisujemy jednym wierszem — suma zwrotów = kwota wpłaty.
+      const rows = ((await tx.paymentRefund.findMany({ where: { paymentId: attempt.paymentId }, select: { amount: true, status: true } })) as Array<{ amount: unknown; status: string }>)
+        .map((r) => ({ amount: num(r.amount), status: r.status }));
+      const cb = applyChargeback({ amount: num(pay.amount), status: 'PAID' }, rows);
+      await tx.paymentRefund.updateMany({ where: { paymentId: attempt.paymentId, status: { in: ['PENDING', 'UNCERTAIN'] } }, data: { status: 'DONE', lockKey: null } });
+      if (cb.residual > 0) {
+        await tx.paymentRefund.create({
+          data: {
+            paymentId: attempt.paymentId,
+            registrationId: attempt.registrationId,
+            amount: cb.residual,
+            currency: 'PLN',
+            status: 'DONE',
+            source: 'tpay-notification',
+            createdBy: 'tpay',
+            testMode,
+            raw: { tr_id: trId || null, tr_status: 'chargeback' },
+          },
+        });
+      }
+      return 'REFUNDED';
     })) as 'REFUNDED' | 'UNMATCHED' | null;
     if (!changed) return true; // ponowione powiadomienie o zwrocie
     this.logger.log(`Zwrot Tpay odnotowany (próba ${attempt.id}, zgłoszenie ${attempt.registrationId})`);

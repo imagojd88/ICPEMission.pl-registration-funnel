@@ -21,6 +21,7 @@ const TYPE_LABEL: Record<string, string> = {
   PAYMENT_DUE_SOON: 'Przypomnienie o racie (przed terminem)',
   PAYMENT_OVERDUE: 'Ponaglenie o racie (po terminie)',
   PAYMENT_RECEIVED: 'Otrzymaliśmy wpłatę (płatność online)',
+  PAYMENT_REFUNDED: 'Zwróciliśmy wpłatę (zwrot płatności online)',
   ONLINE_PAYMENT_ALERT: 'Płatność online wymaga uwagi (do organizatora)',
   ACCOMMODATION_CHANGED: 'Zmiana noclegu (do gościa)',
   ACCOMMODATION_CHANGED_ADMIN: 'Zmiana noclegu (kopia dla organizatora)',

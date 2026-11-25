@@ -9,6 +9,7 @@ import {
   Settings,
   GraduationCap,
   Library,
+  LifeBuoy,
   LogOut,
   Sun,
   Moon,
@@ -27,6 +28,7 @@ type AdminScreen =
   | 'attendance'
   | 'courses'
   | 'settings'
+  | 'help'
 
 interface NavItem {
   id: AdminScreen
@@ -45,6 +47,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'attendance', label: 'Obecność', icon: UserCheck },
   { id: 'courses', label: 'Formacja online', icon: GraduationCap },
   { id: 'settings', label: 'Ustawienia', icon: Settings },
+  { id: 'help', label: 'Pomoc', icon: LifeBuoy },
 ]
 
 interface AdminSidebarProps {

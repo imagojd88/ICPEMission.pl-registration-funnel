@@ -1,6 +1,6 @@
 # 20 — Plan wdrożenia Tpay
 
-> Status: etapy 0–3 WYKONANE w kodzie 25.11.2026 (do pushu i Manual Deploy `icpe-api`; szczegóły i odstępstwa: `session_notes.md`). Pozostają: etap 4 (zwroty z panelu) i etap 5 (sandbox / tryb testowy, produkcja). Plan zatwierdzony przez Jacka 25.11.2026, przygotowany przez agenta po lekturze dokumentacji Tpay i kodu.
+> Status: etapy 0–3 WYKONANE w kodzie 25.11.2026; etap 4 (zwroty z panelu admina) WYKONANY w kodzie 25.11.2026 — do pushu i Manual Deploy `icpe-api`, NIE sprawdzony na działającym Tpay (szczegóły, założenia i scenariusze testu: `session_notes.md`, sekcja „Zwroty z panelu (etap 4)” niżej). Pozostaje etap 5 (testy w trybie testowym, produkcja). Plan zatwierdzony przez Jacka 25.11.2026, przygotowany przez agenta po lekturze dokumentacji Tpay i kodu.
 > Oznaczenia: **[DOK]** fakt z dokumentacji Tpay, **[KOD]** fakt z kodu, **[ZAŁ]** założenie lub rekomendacja.
 > Etap 0 częściowo wykonany 25.11.2026: `POST payments/dev/confirm/:regId` wymaga logowania admina (commit `58080fd`). `POST payments/:regId/checkout` i logowanie ładunku webhooka pozostają do zamknięcia.
 
@@ -43,6 +43,11 @@ Nagłówek `X-JWS-Signature` (trzy części rozdzielone kropką; pierwsza ma pol
 
 ### Zwroty [DOK]
 `POST /transactions/{id}/refunds` (`{}` = pełny, `{"amount": …}` = częściowy). Zwrot pełny daje powiadomienie `tr_status=chargeback`. Powiadomienie o zwrocie częściowym i o chargebacku bankowym nie jest opisane.
+
+### Zwroty z panelu (etap 4, wykonany 25.11.2026)
+- **[DOK]** Ścieżka przyjmuje identyfikator transakcji z API (`transactionId`, u nas `OnlinePayment.externalId`), nie tytuł `TR-…`. Zwrot pełny zmienia status transakcji (`refund` / `chargeback`); zwrot częściowy statusu NIE zmienia, nawet gdy częściowe sumują się do 100%. PayPal nie obsługuje zwrotów. Kody błędów: `already_refunded`, `cannot_create_refund`, `no_sufficient_funds_or_refund_limit_reached`, `refund_failed`, `refund_period_expired`, `cannot_refund_collect_transaction`, `cannot_refund_marketplace_transaction`. Statusy zwrotu po stronie Tpay: New, Pending, Cancel, Hold, Done, Processed (+ BLIK_*).
+- **[ZAŁ]** Kształt odpowiedzi `POST …/refunds` (czytamy tylko `result`, `status`, `errors[].errorCode`; HTTP 2xx bez błędów = przyjęty), format błędów, zachowanie w trybie testowym konta, brak powiadomienia o zwrocie częściowym, zwrot anulowany / wstrzymany przez Tpay PO przyjęciu (statusy Cancel / Hold) — system tego nie śledzi.
+- **[KOD]** Tabela `PaymentRefund` (wiersz na zwrot; `lockKey @unique` = jedno zlecenie naraz na wpłatę), `RefundsService`, `POST /admin/payments/:paymentId/refund`, `POST /admin/payments/refunds/:refundId/resolve`. „Wpłacono” = wpłaty PAID − zwroty DONE. Odpowiedź niejednoznaczna (czas, 5xx) → stan „do wyjaśnienia”, bez ponowienia, mail do organizatora, ręczne rozstrzygnięcie w panelu.
 
 ### Sandbox [DOK]
 BLIK: kody zaczynające się od `777`. Osobna baza i osobne klucze.
@@ -96,7 +101,8 @@ W jednej transakcji bazy: `updateMany` próby z warunkiem „status ≠ PAID” 
 | dwie próby opłacone | obie zaksięgowane, nadpłata widoczna w panelu |
 | zgłoszenie anulowane, a wpłata przyszła | księgujemy i powiadamiamy organizatora |
 | zwrot pełny (`chargeback`) | `Payment.status = 'REFUNDED'`, mail do organizatora, statusu zgłoszenia nie cofamy |
-| zwrot częściowy, chargeback bankowy | korekta ręczna (brak opisu w dokumentacji) |
+| zwrot częściowy z panelu admina | wiersz `PaymentRefund`, „Wpłacono” pomniejszone o kwotę; wpłata zostaje PAID do zwrotu całości |
+| zwrot częściowy zlecony w panelu Tpay, chargeback bankowy | korekta ręczna (brak opisu w dokumentacji; system się o nim nie dowie) |
 | `test_mode=1` na produkcji | odrzucamy |
 
 ## 3. Bezpieczeństwo
@@ -129,7 +135,7 @@ Tworzenie płatności: tylko posiadacz tokenu zgłoszenia; kwota liczona na serw
 - Ostrzeżenie w edycji eventu, gdy `ONLINE` zaznaczone, a Tpay nieskonfigurowany lub waluta ≠ PLN.
 - „Płatności”: źródło „online (Tpay)”, tytuł transakcji, znacznik testu i rozbieżności kwoty; bez przycisku „cofnij”.
 - Ustawienia: kafel „Płatności online” (tryb, środowisko, czy klucze ustawione, adres powiadomień do skopiowania).
-- Zwroty: w wersji 1 tylko z panelu Tpay.
+- Zwroty: od etapu 4 przycisk „Zwróć” przy wpłacie Tpay (pełny / częściowy, powód, powiadomienie gościa); zwrot pełny zlecony w panelu Tpay nadal jest obsługiwany powiadomieniem.
 
 ## 6. Co robi właściciel
 

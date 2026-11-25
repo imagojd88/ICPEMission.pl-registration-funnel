@@ -11,6 +11,7 @@ import {
   iso,
 } from '../admin/personal-os.mapper';
 import { resumeUptimeMonitor } from '../integrations/uptime-keepalive';
+import { netPaidByPayment } from '../payments/refund-ledger';
 
 /** Po ilu dniach od końca eventu automat przełącza go na CLOSED (→ zakładka „Poprzednie"). */
 export const AUTO_CLOSE_DAYS = 7;
@@ -74,14 +75,19 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       where: { instanceId },
       select: {
         status: true,
-        payments: { where: { status: 'PAID' }, select: { amount: true } },
+        payments: { where: { status: 'PAID' }, select: { id: true, amount: true, provider: true } },
       },
     });
+    // Przychód netto: zwroty częściowe wpłat online pomniejszają sumę (wpłaty zwrócone w całości mają status REFUNDED).
+    const net = await netPaidByPayment(
+      this.prisma,
+      (regs as Array<{ payments: Array<{ id: string; amount: unknown; provider: string }> }>).flatMap((r) => r.payments),
+    );
     const registeredCount = regs.length;
     const confirmedCount = regs.filter((r: { status: string }) => r.status === 'CONFIRMED').length;
     const revenue = regs.reduce(
-      (s: number, r: { payments: Array<{ amount: unknown }> }) =>
-        s + r.payments.reduce((ps: number, p: { amount: unknown }) => ps + num(p.amount as number), 0),
+      (s: number, r: { payments: Array<{ id: string; amount: unknown }> }) =>
+        s + r.payments.reduce((ps: number, p: { id: string; amount: unknown }) => ps + (net.get(p.id) ?? num(p.amount as number)), 0),
       0,
     );
     return { registeredCount, confirmedCount, revenue };

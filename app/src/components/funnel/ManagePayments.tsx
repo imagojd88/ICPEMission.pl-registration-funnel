@@ -258,15 +258,28 @@ export default function ManagePayments({ token, onChanged, refreshKey }: {
         {data.payments.length === 0 ? (
           <span className="text-sm" style={{ color: 'var(--muted)' }}>{t('pay.no_payments')}</span>
         ) : (
-          data.payments.map((p) => (
-            <div key={p.id} className="flex justify-between gap-3 text-sm" style={{ color: 'var(--ink)' }}>
-              <span>
-                {day(p.paidAt, lng)} · {t(`pay.src_${p.source}`)}
-                {p.status === 'REFUNDED' ? ` · ${t('pay.refunded')}` : ''}
-              </span>
-              <span className="font-medium" style={{ textDecoration: p.status === 'REFUNDED' ? 'line-through' : 'none' }}>{money(p.amount, p.currency || cur, lng)}</span>
-            </div>
-          ))
+          data.payments.map((p) => {
+            // Zwroty: starsze API nie zwraca listy — wtedy zostaje sam dopisek „zwrócono” przy wpłacie REFUNDED.
+            const refunds = p.refunds ?? []
+            const partly = p.status !== 'REFUNDED' && (p.refunded ?? 0) > 0
+            return (
+              <div key={p.id} className="flex flex-col gap-1">
+                <div className="flex justify-between gap-3 text-sm" style={{ color: 'var(--ink)' }}>
+                  <span>
+                    {day(p.paidAt, lng)} · {t(`pay.src_${p.source}`)}
+                    {p.status === 'REFUNDED' ? ` · ${t('pay.refunded')}` : partly ? ` · ${t('pay.refunded_part')}` : ''}
+                  </span>
+                  <span className="font-medium" style={{ textDecoration: p.status === 'REFUNDED' ? 'line-through' : 'none' }}>{money(p.amount, p.currency || cur, lng)}</span>
+                </div>
+                {refunds.map((r, i) => (
+                  <div key={`${p.id}-r${i}`} className="flex justify-between gap-3 text-sm pl-3" style={{ color: 'var(--muted)' }}>
+                    <span>{day(r.date, lng)} · {t('pay.refund_row')}</span>
+                    <span className="font-medium">−{money(r.amount, p.currency || cur, lng)}</span>
+                  </div>
+                ))}
+              </div>
+            )
+          })
         )}
       </div>
 

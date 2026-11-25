@@ -13,6 +13,7 @@ import AccommodationScreen from '@/components/admin/accommodation/AccommodationS
 import PaymentsScreen from '@/components/admin/payments/PaymentsScreen'
 import CoursesScreen from '@/components/admin/courses/CoursesScreen'
 import LibraryScreen from '@/components/admin/library/LibraryScreen'
+import HelpScreen, { HELP_HASH } from '@/components/admin/help/HelpScreen'
 
 type AdminScreen =
   | 'dashboard'
@@ -24,6 +25,7 @@ type AdminScreen =
   | 'attendance'
   | 'courses'
   | 'settings'
+  | 'help'
 
 const SCREEN_TITLES: Record<AdminScreen, { title: string; subtitle?: string }> = {
   dashboard: { title: 'Dashboard', subtitle: 'Przegląd aktywności i kluczowych wskaźników' },
@@ -35,6 +37,7 @@ const SCREEN_TITLES: Record<AdminScreen, { title: string; subtitle?: string }> =
   attendance: { title: 'Obecność', subtitle: 'Lista obecności i weryfikacja uczestników' },
   courses: { title: 'Formacja online', subtitle: 'Kursy online: filmy, materiały PDF i dostęp kursantów' },
   settings: { title: 'Ustawienia', subtitle: 'Konfiguracja systemu i konta' },
+  help: { title: 'Pomoc', subtitle: 'Instrukcje dla administratora: recepcja, eventy, zgłoszenia, płatności' },
 }
 
 export default function AdminPanel() {
@@ -44,7 +47,7 @@ export default function AdminPanel() {
     setAuthToken(null)
     return false
   })
-  const [view, setView] = useState<AdminScreen>('dashboard')
+  const [view, setView] = useState<AdminScreen>(() => (window.location.hash.startsWith(HELP_HASH) ? 'help' : 'dashboard'))
   const [showWizard, setShowWizard] = useState(false)
 
   useEffect(() => {
@@ -86,6 +89,10 @@ export default function AdminPanel() {
 
   function handleNavigate(screen: AdminScreen) {
     setView(screen)
+    // Kotwica zakładki „Pomoc” (#pomoc/…) nie zostaje w adresie innych ekranów.
+    if (screen !== 'help' && window.location.hash.startsWith(HELP_HASH)) {
+      window.history.replaceState(null, '', window.location.pathname + window.location.search)
+    }
     // Close wizard when navigating away from events
     if (screen !== 'events') {
       setShowWizard(false)
@@ -124,6 +131,8 @@ export default function AdminPanel() {
         return <CoursesScreen />
       case 'settings':
         return <SettingsScreen onLogout={handleLogout} />
+      case 'help':
+        return <HelpScreen />
       default:
         return <EmptyModuleState />
     }

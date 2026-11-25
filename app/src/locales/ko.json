@@ -697,6 +697,8 @@
     "src_transfer": "계좌 이체",
     "src_cash": "현금",
     "refunded": "환불됨",
+    "refunded_part": "일부 환불됨",
+    "refund_row": "환불",
     "fully_paid": "참가비가 전액 납부되었습니다. 감사합니다!",
     "online_title": "온라인 결제",
     "methods": "BLIK · 빠른 계좌 이체 (Tpay)",

@@ -1265,7 +1265,38 @@ export interface RegistrationPaymentRow {
   mismatch?: boolean
   /** wpłata online (Tpay): kwota, na którą utworzono płatność */
   expected?: number | null
+  /** zwroty tej wpłaty (wpłaty Tpay) — od najstarszego */
+  refunds?: PaymentRefundRow[]
+  /** ile z tej wpłaty zwrócono */
+  refundedAmount?: number
+  /** ile z tej wpłaty liczy się do „Wpłacono” */
+  netAmount?: number
+  refundState?: 'NONE' | 'PARTIAL' | 'FULL'
+  /** ile można jeszcze zwrócić z panelu (0 = zwrot niedostępny) */
+  refundable?: number
+  /** zwrot w toku albo do wyjaśnienia — kolejne zwroty zablokowane */
+  refundInFlight?: boolean
   createdAt: string
+}
+
+export interface PaymentRefundRow {
+  id: string
+  amount: number
+  reason: string | null
+  /** PENDING (w toku) | DONE (wykonany) | UNCERTAIN (do wyjaśnienia) | FAILED (odrzucony) */
+  status: 'PENDING' | 'DONE' | 'UNCERTAIN' | 'FAILED'
+  source: 'panel' | 'tpay-notification'
+  by: string | null
+  createdAt: string
+}
+
+export interface RefundResult extends RegistrationPayments {
+  ok: boolean
+  /** Tpay nie potwierdził zwrotu (np. przekroczony czas) — zwrot czeka na wyjaśnienie */
+  uncertain?: boolean
+  refundId?: string
+  amount?: number
+  guestMail?: 'sent' | 'skipped' | 'failed'
 }
 
 export interface RegistrationPayments {
@@ -1294,6 +1325,23 @@ export async function addRegistrationPayment(
 /** Cofa błędnie wpisaną wpłatę (zostaje w historii jako anulowana). */
 export async function voidRegistrationPayment(paymentId: string, token?: string): Promise<RegistrationPayments> {
   return apiFetch<RegistrationPayments>(`/admin/payments/${paymentId}`, { method: 'DELETE', headers: authHeaders(token) })
+}
+
+/**
+ * Zleca zwrot wpłaty Tpay (prawdziwy przelew zwrotny). Bez `amount` = cała pozostała kwota wpłaty.
+ * Kwotę sprawdza serwer. Tylko pełny admin.
+ */
+export async function refundPayment(
+  paymentId: string,
+  dto: { amount?: number; reason?: string; notifyGuest?: boolean },
+  token?: string,
+): Promise<RefundResult> {
+  return apiFetch<RefundResult>(`/admin/payments/${paymentId}/refund`, { method: 'POST', headers: authHeaders(token), body: JSON.stringify(dto) })
+}
+
+/** Rozstrzyga zwrot „do wyjaśnienia” po sprawdzeniu w panelu Tpay (nic nie wysyła do Tpay). */
+export async function resolveRefund(refundId: string, outcome: 'done' | 'failed', token?: string): Promise<RefundResult> {
+  return apiFetch<RefundResult>(`/admin/payments/refunds/${refundId}/resolve`, { method: 'POST', headers: authHeaders(token), body: JSON.stringify({ outcome }) })
 }
 
 export async function markRegistrationPaid(id: string, token?: string): Promise<void> {
@@ -1589,7 +1637,13 @@ export interface ManagedPayments {
   summary: NonNullable<RegistrationDto['payment']>
   /** granice kwoty płatności online: `due` = „Zapłać teraz”, `min`…`max` = „Inna kwota” */
   bounds: { due: number; min: number; max: number }
-  payments: Array<{ id: string; amount: number; currency: string; status: 'PAID' | 'REFUNDED'; source: 'online' | 'transfer' | 'cash'; paidAt: string }>
+  payments: Array<{
+    id: string; amount: number; currency: string; status: 'PAID' | 'REFUNDED'; source: 'online' | 'transfer' | 'cash'; paidAt: string
+    /** łączna zwrócona kwota tej wpłaty */
+    refunded?: number
+    /** zwroty tej wpłaty: dzień `YYYY-MM-DD` i kwota */
+    refunds?: Array<{ amount: number; date: string }>
+  }>
   lastAttempt: { status: 'CREATED' | 'PENDING' | 'PAID' | 'REFUNDED' | 'FAILED' | 'EXPIRED'; amount: number; paidAmount: number | null; createdAt: string } | null
   online: { available: boolean; provider: 'tpay' | null; reason: OnlineUnavailableReason | null }
 }

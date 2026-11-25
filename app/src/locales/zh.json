@@ -697,6 +697,8 @@
     "src_transfer": "银行转账",
     "src_cash": "现金",
     "refunded": "已退款",
+    "refunded_part": "已部分退款",
+    "refund_row": "退款",
     "fully_paid": "您的报名费用已全部付清。谢谢！",
     "online_title": "在线付款",
     "methods": "BLIK · 快速银行转账 (Tpay)",

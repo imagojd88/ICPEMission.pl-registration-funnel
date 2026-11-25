@@ -5,10 +5,12 @@ import { CourseAccessService } from '../courses/course-access.service';
 import {
   addDays, buildSchedule, hasPaymentPlan, minDepositPctFor, normalizePaymentPlan, paymentState, warsawDate,
   PaymentPlan, PaymentState, PricingConfig, ScheduleItem, contactCountry, onlineProviderFor,
+  netPaidAmount, refundableAmount, refundedOfPayment, refundInFlight, refundState,
 } from '../shared';
 import { manageRegistrationLink } from './registrations.service';
 // Czysty helper (process.env) — bez importu PaymentsModule, żeby nie tworzyć zależności cyklicznej.
 import { configuredOnlineProviders } from '../payments/tpay-config';
+import { netPaidByPayment } from '../payments/refund-ledger';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Db = any;
@@ -18,7 +20,7 @@ export const PARTIAL_PROVIDERS = ['panel', 'bank-import'];
 /**
  * Źródła wpłat, które mogą być częściowe (zadatek, rata) — przy nich stan płatności liczymy z sumy
  * wpłat. Wpłaty online z Tpay do nich należą, ale NIE można ich cofnąć w panelu (`voidPayment`
- * dopuszcza tylko PARTIAL_PROVIDERS) — zwrot robi się w panelu Tpay.
+ * dopuszcza tylko PARTIAL_PROVIDERS) — wpłatę Tpay się ZWRACA (`RefundsService`, tabela `PaymentRefund`).
  */
 export const SUM_PROVIDERS = [...PARTIAL_PROVIDERS, 'tpay'];
 const ACTIVE_STATUSES = ['PENDING_PAYMENT', 'AWAITING_TRANSFER', 'CONFIRMED'];
@@ -85,17 +87,24 @@ export class PaymentPlanService implements OnModuleInit, OnModuleDestroy {
     if (this.timer) clearInterval(this.timer);
   }
 
-  /** Suma zaksięgowanych wpłat (PAID) per zgłoszenie + czy są wśród nich wpłaty częściowe z panelu / importu. */
-  async paidMap(where: Record<string, unknown>): Promise<Map<string, { paid: number; partial: boolean }>> {
+  /**
+   * Suma zaksięgowanych wpłat (PAID) per zgłoszenie, POMNIEJSZONA o zwroty (`PaymentRefund` DONE),
+   * + czy są wśród nich wpłaty częściowe z panelu / importu + dostawcy tych wpłat (`providers`).
+   * Wpłata zwrócona w całości ma status REFUNDED i nie jest tu w ogóle brana.
+   */
+  async paidMap(where: Record<string, unknown>): Promise<Map<string, { paid: number; partial: boolean; providers: string[] }>> {
     const rows = (await this.db.payment.findMany({
       where: { status: 'PAID', registration: where },
-      select: { registrationId: true, amount: true, provider: true },
-    })) as Array<{ registrationId: string; amount: unknown; provider: string }>;
-    const map = new Map<string, { paid: number; partial: boolean }>();
+      select: { id: true, registrationId: true, amount: true, provider: true },
+    })) as Array<{ id: string; registrationId: string; amount: unknown; provider: string }>;
+    const net = await netPaidByPayment(this.db, rows);
+    const map = new Map<string, { paid: number; partial: boolean; providers: string[] }>();
     for (const r of rows) {
-      const cur = map.get(r.registrationId) ?? { paid: 0, partial: false };
-      cur.paid = round2(cur.paid + num(r.amount));
+      const cur = map.get(r.registrationId) ?? { paid: 0, partial: false, providers: [] };
+      const amount = net.get(r.id) ?? num(r.amount);
+      cur.paid = round2(cur.paid + amount);
       if (SUM_PROVIDERS.includes(r.provider)) cur.partial = true;
+      if (amount > 0 && !cur.providers.includes(r.provider)) cur.providers.push(r.provider);
       map.set(r.registrationId, cur);
     }
     return map;
@@ -109,19 +118,20 @@ export class PaymentPlanService implements OnModuleInit, OnModuleDestroy {
   async decorate<T extends { id: string; totalPrice: number; createdAt: string; rooms?: Array<{ roomId: string }>; paymentStatus?: string }>(
     instanceId: string,
     list: T[],
-  ): Promise<Array<T & { paidAmount: number; payment: PaymentSummary }>> {
+  ): Promise<Array<T & { paidAmount: number; paidProviders: string[]; payment: PaymentSummary }>> {
     const inst = await this.db.eventInstance.findUnique({ where: { id: instanceId }, select: { pricingConfig: true } });
     const cfg = (inst?.pricingConfig ?? null) as PricingConfig | null;
     const paid = await this.paidMap({ instanceId });
     const today = warsawDate();
     return list.map((r) => {
-      const p = paid.get(r.id) ?? { paid: 0, partial: false };
+      const p = paid.get(r.id) ?? { paid: 0, partial: false, providers: [] as string[] };
       const payment = summarize(cfg, { totalPrice: r.totalPrice, createdAt: r.createdAt, roomIds: (r.rooms ?? []).map((x) => x.roomId) }, p.paid, today);
       const sumBased = payment.hasPlan || p.partial;
       const paymentStatus = !sumBased || r.totalPrice <= 0
         ? r.paymentStatus
         : payment.fullyPaid ? 'PAID' : p.paid > 0 || r.paymentStatus === 'PENDING' ? 'PENDING' : r.paymentStatus;
-      return { ...r, paymentStatus, paidAmount: p.paid, payment };
+      // `paidProviders`: dostawcy zaksięgowanych wpłat (np. ['tpay', 'panel']) — kolumna „Metoda” w panelu.
+      return { ...r, paymentStatus, paidAmount: p.paid, paidProviders: p.providers, payment };
     });
   }
 
@@ -209,8 +219,26 @@ export class PaymentPlanService implements OnModuleInit, OnModuleDestroy {
       include: { instance: { select: { pricingConfig: true } }, payments: { orderBy: { createdAt: 'desc' } } },
     });
     if (!reg) throw new NotFoundException('Registration not found');
+    const refundRows = (await this.db.paymentRefund.findMany({
+      where: { registrationId },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true, paymentId: true, amount: true, reason: true, status: true, source: true, createdBy: true, createdAt: true },
+    })) as Array<{ id: string; paymentId: string; amount: unknown; reason: string | null; status: string; source: string; createdBy: string | null; createdAt: Date }>;
+    const tpayReady = configuredOnlineProviders().includes('tpay');
     const payments = (reg.payments as Array<{ id: string; amount: unknown; currency: string; status: string; provider: string; method: string; externalId: string | null; raw: unknown; createdAt: Date }>).map((p) => {
       const raw = (p.raw ?? {}) as { paidAt?: string; note?: string; by?: string; sender?: string; title?: string; testMode?: boolean; mismatch?: boolean; expected?: number };
+      const refunds = refundRows.filter((r) => r.paymentId === p.id).map((r) => ({
+        id: r.id,
+        amount: num(r.amount),
+        reason: r.reason,
+        /** PENDING | DONE | UNCERTAIN | FAILED — „Wpłacono” pomniejszają tylko DONE */
+        status: r.status,
+        /** 'panel' | 'tpay-notification' */
+        source: r.source,
+        by: r.createdBy,
+        createdAt: r.createdAt.toISOString(),
+      }));
+      const self = { amount: num(p.amount), status: p.status };
       return {
         id: p.id,
         amount: num(p.amount),
@@ -227,10 +255,17 @@ export class PaymentPlanService implements OnModuleInit, OnModuleDestroy {
         testMode: !!raw.testMode,
         mismatch: !!raw.mismatch,
         expected: typeof raw.expected === 'number' ? raw.expected : null,
+        // Zwroty (tylko wpłaty Tpay): historia, ile zwrócono, ile jeszcze można zwrócić, czy zwrot czeka na wyjaśnienie.
+        refunds,
+        refundedAmount: refundedOfPayment(self, refunds),
+        netAmount: netPaidAmount(self, refunds),
+        refundState: refundState(self, refunds),
+        refundable: p.provider === 'tpay' && tpayReady && String(p.currency).toUpperCase() === 'PLN' && !refundInFlight(refunds) ? refundableAmount(self, refunds) : 0,
+        refundInFlight: refundInFlight(refunds),
         createdAt: p.createdAt.toISOString(),
       };
     });
-    const paid = round2(payments.filter((p) => p.status === 'PAID').reduce((s, p) => s + p.amount, 0));
+    const paid = round2(payments.reduce((s, p) => s + p.netAmount, 0));
     const cfg = (reg.instance?.pricingConfig ?? null) as PricingConfig | null;
     return {
       registrationId,

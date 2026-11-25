@@ -132,7 +132,7 @@ export default function OnlinePaymentsSettings() {
             </div>
             <p className="text-xs" style={{ color: 'var(--faint)' }}>
               Wartości kluczy ustawiasz wyłącznie na Renderze (icpe-api ▸ Environment). Panel pokazuje tylko, czy są ustawione.
-              Zwroty wykonuje się w panelu Tpay.
+              Zwroty wpłat Tpay zleca się w „Płatnościach” (przycisk „Zwróć” przy wpłacie).
             </p>
           </>
         )}

@@ -3,6 +3,7 @@ import { PaymentsController } from './payments.controller';
 import { PaymentsService } from './payments.service';
 import { TpayService } from './tpay.service';
 import { OnlinePaymentsService } from './online-payments.service';
+import { RefundsService } from './refunds.service';
 import { AuthModule } from '../auth/auth.module';
 import { RegistrationsModule } from '../registrations/registrations.module';
 import { NotificationsModule } from '../notifications/notifications.module';
@@ -13,6 +14,6 @@ import { NotificationsModule } from '../notifications/notifications.module';
 @Module({
   imports: [AuthModule, RegistrationsModule, NotificationsModule],
   controllers: [PaymentsController],
-  providers: [PaymentsService, TpayService, OnlinePaymentsService],
+  providers: [PaymentsService, TpayService, OnlinePaymentsService, RefundsService],
 })
 export class PaymentsModule {}

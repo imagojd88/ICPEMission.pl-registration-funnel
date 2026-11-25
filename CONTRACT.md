@@ -52,10 +52,12 @@ Jeden RSVP na (event, e-mail) — ponowny zapis z tym samym e-mailem aktualizuje
 | POST | `/admin/instances/:id/room-types` | dodanie typu pokoju |
 | POST | `/admin/instances/:id/rooms` | generowanie puli pokoi |
 | PUT | `/admin/instances/:id/pricing` | progi wiekowe, opcje, rabaty (`PricingConfig`) |
-| GET | `/admin/instances/:id/registrations?status=&q=` | `RegistrationDto[]` |
+| GET | `/admin/instances/:id/registrations?status=&q=` | `RegistrationDto[]` — od 2026-11-25 z opcjonalnym `paidProviders: string[]` (dostawcy zaksięgowanych wpłat, np. `["tpay","panel"]`); `paidAmount` jest pomniejszone o zwroty |
 | PATCH | `/admin/registrations/:id/status` | `{ status }` |
 | POST | `/admin/registrations/:id/mark-paid` | ręczne potwierdzenie przelewu |
 | POST | `/admin/registrations/:id/assign-room` | `{ roomId }` |
+| POST | `/admin/payments/:paymentId/refund` | zwrot wpłaty Tpay — TYLKO JWT pełnego admina (token serwisowy → 403); szczegóły niżej |
+| POST | `/admin/payments/refunds/:refundId/resolve` | `{ outcome: 'done' \| 'failed' }` — rozstrzygnięcie zwrotu „do wyjaśnienia”; nic nie wysyła do Tpay; TYLKO JWT pełnego admina |
 | GET | `/admin/instances/:id/export.xlsx` | eksport listy |
 | POST | `/admin/meetings` + `/admin/attendance/:recordId` | moduł obecności |
 
@@ -74,6 +76,13 @@ Jeden RSVP na (event, e-mail) — ponowny zapis z tym samym e-mailem aktualizuje
 - Listy z autoryzacją (`GET /admin/instances`, `GET /admin/instances/:id`, `GET /admin/summary`, recepcja) zwracają event jak zwykle; `/admin/instances*` dokłada pole `unlisted`.
 - Zapis: `PATCH /admin/instances/:id` z `{ unlisted: boolean }`; opcjonalnie `unlisted: true` w `POST /admin/series`. Klon (`POST /admin/instances/:id/clone`) dziedziczy flagę.
 - `GET /r/:slug` (pole instancji) i `GET /r/:slug/config` zwracają `unlisted` — publiczny lejek dokłada na tej podstawie `<meta name="robots" content="noindex">`.
+
+## Zwroty wpłat Tpay z panelu (2026-11-25)
+- `POST /admin/payments/:paymentId/refund`, body `{ amount?: number, reason?: string, notifyGuest?: boolean }`. Bez `amount` = cała pozostała (niezwrócona) kwota wpłaty; `notifyGuest` domyślnie `true` (mail „Zwróciliśmy wpłatę”). Kwotę sprawdza serwer: > 0, ≤ (kwota wpłaty − zwroty wykonane), co do grosza.
+- Warunki: wpłata `provider = 'tpay'`, status `PAID`, PLN, tryb `tpay` skonfigurowany, brak zwrotu w toku. Błędy: 400 (kwota, wpłata nie do zwrotu, odmowa Tpay — z komunikatem), 403 (token serwisowy), 404, 409 (zwrot tej wpłaty w toku / do wyjaśnienia albo stan zmienił się w trakcie), 503 (Tpay nieskonfigurowany).
+- Odpowiedź 200: `{ ok, uncertain, refundId, amount, guestMail?: 'sent' | 'skipped' | 'failed', registrationId, payments[], summary }` (jak `GET /admin/registrations/:id/payments`). `uncertain: true` = Tpay nie potwierdził zwrotu (przekroczony czas); nic nie zaksięgowano, zwrot czeka na rozstrzygnięcie (`…/resolve`), kolejne zwroty tej wpłaty są zablokowane.
+- Model: tabela `PaymentRefund` (osobny wiersz na zwrot; statusy `PENDING` / `DONE` / `UNCERTAIN` / `FAILED`; źródło `panel` / `tpay-notification`). „Wpłacono” = wpłaty `PAID` − zwroty `DONE`; wpłata zwrócona w całości ma `Payment.status = REFUNDED` (tak samo po powiadomieniu `chargeback`).
+- Pola dodane (wszystkie opcjonalne, addytywne): w `GET /admin/registrations/:id/payments` wiersz wpłaty ma `refunds[] { id, amount, reason, status, source, by, createdAt }`, `refundedAmount`, `netAmount`, `refundState` (`NONE` / `PARTIAL` / `FULL`), `refundable`, `refundInFlight`; w `GET /registrations/manage/:token/payments` wiersz wpłaty ma `refunded` i `refunds[] { amount, date }`; recepcja (`/desk/…/payments`) — `refundedAmount`.
 
 ## Kraj zamieszkania zgłaszającego i flaga kodów rabatowych (2026-11-25)
 - `contact.countryCode` (opcjonalne) — kod ISO 3166-1 alpha-2, wielkie litery (np. `PL`). `POST /registrations` przyjmuje też małe litery (zamienia na wielkie), puste traktuje jak brak; inna wartość (nazwa kraju, 3 litery) → 400. Zmiana wyłącznie addytywna — bez pola wszystko działa jak dotąd.

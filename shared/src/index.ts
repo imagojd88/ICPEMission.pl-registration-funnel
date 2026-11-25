@@ -5,3 +5,4 @@ export * from './calendar';
 export * from './desk';
 export * from './onlinePayments';
 export * from './eventWizard';
+export * from './refunds';

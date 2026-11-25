@@ -707,6 +707,8 @@
     "src_transfer": "przelew",
     "src_cash": "gotówka",
     "refunded": "zwrócono",
+    "refunded_part": "zwrócono częściowo",
+    "refund_row": "zwrot",
     "fully_paid": "Zgłoszenie jest opłacone w całości. Dziękujemy!",
     "online_title": "Zapłać online",
     "methods": "BLIK · szybki przelew (Tpay)",

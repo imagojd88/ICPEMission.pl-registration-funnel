@@ -701,6 +701,8 @@
     "src_transfer": "bonifico",
     "src_cash": "contanti",
     "refunded": "rimborsato",
+    "refunded_part": "rimborsato in parte",
+    "refund_row": "rimborso",
     "fully_paid": "L'iscrizione è stata pagata per intero. Grazie!",
     "online_title": "Paga online",
     "methods": "BLIK · bonifico rapido (Tpay)",

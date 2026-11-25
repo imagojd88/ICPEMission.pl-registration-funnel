@@ -1,9 +1,10 @@
-import { Controller, Get, Post, Param, Body, Req, Res, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, Req, Res, HttpCode, HttpStatus, UseGuards, ForbiddenException } from '@nestjs/common';
 import type { RawBodyRequest } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { PaymentsService } from './payments.service';
 import { OnlinePaymentsService } from './online-payments.service';
+import { RefundActor, RefundsService } from './refunds.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @ApiTags('payments')
@@ -12,7 +13,46 @@ export class PaymentsController {
   constructor(
     private readonly payments: PaymentsService,
     private readonly online: OnlinePaymentsService,
+    private readonly refunds: RefundsService,
   ) {}
+
+  /**
+   * Zwroty zleca wyłącznie zalogowany pełny admin (JWT realm `admin`). `JwtAuthGuard` wpuszcza też
+   * token serwisowy (integracje) — ten zwrotów zlecać nie może; pomocnik recepcji nie przechodzi guarda wcale.
+   */
+  private refundActor(req: { user?: { sub?: string; email?: string; realm?: string } }): RefundActor {
+    const u = req.user;
+    if (!u || u.realm !== 'admin' || !u.email) throw new ForbiddenException('Zwrot może zlecić tylko zalogowany administrator.');
+    return { id: u.sub ? String(u.sub) : null, email: String(u.email) };
+  }
+
+  // ── Zwroty wpłat Tpay (panel admina) ───────────────────────────────────────
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Post('admin/payments/refunds/:refundId/resolve')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Rozstrzygnij zwrot „do wyjaśnienia” po sprawdzeniu w panelu Tpay: outcome = done | failed (nic nie wysyła do Tpay)' })
+  resolveRefund(
+    @Param('refundId') refundId: string,
+    @Body() dto: { outcome?: 'done' | 'failed'; notifyGuest?: boolean },
+    @Req() req: { user?: { sub?: string; email?: string; realm?: string } },
+  ) {
+    return this.refunds.resolve(refundId, dto ?? {}, this.refundActor(req));
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Post('admin/payments/:paymentId/refund')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Zleć zwrot wpłaty Tpay (bez amount = cała pozostała kwota); kwotę sprawdza serwer; tylko pełny admin' })
+  refundPayment(
+    @Param('paymentId') paymentId: string,
+    @Body() dto: { amount?: number | string; reason?: string; notifyGuest?: boolean },
+    @Req() req: { user?: { sub?: string; email?: string; realm?: string } },
+  ) {
+    return this.refunds.refund(paymentId, dto ?? {}, this.refundActor(req));
+  }
 
   // ── Płatności online (Tpay) ────────────────────────────────────────────────
 

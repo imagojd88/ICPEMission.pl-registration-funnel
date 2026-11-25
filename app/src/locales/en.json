@@ -697,6 +697,8 @@
     "src_transfer": "bank transfer",
     "src_cash": "cash",
     "refunded": "refunded",
+    "refunded_part": "partly refunded",
+    "refund_row": "refund",
     "fully_paid": "Your registration is paid in full. Thank you!",
     "online_title": "Pay online",
     "methods": "BLIK · fast bank transfer (Tpay)",
