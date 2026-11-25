@@ -76,8 +76,25 @@ export class IcpeGoEventDto {
   @ApiProperty({ required: false, description: 'Tylko z ?lang= — tytuł w tym języku (fallback EN, potem PL).' })
   titleText?: string;
 
-  @ApiProperty({ type: String, nullable: true, description: 'Miejsce jako jeden tekst (bez zmian).' })
+  @ApiProperty({ type: String, nullable: true, description: 'Miejsce jako jeden tekst — wersja polska (kanoniczna, bez zmian).' })
   location!: string | null;
+
+  @ApiProperty({
+    type: 'object',
+    additionalProperties: { type: 'string' },
+    example: { pl: 'Ośrodek h2o, Kiczyce', en: 'h2o Centre, Kiczyce' },
+    description:
+      'Miejsce w wersjach językowych: pl zawsze (= location), en/it gdy przetłumaczono w panelu. Puste {} gdy brak miejsca.',
+  })
+  locations!: Record<string, string>;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    required: false,
+    description: 'Tylko z ?lang= — miejsce w tym języku; brak tłumaczenia → EN → PL.',
+  })
+  locationText?: string | null;
 
   @ApiProperty({
     type: String,

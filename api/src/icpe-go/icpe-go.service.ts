@@ -25,7 +25,7 @@ type InstanceRow = {
   capacity: number | null;
   registrationOpensAt: Date;
   registrationClosesAt: Date;
-  series: { type: string; page: { slug: string; published: boolean } | null } | null;
+  series: { type: string; page: { slug: string; published: boolean; customFields: unknown } | null } | null;
 };
 
 const INSTANCE_SELECT = {
@@ -40,7 +40,7 @@ const INSTANCE_SELECT = {
   capacity: true,
   registrationOpensAt: true,
   registrationClosesAt: true,
-  series: { select: { type: true, page: { select: { slug: true, published: true } } } },
+  series: { select: { type: true, page: { select: { slug: true, published: true, customFields: true } } } },
 };
 
 @Injectable()
@@ -118,6 +118,7 @@ export class IcpeGoService {
     const cap = inst.capacity && inst.capacity > 0 ? inst.capacity : null;
     const title = localizedMap(inst.title);
     const inviteOnly = type === 'INVITE';
+    const locations = locationMap(inst.location, inst.series?.page?.customFields);
     return {
       id: inst.id,
       slug,
@@ -125,6 +126,8 @@ export class IcpeGoService {
       title,
       ...(lang ? { titleText: pickLang(title, lang) } : {}),
       location: inst.location ?? null,
+      locations,
+      ...(lang ? { locationText: pickLocation(locations, lang) } : {}),
       countryCode: isoCountry(inst.countryCode),
       startsAt: inst.startsAt.toISOString(),
       endsAt: inst.endsAt.toISOString(),
@@ -153,6 +156,32 @@ export class IcpeGoService {
       },
     };
   }
+}
+
+/**
+ * Miejsce w wersjach językowych: { pl: <location>, en?, it? }.
+ * Tłumaczenia z `RegistrationPage.customFields.locationI18n` (edycja eventu, zakładki EN/IT) liczą się
+ * tylko, gdy powstały z obecnej wersji PL (`locationI18n.pl === location`) — tak samo jak na stronie
+ * zapisów (`eventLocation` we froncie). Nieaktualne tłumaczenie pomijamy.
+ */
+function locationMap(location: string | null, customFields: unknown): Record<string, string> {
+  const base = (location ?? '').trim();
+  if (!base) return {};
+  const out: Record<string, string> = { pl: base };
+  const m = ((customFields ?? {}) as { locationI18n?: Record<string, unknown> | null }).locationI18n;
+  if (!m || typeof m !== 'object') return out;
+  if (String(m.pl ?? '').trim() !== base) return out;
+  for (const [k, v] of Object.entries(m)) {
+    if (k === 'pl' || typeof v !== 'string' || !v.trim()) continue;
+    out[k] = v.trim();
+  }
+  return out;
+}
+
+/** Miejsce w żądanym języku; brak tłumaczenia → angielski → polski. */
+function pickLocation(m: Record<string, string>, lang: string): string | null {
+  const l = lang.toLowerCase().slice(0, 2);
+  return m[l] ?? m.en ?? m.pl ?? null;
 }
 
 /** Kod kraju ISO 3166-1 alpha-2: wielkie litery, dokładnie 2 znaki — inaczej null. */

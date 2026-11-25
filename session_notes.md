@@ -51,6 +51,13 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — panel admina (kreator eventów)
 
+### API ICPE Go: miejsce eventu w językach (`locations`, `locationText`) (2026-11-25)
+- **Problem (Jacek):** ICPE Go na Home w EN pokazywało adres z polskiej wersji; API dawało tylko `location` (kanoniczne PL).
+- **Zmiana:** `api/src/icpe-go/icpe-go.service.ts`: `locations` = `{ pl: location, en?, it? }` z `RegistrationPage.customFields.locationI18n`, tylko gdy tłumaczenie jest aktualne (`locationI18n.pl === location`, jak `eventLocation` we froncie); `locationText` przy `?lang=` (język → EN → PL). `location` bez zmian. Swagger: `icpe-go.dto.ts`. Dokumentacja `docs/18-api-icpe-go.md` + Projekt `plany/18-api-icpe-go.md`.
+- **Do zrobienia poza kodem:** ICPE Go musi czytać `locationText` (z `?lang=en`) albo `locations.en` zamiast `location`. EN pojawi się tylko przy eventach z wpisanym tłumaczeniem miejsca (edycja eventu ▸ zakładka EN ▸ Lokalizacja).
+- **Weryfikacja:** `tsc` api: tylko 3 stare błędy w `courses/*`. Produkcyjne API niedostępne z sandboxa, więc nie sprawdzono, które eventy mają tłumaczenia.
+- **Stan:** niewypchnięte; po pushu **Manual Deploy `icpe-api`**.
+
 ### Ukryty event — działa pod linkiem, nie ma go na publicznych listach (2026-11-25)
 - **Po co:** event testowy do prób płatności Tpay na produkcji, niewidoczny na https://rejestracja.icpemission.pl/ .
 - **Baza (addytywnie, wejdzie przez `prisma db push`):** `EventInstance.unlisted Boolean @default(false)`.

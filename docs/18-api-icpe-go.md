@@ -39,7 +39,7 @@ Lista udostępnionych eventów, posortowana po dacie rozpoczęcia (najbliższe p
 | Parametr | Wartości | Domyślnie | Znaczenie |
 |---|---|---|---|
 | `scope` | `upcoming` · `open` · `all` | `upcoming` | `upcoming`: eventy, które się jeszcze nie skończyły (otwarte i zamknięte). `open`: tylko z otwartymi zapisami. `all`: także przeszłe i zarchiwizowane. Szkice (DRAFT) nigdy nie są zwracane. |
-| `lang` | `pl` · `en` · `it` · `ko` · `zh` | brak | Dodaje pole `titleText` z tytułem w tym języku. Brak tłumaczenia: angielski, potem polski. |
+| `lang` | `pl` · `en` · `it` · `ko` · `zh` | brak | Dodaje pola `titleText` i `locationText` w tym języku. Brak tłumaczenia: angielski, potem polski. |
 | `key` | klucz | brak | Gdy ustawiono `ICPE_GO_API_KEY` (alternatywa dla nagłówka). |
 
 Odpowiedź:
@@ -75,6 +75,8 @@ Event nieudostępniony albo nieistniejący: `404`. API nie zdradza, czy taki eve
   "title": { "pl": "Rekolekcje wspólnot", "en": "Communities' Retreat", "it": "…" },
   "titleText": "Rekolekcje wspólnot",
   "location": "Ośrodek h2o, Kiczyce",
+  "locations": { "pl": "Ośrodek h2o, Kiczyce", "en": "h2o Centre, Kiczyce" },
+  "locationText": "Ośrodek h2o, Kiczyce",
   "countryCode": "PL",
   "startsAt": "2027-08-22T12:00:00.000Z",
   "endsAt": "2027-08-27T20:00:00.000Z",
@@ -110,7 +112,9 @@ Event nieudostępniony albo nieistniejący: `404`. API nie zdradza, czy taki eve
 | `type` | `ONE_TIME` (zwykły z rejestracją), `STANDALONE` (bez rejestracji, potwierdzenie TAK/NIE), `INVITE` (na zaproszenie), `EVERGREEN`. |
 | `title` | Tytuł we wszystkich wpisanych językach (tylko niepuste). |
 | `titleText` | Tylko z `?lang=`. |
-| `location` | Miejsce jako jeden tekst, tak jak wpisano w panelu (bez kraju). |
+| `location` | Miejsce jako jeden tekst, **zawsze wersja polska** (tak jak wpisano w panelu, bez kraju). Do wyświetlania w innych językach użyj `locations` albo `locationText`. |
+| `locations` | Miejsce w wersjach językowych: `pl` zawsze (= `location`), `en` / `it`, gdy przetłumaczono w panelu (edycja eventu ▸ zakładka języka ▸ „Lokalizacja”). Tłumaczenie zrobione do starszej wersji PL jest pomijane, tak jak na stronie zapisów. `{}`, gdy event nie ma miejsca. |
+| `locationText` | Tylko z `?lang=`. Miejsce w tym języku: brak tłumaczenia → angielski → polski. KO i ZH dostają wersję EN, bo panel nie ma tłumaczeń miejsca na te języki. |
 | `countryCode` | Kraj eventu: kod ISO 3166-1 alpha-2, wielkie litery, dokładnie 2 znaki (np. `"PL"`, `"IT"`, `"MT"`). `null`, gdy w panelu nie wybrano kraju. Bez nazwy kraju: ICPE Go tłumaczy ją sam. Ustawia się w edycji eventu, pole „Kraj” pod „Miejsce”. |
 | `startsAt`, `endsAt` | Początek i koniec, ISO 8601 w UTC. Do wyświetlania przelicz na `Europe/Warsaw`. |
 | `status` | `OPEN` (zapisy otwarte) albo `CLOSED` (zamknięte, zakończone lub zarchiwizowane). |
@@ -156,6 +160,7 @@ const { events } = await res.json()
 
 ## Zmiany
 
+- **2026-11-25:** nowe pola `locations` i `locationText` (miejsce w języku użytkownika). `location` bez zmian (polska wersja).
 - **2026-11-25:** nowe pole `countryCode` (ISO 3166-1 alpha-2 albo `null`). `location` bez zmian.
 
 ## Pliki w repo
