@@ -446,7 +446,7 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
                 boxShadow: '0 4px 16px rgba(197,106,58,0.30)',
               }}
             >
-              {t('summary.pay_now', { amount: money(price.total) })}
+              {t('summary.pay_now', { amount: money(schedule.length > 1 ? schedule[0].amount : price.total) })}
             </button>
             <p className="text-xs text-center" style={{ color: 'var(--muted)' }}>
               {t('summary.payment_secure')}

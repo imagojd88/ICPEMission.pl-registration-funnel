@@ -276,7 +276,7 @@
     "discount": "优惠（ICPE10）",
     "total": "应付总额",
     "pay_now": "立即付款 · {{amount}}",
-    "payment_secure": "🔒 由 Przelewy24 处理付款 · BLIK / 银行卡",
+    "payment_secure": "🔒 由 Tpay 处理付款 · BLIK / 快速转账",
     "transfer_title": "转账信息",
     "recipient": "收款人",
     "account": "账号",

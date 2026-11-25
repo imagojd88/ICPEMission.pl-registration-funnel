@@ -276,7 +276,7 @@
     "discount": "할인 (ICPE10)",
     "total": "총 결제 금액",
     "pay_now": "지금 결제 · {{amount}}",
-    "payment_secure": "🔒 Przelewy24 결제 · BLIK / 카드",
+    "payment_secure": "🔒 Tpay 결제 · BLIK / 빠른 계좌이체",
     "transfer_title": "이체 정보",
     "recipient": "받는 사람",
     "account": "계좌 번호",

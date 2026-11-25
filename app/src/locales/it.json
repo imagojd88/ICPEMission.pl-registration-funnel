@@ -280,7 +280,7 @@
     "discount": "Sconto (ICPE10)",
     "total": "Totale da pagare",
     "pay_now": "Paga ora · {{amount}}",
-    "payment_secure": "🔒 Pagamento gestito da Przelewy24 · BLIK / carta",
+    "payment_secure": "🔒 Pagamento gestito da Tpay · BLIK / bonifico rapido",
     "transfer_title": "Dati per il bonifico",
     "recipient": "Destinatario",
     "account": "Numero di conto",

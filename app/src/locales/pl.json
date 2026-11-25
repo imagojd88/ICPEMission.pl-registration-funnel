@@ -286,7 +286,7 @@
     "discount": "Rabat (ICPE10)",
     "total": "Razem do zapłaty",
     "pay_now": "Zapłać teraz · {{amount}}",
-    "payment_secure": "🔒 Płatność obsługuje Przelewy24 · BLIK / karta",
+    "payment_secure": "🔒 Płatność obsługuje Tpay · BLIK / szybki przelew",
     "transfer_title": "Dane do przelewu",
     "recipient": "Odbiorca",
     "account": "Nr konta",

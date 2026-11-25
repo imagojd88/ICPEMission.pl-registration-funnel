@@ -276,7 +276,7 @@
     "discount": "Discount (ICPE10)",
     "total": "Total to pay",
     "pay_now": "Pay now · {{amount}}",
-    "payment_secure": "🔒 Payment processed by Przelewy24 · BLIK / card",
+    "payment_secure": "🔒 Payment processed by Tpay · BLIK / fast bank transfer",
     "transfer_title": "Transfer details",
     "recipient": "Recipient",
     "account": "Account number",

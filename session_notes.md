@@ -51,6 +51,14 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — panel admina (kreator eventów)
 
+### 25.11.2026 (wieczór) — event testowy Tpay i dwie poprawki lejka
+- Na produkcji utworzono UKRYTY event testowy `test-platnosci-tpay` (https://rejestracja.icpemission.pl/r/test-platnosci-tpay): 40 zł, PLN, przelew + online, plan 50% / 50% do 2026-12-05, darowizna, PL + EN. Nie ma go na stronie głównej. Po testach zamknąć lub zarchiwizować.
+- Render: `PAYMENTS_MODE=tpay`, `TPAY_ENV=production`, `TPAY_ALLOW_TEST_MODE=true` (tryb testowy konta Tpay). PRZED startem rejestracji 16.01.2027: `TPAY_ALLOW_TEST_MODE=false` i wyłączyć tryb testowy w panelu Tpay.
+- Poprawki (frontend, bez deployu API): `SummaryScreen.tsx` — przycisk „Zapłać teraz" pokazuje kwotę wymaganą teraz (pierwsza rata), nie całość (transakcja i tak była liczona przez serwer jako `due`); locale ×5 — „Płatność obsługuje Tpay" zamiast Przelewy24.
+- Znalezione, NIEnaprawione: kreator nadpisuje zera domyślnymi (80/40/15), dokłada 3 pokoje, progi wiekowe i kod ICPE10, nie ma harmonogramu, etykieta „Online (karta / Przelewy24)"; krok „Wybór pokoju" widoczny na stronie eventu bez pokoi; pole „Kod rabatowy" mimo braku kodów; brak pola „Kraj" w formularzu (reguła Tpay działa dziś tylko po języku); brak godzin eventu; menu boczne panelu zasłania formularz przy wąskim oknie; bloki „Poziomy cen" i „Harmonogram" pod nagłówkiem „POKOJE".
+- Push: `git add -A && git commit -m "Lejek: kwota zadatku na przycisku płatności online, Tpay w opisie operatora" && git push`
+
+
 ### API ICPE Go: miejsce eventu w językach (`locations`, `locationText`) (2026-11-25)
 - **Problem (Jacek):** ICPE Go na Home w EN pokazywało adres z polskiej wersji; API dawało tylko `location` (kanoniczne PL).
 - **Zmiana:** `api/src/icpe-go/icpe-go.service.ts`: `locations` = `{ pl: location, en?, it? }` z `RegistrationPage.customFields.locationI18n`, tylko gdy tłumaczenie jest aktualne (`locationI18n.pl === location`, jak `eventLocation` we froncie); `locationText` przy `?lang=` (język → EN → PL). `location` bez zmian. Swagger: `icpe-go.dto.ts`. Dokumentacja `docs/18-api-icpe-go.md` + Projekt `plany/18-api-icpe-go.md`.
