@@ -1,6 +1,7 @@
 import { Injectable, ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
+import { canUseAdminApi } from '../shared';
 
 interface RequestWithUser {
   headers: Record<string, string>;
@@ -26,8 +27,11 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     // podpisywane osobnym sekretem) NIE mogą wejść na /admin/*, nawet gdyby sekret był wspólny.
     try {
       const result = (await super.canActivate(context)) as boolean;
-      const user = req.user as { realm?: string } | undefined;
-      if (result && user?.realm === 'admin') return true;
+      // Wymagane OBA warunki: realm 'admin' ORAZ rola z listy pełnych ról (SUPER_ADMIN / ADMIN /
+      // COORDINATOR). Pomocnik eventu (EVENT_STAFF, realm 'desk') nie wchodzi na nic za tym guardem;
+      // jego jedyne API to /desk/* (DeskAuthGuard).
+      const user = req.user as { realm?: string; role?: string } | undefined;
+      if (result && canUseAdminApi(user?.realm, user?.role)) return true;
       req.user = undefined;
     } catch {
       // fall through

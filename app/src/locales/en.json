@@ -517,5 +517,158 @@
     "done": "Thank you! We will let you know as soon as registration opens.",
     "error": "Could not save your address. Please check it and try again.",
     "consent": "By entering your e-mail you agree to receive a one-off message when registration for this event opens."
+  },
+  "desk": {
+    "title": "Reception",
+    "common": {
+      "loading": "Loading…",
+      "saving": "Saving…",
+      "cancel": "Cancel"
+    },
+    "login": {
+      "greeting": "God bless you!",
+      "title": "Event reception",
+      "subtitle": "Sign in with a helper or administrator account.",
+      "password": "Password",
+      "submit": "Sign in",
+      "error_bad": "Incorrect e-mail or password.",
+      "error_offline": "No internet connection. Check the network and try again."
+    },
+    "events": {
+      "heading": "Your events",
+      "none": "You do not have access to any event. Ask the organiser to grant you access.",
+      "open": "Open reception"
+    },
+    "top": {
+      "events": "Events",
+      "logout": "Sign out",
+      "language": "Language",
+      "theme": "Light / dark theme",
+      "updated": "Updated {{time}}",
+      "refresh": "Refresh",
+      "logged_as": "Signed in: {{email}}"
+    },
+    "offline": {
+      "banner": "No internet connection. You are seeing data from {{time}}. Changes will not be saved until the connection is back.",
+      "first_load": "No internet connection. The list will load by itself once the connection is back.",
+      "action": "No internet connection. Nothing was saved. Try again when the connection is back."
+    },
+    "errors": {
+      "forbidden": "You are not allowed to do this.",
+      "no_access": "You do not have access to this event.",
+      "notfound": "Not found. Refresh the list.",
+      "server": "Something went wrong. Please try again.",
+      "session": "Your session has expired. Sign in again."
+    },
+    "counters": {
+      "arrived": "Arrived",
+      "x_of_y": "{{a}} of {{b}}",
+      "regs": "registrations",
+      "people_x_of_y": "people: {{a}} of {{b}}",
+      "people": "People on site",
+      "on_site": "arrived",
+      "to_pay": "Total to pay",
+      "regs_n": "registrations: {{n}}",
+      "keys": "Keys handed out",
+      "keys_out": "to be returned: {{n}}",
+      "requests": "Open requests"
+    },
+    "search": {
+      "placeholder": "Surname, first name, e-mail or registration no.",
+      "clear": "Clear"
+    },
+    "filter": {
+      "all": "All",
+      "absent": "Not arrived",
+      "unpaid": "Balance due",
+      "requests": "With request"
+    },
+    "list": {
+      "empty": "No registrations.",
+      "none_match": "Nothing found.",
+      "people": "People: {{n}}",
+      "no_room": "not assigned"
+    },
+    "badge": {
+      "arrived": "On site",
+      "absent": "Not arrived",
+      "due": "To pay {{amount}}",
+      "key_out": "Key handed out",
+      "key_back": "Key returned",
+      "requests": "Requests: {{n}}"
+    },
+    "card": {
+      "people": "People",
+      "child": "child",
+      "child_age": "child, age: {{n}}",
+      "diet": "Diet",
+      "diet_notes": "Dietary notes",
+      "details": "Registration",
+      "room": "Room",
+      "room_note": "Room notes",
+      "contact": "Registered by",
+      "phone": "Phone",
+      "reg_no": "Registration no.",
+      "arrived_at": "Arrival: {{time}}"
+    },
+    "money": {
+      "title": "Payment",
+      "total": "Amount",
+      "paid": "Paid",
+      "remaining": "Remaining",
+      "due_now": "To pay now",
+      "overdue": "Overdue",
+      "settled": "Settled"
+    },
+    "act": {
+      "check_in": "Mark arrival",
+      "undo_check_in": "Undo arrival",
+      "confirm_undo_check_in": "Undo the arrival mark?"
+    },
+    "pay": {
+      "open": "Take payment",
+      "amount": "Amount ({{currency}})",
+      "cash": "Cash",
+      "transfer": "Bank transfer",
+      "online": "Online",
+      "note": "Note (optional)",
+      "submit": "Take {{amount}} ({{method}})",
+      "done": "Payment of {{amount}} saved.",
+      "err_amount": "Enter an amount greater than zero.",
+      "err_too_much": "The amount is higher than the balance due ({{amount}}).",
+      "void": "Undo",
+      "confirm_void": "Undo the payment of {{amount}}? It stays in the history as cancelled.",
+      "voided": "cancelled"
+    },
+    "key": {
+      "title": "Key",
+      "issue": "Key handed out",
+      "issue_again": "Key handed out again",
+      "return": "Key returned",
+      "undo_issue": "Undo key hand-out",
+      "undo_return": "Undo key return",
+      "confirm_undo": "Are you sure you want to undo this?",
+      "issued_at": "Handed out: {{time}}",
+      "returned_at": "Returned: {{time}}"
+    },
+    "req": {
+      "title": "Additional requests",
+      "add": "Additional request",
+      "kind": {
+        "DIET": "Diet",
+        "EXTRA_BED": "Extra bed",
+        "OTHER": "Other"
+      },
+      "person": "Person (optional)",
+      "whole": "Whole registration",
+      "note": "Note",
+      "submit": "Save request",
+      "saved": "Request saved.",
+      "open": "Open",
+      "done": "Done",
+      "mark_done": "Mark as done",
+      "reopen": "Reopen",
+      "err_note": "Describe the request in the note."
+    }
   }
 }

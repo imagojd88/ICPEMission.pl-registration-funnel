@@ -22,6 +22,13 @@ export class AuthController {
     return this.auth.loginAdmin(dto.email, dto.password, !!dto.remember);
   }
 
+  /** Recepcja: logowanie pomocnika eventu albo admina (e-mail + hasło jak w panelu). */
+  @Post('desk/login')
+  @ApiOperation({ summary: 'Logowanie do Recepcji (pomocnik eventu lub admin)' })
+  loginDesk(@Body() dto: AdminLoginDto) {
+    return this.auth.loginDesk(dto.email, dto.password);
+  }
+
   /** Przedłużenie sesji admina (panel woła to sam, gdy minie połowa ważności tokenu). */
   @Post('admin/refresh')
   @UseGuards(JwtAuthGuard)

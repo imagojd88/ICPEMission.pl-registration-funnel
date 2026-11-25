@@ -18,6 +18,7 @@ import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import ImageGalleryPicker from '@/components/admin/ImageGalleryPicker'
 import InvitedGuestsSection from '@/components/admin/events/InvitedGuestsSection'
+import StaffSection from '@/components/admin/events/StaffSection'
 import AffiliationSelect from '@/components/admin/events/AffiliationSelect'
 import SpecialGuestsEditor, { guestRowsFrom, guestsToSave, guestsMissingBio, type GuestRow } from '@/components/admin/events/SpecialGuestsEditor'
 import type { AffiliationField } from '@/lib/communities'
@@ -1130,6 +1131,9 @@ export default function EventEditForm({
           />
         </Section>
       )}
+
+      {/* Pomocnicy eventu + link do Recepcji (zapis od razu, poza „Zapisz" formularza). */}
+      <StaffSection instanceId={editTarget.instanceId} />
 
       <Section title="Formularz zapisu">
         {/* Nie <Field> (to <label>) — kliknięcie w odstęp wybierałoby pierwszy przycisk. */}

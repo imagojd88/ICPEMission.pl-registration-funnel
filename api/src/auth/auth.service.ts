@@ -1,8 +1,11 @@
-import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ForbiddenException, Logger } from '@nestjs/common';
+import { EVENT_STAFF_ROLE, isFullAdminRole } from '../shared';
 
 /** Czas sesji admina: zwykła (bez „Zapamiętaj mnie") i zapamiętana. Nadpisywalne z ENV. */
 const sessionTtl = (remember: boolean) =>
   remember ? process.env.ADMIN_REMEMBER_TTL || '30d' : process.env.ADMIN_SESSION_TTL || '12h';
+/** Sesja pomocnika w Recepcji (bez „Zapamiętaj mnie" i bez odświeżania: często wspólny tablet). */
+const deskSessionTtl = () => process.env.DESK_SESSION_TTL || '12h';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import * as argon2 from 'argon2';
@@ -44,10 +47,37 @@ export class AuthService {
     if (!user) throw new UnauthorizedException('Invalid credentials');
     const ok = await argon2.verify(user.passwordHash, password);
     if (!ok) throw new UnauthorizedException('Invalid credentials');
+    // Pomocnik eventu (EVENT_STAFF) nie dostaje tokenu panelu — loguje się wyłącznie w Recepcji.
+    if (!isFullAdminRole(user.role)) throw new ForbiddenException('To konto ma dostęp tylko do Recepcji (/recepcja).');
     return this.issueAdminToken(user, remember);
   }
 
+  /**
+   * Logowanie do Recepcji (ten sam e-mail + hasło co w panelu).
+   * Pełny admin dostaje zwykły token panelu (realm 'admin'), pomocnik: token realm 'desk',
+   * którego JwtAuthGuard (całe /admin/*) nie przyjmuje.
+   */
+  async loginDesk(email: string, password: string) {
+    const raw = String(email ?? '').trim();
+    const user =
+      (await this.prisma.adminUser.findUnique({ where: { email: raw } })) ??
+      (raw.toLowerCase() !== raw ? await this.prisma.adminUser.findUnique({ where: { email: raw.toLowerCase() } }) : null);
+    if (!user) throw new UnauthorizedException('Invalid credentials');
+    const ok = await argon2.verify(user.passwordHash, password);
+    if (!ok) throw new UnauthorizedException('Invalid credentials');
+    if (isFullAdminRole(user.role)) return this.issueAdminToken(user, false);
+    if ((user.role as string) !== EVENT_STAFF_ROLE) throw new UnauthorizedException('Invalid credentials');
+    const payload = { sub: user.id, email: user.email, role: EVENT_STAFF_ROLE, realm: 'desk' };
+    return {
+      accessToken: this.jwt.sign(payload, { expiresIn: deskSessionTtl() }),
+      user: { id: user.id, email: user.email, role: EVENT_STAFF_ROLE },
+      remember: false,
+    };
+  }
+
   private issueAdminToken(user: { id: string; email: string; role: string }, remember: boolean) {
+    // Bezpiecznik: token realm 'admin' wyłącznie dla pełnych ról (nigdy dla EVENT_STAFF).
+    if (!isFullAdminRole(user.role)) throw new ForbiddenException('Brak dostępu do panelu');
     // `rmb` zapamiętuje wybór „Zapamiętaj mnie", żeby odświeżenie zachowało długość sesji.
     const payload = { sub: user.id, email: user.email, role: user.role, realm: 'admin', rmb: remember };
     return {
@@ -62,6 +92,7 @@ export class AuthService {
     if (current?.realm !== 'admin' || !current.sub) throw new UnauthorizedException('Tylko sesja admina');
     const user = await this.prisma.adminUser.findUnique({ where: { id: current.sub } });
     if (!user) throw new UnauthorizedException('Konto nie istnieje');
+    if (!isFullAdminRole(user.role)) throw new UnauthorizedException('Tylko sesja admina');
     return this.issueAdminToken(user, !!current.rmb);
   }
 

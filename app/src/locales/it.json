@@ -521,5 +521,158 @@
     "done": "Grazie! Ti avviseremo appena apriranno le iscrizioni.",
     "error": "Non è stato possibile salvare l'indirizzo. Controllalo e riprova.",
     "consent": "Inserendo la tua e-mail accetti di ricevere un unico messaggio all'apertura delle iscrizioni a questo evento."
+  },
+  "desk": {
+    "title": "Accoglienza",
+    "common": {
+      "loading": "Caricamento…",
+      "saving": "Salvataggio…",
+      "cancel": "Annulla"
+    },
+    "login": {
+      "greeting": "Pace e bene!",
+      "title": "Accoglienza dell'evento",
+      "subtitle": "Accedi con l'account di collaboratore o di amministratore.",
+      "password": "Password",
+      "submit": "Accedi",
+      "error_bad": "E-mail o password non corretti.",
+      "error_offline": "Nessuna connessione a internet. Controlla la rete e riprova."
+    },
+    "events": {
+      "heading": "I tuoi eventi",
+      "none": "Non hai accesso a nessun evento. Chiedi all'organizzatore di abilitarti.",
+      "open": "Apri l'accoglienza"
+    },
+    "top": {
+      "events": "Eventi",
+      "logout": "Esci",
+      "language": "Lingua",
+      "theme": "Tema chiaro / scuro",
+      "updated": "Aggiornato alle {{time}}",
+      "refresh": "Aggiorna",
+      "logged_as": "Accesso: {{email}}"
+    },
+    "offline": {
+      "banner": "Nessuna connessione a internet. Stai vedendo i dati delle {{time}}. Le modifiche non verranno salvate finché la connessione non torna.",
+      "first_load": "Nessuna connessione a internet. L'elenco si caricherà da solo quando la connessione torna.",
+      "action": "Nessuna connessione a internet. Non è stato salvato nulla. Riprova quando la connessione torna."
+    },
+    "errors": {
+      "forbidden": "Non hai i permessi per questa operazione.",
+      "no_access": "Non hai accesso a questo evento.",
+      "notfound": "Non trovato. Aggiorna l'elenco.",
+      "server": "Qualcosa è andato storto. Riprova.",
+      "session": "La sessione è scaduta. Accedi di nuovo."
+    },
+    "counters": {
+      "arrived": "Arrivati",
+      "x_of_y": "{{a}} su {{b}}",
+      "regs": "iscrizioni",
+      "people_x_of_y": "persone: {{a}} su {{b}}",
+      "people": "Persone presenti",
+      "on_site": "arrivate",
+      "to_pay": "Totale da pagare",
+      "regs_n": "iscrizioni: {{n}}",
+      "keys": "Chiavi consegnate",
+      "keys_out": "da restituire: {{n}}",
+      "requests": "Richieste aperte"
+    },
+    "search": {
+      "placeholder": "Cognome, nome, e-mail o n. di iscrizione",
+      "clear": "Cancella"
+    },
+    "filter": {
+      "all": "Tutti",
+      "absent": "Non arrivati",
+      "unpaid": "Con saldo da pagare",
+      "requests": "Con richiesta"
+    },
+    "list": {
+      "empty": "Nessuna iscrizione.",
+      "none_match": "Nessun risultato.",
+      "people": "Persone: {{n}}",
+      "no_room": "non assegnata"
+    },
+    "badge": {
+      "arrived": "Presente",
+      "absent": "Non arrivati",
+      "due": "Da pagare {{amount}}",
+      "key_out": "Chiave consegnata",
+      "key_back": "Chiave restituita",
+      "requests": "Richieste: {{n}}"
+    },
+    "card": {
+      "people": "Persone",
+      "child": "bambino",
+      "child_age": "bambino, età: {{n}}",
+      "diet": "Dieta",
+      "diet_notes": "Note alimentari",
+      "details": "Iscrizione",
+      "room": "Camera",
+      "room_note": "Note sulla camera",
+      "contact": "Iscritto da",
+      "phone": "Telefono",
+      "reg_no": "N. di iscrizione",
+      "arrived_at": "Arrivo: {{time}}"
+    },
+    "money": {
+      "title": "Pagamento",
+      "total": "Importo",
+      "paid": "Pagato",
+      "remaining": "Rimanente",
+      "due_now": "Da pagare ora",
+      "overdue": "Arretrato",
+      "settled": "Saldato"
+    },
+    "act": {
+      "check_in": "Segna l'arrivo",
+      "undo_check_in": "Annulla l'arrivo",
+      "confirm_undo_check_in": "Annullare la registrazione dell'arrivo?"
+    },
+    "pay": {
+      "open": "Registra un pagamento",
+      "amount": "Importo ({{currency}})",
+      "cash": "Contanti",
+      "transfer": "Bonifico",
+      "online": "Online",
+      "note": "Nota (facoltativa)",
+      "submit": "Registra {{amount}} ({{method}})",
+      "done": "Pagamento di {{amount}} salvato.",
+      "err_amount": "Inserisci un importo maggiore di zero.",
+      "err_too_much": "L'importo supera il saldo da pagare ({{amount}}).",
+      "void": "Annulla",
+      "confirm_void": "Annullare il pagamento di {{amount}}? Resterà nello storico come annullato.",
+      "voided": "annullato"
+    },
+    "key": {
+      "title": "Chiave",
+      "issue": "Chiave consegnata",
+      "issue_again": "Chiave consegnata di nuovo",
+      "return": "Chiave restituita",
+      "undo_issue": "Annulla la consegna della chiave",
+      "undo_return": "Annulla la restituzione della chiave",
+      "confirm_undo": "Vuoi davvero annullare?",
+      "issued_at": "Consegnata: {{time}}",
+      "returned_at": "Restituita: {{time}}"
+    },
+    "req": {
+      "title": "Richieste aggiuntive",
+      "add": "Richiesta aggiuntiva",
+      "kind": {
+        "DIET": "Dieta",
+        "EXTRA_BED": "Letto aggiunto",
+        "OTHER": "Altro"
+      },
+      "person": "Persona (facoltativo)",
+      "whole": "Tutta l'iscrizione",
+      "note": "Nota",
+      "submit": "Salva la richiesta",
+      "saved": "Richiesta salvata.",
+      "open": "Aperta",
+      "done": "Evasa",
+      "mark_done": "Segna come evasa",
+      "reopen": "Riapri",
+      "err_note": "Descrivi la richiesta nella nota."
+    }
   }
 }

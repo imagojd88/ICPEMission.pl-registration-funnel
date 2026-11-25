@@ -527,5 +527,158 @@
     "done": "Dziękujemy! Damy Ci znać, gdy tylko ruszą zapisy.",
     "error": "Nie udało się zapisać. Sprawdź adres i spróbuj ponownie.",
     "consent": "Podając e-mail, zgadzasz się na jednorazową wiadomość o otwarciu zapisów na to wydarzenie."
+  },
+  "desk": {
+    "title": "Recepcja",
+    "common": {
+      "loading": "Wczytywanie…",
+      "saving": "Zapisywanie…",
+      "cancel": "Anuluj"
+    },
+    "login": {
+      "greeting": "Szczęść Boże!",
+      "title": "Recepcja wydarzenia",
+      "subtitle": "Zaloguj się kontem pomocnika albo administratora.",
+      "password": "Hasło",
+      "submit": "Zaloguj się",
+      "error_bad": "Nieprawidłowy e-mail lub hasło.",
+      "error_offline": "Brak połączenia z internetem. Sprawdź sieć i spróbuj ponownie."
+    },
+    "events": {
+      "heading": "Twoje wydarzenia",
+      "none": "Nie masz dostępu do żadnego wydarzenia. Poproś organizatora o nadanie dostępu.",
+      "open": "Otwórz recepcję"
+    },
+    "top": {
+      "events": "Wydarzenia",
+      "logout": "Wyloguj",
+      "language": "Język",
+      "theme": "Motyw jasny / ciemny",
+      "updated": "Zaktualizowano {{time}}",
+      "refresh": "Odśwież",
+      "logged_as": "Zalogowano: {{email}}"
+    },
+    "offline": {
+      "banner": "Brak połączenia z internetem. Widzisz dane z godz. {{time}}. Zmiany nie zapiszą się, dopóki połączenie nie wróci.",
+      "first_load": "Brak połączenia z internetem. Lista wczyta się sama, gdy połączenie wróci.",
+      "action": "Brak połączenia z internetem. Nic nie zapisano. Spróbuj ponownie, gdy połączenie wróci."
+    },
+    "errors": {
+      "forbidden": "Nie masz uprawnień do tej czynności.",
+      "no_access": "Nie masz dostępu do tego wydarzenia.",
+      "notfound": "Nie znaleziono. Odśwież listę.",
+      "server": "Coś poszło nie tak. Spróbuj ponownie.",
+      "session": "Sesja wygasła. Zaloguj się ponownie."
+    },
+    "counters": {
+      "arrived": "Przyjechało",
+      "x_of_y": "{{a}} z {{b}}",
+      "regs": "zgłoszeń",
+      "people_x_of_y": "osób: {{a}} z {{b}}",
+      "people": "Osoby na miejscu",
+      "on_site": "przyjechało",
+      "to_pay": "Do zapłaty łącznie",
+      "regs_n": "zgłoszeń: {{n}}",
+      "keys": "Klucze wydane",
+      "keys_out": "do zwrotu: {{n}}",
+      "requests": "Prośby otwarte"
+    },
+    "search": {
+      "placeholder": "Nazwisko, imię, e-mail lub nr zgłoszenia",
+      "clear": "Wyczyść"
+    },
+    "filter": {
+      "all": "Wszyscy",
+      "absent": "Nieobecni",
+      "unpaid": "Z niedopłatą",
+      "requests": "Z prośbą"
+    },
+    "list": {
+      "empty": "Brak zgłoszeń.",
+      "none_match": "Nic nie znaleziono.",
+      "people": "Osób: {{n}}",
+      "no_room": "bez przydziału"
+    },
+    "badge": {
+      "arrived": "Na miejscu",
+      "absent": "Nieobecni",
+      "due": "Do zapłaty {{amount}}",
+      "key_out": "Klucz wydany",
+      "key_back": "Klucz zwrócony",
+      "requests": "Prośby: {{n}}"
+    },
+    "card": {
+      "people": "Osoby",
+      "child": "dziecko",
+      "child_age": "dziecko, wiek: {{n}}",
+      "diet": "Dieta",
+      "diet_notes": "Uwagi żywieniowe",
+      "details": "Zgłoszenie",
+      "room": "Pokój",
+      "room_note": "Uwagi do pokoju",
+      "contact": "Zgłaszający",
+      "phone": "Telefon",
+      "reg_no": "Nr zgłoszenia",
+      "arrived_at": "Przyjazd: {{time}}"
+    },
+    "money": {
+      "title": "Rozliczenie",
+      "total": "Kwota",
+      "paid": "Wpłacono",
+      "remaining": "Pozostało",
+      "due_now": "Do zapłaty teraz",
+      "overdue": "Zaległość",
+      "settled": "Rozliczone"
+    },
+    "act": {
+      "check_in": "Oznacz przyjazd",
+      "undo_check_in": "Cofnij przyjazd",
+      "confirm_undo_check_in": "Cofnąć oznaczenie przyjazdu?"
+    },
+    "pay": {
+      "open": "Przyjmij wpłatę",
+      "amount": "Kwota ({{currency}})",
+      "cash": "Gotówka",
+      "transfer": "Przelew",
+      "online": "Online",
+      "note": "Notatka (opcjonalnie)",
+      "submit": "Przyjmij {{amount}} ({{method}})",
+      "done": "Zapisano wpłatę {{amount}}.",
+      "err_amount": "Podaj kwotę większą od zera.",
+      "err_too_much": "Kwota jest większa niż pozostało do zapłaty ({{amount}}).",
+      "void": "Cofnij",
+      "confirm_void": "Cofnąć wpłatę {{amount}}? Zostanie w historii jako anulowana.",
+      "voided": "cofnięta"
+    },
+    "key": {
+      "title": "Klucz",
+      "issue": "Klucz wydany",
+      "issue_again": "Klucz wydany ponownie",
+      "return": "Klucz zwrócony",
+      "undo_issue": "Cofnij wydanie klucza",
+      "undo_return": "Cofnij zwrot klucza",
+      "confirm_undo": "Na pewno cofnąć?",
+      "issued_at": "Wydany: {{time}}",
+      "returned_at": "Zwrócony: {{time}}"
+    },
+    "req": {
+      "title": "Prośby dodatkowe",
+      "add": "Prośba dodatkowa",
+      "kind": {
+        "DIET": "Dieta",
+        "EXTRA_BED": "Dostawka",
+        "OTHER": "Inne"
+      },
+      "person": "Osoba (opcjonalnie)",
+      "whole": "Całe zgłoszenie",
+      "note": "Notatka",
+      "submit": "Zapisz prośbę",
+      "saved": "Prośba zapisana.",
+      "open": "Otwarta",
+      "done": "Załatwiona",
+      "mark_done": "Oznacz jako załatwioną",
+      "reopen": "Otwórz ponownie",
+      "err_note": "Opisz prośbę w notatce."
+    }
   }
 }

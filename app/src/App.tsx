@@ -9,6 +9,7 @@ const PublicHome = lazy(() => import('./pages/PublicHome'))
 const InviteConfirm = lazy(() => import('./pages/InviteConfirm'))
 const GuestInvitePage = lazy(() => import('./pages/GuestInvitePage'))
 const ManageRegistration = lazy(() => import('./pages/ManageRegistration'))
+const DeskPage = lazy(() => import('./pages/DeskPage'))
 
 function LoadingFallback() {
   return (
@@ -32,6 +33,9 @@ export default function App() {
           {/* „Zaproś gościa" — osobisty link uczestnika (token zaproszenia lub zgłoszenia). */}
           <Route path="/g/:token" element={<GuestInvitePage />} />
           <Route path="/z/:token" element={<ManageRegistration />} />
+          {/* Recepcja: stanowisko przyjęć gości (pomocnicy eventu i admini), PL / EN / IT. */}
+          <Route path="/recepcja" element={<DeskPage />} />
+          <Route path="/recepcja/:instanceId" element={<DeskPage />} />
           {/* Wejście panelu przez prawdziwy plik panel.html — omija zatruty cache
               hostingu (LiteSpeed cache trzyma stare /admin i /index.html). */}
           <Route path="/panel.html" element={<AdminPanel />} />

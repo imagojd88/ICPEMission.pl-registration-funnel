@@ -17,6 +17,9 @@ enum AdminRole {
   SUPER_ADMIN
   ADMIN
   COORDINATOR
+  // Pomocnik eventu: wyłącznie Recepcja (/desk/*) i tylko eventy z EventStaffGrant.
+  // NIE ma wstępu na /admin/* (JwtAuthGuard wpuszcza tylko trzy role powyżej).
+  EVENT_STAFF
 }
 
 enum EventType {
@@ -121,8 +124,26 @@ model AdminUser {
   passwordHash String
   role         AdminRole
   locale       String    @default("pl")
+  staffGrants  EventStaffGrant[]
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+}
+
+// Dostęp pomocnika (AdminUser z rolą EVENT_STAFF) do JEDNEGO eventu w wybranych zakresach.
+// Zakresy: stałe DESK_SCOPES w shared/src/desk.ts.
+model EventStaffGrant {
+  id          String        @id @default(cuid())
+  adminUserId String
+  adminUser   AdminUser     @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+  instanceId  String
+  instance    EventInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  scopes      String[]
+  createdBy   String
+  createdAt   DateTime      @default(now())
+  expiresAt   DateTime?
+
+  @@unique([adminUserId, instanceId])
+  @@index([instanceId])
 }
 
 model ServiceToken {
@@ -197,6 +218,7 @@ model EventInstance {
   registrations        Registration[]
   leads                RegistrationLead[]
   waitlist             WaitlistEntry[]
+  staffGrants          EventStaffGrant[]
   rsvps                EventRsvp[]
   invitations          Invitation[]
   createdAt            DateTime        @default(now())
@@ -283,6 +305,13 @@ model Registration {
   roomLabel           String?            // zakwaterowanie: numer/nazwa przydzielonego pokoju
   roomNote            String?            // zakwaterowanie: opcjonalny komentarz
   roomsReserved       Boolean            @default(false) // pokoje z puli zarezerwowanej dla gości specjalnych (ustawia admin)
+  // Recepcja: kto oznaczył przyjazd oraz wydanie / zwrot klucza (e-mail z tokenu).
+  checkedInBy         String?
+  keyIssuedAt         DateTime?
+  keyIssuedBy         String?
+  keyReturnedAt       DateTime?
+  keyReturnedBy       String?
+  requests            RegistrationRequest[]
   editToken           String             @unique @default(cuid())
   participants        Participant[]
   payments            Payment[]
@@ -767,4 +796,38 @@ model RegistrationLead {
 
   @@unique([instanceId, email])
   @@index([reminderSentAt, convertedAt, lastActivityAt])
+}
+
+// ─── Recepcja (stanowisko przyjęć) ────────────────────────────────────────────
+
+// Prośba dodatkowa zgłoszona na recepcji (dieta, dostawka, inne).
+model RegistrationRequest {
+  id             String       @id @default(cuid())
+  registrationId String
+  registration   Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  participantId  String?
+  kind           String       // DIET | EXTRA_BED | OTHER
+  note           String       @default("")
+  status         String       @default("OPEN") // OPEN | DONE
+  createdBy      String
+  createdAt      DateTime     @default(now())
+  resolvedBy     String?
+  resolvedAt     DateTime?
+
+  @@index([registrationId])
+  @@index([status])
+}
+
+// Dziennik akcji recepcji: kto, co i kiedy (także cofnięcia, których nie widać w polach zgłoszenia).
+model DeskActionLog {
+  id             String   @id @default(cuid())
+  instanceId     String
+  registrationId String?
+  action         String
+  actor          String
+  detail         Json?
+  createdAt      DateTime @default(now())
+
+  @@index([instanceId, createdAt])
+  @@index([registrationId])
 }

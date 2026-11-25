@@ -20,6 +20,7 @@ import { ContentModule } from './content/content.module';
 import { CourseAccessModule } from './courses/course-access.module';
 import { CoursesModule } from './courses/courses.module';
 import { IcpeGoModule } from './icpe-go/icpe-go.module';
+import { DeskModule } from './desk/desk.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { IcpeGoModule } from './icpe-go/icpe-go.module';
     CourseAccessModule,
     CoursesModule,
     IcpeGoModule,
+    DeskModule,
   ],
 })
 export class AppModule {}
