@@ -66,6 +66,11 @@ export class CreateRegistrationDto {
   @ValidateNested() @Type(() => ConsentsDto) @ApiProperty() consents!: ConsentsDto;
   /** Token osobistego zaproszenia (link z maila `/r/:slug?inv=`) — spina zaproszenie ze zgłoszeniem. */
   @IsOptional() @IsString() invitationToken?: string;
+  /**
+   * Klucz sesji formularza (losowy, z przeglądarki) — zamyka wszystkie „niedokończone zgłoszenia” tej sesji,
+   * także założone na wcześniej wpisany adres e-mail. Opcjonalny; nieczytelna wartość jest ignorowana.
+   */
+  @IsOptional() @IsString() leadKey?: string;
 }
 
 /** Zmiana / domówienie noclegu przez gościa (strona zgłoszenia `/z/:token`). */

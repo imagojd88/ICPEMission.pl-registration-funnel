@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, Logger, NotFoundException, OnModuleDes
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { publicAppUrl } from '../invitations/guest-invite-config';
+import { cleanLeadKey, hasActiveRegistrationFor, leadIdsToClose, normalizeLeadEmail, planLeadUpsert, type LeadRef } from '../shared';
 
 type RunResult = { sent: number; skipped: number; converted: number; deleted: number };
 
@@ -23,7 +24,11 @@ type Db = any;
  * - Lejek zapisuje „lead” po przejściu kroku „Dane” (imię, e-mail, język, krok) i aktualizuje krok.
  * - Przypomnienie: brak aktywności ≥ 3 h, brak zgłoszenia na ten e-mail, zapisy otwarte, są miejsca.
  *   Zawsze tylko jedno (`reminderSentAt`). Link: /r/<slug>?lead=<token> → imię i e-mail wpisane.
- * - Wysłane zgłoszenie oznacza lead jako „dokończony” (`convertedAt`).
+ * - Wysłane zgłoszenie oznacza lead jako „dokończony” (`convertedAt`): lead pod adresem zgłoszenia
+ *   ORAZ wszystkie leady tej samej sesji formularza (`sessionKey` = `leadKey` z lejka) — także ten
+ *   założony na wcześniej wpisany adres. Zmiana e-maila w trakcie przenosi lead sesji na nowy adres.
+ * - Pas bezpieczeństwa: przed wysyłką sprawdzamy, czy na ten adres (małe litery, bez białych znaków)
+ *   nie ma aktywnego zgłoszenia w tym evencie.
  * - Dane leadów usuwamy dzień po zakończeniu eventu.
  * Wyzwalacze: co 5 min (gdy API działa) + `GET /cron/registration-reminders`.
  */
@@ -58,15 +63,16 @@ export class LeadsService implements OnModuleInit, OnModuleDestroy {
       where: { instanceId, status: { not: 'CANCELLED' } },
       select: { contact: true },
     })) as Array<{ contact: unknown }>;
-    return new Set(
-      regs
-        .map((r) => String(((r.contact ?? {}) as { email?: string }).email ?? '').trim().toLowerCase())
-        .filter(Boolean),
-    );
+    return new Set(regs.map((r) => normalizeLeadEmail(((r.contact ?? {}) as { email?: unknown }).email)).filter(Boolean));
   }
 
-  /** Lejek: zapis / aktualizacja rozpoczętego zgłoszenia (publiczne, bez danych wrażliwych). */
-  async upsert(dto: { instanceId?: string; email?: string; firstName?: string; lastName?: string; locale?: string; step?: number }) {
+  /**
+   * Lejek: zapis / aktualizacja rozpoczętego zgłoszenia (publiczne, bez danych wrażliwych).
+   * `leadKey` (opcjonalny) — losowy klucz sesji formularza z przeglądarki: lead tej sesji zmienia adres
+   * zamiast powstawać drugi (plan: `planLeadUpsert`). Bez klucza działa jak dotąd — po samym adresie.
+   * Odpowiedź niczego nie ujawnia (zawsze `{ ok: true }`): ani czy adres jest znany, ani tokenu z linku.
+   */
+  async upsert(dto: { instanceId?: string; email?: string; firstName?: string; lastName?: string; locale?: string; step?: number; leadKey?: string }) {
     const email = String(dto.email ?? '').trim().toLowerCase();
     const firstName = String(dto.firstName ?? '').trim().slice(0, 100);
     if (!dto.instanceId || !EMAIL_RE.test(email) || email.length > 200 || !firstName) {
@@ -77,28 +83,66 @@ export class LeadsService implements OnModuleInit, OnModuleDestroy {
     const locale = ['pl', 'en', 'it', 'ko', 'zh'].includes(String(dto.locale)) ? String(dto.locale) : 'pl';
     const step = Math.min(10, Math.max(1, Math.trunc(Number(dto.step) || 1)));
     const lastName = String(dto.lastName ?? '').trim().slice(0, 100) || null;
+    const leadKey = cleanLeadKey(dto.leadKey);
 
-    const existing = await this.db.registrationLead.findUnique({
+    type Row = LeadRef & { step: number };
+    const existing = (await this.db.registrationLead.findUnique({
       where: { instanceId_email: { instanceId: dto.instanceId, email } },
-    });
-    if (existing?.convertedAt) return { ok: true };
+    })) as Row | null;
+    const byKey = leadKey
+      ? ((await this.db.registrationLead.findFirst({
+          where: { instanceId: dto.instanceId, sessionKey: leadKey, convertedAt: null },
+          orderBy: { lastActivityAt: 'desc' },
+        })) as Row | null)
+      : null;
+    const plan = planLeadUpsert({ email, leadKey, byEmail: existing, byKey });
+
+    // Sierota tej sesji (lead pod wcześniej wpisanym adresem, gdy pod nowym już jest inny) — usuwamy.
+    const dropId = plan.kind === 'skip' || plan.kind === 'touch' ? plan.dropId : undefined;
+    if (dropId) {
+      await this.db.registrationLead
+        .deleteMany({ where: { id: dropId, instanceId: dto.instanceId, sessionKey: leadKey, convertedAt: null } })
+        .catch((err: Error) => this.logger.warn(`upsert/drop: ${err.message}`));
+    }
+    if (plan.kind === 'skip') return { ok: true };
+
     const already = (await this.registeredEmails(dto.instanceId)).has(email);
-    if (existing) {
+    const converted = already ? { convertedAt: new Date() } : {};
+    if (plan.kind === 'touch') {
+      const row = existing as Row;
       await this.db.registrationLead.update({
-        where: { id: existing.id },
+        where: { id: plan.id },
         data: {
           firstName,
           lastName,
           locale,
-          step: Math.max(existing.step, step),
+          step: Math.max(row.step, step),
           lastActivityAt: new Date(),
-          ...(already ? { convertedAt: new Date() } : {}),
+          ...(plan.setSessionKey ? { sessionKey: plan.setSessionKey } : {}),
+          ...converted,
         },
       });
+    } else if (plan.kind === 'move') {
+      // Gość poprawił e-mail: ten sam lead, nowy adres. `reminderSentAt` zostaje — sesja dostaje najwyżej jedno przypomnienie.
+      const row = byKey as Row;
+      try {
+        await this.db.registrationLead.update({
+          where: { id: plan.id },
+          data: { email, firstName, lastName, locale, step: Math.max(row.step, step), lastActivityAt: new Date(), ...converted },
+        });
+      } catch (err) {
+        // Wyścig: pod nowym adresem właśnie powstał inny lead (unikalność instanceId + email).
+        // Nie ponawiamy — zgłoszenie i tak zamknie oba (po kluczu sesji i po adresie).
+        this.logger.warn(`upsert/move: ${(err as Error).message}`);
+      }
     } else {
-      await this.db.registrationLead.create({
-        data: { instanceId: dto.instanceId, email, firstName, lastName, locale, step, ...(already ? { convertedAt: new Date() } : {}) },
-      });
+      try {
+        await this.db.registrationLead.create({
+          data: { instanceId: dto.instanceId, email, firstName, lastName, locale, step, ...(plan.sessionKey ? { sessionKey: plan.sessionKey } : {}), ...converted },
+        });
+      } catch (err) {
+        this.logger.warn(`upsert/create: ${(err as Error).message}`);
+      }
     }
     return { ok: true };
   }
@@ -110,13 +154,26 @@ export class LeadsService implements OnModuleInit, OnModuleDestroy {
     return { firstName: lead.firstName, lastName: lead.lastName ?? '', email: lead.email, instanceId: lead.instanceId };
   }
 
-  /** Wysłane zgłoszenie → lead dokończony (wywoływane z RegistrationsService.create). */
-  async markConverted(instanceId: string, email: string, registrationId: string) {
-    const e = String(email ?? '').trim().toLowerCase();
-    if (!e) return;
-    await this.db.registrationLead
-      .updateMany({ where: { instanceId, email: e, convertedAt: null }, data: { convertedAt: new Date(), registrationId } })
-      .catch((err: Error) => this.logger.warn(`markConverted: ${err.message}`));
+  /**
+   * Wysłane zgłoszenie → leady dokończone (wywoływane z RegistrationsService.create):
+   * lead pod adresem zgłoszenia ORAZ wszystkie leady sesji formularza (`leadKey`), czyli także ten
+   * założony na adres wpisany wcześniej i potem poprawiony. Bez `leadKey` (stary front) — tylko po adresie.
+   */
+  async markConverted(instanceId: string, email: string, registrationId: string, leadKey?: string | null) {
+    const e = normalizeLeadEmail(email);
+    const key = cleanLeadKey(leadKey);
+    if (!e && !key) return;
+    try {
+      const open = (await this.db.registrationLead.findMany({
+        where: { instanceId, convertedAt: null, OR: [...(e ? [{ email: e }] : []), ...(key ? [{ sessionKey: key }] : [])] },
+        select: { id: true, email: true, sessionKey: true, convertedAt: true },
+      })) as LeadRef[];
+      const ids = leadIdsToClose(open, { email: e, leadKey: key });
+      if (!ids.length) return;
+      await this.db.registrationLead.updateMany({ where: { id: { in: ids }, convertedAt: null }, data: { convertedAt: new Date(), registrationId } });
+    } catch (err) {
+      this.logger.warn(`markConverted: ${(err as Error).message}`);
+    }
   }
 
   /** Panel: lista rozpoczętych zgłoszeń eventu. */
@@ -182,7 +239,8 @@ export class LeadsService implements OnModuleInit, OnModuleDestroy {
         this.db.registrationLead.update({ where: { id: lead.id }, data });
       if (!regCache.has(lead.instanceId)) regCache.set(lead.instanceId, await this.registeredEmails(lead.instanceId));
       const registered = regCache.get(lead.instanceId)!;
-      if (registered.has(lead.email)) {
+      // Pas bezpieczeństwa: aktywne zgłoszenie na ten sam adres (małe litery, bez białych znaków) → bez przypomnienia.
+      if (hasActiveRegistrationFor(lead.email, registered)) {
         await mark({ convertedAt: now });
         result.converted++;
         continue;

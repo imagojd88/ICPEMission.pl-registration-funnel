@@ -1,14 +1,15 @@
 import { useState, useEffect, useCallback, Fragment } from 'react'
-import { Search, Check, Wallet, RefreshCw, Plus, ChevronDown, ChevronUp, Undo2, RotateCcw, AlertTriangle } from 'lucide-react'
+import { Search, Check, Wallet, RefreshCw, Plus, ChevronDown, ChevronUp, Undo2, RotateCcw, AlertTriangle, Trash2 } from 'lucide-react'
 import { useAutoRefresh } from '@/hooks/useAutoRefresh'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import {
   getAdminInstances, getAdminRegistrations, markRegistrationPaid, getInstanceFinance, getRegistrationPayments,
-  addRegistrationPayment, voidRegistrationPayment, refundPayment, resolveRefund,
+  addRegistrationPayment, voidRegistrationPayment, refundPayment, resolveRefund, deleteTestPayment,
   type InstanceFinance, type RegistrationPayments, type RegistrationPaymentRow, type PaymentRefundRow,
 } from '@/lib/api'
 import { parseRefundAmount } from '@icpe/shared'
+import ConfirmDialog from '@/components/admin/ConfirmDialog'
 import type { RegistrationDto, EventInstanceDto } from '@icpe/shared'
 
 type Filter = 'all' | 'paid' | 'pending' | 'overdue'
@@ -127,13 +128,17 @@ export default function PaymentsScreen() {
   const [refundBusy, setRefundBusy] = useState(false)
   const [refundErr, setRefundErr] = useState<string | null>(null)
   const [notice, setNotice] = useState<{ tone: 'ok' | 'warn'; text: string } | null>(null)
+  // Trwałe usunięcie wpłaty TESTOWEJ Tpay (sprzątanie po testach) — okno potwierdzenia.
+  const [deleteTestOf, setDeleteTestOf] = useState<{ payment: RegistrationPaymentRow; guest: string } | null>(null)
+  const [deleteTestBusy, setDeleteTestBusy] = useState(false)
+  const [deleteTestErr, setDeleteTestErr] = useState<string | null>(null)
 
   useEffect(() => {
     setLoadingInstances(true)
     getAdminInstances()
       .then((list) => {
         setInstances(list)
-        if (list.length > 0) setSelectedInstanceId(list[0].id)
+        if (list.length > 0) setSelectedInstanceId((list.find((i) => !i.archived) ?? list[0]).id)
       })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
       .finally(() => setLoadingInstances(false))
@@ -260,6 +265,23 @@ export default function PaymentsScreen() {
     }
   }
 
+  async function handleDeleteTest() {
+    if (!deleteTestOf || deleteTestBusy) return
+    setDeleteTestBusy(true)
+    setDeleteTestErr(null)
+    try {
+      const res = await deleteTestPayment(deleteTestOf.payment.id)
+      setDetail(res)
+      setNotice({ tone: 'ok', text: `Usunięto wpłatę testową ${zl(deleteTestOf.payment.amount)} (${deleteTestOf.guest}). Rozliczenie i status zgłoszenia zostały przeliczone.` })
+      setDeleteTestOf(null)
+      loadRegs(selectedInstanceId)
+    } catch (e: unknown) {
+      setDeleteTestErr(e instanceof Error ? e.message.replace(/^API \d+:\s*/, '') : String(e))
+    } finally {
+      setDeleteTestBusy(false)
+    }
+  }
+
   async function handleResolve(f: PaymentRefundRow, outcome: 'done' | 'failed') {
     const q = outcome === 'done'
       ? `Potwierdzasz, że w panelu Tpay zwrot ${zl(f.amount)} JEST wykonany? Wpłata zostanie pomniejszona o tę kwotę, a gość dostanie mail (jeśli zaznaczono powiadomienie).`
@@ -336,7 +358,7 @@ export default function PaymentsScreen() {
             style={{ borderColor: 'var(--border)', background: 'var(--surface)', color: 'var(--ink)' }}
           >
             {instances.map((inst) => (
-              <option key={inst.id} value={inst.id}>{resolveTitle(inst.title)} ({inst.status})</option>
+              <option key={inst.id} value={inst.id}>{resolveTitle(inst.title)} ({inst.archived ? 'ARCHIWUM' : inst.status})</option>
             ))}
           </select>
         )}
@@ -547,6 +569,17 @@ export default function PaymentsScreen() {
                                         <RotateCcw size={12} /> Zwróć
                                       </button>
                                     )}
+                                    {/* Sprzątanie po testach: tylko wpłata Tpay ze znacznikiem TEST (serwer sprawdza to samo). */}
+                                    {p.provider === 'tpay' && p.testMode && !p.refundInFlight && (
+                                      <button
+                                        type="button"
+                                        onClick={() => { setDeleteTestErr(null); setDeleteTestOf({ payment: p, guest: `${r.contact.firstName} ${r.contact.lastName}`.trim() }) }}
+                                        className={`inline-flex items-center gap-1 text-xs rounded-[8px] border px-2 py-1${p.status === 'PAID' && (p.refundable ?? 0) > 0 ? '' : ' ml-auto'}`}
+                                        style={{ background: 'var(--surface)', borderColor: 'var(--err)', color: 'var(--err)', cursor: 'pointer', textDecoration: 'none' }}
+                                      >
+                                        <Trash2 size={12} /> Usuń wpłatę testową
+                                      </button>
+                                    )}
                                     {p.status === 'PAID' && (p.provider === 'panel' || p.provider === 'bank-import') && (
                                       <button type="button" onClick={() => { void handleVoid(p.id) }} className="inline-flex items-center gap-1 text-xs ml-auto" style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}>
                                         <Undo2 size={12} /> cofnij
@@ -609,6 +642,32 @@ export default function PaymentsScreen() {
       <p className="text-xs flex items-center gap-1.5" style={{ color: 'var(--faint)' }}>
         <Wallet size={13} /> „Wpłacone" to suma zaksięgowanych wpłat (także częściowych) pomniejszona o zwroty. „Oznacz opłacone" księguje brakującą resztę.
       </p>
+
+      {/* Okno potwierdzenia: trwałe usunięcie wpłaty testowej */}
+      {deleteTestOf && (
+        <ConfirmDialog
+          title="Usunąć wpłatę testową?"
+          confirmLabel="Usuń wpłatę testową"
+          tone="danger"
+          busy={deleteTestBusy}
+          busyLabel="Usuwam…"
+          error={deleteTestErr}
+          onConfirm={() => { void handleDeleteTest() }}
+          onClose={() => setDeleteTestOf(null)}
+        >
+          <p>
+            <strong>{deleteTestOf.guest}</strong> · wpłata {zl(deleteTestOf.payment.amount)} z {plDate(deleteTestOf.payment.paidAt)}
+            {deleteTestOf.payment.title ? ` · ${deleteTestOf.payment.title}` : ''} · znacznik TEST
+          </p>
+          <p className="px-3 py-2.5 rounded-[10px]" style={{ background: 'var(--err-soft)', border: '1px solid var(--err)' }}>
+            Operacja jest <strong>trwała i nieodwracalna</strong>: wpłata znika z historii razem z próbą płatności online i jej zwrotami{(deleteTestOf.payment.refunds ?? []).length > 0 ? ` (${(deleteTestOf.payment.refunds ?? []).length})` : ''}. To nie jest zwrot — do Tpay nic nie jest wysyłane.
+          </p>
+          <ul className="list-disc pl-5 flex flex-col gap-1">
+            <li>„Wpłacono” i status zgłoszenia zostaną przeliczone: jeśli bez tej wpłaty brakuje zadatku (albo całości, gdy event nie ma harmonogramu), zgłoszenie wróci z „Potwierdzone” do „Oczekuje na wpłatę”.</li>
+            <li>Serwer usunie wyłącznie wpłatę testową Tpay. Prawdziwej wpłaty tym przyciskiem usunąć się nie da.</li>
+          </ul>
+        </ConfirmDialog>
+      )}
 
       {/* Okno potwierdzenia zwrotu wpłaty Tpay */}
       {refundOf && (

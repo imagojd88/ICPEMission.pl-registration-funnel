@@ -117,6 +117,9 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       status: mapInstanceStatus(inst.status),
       // Ukryty event (tylko przez link /r/<slug>) — panel pokazuje znacznik „UKRYTY".
       unlisted: inst.unlisted === true,
+      // Zarchiwizowany (status wewnętrzny ARCHIVED). `status` zostaje CLOSED — kontrakt Personal OS bez zmian;
+      // panel na tej podstawie ukrywa event na liście i pokazuje „Przywróć z archiwum”.
+      archived: inst.status === 'ARCHIVED',
       capacity: inst.capacity ?? 0,
       registeredCount: agg.registeredCount,
       confirmedCount: agg.confirmedCount,
@@ -506,6 +509,11 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       data.status = dto.status as any;
       const current = await this.prisma.eventInstance.findUnique({ where: { id: instanceId }, select: { status: true } });
       if (!current) throw new NotFoundException('Event not found');
+      // Archiwum jest dla eventów zamkniętych: otwarty trzeba najpierw zamknąć (zapisy, przypomnienia i recepcja
+      // pomocników przestają działać dopiero po zamknięciu — archiwizacja „z marszu” byłaby zamknięciem bez pytania).
+      if (dto.status === 'ARCHIVED' && current.status === 'OPEN') {
+        throw new BadRequestException('Najpierw zamknij event — archiwizować można tylko zamknięty.');
+      }
       // Ręczne ponowne otwarcie → zapamiętujemy, żeby automat nie zamknął eventu z powrotem.
       if (dto.status === 'OPEN' && current.status !== 'OPEN') {
         data.reopenedAt = new Date();

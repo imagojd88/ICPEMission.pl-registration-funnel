@@ -6,6 +6,7 @@ import {
   BedDouble,
   CreditCard,
   UserCheck,
+  ConciergeBell,
   Settings,
   GraduationCap,
   Library,
@@ -26,6 +27,7 @@ type AdminScreen =
   | 'accommodation'
   | 'payments'
   | 'attendance'
+  | 'desk'
   | 'courses'
   | 'settings'
   | 'help'
@@ -45,6 +47,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'accommodation', label: 'Zakwaterowanie', icon: BedDouble },
   { id: 'payments', label: 'Płatności', icon: CreditCard },
   { id: 'attendance', label: 'Obecność', icon: UserCheck },
+  { id: 'desk', label: 'Recepcja', icon: ConciergeBell },
   { id: 'courses', label: 'Formacja online', icon: GraduationCap },
   { id: 'settings', label: 'Ustawienia', icon: Settings },
   { id: 'help', label: 'Pomoc', icon: LifeBuoy },

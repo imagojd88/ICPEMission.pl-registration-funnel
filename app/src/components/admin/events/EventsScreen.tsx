@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
-import { ExternalLink, Pencil, Archive, RotateCcw } from 'lucide-react'
+import { ExternalLink, Pencil, Archive, ArchiveRestore, Lock, RotateCcw } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import EventWizard from './EventWizard'
 import EventEditForm from './EventEditForm'
 import { getAdminInstances, updateEventInstance } from '@/lib/api'
+import ConfirmDialog from '@/components/admin/ConfirmDialog'
 import type { EventInstanceDto } from '@icpe/shared'
 
 type FilterTab = 'all' | 'one_time' | 'evergreen' | 'standalone' | 'invite'
@@ -85,6 +86,26 @@ export default function EventsScreen({ onOpenWizard, showWizard, onCloseWizard }
   }, [loadInstances])
 
   const [statusBusy, setStatusBusy] = useState<string | null>(null)
+  // Archiwum: zarchiwizowane eventy są domyślnie ukryte; okno potwierdzenia archiwizacji / przywrócenia.
+  const [showArchived, setShowArchived] = useState(false)
+  const [archiveOf, setArchiveOf] = useState<{ ev: EventInstanceDto; restore: boolean } | null>(null)
+  const [archiveErr, setArchiveErr] = useState<string | null>(null)
+
+  /** Archiwizacja zamkniętego eventu / przywrócenie z archiwum (→ zamknięty). */
+  async function confirmArchive() {
+    if (!archiveOf) return
+    setStatusBusy(archiveOf.ev.id)
+    setArchiveErr(null)
+    try {
+      await updateEventInstance(archiveOf.ev.id, { status: archiveOf.restore ? 'CLOSED' : 'ARCHIVED' })
+      setArchiveOf(null)
+      loadInstances()
+    } catch (e: unknown) {
+      setArchiveErr(e instanceof Error ? e.message : String(e))
+    } finally {
+      setStatusBusy(null)
+    }
+  }
 
   /** Ręczne zamknięcie / ponowne otwarcie eventu. Zamknięte eventy trafiają do „Poprzednich"
    *  w Personal OS; automat zamyka je też sam 7 dni po zakończeniu. */
@@ -107,7 +128,9 @@ export default function EventsScreen({ onOpenWizard, showWizard, onCloseWizard }
     }
   }
 
+  const archivedCount = instances.filter((i) => i.archived === true).length
   const filtered = instances.filter((inst) => {
+    if (inst.archived === true && !showArchived) return false
     const t = instanceTypeLabel(inst.type ?? 'ONE_TIME')
     if (filter === 'one_time') return t === 'jednorazowy'
     if (filter === 'evergreen') return t === 'cykliczny'
@@ -159,6 +182,7 @@ export default function EventsScreen({ onOpenWizard, showWizard, onCloseWizard }
   return (
     <div className="flex flex-col gap-5">
       {/* Filter tabs */}
+      <div className="flex items-center gap-4 flex-wrap">
       <div className="flex items-center gap-1 p-1 rounded-[12px] self-start" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
         {FILTER_TABS.map((tab) => (
           <button
@@ -174,6 +198,11 @@ export default function EventsScreen({ onOpenWizard, showWizard, onCloseWizard }
             {tab.label}
           </button>
         ))}
+      </div>
+      <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: 'var(--muted)' }}>
+        <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} className="accent-[var(--brand)] w-4 h-4" />
+        Pokaż zarchiwizowane{archivedCount > 0 ? ` (${archivedCount})` : ''}
+      </label>
       </div>
 
       {/* Error */}
@@ -215,7 +244,11 @@ export default function EventsScreen({ onOpenWizard, showWizard, onCloseWizard }
           <div className="px-5 py-8 text-center flex flex-col items-center gap-3">
             <p className="text-sm font-medium" style={{ color: 'var(--ink)' }}>Brak eventów</p>
             <p className="text-sm" style={{ color: 'var(--faint)' }}>
-              {instances.length === 0 ? 'Utwórz pierwszy event klikając „+ Nowy event".' : 'Brak eventów w tej kategorii.'}
+              {instances.length === 0
+                ? 'Utwórz pierwszy event klikając „+ Nowy event".'
+                : archivedCount > 0 && !showArchived
+                  ? `Brak eventów w tej kategorii (zarchiwizowane są ukryte — zaznacz „Pokaż zarchiwizowane”).`
+                  : 'Brak eventów w tej kategorii.'}
             </p>
             {instances.length === 0 && (
               <Button size="sm" onClick={openNew} className="mt-1">
@@ -298,7 +331,7 @@ export default function EventsScreen({ onOpenWizard, showWizard, onCloseWizard }
                           )}
                         </div>
                       </td>
-                      <td className="px-5 py-3.5">{statusBadge(statusStr)}</td>
+                      <td className="px-5 py-3.5">{ev.archived === true ? <Badge variant="muted">Zarchiwizowany</Badge> : statusBadge(statusStr)}</td>
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-3">
                           {slug && seriesId && (
@@ -310,19 +343,44 @@ export default function EventsScreen({ onOpenWizard, showWizard, onCloseWizard }
                               <Pencil size={12} /> Edytuj
                             </button>
                           )}
-                          <button
-                            onClick={() => { void toggleClosed(ev) }}
-                            disabled={statusBusy === ev.id}
-                            className="flex items-center gap-1 text-xs font-medium transition-colors hover:text-[var(--brand)] disabled:opacity-50"
-                            style={{ color: 'var(--muted)' }}
-                            title={ev.status === 'OPEN'
-                              ? 'Zamknij zapisy i przenieś event do „Poprzednich"'
-                              : 'Otwórz event ponownie'}
-                          >
-                            {ev.status === 'OPEN'
-                              ? <><Archive size={12} /> Zamknij</>
-                              : <><RotateCcw size={12} /> Otwórz ponownie</>}
-                          </button>
+                          {ev.archived === true ? (
+                            <button
+                              onClick={() => { setArchiveErr(null); setArchiveOf({ ev, restore: true }) }}
+                              disabled={statusBusy === ev.id}
+                              className="flex items-center gap-1 text-xs font-medium transition-colors hover:text-[var(--brand)] disabled:opacity-50"
+                              style={{ color: 'var(--muted)' }}
+                              title="Przywróć event z archiwum — wróci jako zamknięty"
+                            >
+                              <ArchiveRestore size={12} /> Przywróć z archiwum
+                            </button>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => { void toggleClosed(ev) }}
+                                disabled={statusBusy === ev.id}
+                                className="flex items-center gap-1 text-xs font-medium transition-colors hover:text-[var(--brand)] disabled:opacity-50"
+                                style={{ color: 'var(--muted)' }}
+                                title={ev.status === 'OPEN'
+                                  ? 'Zamknij zapisy i przenieś event do „Poprzednich"'
+                                  : 'Otwórz event ponownie'}
+                              >
+                                {ev.status === 'OPEN'
+                                  ? <><Lock size={12} /> Zamknij</>
+                                  : <><RotateCcw size={12} /> Otwórz ponownie</>}
+                              </button>
+                              {ev.status !== 'OPEN' && (
+                                <button
+                                  onClick={() => { setArchiveErr(null); setArchiveOf({ ev, restore: false }) }}
+                                  disabled={statusBusy === ev.id}
+                                  className="flex items-center gap-1 text-xs font-medium transition-colors hover:text-[var(--brand)] disabled:opacity-50"
+                                  style={{ color: 'var(--muted)' }}
+                                  title="Schowaj zamknięty event do archiwum"
+                                >
+                                  <Archive size={12} /> Archiwizuj
+                                </button>
+                              )}
+                            </>
+                          )}
                           {slug && (
                             <a
                               href={`https://rejestracja.icpemission.pl/r/${slug}`}
@@ -344,6 +402,34 @@ export default function EventsScreen({ onOpenWizard, showWizard, onCloseWizard }
           </div>
         )}
       </div>
+
+      {/* Archiwizacja / przywrócenie z archiwum */}
+      {archiveOf && (
+        <ConfirmDialog
+          title={archiveOf.restore ? 'Przywrócić event z archiwum?' : 'Zarchiwizować event?'}
+          confirmLabel={archiveOf.restore ? 'Przywróć z archiwum' : 'Archiwizuj'}
+          busy={statusBusy === archiveOf.ev.id}
+          busyLabel="Zapisuję…"
+          error={archiveErr}
+          onConfirm={() => { void confirmArchive() }}
+          onClose={() => setArchiveOf(null)}
+        >
+          <p><strong>{resolveTitle(archiveOf.ev.title)}</strong></p>
+          {archiveOf.restore ? (
+            <ul className="list-disc pl-5 flex flex-col gap-1">
+              <li>Event wróci na listę jako <strong>zamknięty</strong> (zapisy pozostają wyłączone). Żeby znów przyjmował zgłoszenia, użyj potem „Otwórz ponownie”.</li>
+              <li>Wróci też do Recepcji: do listy eventów administratora i pomocników, którzy mają do niego dostęp.</li>
+            </ul>
+          ) : (
+            <ul className="list-disc pl-5 flex flex-col gap-1">
+              <li>Event zniknie z tej listy (zobaczysz go po zaznaczeniu „Pokaż zarchiwizowane”) i z listy eventów w Recepcji — także u pomocników.</li>
+              <li>Nic nie jest usuwane: zgłoszenia, wpłaty i ustawienia zostają; „Zgłoszenia” i „Płatności” nadal pokazują event na liście wyboru z dopiskiem ARCHIWUM.</li>
+              <li>Strona eventu pod linkiem nadal pokazuje „zapisy zamknięte”, a strony zgłoszeń gości działają jak przy zamkniętym evencie.</li>
+              <li>Archiwizację można cofnąć („Przywróć z archiwum”).</li>
+            </ul>
+          )}
+        </ConfirmDialog>
+      )}
     </div>
   )
 }

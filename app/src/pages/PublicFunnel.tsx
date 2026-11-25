@@ -11,7 +11,7 @@ import { setAnalyticsContext, track } from '../lib/analytics'
 
 /** Nazwy kroków w analityce (stałe, niezależne od języka). */
 const STEP_NAMES = ['applicant', 'participants', 'preferences', 'accommodation', 'options'] as const
-import { clearDraft, loadDraft, pruneExpiredDrafts, saveDraft, type ResumableScreen } from '../lib/funnelDraft'
+import { clearDraft, clearLeadKey, getLeadKey, loadDraft, pruneExpiredDrafts, saveDraft, type ResumableScreen } from '../lib/funnelDraft'
 
 /** Rozdziela „Imię Nazwisko" na pola DTO. */
 function splitName(full: string): { firstName: string; lastName?: string } {
@@ -543,6 +543,8 @@ export default function PublicFunnel() {
       lastName: a.lastName.trim() || undefined,
       locale: (i18n.language || 'pl').slice(0, 2),
       step,
+      // Klucz sesji formularza: poprawiony e-mail przenosi lead na nowy adres (nie zostaje stary z przypomnieniem).
+      ...(getLeadKey(slug ?? '') ? { leadKey: getLeadKey(slug ?? '') } : {}),
     }).catch(() => undefined)
   }
   // Niedokończone zgłoszenie z poprzedniej wizyty (localStorage) — pokazujemy je jako
@@ -994,11 +996,16 @@ export default function PublicFunnel() {
         paymentMethod: toPaymentMethod(stepper.paymentMethod),
         consents: stepper.consents,
         ...(invite ? { invitationToken: invite.token } : {}),
+        // Zamyka wszystkie „niedokończone zgłoszenia” tej sesji formularza (także pod wcześniej wpisanym adresem).
+        ...(getLeadKey(draftSlug) ? { leadKey: getLeadKey(draftSlug) } : {}),
       }
       const res = await createRegistration(dto)
       // Od tej chwili zgłoszenie istnieje: żadnej ponownej wysyłki, szkic do kosza.
       createdRef.current = true
-      if (draftSlug) clearDraft(draftSlug)
+      if (draftSlug) {
+        clearDraft(draftSlug)
+        clearLeadKey(draftSlug)
+      }
       const editToken = (res.registration as { editToken?: string }).editToken
       setResult({
         regId: res.registration.id,

@@ -11,6 +11,7 @@ import SettingsScreen from '@/components/admin/settings/SettingsScreen'
 import AttendanceScreen from '@/components/admin/attendance/AttendanceScreen'
 import AccommodationScreen from '@/components/admin/accommodation/AccommodationScreen'
 import PaymentsScreen from '@/components/admin/payments/PaymentsScreen'
+import DeskActivityScreen from '@/components/admin/desk/DeskActivityScreen'
 import CoursesScreen from '@/components/admin/courses/CoursesScreen'
 import LibraryScreen from '@/components/admin/library/LibraryScreen'
 import HelpScreen, { HELP_HASH } from '@/components/admin/help/HelpScreen'
@@ -23,6 +24,7 @@ type AdminScreen =
   | 'accommodation'
   | 'payments'
   | 'attendance'
+  | 'desk'
   | 'courses'
   | 'settings'
   | 'help'
@@ -35,6 +37,7 @@ const SCREEN_TITLES: Record<AdminScreen, { title: string; subtitle?: string }> =
   accommodation: { title: 'Zakwaterowanie', subtitle: 'Zarządzaj pokojami i przydziałami' },
   payments: { title: 'Płatności', subtitle: 'Historia transakcji i rozliczenia' },
   attendance: { title: 'Obecność', subtitle: 'Lista obecności i weryfikacja uczestników' },
+  desk: { title: 'Recepcja', subtitle: 'Prośby dodatkowe gości i dziennik działań stanowiska przyjęć' },
   courses: { title: 'Formacja online', subtitle: 'Kursy online: filmy, materiały PDF i dostęp kursantów' },
   settings: { title: 'Ustawienia', subtitle: 'Konfiguracja systemu i konta' },
   help: { title: 'Pomoc', subtitle: 'Instrukcje dla administratora: recepcja, eventy, zgłoszenia, płatności' },
@@ -127,6 +130,8 @@ export default function AdminPanel() {
         return <PaymentsScreen />
       case 'attendance':
         return <AttendanceScreen />
+      case 'desk':
+        return <DeskActivityScreen />
       case 'courses':
         return <CoursesScreen />
       case 'settings':

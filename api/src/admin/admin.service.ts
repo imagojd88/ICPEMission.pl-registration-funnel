@@ -69,18 +69,29 @@ export class AdminService {
     return this.loadContractRegistration(registrationId);
   }
 
+  /**
+   * Zmiana statusu (kontrakt). Anulowanie zapamiętuje status sprzed anulowania (`statusBeforeCancel`),
+   * żeby „Przywróć zgłoszenie” mogło oddać np. listę rezerwową albo potwierdzenie bez wpłat.
+   * Nie wysyła żadnego maila do gościa. Miejsce i pokoje zwalniają się same: liczniki miejsc
+   * i limit pokoi pomijają zgłoszenia CANCELLED.
+   */
   async updateRegistrationStatus(id: string, status: string) {
+    const next = contractStatusToInternal(status) as
+      | 'DRAFT'
+      | 'PENDING_PAYMENT'
+      | 'AWAITING_TRANSFER'
+      | 'CONFIRMED'
+      | 'WAITLIST'
+      | 'CANCELLED';
+    const current = await this.prisma.registration.findUnique({ where: { id }, select: { status: true } });
+    if (!current) throw new NotFoundException('Registration not found');
+    const remember =
+      next === 'CANCELLED'
+        ? current.status !== 'CANCELLED' ? { statusBeforeCancel: current.status } : {}
+        : { statusBeforeCancel: null };
     await this.prisma.registration.update({
       where: { id },
-      data: {
-        status: contractStatusToInternal(status) as
-          | 'DRAFT'
-          | 'PENDING_PAYMENT'
-          | 'AWAITING_TRANSFER'
-          | 'CONFIRMED'
-          | 'WAITLIST'
-          | 'CANCELLED',
-      },
+      data: { status: next, ...(remember as object) } as never,
     });
     this.courseAccess.syncRegistrationSafe(id);
     return this.loadContractRegistration(id);

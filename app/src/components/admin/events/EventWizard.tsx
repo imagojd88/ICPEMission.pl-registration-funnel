@@ -750,11 +750,18 @@ function Step0Type({ state, update }: { state: WizardState; update: (p: Partial<
           <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
             Konfiguracja cykliczności
           </p>
+          {/* Makieta: poniższe pola nie mają jeszcze zapisu — wyłączone, żeby nie udawały działania. */}
+          <p className="text-xs" style={{ color: 'var(--muted)' }}>
+            Harmonogram powtórzeń nie jest jeszcze obsługiwany — te ustawienia nie są zapisywane. Event utworzy się jak pojedyncza edycja.
+          </p>
           <div className="flex gap-3">
             {['Tygodniowo', 'Miesięcznie'].map((f) => (
               <button
                 key={f}
-                className="px-3 py-1.5 rounded-[8px] text-sm border transition-colors hover:bg-[var(--brand-soft)]"
+                type="button"
+                disabled
+                title="Jeszcze nieobsługiwane"
+                className="px-3 py-1.5 rounded-[8px] text-sm border disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{ borderColor: 'var(--border)', color: 'var(--ink)' }}
               >
                 {f}
@@ -765,7 +772,10 @@ function Step0Type({ state, update }: { state: WizardState; update: (p: Partial<
             {['Pon', 'Wt', 'Śr', 'Czw', 'Pt', 'Sob', 'Nd'].map((d) => (
               <button
                 key={d}
-                className="px-2.5 py-1 rounded-[8px] text-xs border transition-colors hover:bg-[var(--brand-soft)] hover:border-[var(--brand)]"
+                type="button"
+                disabled
+                title="Jeszcze nieobsługiwane"
+                className="px-2.5 py-1 rounded-[8px] text-xs border disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{ borderColor: 'var(--border)', color: 'var(--muted)' }}
               >
                 {d}
@@ -773,8 +783,8 @@ function Step0Type({ state, update }: { state: WizardState; update: (p: Partial<
             ))}
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <Input label="Otwórz rejestrację (dni przed)" type="number" placeholder="30" />
-            <Input label="Zamknij rejestrację (dni przed)" type="number" placeholder="3" />
+            <Input label="Otwórz rejestrację (dni przed)" type="number" placeholder="30" disabled />
+            <Input label="Zamknij rejestrację (dni przed)" type="number" placeholder="3" disabled />
           </div>
         </div>
       )}

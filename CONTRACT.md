@@ -8,7 +8,8 @@ Bazowy URL: `VITE_API_URL` (dev: `http://localhost:3000`). Format: JSON. Typy DT
 | GET | `/r/:slug` | — | `EventInstanceDto` (aktualna otwarta edycja) |
 | GET | `/r/:slug/config?locale=` | — | konfiguracja formularza (pola, pokoje `RoomTypeDto[]`, cennik `PricingConfig`, języki) |
 | POST | `/pricing/quote` | `PriceInput` | `PriceResult` |
-| POST | `/registrations` | `CreateRegistrationDto` | `{ registration: RegistrationDto, summary: PriceResult, payment: {...} }` |
+| POST | `/registrations` | `CreateRegistrationDto` (od 2026-11-25 z opcjonalnym `leadKey`) | `{ registration: RegistrationDto, summary: PriceResult, payment: {...} }` |
+| POST | `/registrations/leads` | `{ instanceId, email, firstName, lastName?, locale?, step?, leadKey? }` | `{ ok: true }` — „rozpoczęte zgłoszenie” (jedno przypomnienie po 3 h); nic nie ujawnia |
 | GET | `/registrations/:id?token=` | — | `RegistrationDto` (magic-link) |
 | PUT | `/registrations/:id?token=` | `CreateRegistrationDto` (partial) | `RegistrationDto` |
 | GET | `/registrations/:id/calendar.ics` | — | `text/calendar` |
@@ -45,7 +46,7 @@ Jeden RSVP na (event, e-mail) — ponowny zapis z tym samym e-mailem aktualizuje
 | POST/PUT | `/admin/series[/:id]` | tworzenie/edycja serii (one-time/evergreen) |
 | POST | `/admin/series/:id/page` | konfiguracja generatora strony |
 | POST | `/admin/series/:id/publish` | publikacja |
-| GET | `/admin/instances?status=` | `EventInstanceDto[]` — od 2026-11-25 z opcjonalnym polem `unlisted: boolean` (ukryty event; lista admina i Personal OS nadal go zwraca) |
+| GET | `/admin/instances?status=` | `EventInstanceDto[]` — od 2026-11-25 z opcjonalnymi polami `unlisted: boolean` (ukryty event; lista admina i Personal OS nadal go zwraca) i `archived: boolean` (event zarchiwizowany; `status` zostaje `CLOSED`) |
 | GET | `/admin/instances/:id` | edycja + `roomTypes[]` + obłożenie (+ opcjonalne `unlisted`) |
 | PATCH | `/admin/instances/:id` | edycja pól instancji; przyjmuje m.in. opcjonalne `unlisted: boolean` |
 | POST | `/admin/instances/:id/clone` | klon edycji |
@@ -89,3 +90,38 @@ Jeden RSVP na (event, e-mail) — ponowny zapis z tym samym e-mailem aktualizuje
 - Płatność online (Tpay): NAJPIERW kraj (`PL` → dostępna; inny kraj → niedostępna niezależnie od języka), dopiero gdy kraju brak — język zgłoszenia (`locale`). Jedna reguła (`onlineProviderFor`) dla lejka, `GET /registrations/manage/:token/payments`, tworzenia płatności i przycisków „Zapłać online” w mailach.
 - `PATCH /admin/registrations/:id`: `contact.countryCode` z kodem zapisuje kraj, pusty tekst usuwa zapisany kraj. Odpowiedzi ze zgłoszeniem (`contact`) zwracają `countryCode`, gdy jest zapisany.
 - `GET /r/:slug/config` zwraca `hasDiscountCodes: boolean` — czy event ma aktywny kod rabatowy (lejek ukrywa pole „Kod rabatowy”, gdy nie ma).
+
+## Panel admina — dodatki z 2026-11-25 (wyłącznie addytywne)
+Istniejące trasy i kształty odpowiedzi kontraktu Personal OS bez zmian. Nowe pola są opcjonalne, nowe trasy niczego nie zastępują.
+
+### Niedokończone zgłoszenia: klucz sesji formularza (`leadKey`)
+- `POST /registrations/leads` i `POST /registrations` przyjmują opcjonalne `leadKey` — losowy tekst 16–64 znaków `[A-Za-z0-9_-]`, tworzony w przeglądarce gościa (jeden na event i sesję formularza). Wartość w innym formacie jest ignorowana.
+- Z kluczem: lead tej sesji **zmienia adres**, gdy gość poprawi e-mail (nie powstaje drugi), a wysłane zgłoszenie zamyka lead pod adresem zgłoszenia **oraz** wszystkie leady z tym kluczem. Bez klucza (starszy front) działa jak dotąd — po samym adresie.
+- Klucz nie jest tokenem z linku przypomnienia (`GET /registrations/leads/:token`) i nie daje dostępu do żadnych danych; odpowiedź `POST /registrations/leads` to zawsze `{ ok: true }`.
+- Cron przypomnień pomija lead, gdy w evencie jest aktywne (nieanulowane) zgłoszenie na ten sam adres po normalizacji (małe litery, bez białych znaków). Bez dopasowań po nazwisku ani „podobnych” adresach.
+- Baza: `RegistrationLead.sessionKey String?` (+ indeks `instanceId, sessionKey`).
+
+### Archiwizacja eventu
+- `PATCH /admin/instances/:id` z `{ status: 'ARCHIVED' }` — tylko dla eventu, który nie jest `OPEN` (otwarty → 400 „Najpierw zamknij event”). Powrót: `{ status: 'CLOSED' }`.
+- `GET /admin/instances` i `GET /admin/instances/:id` zwracają `archived: boolean`; pole `status` nadal `OPEN | CLOSED` (zarchiwizowany = `CLOSED`), więc klient, który pola nie zna, widzi event jak zamknięty.
+
+### Zgłoszenie: szczegóły dla admina, przywracanie, trwałe usuwanie danych testowych
+| Metoda | Ścieżka | Kto | Opis |
+|---|---|---|---|
+| GET | `/admin/registrations/:id/detail` | tylko JWT admina (token serwisowy → 403) | `{ id, internalStatus, status, manageToken, manageUrl, currency, totalPrice, paidAmount, payments: { count, testCount, realCount }, canRestore, canDeletePermanently, deleteBlocker }` — jedyna odpowiedź admina z tokenem strony gościa (`/z/<token>`) |
+| POST | `/admin/registrations/:id/restore` | JWT admina lub token serwisowy | body `{ force?: boolean }`. Tylko zgłoszenie `CANCELLED` (inaczej 400). Brak miejsc / pokoi i brak `force` → 200 `{ ok: false, needsConfirm: true, warnings[], nextInternalStatus }`, nic nie zmienia. Sukces → `{ ok: true, internalStatus, status, warnings[] }`. Bez maila do gościa |
+| POST | `/admin/registrations/:id/delete-permanently` | tylko JWT admina | body `{ confirm: 'USUŃ' }`. Serwer odmawia (400), gdy zgłoszenie nie jest anulowane albo ma jakąkolwiek nietestową wpłatę; 409 przy zwrocie w toku. Usuwa trwale zgłoszenie z uczestnikami, wpłatami testowymi, próbami płatności, zwrotami, prośbami i wpisami dzienników |
+| DELETE | `/admin/payments/:paymentId/test` | tylko JWT admina | trwale usuwa wpłatę **testową Tpay** (`provider = 'tpay'` i znacznik testu na wpłacie oraz na próbie `OnlinePayment`) z jej próbą i zwrotami; 400 dla każdej innej wpłaty; 409 przy zwrocie w toku. Przelicza status zgłoszenia (może cofnąć `CONFIRMED` → oczekuje na wpłatę). Odpowiedź jak `GET /admin/registrations/:id/payments` + `{ ok, deleted, internalStatus }`. Nic nie wysyła do Tpay |
+
+- Status po przywróceniu: sprzed anulowania, jeśli był `WAITLIST` albo `CONFIRMED` (`Registration.statusBeforeCancel`, zapisywane przez `PATCH /admin/registrations/:id/status` przy anulowaniu); w pozostałych przypadkach z wpłat — reguła `syncStatus` (zadatek przy harmonogramie, całość bez niego) → `CONFIRMED`, inaczej `PENDING_PAYMENT` / `AWAITING_TRANSFER` wg metody.
+- `PATCH /admin/registrations/:id/status` — kształt bez zmian; nieistniejące zgłoszenie zwraca teraz 404 (wcześniej błąd 500 z bazy).
+- Usunięcia są zapisywane w logu serwera (kto, id zgłoszenia / wpłaty, liczby usuniętych wierszy) — bez danych osobowych gościa.
+
+### Recepcja w panelu: dziennik działań i prośby dodatkowe
+| Metoda | Ścieżka | Opis |
+|---|---|---|
+| GET | `/admin/instances/:id/desk-log?actor=&action=&page=&pageSize=` | dziennik `DeskActionLog` eventu, od najnowszych; `pageSize` 10–200 (domyślnie 50). `{ total, page, pageSize, pages, actors[], actions[], items[] { id, createdAt, actor, action, registrationId, registrant, amount, method, kind, via } }` |
+| GET | `/admin/instances/:id/desk-requests?status=OPEN\|DONE` | prośby `RegistrationRequest` eventu: `{ counts: { open, done, total }, items[] { id, registrationId, registrant, registrationStatus, roomLabel, participant, kind, note, status, createdBy, createdAt, resolvedBy, resolvedAt } }` |
+| PATCH | `/admin/instances/:id/desk-requests/:requestId` | `{ status: 'OPEN' \| 'DONE' }` — tylko JWT admina; dopisuje wpis do dziennika (`REQUEST_DONE` / `REQUEST_REOPEN`, `via: 'panel'`) |
+
+Wszystkie za `JwtAuthGuard` (pomocnik recepcji nie przechodzi). Trasy `/desk/*` bez zmian.

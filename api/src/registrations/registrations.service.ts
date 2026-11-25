@@ -303,7 +303,8 @@ export class RegistrationsService {
     this.courseAccess.syncRegistrationSafe(registration.id);
 
     // Rozpoczęte zgłoszenie (lead) → dokończone: bez przypomnienia.
-    void this.leads.markConverted(dto.instanceId, (dto.contact as { email: string }).email, registration.id);
+    // Zamykamy lead pod adresem zgłoszenia i wszystkie leady tej sesji formularza (`leadKey`).
+    void this.leads.markConverted(dto.instanceId, (dto.contact as { email: string }).email, registration.id, dto.leadKey);
 
     return {
       registration: this.mapToDto(registration),

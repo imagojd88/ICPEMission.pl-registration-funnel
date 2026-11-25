@@ -106,3 +106,69 @@ export function pruneExpiredDrafts(): void {
     /* jw. */
   }
 }
+
+// ---------------------------------------------------------------------------
+// Klucz sesji formularza („leadKey”) — niedokończone zgłoszenia
+// ---------------------------------------------------------------------------
+// Losowy, nieodgadywalny identyfikator tej przeglądarki dla danego eventu. Lejek wysyła go przy zapisie
+// „rozpoczętego zgłoszenia” i przy wysłaniu zgłoszenia: dzięki temu poprawienie e-maila w trakcie nie
+// zostawia starego adresu z przypomnieniem „dokończ zgłoszenie”, a wysłane zgłoszenie zamyka wszystko,
+// co ta sesja zaczęła. Klucz nie daje dostępu do żadnych danych. Osobny prefiks — `pruneExpiredDrafts`
+// sprząta tylko szkice.
+
+const LEAD_KEY_PREFIX = 'icpe:leadkey:'
+/** Tyle samo, ile API czeka z przypomnieniem najdłużej (7 dni) — potem klucz i tak nic nie znaczy. */
+const LEAD_KEY_TTL_DAYS = 7
+/** Gdy storage jest zablokowany (tryb prywatny), klucz żyje do zamknięcia karty. */
+const memoryLeadKeys = new Map<string, string>()
+
+function randomLeadKey(): string {
+  try {
+    const bytes = new Uint8Array(24)
+    window.crypto.getRandomValues(bytes)
+    return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
+  } catch {
+    // Bez Web Crypto nie udajemy losowości — brak klucza = działanie jak dotąd (po samym adresie).
+    return ''
+  }
+}
+
+/** Klucz sesji formularza dla eventu (tworzy przy pierwszym użyciu). Pusty tekst = brak klucza. */
+export function getLeadKey(slug: string): string {
+  if (!slug) return ''
+  const mem = memoryLeadKeys.get(slug)
+  if (mem) return mem
+  try {
+    const raw = window.localStorage.getItem(`${LEAD_KEY_PREFIX}${slug}`)
+    if (raw) {
+      const d = JSON.parse(raw) as { k?: unknown; t?: unknown }
+      const fresh = typeof d?.t === 'number' && Date.now() - d.t < LEAD_KEY_TTL_DAYS * 24 * 60 * 60 * 1000
+      if (fresh && typeof d.k === 'string' && /^[A-Za-z0-9_-]{16,64}$/.test(d.k)) {
+        memoryLeadKeys.set(slug, d.k)
+        return d.k
+      }
+    }
+  } catch {
+    /* uszkodzony wpis / zablokowany storage — tworzymy nowy klucz niżej */
+  }
+  const key = randomLeadKey()
+  if (!key) return ''
+  memoryLeadKeys.set(slug, key)
+  try {
+    window.localStorage.setItem(`${LEAD_KEY_PREFIX}${slug}`, JSON.stringify({ k: key, t: Date.now() }))
+  } catch {
+    /* jw. — zostaje klucz w pamięci karty */
+  }
+  return key
+}
+
+/** Po wysłaniu zgłoszenia: następne zgłoszenie z tej przeglądarki to nowa sesja formularza. */
+export function clearLeadKey(slug: string): void {
+  if (!slug) return
+  memoryLeadKeys.delete(slug)
+  try {
+    window.localStorage.removeItem(`${LEAD_KEY_PREFIX}${slug}`)
+  } catch {
+    /* jw. */
+  }
+}

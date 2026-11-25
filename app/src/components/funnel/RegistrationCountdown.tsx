@@ -50,9 +50,25 @@ export default function RegistrationCountdown({ opensAt, onOpen, instanceId }: P
     { v: Math.floor((sec % 3600) / 60), label: t('countdown.minutes') },
     { v: sec % 60, label: t('countdown.seconds') },
   ]
-  const when = new Date(target).toLocaleString(bcp47(i18n.language), {
-    day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
-  })
+  // Godzina startu zawsze w czasie polskim (tak ustawia ją organizator), z nazwą strefy: CET zimą, CEST latem.
+  const EVENT_TZ = 'Europe/Warsaw'
+  const whenFmt = { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' } as const
+  const targetDate = new Date(target)
+  let when = targetDate.toLocaleString(bcp47(i18n.language), whenFmt)
+  let localWhen: string | null = null
+  try {
+    const tzName = new Intl.DateTimeFormat('en-GB', { timeZone: EVENT_TZ, timeZoneName: 'short' })
+      .formatToParts(targetDate).find((x) => x.type === 'timeZoneName')?.value ?? ''
+    const zone = /^CES?T$/.test(tzName) ? tzName : 'CET'
+    when = `${targetDate.toLocaleString(bcp47(i18n.language), { ...whenFmt, timeZone: EVENT_TZ })} ${zone}`
+    // Gość w innej strefie dostaje dodatkowo godzinę w swoim czasie.
+    const wall = (tz?: string) => targetDate.toLocaleString('en-GB', { ...whenFmt, timeZone: tz })
+    if (wall(EVENT_TZ) !== wall(undefined)) {
+      localWhen = targetDate.toLocaleString(bcp47(i18n.language), { ...whenFmt, timeZoneName: 'short' })
+    }
+  } catch {
+    /* stara przeglądarka bez stref czasowych: zostaje czas lokalny bez etykiety */
+  }
 
   return (
     <>
@@ -78,6 +94,11 @@ export default function RegistrationCountdown({ opensAt, onOpen, instanceId }: P
       <p className="text-sm text-center" style={{ color: 'var(--ink)' }}>
         {t('landing.opens_at', { date: when })}
       </p>
+      {localWhen && (
+        <p className="text-xs text-center" style={{ color: 'var(--muted)' }}>
+          {t('landing.opens_at_local', { date: localWhen })}
+        </p>
+      )}
     </div>
 
     {/* Lista oczekujących */}

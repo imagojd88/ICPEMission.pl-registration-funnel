@@ -84,6 +84,8 @@ export interface EventInstanceDto {
   slug: string;
   /** Ukryty event: działa pod bezpośrednim linkiem /r/<slug>, ale nie ma go na publicznych listach. */
   unlisted?: boolean;
+  /** Event zarchiwizowany (status wewnętrzny ARCHIVED; w `status` nadal CLOSED). Tylko odpowiedzi admina. */
+  archived?: boolean;
 }
 
 export interface RegistrationDto {
@@ -156,6 +158,8 @@ export interface CreateRegistrationDto {
   consents: { rodo: boolean; regulamin: boolean };
   /** Token osobistego zaproszenia (link `/r/:slug?inv=`) — spina zaproszenie ze zgłoszeniem. */
   invitationToken?: string;
+  /** Klucz sesji formularza — zamyka wszystkie niedokończone zgłoszenia (leady) tej sesji. Opcjonalny. */
+  leadKey?: string;
 }
 
 /** Skrót KPI dla dashboardu / karty Personal OS. */

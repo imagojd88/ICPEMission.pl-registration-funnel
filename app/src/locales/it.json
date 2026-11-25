@@ -28,6 +28,7 @@
     "badge_soon": "Iscrizioni a breve",
     "opens_title": "Le iscrizioni aprono tra",
     "opens_at": "Apertura iscrizioni: {{date}}",
+    "opens_at_local": "Nel tuo fuso orario: {{date}}",
     "levels_title": "Prezzi",
     "level_default": "Prezzo",
     "level_range": "{{from}} – {{until}}",

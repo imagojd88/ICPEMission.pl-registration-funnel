@@ -28,6 +28,7 @@
     "badge_soon": "报名即将开始",
     "opens_title": "距报名开始还有",
     "opens_at": "报名开始时间：{{date}}",
+    "opens_at_local": "您所在时区的时间：{{date}}",
     "levels_title": "费用",
     "level_default": "费用",
     "level_range": "{{from}} – {{until}}",

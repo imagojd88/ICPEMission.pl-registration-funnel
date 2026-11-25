@@ -6,11 +6,13 @@ import { DeskService } from './desk.service';
 import { DeskAuthGuard } from './desk-auth.guard';
 import { StaffController } from './staff.controller';
 import { StaffService } from './staff.service';
+import { DeskAdminController } from './desk-admin.controller';
+import { DeskAdminService } from './desk-admin.service';
 
-/** Recepcja (/desk/*) + zarządzanie pomocnikami eventu (/admin/instances/:id/staff). */
+/** Recepcja (/desk/*) + zarządzanie pomocnikami eventu (/admin/instances/:id/staff) + wgląd admina w dziennik i prośby. */
 @Module({
   imports: [AuthModule, RegistrationsModule],
-  controllers: [DeskController, StaffController],
-  providers: [DeskService, StaffService, DeskAuthGuard],
+  controllers: [DeskController, StaffController, DeskAdminController],
+  providers: [DeskService, StaffService, DeskAuthGuard, DeskAdminService],
 })
 export class DeskModule {}

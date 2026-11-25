@@ -28,6 +28,7 @@
     "badge_soon": "Registration opens soon",
     "opens_title": "Registration opens in",
     "opens_at": "Registration opens: {{date}}",
+    "opens_at_local": "In your time zone: {{date}}",
     "levels_title": "Prices",
     "level_default": "Price",
     "level_range": "{{from}} – {{until}}",

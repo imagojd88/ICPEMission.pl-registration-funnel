@@ -48,7 +48,7 @@ export class RegistrationsController {
 
   @Post('registrations/leads')
   @ApiOperation({ summary: 'Funnel: started registration (name + e-mail after step "Dane"), for one reminder' })
-  upsertLead(@Body() dto: { instanceId?: string; email?: string; firstName?: string; lastName?: string; locale?: string; step?: number }) {
+  upsertLead(@Body() dto: { instanceId?: string; email?: string; firstName?: string; lastName?: string; locale?: string; step?: number; leadKey?: string }) {
     return this.leads.upsert(dto);
   }
 

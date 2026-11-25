@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { X, Plus, Trash2 } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
@@ -30,11 +30,14 @@ const nextUid = () => `x-${++uid}-${Date.now()}`
 export default function RegistrationEditForm({
   registration,
   pricingConfig: eventPricing,
+  focusSection,
   onClose,
   onSaved,
 }: {
   registration: RegistrationDto
   pricingConfig: PricingConfig
+  /** Otwórz formularz przewinięty do sekcji (przycisk „Zmień pokoje” w szczegółach zgłoszenia). */
+  focusSection?: 'rooms'
   onClose: () => void
   onSaved: () => void
 }) {
@@ -85,6 +88,10 @@ export default function RegistrationEditForm({
   const hasReserve = (pricingConfig.rooms ?? []).some((r) => (r.reserved ?? 0) > 0)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const roomsRef = useRef<HTMLElement | null>(null)
+  useEffect(() => {
+    if (focusSection === 'rooms') roomsRef.current?.scrollIntoView({ block: 'start' })
+  }, [focusSection])
 
   // Ręczna korekta ceny (np. zgłoszenie sprzed zmian w cenniku, rabat rodzinny, kwota ustalona z gościem).
   const adj0 = registration.options?.adjustment
@@ -301,7 +308,7 @@ export default function RegistrationEditForm({
 
           {/* Pokoje */}
           {roomTypes.length > 0 && (
-            <section className="flex flex-col gap-3">
+            <section ref={roomsRef} className="flex flex-col gap-3" style={{ scrollMarginTop: 12 }}>
               <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--faint)' }}>
                 Pokoje{isAccommodationOptional(pricingConfig) ? ' (nocleg opcjonalny)' : ''}
               </p>

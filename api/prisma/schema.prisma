@@ -315,6 +315,9 @@ model Registration {
   keyIssuedBy         String?
   keyReturnedAt       DateTime?
   keyReturnedBy       String?
+  // Status sprzed anulowania w panelu (do „Przywróć zgłoszenie”); null = nieznany (starsze anulowania,
+  // anulowania ze ścieżki zaproszeń) — wtedy status przywrócenia wynika z samych wpłat.
+  statusBeforeCancel  String?
   requests            RegistrationRequest[]
   editToken           String             @unique @default(cuid())
   participants        Participant[]
@@ -867,11 +870,16 @@ model RegistrationLead {
   reminderStatus String?
   convertedAt    DateTime?
   registrationId String?
+  /// Losowy klucz sesji formularza (tworzy go przeglądarka, trzyma obok szkicu). Pozwala zamknąć WSZYSTKIE
+  /// leady tej sesji po wysłaniu zgłoszenia i przenieść lead na nowy adres, gdy gość poprawi e-mail.
+  /// To NIE jest `token` z linku przypomnienia i nie daje dostępu do żadnych danych.
+  sessionKey     String?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
   @@unique([instanceId, email])
   @@index([reminderSentAt, convertedAt, lastActivityAt])
+  @@index([instanceId, sessionKey])
 }
 
 // ─── Recepcja (stanowisko przyjęć) ────────────────────────────────────────────

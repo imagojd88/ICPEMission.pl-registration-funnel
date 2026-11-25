@@ -28,6 +28,7 @@
     "badge_soon": "신청 곧 시작",
     "opens_title": "신청 시작까지",
     "opens_at": "신청 시작: {{date}}",
+    "opens_at_local": "현지 시간: {{date}}",
     "levels_title": "참가비",
     "level_default": "참가비",
     "level_range": "{{from}} – {{until}}",

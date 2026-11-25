@@ -30,6 +30,7 @@
     "badge_soon": "Rejestracja wkrótce",
     "opens_title": "Zapisy ruszają za",
     "opens_at": "Start zapisów: {{date}}",
+    "opens_at_local": "W Twojej strefie czasowej: {{date}}",
     "levels_title": "Ceny",
     "level_default": "Cena",
     "level_range": "{{from}} – {{until}}",

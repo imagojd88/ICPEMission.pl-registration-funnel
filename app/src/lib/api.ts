@@ -1688,6 +1688,8 @@ export async function getOnlinePaymentsStatus(token?: string): Promise<OnlinePay
 /** Publiczne: lejek zapisuje rozpoczęte zgłoszenie (imię + e-mail po kroku „Dane"). */
 export function saveRegistrationLead(input: {
   instanceId: string; email: string; firstName: string; lastName?: string; locale: string; step: number
+  /** klucz sesji formularza (`getLeadKey`) — opcjonalny */
+  leadKey?: string
 }): Promise<{ ok: boolean }> {
   return apiFetch<{ ok: boolean }>('/registrations/leads', { method: 'POST', body: JSON.stringify(input) })
 }
@@ -1715,4 +1717,143 @@ export interface RegistrationLeadItem {
 /** Admin: rozpoczęte zgłoszenia eventu (niedokończone i dokończone). */
 export function getAdminLeads(instanceId: string, token?: string): Promise<RegistrationLeadItem[]> {
   return apiFetch<RegistrationLeadItem[]>(`/admin/instances/${instanceId}/leads`, { headers: authHeaders(token) })
+}
+
+// ---------------------------------------------------------------------------
+// Panel ▸ Zgłoszenia: szczegóły dla admina, przywracanie, trwałe usuwanie danych testowych
+// ---------------------------------------------------------------------------
+
+export interface AdminRegistrationDetail {
+  id: string
+  /** status wewnętrzny: PENDING_PAYMENT | AWAITING_TRANSFER | CONFIRMED | WAITLIST | CANCELLED | DRAFT */
+  internalStatus: string
+  status: string
+  /** token strony gościa — tylko w tej odpowiedzi, tylko dla zalogowanego admina */
+  manageToken: string
+  /** pełny adres strony gościa: …/z/<token> */
+  manageUrl: string
+  currency: string
+  totalPrice: number
+  /** suma zaksięgowanych wpłat po zwrotach */
+  paidAmount: number
+  payments: { count: number; testCount: number; realCount: number }
+  canRestore: boolean
+  canDeletePermanently: boolean
+  deleteBlocker: 'NOT_CANCELLED' | 'REAL_PAYMENTS' | null
+}
+
+/** Szczegóły zgłoszenia dla admina (link strony gościa, co wolno zrobić). Starsze API → błąd 404. */
+export async function getAdminRegistrationDetail(id: string, token?: string): Promise<AdminRegistrationDetail> {
+  return apiFetch<AdminRegistrationDetail>(`/admin/registrations/${encodeURIComponent(id)}/detail`, { headers: authHeaders(token) })
+}
+
+export interface RestoreRegistrationResult {
+  /** false + needsConfirm = nic nie zmieniono, są ostrzeżenia o limitach — ponów z force */
+  ok: boolean
+  needsConfirm: boolean
+  warnings: string[]
+  internalStatus: string
+  status: string
+  /** status, który zgłoszenie dostanie po przywróceniu (gdy needsConfirm) */
+  nextInternalStatus?: string
+}
+
+/** Przywraca anulowane zgłoszenie. Przy braku miejsc / pokoi bez `force` zwraca ostrzeżenia i nic nie zmienia. */
+export async function restoreRegistration(id: string, force = false, token?: string): Promise<RestoreRegistrationResult> {
+  return apiFetch<RestoreRegistrationResult>(`/admin/registrations/${encodeURIComponent(id)}/restore`, {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: JSON.stringify({ force }),
+  })
+}
+
+/** TRWALE usuwa anulowane zgłoszenie bez prawdziwych wpłat. `confirm` musi być słowem „USUŃ” — sprawdza serwer. */
+export async function deleteRegistrationPermanently(id: string, confirm: string, token?: string): Promise<{ ok: boolean }> {
+  return apiFetch<{ ok: boolean }>(`/admin/registrations/${encodeURIComponent(id)}/delete-permanently`, {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: JSON.stringify({ confirm }),
+  })
+}
+
+/** TRWALE usuwa wpłatę testową Tpay (serwer odmawia dla każdej innej wpłaty). Zwraca odświeżone wpłaty zgłoszenia. */
+export async function deleteTestPayment(paymentId: string, token?: string): Promise<RegistrationPayments & { ok: boolean; internalStatus: string | null }> {
+  return apiFetch(`/admin/payments/${encodeURIComponent(paymentId)}/test`, { method: 'DELETE', headers: authHeaders(token) })
+}
+
+// ---------------------------------------------------------------------------
+// Panel ▸ Recepcja: dziennik działań i prośby dodatkowe
+// ---------------------------------------------------------------------------
+
+export interface DeskLogItem {
+  id: string
+  createdAt: string
+  actor: string
+  /** CHECK_IN | CHECK_IN_UNDO | KEY_ISSUE | KEY_RETURN | KEY_ISSUE_UNDO | KEY_RETURN_UNDO | PAYMENT_ADD | PAYMENT_VOID | REQUEST_ADD | REQUEST_DONE | REQUEST_REOPEN */
+  action: string
+  registrationId: string | null
+  registrant: string | null
+  amount: number | null
+  method: string | null
+  kind: string | null
+  via: string | null
+}
+
+export interface DeskLogPage {
+  total: number
+  page: number
+  pageSize: number
+  pages: number
+  actors: string[]
+  actions: string[]
+  items: DeskLogItem[]
+}
+
+export async function getDeskLog(
+  instanceId: string,
+  opts: { actor?: string; action?: string; page?: number; pageSize?: number } = {},
+  token?: string,
+): Promise<DeskLogPage> {
+  const params = new URLSearchParams()
+  if (opts.actor) params.set('actor', opts.actor)
+  if (opts.action) params.set('action', opts.action)
+  if (opts.page) params.set('page', String(opts.page))
+  if (opts.pageSize) params.set('pageSize', String(opts.pageSize))
+  const qs = params.toString() ? `?${params.toString()}` : ''
+  return apiFetch<DeskLogPage>(`/admin/instances/${encodeURIComponent(instanceId)}/desk-log${qs}`, { headers: authHeaders(token) })
+}
+
+export interface DeskRequestItem {
+  id: string
+  registrationId: string
+  registrant: string
+  registrationStatus: string
+  roomLabel: string | null
+  participant: string | null
+  /** DIET | EXTRA_BED | OTHER */
+  kind: string
+  note: string
+  status: 'OPEN' | 'DONE'
+  createdBy: string
+  createdAt: string
+  resolvedBy: string | null
+  resolvedAt: string | null
+}
+
+export interface DeskRequestsList {
+  counts: { open: number; done: number; total: number }
+  items: DeskRequestItem[]
+}
+
+export async function getDeskRequests(instanceId: string, status?: 'OPEN' | 'DONE', token?: string): Promise<DeskRequestsList> {
+  const qs = status ? `?status=${status}` : ''
+  return apiFetch<DeskRequestsList>(`/admin/instances/${encodeURIComponent(instanceId)}/desk-requests${qs}`, { headers: authHeaders(token) })
+}
+
+export async function setDeskRequestStatus(instanceId: string, requestId: string, status: 'OPEN' | 'DONE', token?: string): Promise<{ ok: boolean }> {
+  return apiFetch<{ ok: boolean }>(`/admin/instances/${encodeURIComponent(instanceId)}/desk-requests/${encodeURIComponent(requestId)}`, {
+    method: 'PATCH',
+    headers: authHeaders(token),
+    body: JSON.stringify({ status }),
+  })
 }
