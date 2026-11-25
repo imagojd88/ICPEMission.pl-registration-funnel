@@ -468,6 +468,8 @@ export class NotificationsService {
       const amount = formatMoney(total, (String(d.currency ?? 'PLN') as 'PLN' | 'EUR' | 'USD'), lang);
       const acc = d.accommodation as MailAccommodation | undefined;
       const manageLink = String(d.manageLink ?? '');
+      const donation = Number(d.donation ?? 0) > 0 ? Number(d.donation) : 0;
+      const donationAmount = formatMoney(donation, (String(d.currency ?? 'PLN') as 'PLN' | 'EUR' | 'USD'), lang);
       const sig = signature(lang);
       const subject = L(lang, {
         pl: `Potwierdzenie zgłoszenia — ${title}`,
@@ -485,6 +487,15 @@ export class NotificationsService {
           ko: `${title}에 신청해 주셔서 감사합니다.`,
           zh: `感谢您报名参加：${title}。`,
         }),
+        // Podziękowanie za dobrowolną darowiznę na dofinansowanie pobytu innych (jest już w kwocie łącznej).
+        ...(donation > 0
+          ? ['', L(lang, {
+              pl: `Serdecznie dziękujemy za darowiznę w wysokości ${donationAmount}. Dzięki niej w wydarzeniu będzie mógł wziąć udział ktoś, kogo nie stać na pokrycie kosztów pobytu. Darowizna jest wliczona w kwotę zgłoszenia.`,
+              en: `Thank you very much for your donation of ${donationAmount}. It will help someone who cannot afford the cost of the stay to take part in the event. The donation is included in your registration total.`,
+              ko: `${donationAmount}의 후원금에 진심으로 감사드립니다. 이 후원금은 체류비를 부담하기 어려운 분이 행사에 참가할 수 있도록 돕는 데 쓰입니다. 후원금은 신청 금액에 포함되어 있습니다.`,
+              zh: `衷心感谢您捐款 ${donationAmount}。这笔捐款将帮助无力承担住宿费用的人参加本次活动。捐款已计入报名总金额。`,
+            })]
+          : []),
         ...accommodationLines(acc, lang),
         ...paymentLines(d.paymentMethod, amount, lang, total, String(d.currency ?? 'PLN'), d.leaderDepositPct as number | undefined),
         '',
@@ -909,6 +920,8 @@ export class NotificationsService {
     manageLink?: string;
     /** % zaliczki u lidera (metoda LEADER_DEPOSIT); domyślnie 50. */
     leaderDepositPct?: number;
+    /** Dobrowolna darowizna gościa (już wliczona w totalPrice) — mail za nią dziękuje. */
+    donation?: number;
   }) {
     await this.sendMail({
       to: opts.to,

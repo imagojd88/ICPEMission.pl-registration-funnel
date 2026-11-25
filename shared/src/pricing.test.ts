@@ -205,3 +205,24 @@ test('trzy zniżki osobno: nocleg −100%, formacja −50%, wyżywienie bez zni�
   assert.equal(r.lines[0].meals, 50);
   assert.equal(r.total, 75);
 });
+
+test('darowizna: doliczana po rabatach i korekcie, tylko gdy event ją włączył', () => {
+  const people = [{ type: 'adult' as const, age: 30 }, { type: 'adult' as const, age: 30 }];
+  const on: PricingConfig = { ...DEFAULT_PRICING, donationEnabled: true };
+  const off = computePrice({ rooms: [], withoutRoom: people, options: { donation: 100 } });
+  assert.equal(off.total, 260);
+  assert.equal(off.donation, undefined);
+  const plain = computePrice({ rooms: [], withoutRoom: people, options: { donation: 100 } }, on);
+  assert.equal(plain.total, 360);
+  assert.equal(plain.donation, 100);
+  assert.equal(plain.subtotal, 260);
+  const code = computePrice({ rooms: [], withoutRoom: people, options: { donation: 50 }, discountCode: 'icpe10' }, on);
+  assert.equal(code.total, 260 - 26 + 50);
+  const adj = computePrice({ rooms: [], withoutRoom: people, options: { donation: 75.5, adjustment: { discountPct: 10 } } }, on);
+  assert.equal(adj.total, 234 + 75.5);
+  assert.equal(adj.manualAdjustment, 26);
+  const over = computePrice({ rooms: [], withoutRoom: people, options: { donation: 200, adjustment: { overrideTotal: 99 } } }, on);
+  assert.equal(over.total, 299);
+  assert.equal(computePrice({ rooms: [], withoutRoom: people, options: { donation: -5 } }, on).total, 260);
+  assert.equal(computePrice({ rooms: [], withoutRoom: people, options: { donation: Number.NaN } }, on).total, 260);
+});

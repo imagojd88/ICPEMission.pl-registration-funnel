@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Search, Check, Wallet } from 'lucide-react'
+import { Search, Check, Wallet, RefreshCw } from 'lucide-react'
+import { useAutoRefresh } from '@/hooks/useAutoRefresh'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import { getAdminInstances, getAdminRegistrations, markRegistrationPaid } from '@/lib/api'
@@ -63,6 +64,16 @@ export default function PaymentsScreen() {
       .finally(() => setLoadingRegs(false))
   }, [])
 
+  // Odświeżanie w tle co 30 s (bez migania listy) — liczby zgłoszeń, wpłat i darowizn „na bieżąco".
+  const { lastUpdatedAt, refreshing, refreshNow } = useAutoRefresh(
+    async () => {
+      if (!selectedInstanceId) return
+      const list = await getAdminRegistrations(selectedInstanceId)
+      setRegs(list.filter((r) => r.status !== 'CANCELLED'))
+    },
+    { intervalMs: 30000, enabled: !!selectedInstanceId && busyId === null },
+  )
+
   useEffect(() => {
     if (selectedInstanceId) loadRegs(selectedInstanceId)
   }, [selectedInstanceId, loadRegs])
@@ -86,6 +97,15 @@ export default function PaymentsScreen() {
   const pendingAmount = regs.filter((r) => !isPaid(r)).reduce((s, r) => s + (r.totalPrice ?? 0), 0)
   const paidCount = regs.filter(isPaid).length
 
+  // Finanse eventu: należności, osoby i pula darowizn (darowizna jest częścią kwoty zgłoszenia).
+  const expectedTotal = revenue + pendingAmount
+  const peopleCount = regs.reduce((s, r) => s + (r.participants?.length ?? 0), 0)
+  const donationOf = (r: RegistrationDto) => Math.max(0, Number(r.options?.donation ?? 0) || 0)
+  const donationsTotal = regs.reduce((s, r) => s + donationOf(r), 0)
+  const donationsPaid = regs.filter(isPaid).reduce((s, r) => s + donationOf(r), 0)
+  const donorsCount = regs.filter((r) => donationOf(r) > 0).length
+  const paidPct = expectedTotal > 0 ? Math.round((revenue / expectedTotal) * 100) : 0
+
   const filtered = regs.filter((r) => {
     const q = search.toLowerCase()
     const matchSearch =
@@ -103,11 +123,12 @@ export default function PaymentsScreen() {
     { id: 'pending', label: 'Oczekujące' },
   ]
 
-  function card(label: string, value: string, accent?: string) {
+  function card(label: string, value: string, accent?: string, hint?: string) {
     return (
       <div className="rounded-[15px] border p-4 flex-1 min-w-[150px]" style={{ background: 'var(--surface)', borderColor: 'var(--border)', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
         <p className="text-xs uppercase tracking-wider" style={{ color: 'var(--faint)' }}>{label}</p>
         <p className="text-2xl font-bold mt-1" style={{ color: accent ?? 'var(--ink)' }}>{value}</p>
+        {hint && <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>{hint}</p>}
       </div>
     )
   }
@@ -141,9 +162,25 @@ export default function PaymentsScreen() {
 
       {/* Summary */}
       <div className="flex gap-3 flex-wrap">
-        {card('Przychód', zl(revenue), 'var(--ok)')}
-        {card('Oczekuje', zl(pendingAmount), 'var(--warn)')}
+        {card('Zgłoszenia', String(regs.length), undefined, `${peopleCount} os.`)}
+        {card('Prognoza wpływów', zl(expectedTotal), undefined, 'suma kwot wszystkich zgłoszeń')}
+        {card('Wpłacone', zl(revenue), 'var(--ok)', `${paidPct}% prognozy`)}
+        {card('Do wpłaty', zl(pendingAmount), 'var(--warn)', `${regs.length - paidCount} zgłoszeń czeka`)}
         {card('Opłacone', `${paidCount} / ${regs.length}`)}
+        {card('Pula darowizn', zl(donationsTotal), 'var(--brand)', donorsCount > 0 ? `wpłacone ${zl(donationsPaid)} · ${donorsCount} darczyńców` : 'brak darowizn')}
+      </div>
+      <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--faint)' }}>
+        <button
+          type="button"
+          onClick={() => void refreshNow()}
+          className="inline-flex items-center gap-1 rounded-[8px] border px-2 py-1"
+          style={{ borderColor: 'var(--border)', background: 'var(--surface)', color: 'var(--muted)', cursor: 'pointer' }}
+        >
+          <RefreshCw size={12} className={refreshing ? 'animate-spin' : ''} /> Odśwież
+        </button>
+        <span>
+          Odświeża się samo co 30 s{lastUpdatedAt ? ` · ostatnio ${lastUpdatedAt.toLocaleTimeString('pl-PL')}` : ''}. Kwoty zawierają darowizny; zgłoszenia anulowane pominięte.
+        </span>
       </div>
 
       {/* Filters */}

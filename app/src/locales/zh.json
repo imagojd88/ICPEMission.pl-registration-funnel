@@ -236,7 +236,11 @@
     "rodo": "我同意为组织培育避静而处理我的个人信息（GDPR）。",
     "regulamin": "我已阅读并接受条款与条件。",
     "rodo_link": "GDPR",
-    "terms_link": "条款"
+    "terms_link": "条款",
+    "donation_title": "自愿捐款：资助无力承担费用的人参加",
+    "donation_hint": "捐款完全自愿，将计入报名总金额。",
+    "donation_custom": "其他金额",
+    "donation_custom_label": "捐款金额"
   },
   "payment_method": {
     "title": "选择付款方式",
@@ -302,7 +306,8 @@
     "diet": "饮食",
     "leader_title": "通过团体负责人交定金",
     "leader_desc": "请将定金 {{deposit}}（{{pct}}%）交给您的团体负责人，其余 {{rest}} 在报到处以现金支付。",
-    "submit_leader": "确认报名 →"
+    "submit_leader": "确认报名 →",
+    "donation": "捐款"
   },
   "success": {
     "paid_title": "谢谢！",

@@ -18,6 +18,7 @@ class RoomBookingDto {
 class PriceOptionsDto {
   @IsOptional() transport?: boolean;
   @IsOptional() bedding?: boolean;
+  @IsOptional() @IsNumber() @Min(0) donation?: number;
 }
 
 /** DTO dla POST /pricing/quote — podgląd ceny (niewiążący). */

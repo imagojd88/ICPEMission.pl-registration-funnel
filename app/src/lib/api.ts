@@ -1180,6 +1180,8 @@ export interface AdminEditRegistrationDto {
   options?: {
     transport?: boolean
     bedding?: boolean
+    /** darowizna gościa na dofinansowanie pobytu innych (0 = usuń) */
+    donation?: number
     /** ręczna korekta ceny (rabat %, rabat kwotowy, kwota końcowa, notatka) */
     adjustment?: { discountPct?: number; discountAmount?: number; overrideTotal?: number; note?: string }
   }
@@ -1417,7 +1419,7 @@ export interface ManagedRegistration {
   contact: { firstName: string; lastName: string; email: string }
   participants: Array<{ type: 'adult' | 'child'; name: string; age: number }>
   rooms: Array<{ roomId: string; participantIndexes: number[] }>
-  options: { transport?: boolean; bedding?: boolean; adjustment?: { discountPct?: number; discountAmount?: number; overrideTotal?: number; note?: string } }
+  options: { transport?: boolean; bedding?: boolean; donation?: number; adjustment?: { discountPct?: number; discountAmount?: number; overrideTotal?: number; note?: string } }
   discountCode?: string
   totalPrice: number
   currency: 'PLN' | 'EUR' | 'USD'

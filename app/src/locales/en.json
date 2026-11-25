@@ -236,7 +236,11 @@
     "rodo": "I consent to the processing of my personal data for the purpose of organising the formation retreat (GDPR).",
     "regulamin": "I have read and accept the terms and conditions.",
     "rodo_link": "GDPR",
-    "terms_link": "terms"
+    "terms_link": "terms",
+    "donation_title": "Optional donation to help cover the stay of someone who cannot afford to take part",
+    "donation_hint": "The donation is voluntary. It will be added to your registration total.",
+    "donation_custom": "Other amount",
+    "donation_custom_label": "Donation amount"
   },
   "payment_method": {
     "title": "Choose payment method",
@@ -302,7 +306,8 @@
     "diet": "Diet",
     "leader_title": "Deposit via your community leader",
     "leader_desc": "Hand a deposit of {{deposit}} ({{pct}}%) to your community leader. Pay the remaining {{rest}} in cash at the registration desk.",
-    "submit_leader": "Confirm registration →"
+    "submit_leader": "Confirm registration →",
+    "donation": "Donation"
   },
   "success": {
     "paid_title": "Thank you!",

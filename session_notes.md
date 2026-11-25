@@ -51,6 +51,18 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — panel admina (kreator eventów)
 
+### Lejek: opcjonalna darowizna na dofinansowanie pobytu innych (2026-11-25)
+- **Prośba (Jacek):** w procesie rejestracji opcja „Opcjonalna darowizna na rzecz dofinansowania pobytu kogoś, kogo nie stać na udział” — 50 zł / 100 zł / 200 zł / Dowolna kwota (otwiera pole do wpisania).
+- **Model (shared + lustro `api/src/_shared`):** `PricingConfig.donationEnabled?` (włącznik per event, domyślnie wyłączone → stare eventy bez zmian), `PriceOptions.donation?` (kwota), `PriceResult.donation?`, `DONATION_PRESETS` (PLN 50/100/200; EUR i USD 10/25/50), `DONATION_MAX` 100 000, `cleanDonation()`. `computePrice`: darowizna doliczana NA KOŃCU — po kodzie rabatowym, ręcznej korekcie i także po „kwocie końcowej” admina; nie wchodzi do `subtotal`. Test w `pricing.test.ts` (17/17).
+- **API:** `OptionsDto.donation` (0–100 000) i `PriceOptionsDto.donation`; `create` zapisuje darowiznę w `optionsJson` tylko gdy event ma `donationEnabled`; `storedOptions` ją zwraca (strona gościa `/z/:token` i przeliczenia po zmianie noclegu zachowują darowiznę); `adminUpdate` zachowuje darowiznę gościa, gdy panel jej nie przyśle, a przyjmuje nową kwotę (0 = usuń). Bez zmian w bazie.
+- **Lejek:** krok „Opcje” (`Step4Options.tsx`) — przyciski kwot + „Dowolna kwota” z polem; ponowne kliknięcie wybranej kwoty = rezygnacja; widoczne tylko przy `donationEnabled` i evencie płatnym. Kwota w pasku ceny, w podsumowaniu (wiersz „Darowizna”) i w zgłoszeniu. Tłumaczenia PL/EN/IT/KO/ZH (`options.donation_*`, `summary.donation`).
+- **Panel:** `admin/events/DonationToggle.tsx` — włącznik w „Edytuj event” (pod polami noclegu opcjonalnego) i w kreatorze; „Edytuj zgłoszenie”: pole „Darowizna” + wiersz w rozbiciu ceny.
+- **Weryfikacja:** `tsc --noEmit` app ✓, api ✓ (poza starymi `src/courses`), testy silnika 17/17. `vite build` w sandboxie nie wystartował (esbuild: „The service was stopped: write EPIPE” już przy wczytaniu `vite.config.ts`) — NIE zbudowane i NIE przeklikane w przeglądarce.
+- **Otwarte:** brak zestawienia sumy darowizn w panelu; darowizna nie ma osobnej linii w mailach (jest w kwocie łącznej); kwoty EUR/USD 10/25/50 przyjęte przeze mnie; nazwa „darowizna” przy wpłacie na firmę — do sprawdzenia z księgową.
+- **Dopisane (14:50):** mail potwierdzający dziękuje za darowiznę (akapit PL/EN/KO/ZH z kwotą; `sendConfirmation({ donation })`, `notifications.service.ts`). Zakładka „Płatności”: kafle per event — Zgłoszenia (+ osoby), Prognoza wpływów (suma kwot zgłoszeń), Wpłacone (+ % prognozy), Do wpłaty, Opłacone X / Y, Pula darowizn (+ wpłacone, liczba darczyńców); odświeżanie w tle co 30 s (`useAutoRefresh`) + przycisk „Odśwież”. Liczone w przeglądarce z listy zgłoszeń (bez nowego endpointu). tsc app ✓, api ✓ (poza `src/courses`); nieprzeklikane.
+- **Nie zrobione — zaliczki:** system zapisuje tylko wpłatę całej kwoty („Oznacz jako opłacone”), nie ma wpłat częściowych ani harmonogramu (20% / 50% / dopłata). Kafle „zaliczki wpłacone / oczekiwane” wymagają tej funkcji; do zrobienia razem z progami cenowymi (dokument 19, sekcja 6).
+- Stan: do pushu + **Manual Deploy `icpe-api`**. Potem włączyć w „Edytuj event” dla rekolekcji h2o.
+
 ### API dla ICPE Go: dane eventów do pobrania (2026-11-25)
 - **Prośba (Jacek):** endpointy, z których aplikacja webowa ICPE Go pobierze dane eventu po zaznaczeniu po naszej stronie „udostępniaj dane ICPE Go": event, daty, liczba rejestracji (dorośli / dzieci), % zajętych miejsc, link do rejestracji.
 - **Baza:** `EventInstance.shareWithIcpeGo Boolean @default(false)` (wchodzi przez `prisma db push` przy starcie).

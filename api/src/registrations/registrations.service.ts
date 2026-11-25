@@ -7,7 +7,7 @@ import { buildIcs, googleCalendarUrl } from '../shared';
 import { CreateRegistrationDto } from './dto/create-registration.dto';
 import { v4 as uuid } from 'uuid';
 import { guestInviteConfig, guestInvitePageLink, publicAppUrl } from '../invitations/guest-invite-config';
-import { buildPriceInput, hasAccommodation, roomLabel, leaderDepositSplit, PricingConfig, PriceAdjustment } from '../shared';
+import { buildPriceInput, hasAccommodation, roomLabel, leaderDepositSplit, cleanDonation, PricingConfig, PriceAdjustment } from '../shared';
 import type { MailAccommodation } from '../notifications/notifications.service';
 import { assertRoomStock, instanceRoomAvailability } from './room-stock';
 import { LeadsService } from './leads.service';
@@ -30,11 +30,12 @@ function cleanAdjustment(raw: unknown): PriceAdjustment | undefined {
   return Object.keys(out).length ? out : undefined;
 }
 
-/** Opcje z zapisanego zgłoszenia (transport, pościel, ręczna korekta). */
-function storedOptions(optionsJson: unknown): { transport: boolean; bedding: boolean; adjustment?: PriceAdjustment } {
-  const o = (optionsJson ?? {}) as { transport?: boolean; bedding?: boolean; adjustment?: unknown };
+/** Opcje z zapisanego zgłoszenia (transport, pościel, darowizna, ręczna korekta). */
+function storedOptions(optionsJson: unknown): { transport: boolean; bedding: boolean; donation?: number; adjustment?: PriceAdjustment } {
+  const o = (optionsJson ?? {}) as { transport?: boolean; bedding?: boolean; donation?: unknown; adjustment?: unknown };
   const adjustment = cleanAdjustment(o.adjustment);
-  return { transport: !!o.transport, bedding: !!o.bedding, ...(adjustment ? { adjustment } : {}) };
+  const donation = cleanDonation(o.donation);
+  return { transport: !!o.transport, bedding: !!o.bedding, ...(donation > 0 ? { donation } : {}), ...(adjustment ? { adjustment } : {}) };
 }
 
 /** Link do strony zgłoszenia gościa (zmiana / domówienie noclegu). */
@@ -164,11 +165,14 @@ export class RegistrationsService {
     assertRooms(rooms, n, cfg);
     // Limit pokoi: nie przyjmujemy zgłoszenia na wyczerpany typ pokoju (409).
     await assertRoomStock(this.prisma, dto.instanceId, cfg, rooms);
+    // Darowizna na dofinansowanie pobytu innych — tylko gdy event ją włączył.
+    const donation = cfg?.donationEnabled ? cleanDonation(dto.options?.donation) : 0;
+    // Gość nie może sam ustawić korekty ceny — tylko transport/pościel/darowiznę.
+    const guestOptions = { transport: !!dto.options?.transport, bedding: !!dto.options?.bedding, ...(donation > 0 ? { donation } : {}) };
     const priceInput = buildPriceInput(
       dto.participants.map((p) => ({ type: p.type, age: p.age ?? 0 })),
       rooms,
-      // Gość nie może sam ustawić korekty ceny — tylko transport/pościel.
-      { transport: !!dto.options?.transport, bedding: !!dto.options?.bedding },
+      guestOptions,
       dto.discountCode,
     );
 
@@ -184,7 +188,7 @@ export class RegistrationsService {
         contact: dto.contact as object,
         // roomsJson — skład pokoi (nowy model kompozycji); pole dodane do schematu Prisma
         ...(({ roomsJson: rooms as unknown }) as { roomsJson: unknown }),
-        optionsJson: { transport: !!dto.options?.transport, bedding: !!dto.options?.bedding } as unknown,
+        optionsJson: guestOptions as unknown,
         discountCode: dto.discountCode,
         dietaryNotes: dto.dietaryNotes,
         totalPrice: priceResult.total,
@@ -248,6 +252,7 @@ export class RegistrationsService {
       editToken,
       guestInviteLink,
       leaderDepositPct: cfg?.leaderDepositPct,
+      donation: priceResult.donation ?? 0,
       accommodation: mailAccommodation(cfg, rooms, n, mailLang(dto.locale)),
       manageLink: hasAccommodation(cfg) ? manageRegistrationLink(editToken) : undefined,
     }).catch(console.error);
@@ -284,7 +289,7 @@ export class RegistrationsService {
     contact?: Record<string, unknown>;
     participants: Array<{ type: 'adult' | 'child'; firstName: string; lastName?: string; age?: number; gender?: string; dietary?: string }>;
     rooms: Array<{ roomId: string; participantIndexes: number[] }>;
-    options?: { transport?: boolean; bedding?: boolean; adjustment?: unknown };
+    options?: { transport?: boolean; bedding?: boolean; donation?: number; adjustment?: unknown };
     discountCode?: string;
     dietaryNotes?: string | null;
     locale?: string;
@@ -296,7 +301,11 @@ export class RegistrationsService {
 
     // Opcje + ręczna korekta ceny (rabat % / kwotowy / kwota końcowa) — tylko z panelu admina.
     const adj = cleanAdjustment(dto.options?.adjustment);
-    const adminOptions = { transport: !!dto.options?.transport, bedding: !!dto.options?.bedding, ...(adj ? { adjustment: adj } : {}) };
+    // Darowizna gościa zostaje przy zgłoszeniu, chyba że admin poda nową kwotę (0 = usuń).
+    const donation = dto.options?.donation === undefined
+      ? storedOptions((reg as { optionsJson?: unknown }).optionsJson).donation ?? 0
+      : cleanDonation(dto.options.donation);
+    const adminOptions = { transport: !!dto.options?.transport, bedding: !!dto.options?.bedding, ...(donation > 0 ? { donation } : {}), ...(adj ? { adjustment: adj } : {}) };
     // Admin może zostawić osoby bez pokoju (np. ktoś zrezygnował z noclegu) — bez blokady.
     const cfg = ((reg as { instance?: { pricingConfig?: unknown } }).instance?.pricingConfig ?? null) as PricingConfig | null;
     const rooms = normalizeRooms(dto.rooms, dto.participants.length, cfg);

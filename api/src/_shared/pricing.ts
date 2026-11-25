@@ -109,6 +109,28 @@ export interface PricingConfig {
   };
   /** kody rabatowe → ułamek zniżki (0.10 = 10%) */
   discountCodes: Record<string, number>;
+  /**
+   * Opcjonalna darowizna na dofinansowanie pobytu osób, których nie stać na udział:
+   * gość wybiera kwotę w kroku „Opcje” (50 / 100 / 200 albo dowolna). Brak / false = opcja ukryta.
+   */
+  donationEnabled?: boolean;
+}
+
+/** Proponowane kwoty darowizny per waluta (ostatnia opcja w formularzu to „dowolna kwota”). */
+export const DONATION_PRESETS: Record<string, number[]> = {
+  PLN: [50, 100, 200],
+  EUR: [10, 25, 50],
+  USD: [10, 25, 50],
+};
+
+/** Górny limit darowizny w jednym zgłoszeniu (ochrona przed literówką). */
+export const DONATION_MAX = 100000;
+
+/** Kwota darowizny z dowolnego wejścia: liczba >= 0, do 2 miejsc po przecinku, z limitem. */
+export function cleanDonation(v: unknown): number {
+  const n = typeof v === 'number' ? v : typeof v === 'string' ? Number(v.replace(',', '.')) : NaN;
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return Math.min(DONATION_MAX, Math.round(n * 100) / 100);
 }
 
 /** Ustawienia domyślne (wg ustaleń: nocleg 80/100/70, wyżywienie 80, formacja 50, 1 noc). */
@@ -133,6 +155,11 @@ export const DEFAULT_PRICING: PricingConfig = {
 export interface PriceOptions {
   transport?: boolean;
   bedding?: boolean;
+  /**
+   * Dobrowolna darowizna na dofinansowanie pobytu innych (kwota w walucie eventu).
+   * Liczona tylko, gdy event ma `donationEnabled`; doliczana PO rabatach i ręcznej korekcie.
+   */
+  donation?: number;
   /** Ręczna korekta ceny zgłoszenia przez admina (zapisywana w `Registration.optionsJson`). */
   adjustment?: PriceAdjustment;
 }
@@ -193,6 +220,8 @@ export interface PriceResult {
   manualAdjustment?: number;
   /** kwota końcowa wpisana ręcznie przez admina */
   overridden?: boolean;
+  /** dobrowolna darowizna doliczona do kwoty (nie podlega rabatom ani ręcznej korekcie) */
+  donation?: number;
   /** suma przed rabatem */
   subtotal: number;
   /** kwota do zapłaty */
@@ -314,13 +343,18 @@ export function computePrice(input: PriceInput, config: PricingConfig = DEFAULT_
     }
   }
 
+  // Darowizna: zawsze osobno, na końcu — rabaty i kwota ręczna admina jej nie zmieniają.
+  const donation = config.donationEnabled ? cleanDonation(input.options?.donation) : 0;
+  total += donation;
+
   return {
     formation,
     accommodation,
     meals,
     options: opts,
     discount,
-    ...(adj ? { manualAdjustment: afterCode - total, overridden: typeof adj.overrideTotal === 'number' } : {}),
+    ...(adj ? { manualAdjustment: afterCode - (total - donation), overridden: typeof adj.overrideTotal === 'number' } : {}),
+    ...(donation > 0 ? { donation } : {}),
     subtotal,
     total,
     people,

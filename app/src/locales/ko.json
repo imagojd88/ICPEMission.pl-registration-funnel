@@ -236,7 +236,11 @@
     "rodo": "양성 피정 진행을 위한 개인정보 처리에 동의합니다 (GDPR).",
     "regulamin": "이용 약관을 읽었으며 이에 동의합니다.",
     "rodo_link": "GDPR",
-    "terms_link": "이용 약관"
+    "terms_link": "이용 약관",
+    "donation_title": "참가비를 부담하기 어려운 분의 체류비 지원을 위한 선택적 후원금",
+    "donation_hint": "후원은 자유입니다. 신청 금액에 합산됩니다.",
+    "donation_custom": "직접 입력",
+    "donation_custom_label": "후원 금액"
   },
   "payment_method": {
     "title": "결제 방법 선택",
@@ -302,7 +306,8 @@
     "diet": "식단",
     "leader_title": "공동체 리더에게 예약금 전달",
     "leader_desc": "공동체 리더에게 예약금 {{deposit}}({{pct}}%)를 전달해 주세요. 나머지 {{rest}}는 접수처에서 현금으로 결제합니다.",
-    "submit_leader": "신청 확정하기 →"
+    "submit_leader": "신청 확정하기 →",
+    "donation": "후원금"
   },
   "success": {
     "paid_title": "감사합니다!",

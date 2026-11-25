@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { formatMoney } from '@icpe/shared'
+import { formatMoney, DONATION_PRESETS, DONATION_MAX, cleanDonation } from '@icpe/shared'
 import type { PricingConfig } from '@icpe/shared'
 import { Input } from '../../ui/Input'
 
 interface Options {
   transport: boolean
   bedding: boolean
+  /** dobrowolna darowizna (0 = brak) */
+  donation: number
 }
 
 interface Consents {
@@ -100,6 +102,39 @@ export default function Step4Options({
   const money = (n: number) => formatMoney(n, pricingConfig.currency, i18n.language)
   const [discountError, setDiscountError] = useState(false)
 
+  // Darowizna: kwoty proponowane dla waluty eventu + „dowolna kwota" z polem do wpisania.
+  const donationPresets = DONATION_PRESETS[pricingConfig.currency ?? 'PLN'] ?? DONATION_PRESETS.PLN
+  const donation = options.donation ?? 0
+  const [customOpen, setCustomOpen] = useState(donation > 0 && !donationPresets.includes(donation))
+  const [customText, setCustomText] = useState(donation > 0 && !donationPresets.includes(donation) ? String(donation) : '')
+  const setDonation = (v: number) => onOptionsChange({ ...options, donation: v })
+  const pickPreset = (v: number) => {
+    setCustomOpen(false)
+    setCustomText('')
+    setDonation(donation === v ? 0 : v) // ponowne kliknięcie = rezygnacja
+  }
+  const toggleCustom = () => {
+    if (customOpen) {
+      setCustomOpen(false)
+      setCustomText('')
+      setDonation(0)
+    } else {
+      setCustomOpen(true)
+      setDonation(0)
+    }
+  }
+  const onCustomText = (raw: string) => {
+    const text = raw.replace(/[^\d.,]/g, '').slice(0, 9)
+    setCustomText(text)
+    setDonation(Math.min(DONATION_MAX, cleanDonation(text)))
+  }
+  const chipStyle = (active: boolean) => ({
+    border: active ? '1.5px solid var(--brand)' : '1.5px solid var(--border)',
+    background: active ? 'var(--brand-soft)' : 'var(--surface)',
+    color: active ? 'var(--brand)' : 'var(--ink)',
+    cursor: 'pointer',
+  })
+
   const applyDiscount = () => {
     const code = discountCode.trim().toUpperCase()
     const isValid = code in pricingConfig.discountCodes
@@ -146,6 +181,62 @@ export default function Step4Options({
           checked={options.bedding}
           onChange={(v) => onOptionsChange({ ...options, bedding: v })}
         />
+      )}
+
+      {/* Darowizna na dofinansowanie pobytu innych — tylko gdy event ją włączył */}
+      {pricingConfig.donationEnabled && !pricingConfig.free && (
+        <div className="flex flex-col gap-2" role="group" aria-label={t('options.donation_title')}>
+          <p className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
+            {t('options.donation_title')}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {donationPresets.map((v) => {
+              const active = !customOpen && donation === v
+              return (
+                <button
+                  key={v}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => pickPreset(v)}
+                  className="px-4 py-[10px] text-sm font-semibold rounded-[12px] transition-all duration-150 active:scale-[0.97]"
+                  style={chipStyle(active)}
+                >
+                  {money(v)}
+                </button>
+              )
+            })}
+            <button
+              type="button"
+              aria-pressed={customOpen}
+              onClick={toggleCustom}
+              className="px-4 py-[10px] text-sm font-semibold rounded-[12px] transition-all duration-150 active:scale-[0.97]"
+              style={chipStyle(customOpen)}
+            >
+              {t('options.donation_custom')}
+            </button>
+          </div>
+          {customOpen && (
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                inputMode="decimal"
+                autoFocus
+                value={customText}
+                onChange={(e) => onCustomText(e.target.value)}
+                placeholder="0"
+                aria-label={t('options.donation_custom_label')}
+                className="w-32 rounded-[12px] px-3 py-[13px] text-sm transition-all duration-150 focus:outline-none focus:ring-2"
+                style={{ border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--ink)' }}
+              />
+              <span className="text-sm" style={{ color: 'var(--muted)' }}>
+                {pricingConfig.currency && pricingConfig.currency !== 'PLN' ? pricingConfig.currency : 'zł'}
+              </span>
+            </div>
+          )}
+          <p className="text-xs" style={{ color: 'var(--muted)' }}>
+            {t('options.donation_hint')}
+          </p>
+        </div>
       )}
 
       {/* Discount code */}

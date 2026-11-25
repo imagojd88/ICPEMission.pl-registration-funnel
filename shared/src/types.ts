@@ -104,6 +104,8 @@ export interface RegistrationDto {
   options?: {
     transport?: boolean;
     bedding?: boolean;
+    /** dobrowolna darowizna na dofinansowanie pobytu innych (kwota w walucie eventu) */
+    donation?: number;
     /** ręczna korekta ceny admina (rabat %, rabat kwotowy, kwota końcowa, notatka) */
     adjustment?: { discountPct?: number; discountAmount?: number; overrideTotal?: number; note?: string };
   };
@@ -128,7 +130,7 @@ export interface CreateRegistrationDto {
   rooms: RoomCompositionEntry[];
   dietaryNotes?: string;
   dietaryTags?: string[];
-  options?: { transport?: boolean; bedding?: boolean };
+  options?: { transport?: boolean; bedding?: boolean; donation?: number };
   discountCode?: string;
   paymentMethod: PaymentMethod;
   consents: { rodo: boolean; regulamin: boolean };

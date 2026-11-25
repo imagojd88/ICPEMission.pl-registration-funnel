@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { X, Plus, Trash2 } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
-import { computePrice, formatMoney, roomLabel } from '@icpe/shared'
+import { computePrice, formatMoney, roomLabel, cleanDonation } from '@icpe/shared'
 import { funnelPriceInput, isAccommodationOptional } from '../../../lib/funnelPrice'
 import type { PricingConfig } from '@icpe/shared'
 import type { RegistrationDto } from '@icpe/shared'
@@ -68,6 +68,10 @@ export default function RegistrationEditForm({
     transport: !!registration.options?.transport,
     bedding: !!registration.options?.bedding,
   })
+  // Darowizna gościa (dofinansowanie pobytu innych) — admin może ją poprawić albo usunąć (puste = 0).
+  const [donationText, setDonationText] = useState(registration.options?.donation ? String(registration.options.donation) : '')
+  const donation = cleanDonation(donationText)
+  const showDonation = !!pricingConfig.donationEnabled || (registration.options?.donation ?? 0) > 0
   const [dietaryNotes, setDietaryNotes] = useState(registration.dietaryNotes ?? '')
   // Pokoje z puli zarezerwowanej dla gości specjalnych (nie zmniejszają puli zapisów publicznych).
   const [roomsReserved, setRoomsReserved] = useState(!!registration.roomsReserved)
@@ -109,7 +113,7 @@ export default function RegistrationEditForm({
         participantIndexes: r.pids.map((pid) => participants.findIndex((p) => p.id === pid)).filter((i) => i >= 0),
       })),
       pricingConfig,
-      { transport: options.transport, bedding: options.bedding, ...(adjustment ? { adjustment } : {}) },
+      { transport: options.transport, bedding: options.bedding, donation, ...(adjustment ? { adjustment } : {}) },
       registration.discountCode,
     )
     try {
@@ -118,7 +122,7 @@ export default function RegistrationEditForm({
       return null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rooms, participants, options, pricingConfig, registration.discountCode, JSON.stringify(adjustment)])
+  }, [rooms, participants, options, donation, pricingConfig, registration.discountCode, JSON.stringify(adjustment)])
   const total = priced?.result.total ?? 0
   const lineFor = (pIdx: number) => {
     if (!priced) return undefined
@@ -193,7 +197,7 @@ export default function RegistrationEditForm({
             participantIndexes: r.pids.map((pid) => participants.findIndex((p) => p.id === pid)).filter((i) => i >= 0),
           }))
           .filter((r) => r.participantIndexes.length > 0),
-        options: { ...options, ...(adjustment ? { adjustment } : {}) },
+        options: { ...options, donation, ...(adjustment ? { adjustment } : {}) },
         discountCode: registration.discountCode,
         dietaryNotes: dietaryNotes.trim() || null,
         roomsReserved,
@@ -327,6 +331,18 @@ export default function RegistrationEditForm({
             </section>
           )}
 
+          {/* Darowizna */}
+          {showDonation && (
+            <section className="flex flex-col gap-2">
+              <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--faint)' }}>Darowizna na dofinansowanie pobytu innych</p>
+              <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--ink)' }}>
+                <input value={donationText} onChange={(e) => setDonationText(e.target.value.replace(/[^\d.,]/g, ''))} inputMode="decimal" placeholder="0" className={inputCls} style={{ ...inputStyle, width: 96 }} aria-label="Kwota darowizny" />
+                <span>{pricingConfig.currency && pricingConfig.currency !== 'PLN' ? pricingConfig.currency : 'zł'}</span>
+                <span className="text-xs" style={{ color: 'var(--faint)' }}>(doliczana po rabatach i kwocie ręcznej; puste = brak)</span>
+              </div>
+            </section>
+          )}
+
           {/* Opcje */}
           {(showTransport || showBedding) && (
             <section className="flex flex-col gap-2">
@@ -402,6 +418,11 @@ export default function RegistrationEditForm({
                 <span className="text-xs" style={{ color: 'var(--faint)' }}>(zastępuje wyliczenie)</span>
               </div>
               <input value={adjNote} onChange={(e) => setAdjNote(e.target.value)} placeholder="Powód korekty, np. rabat rodzinny, zgłoszenie sprzed zmian w cenniku" className={inputCls} style={inputStyle} />
+              {(priced.result.donation ?? 0) > 0 && (
+                <div className="flex justify-between text-sm px-1" style={{ color: 'var(--muted)' }}>
+                  <span>Darowizna</span><span>+{money(priced.result.donation ?? 0)}</span>
+                </div>
+              )}
               <div className="flex justify-between text-sm font-semibold px-1" style={{ color: 'var(--ink)' }}>
                 <span>Do zapłaty{priced.result.overridden ? ' (kwota ręczna)' : priced.result.manualAdjustment ? ` (rabat −${money(priced.result.manualAdjustment)})` : ''}</span>
                 <span>{money(total)}</span>

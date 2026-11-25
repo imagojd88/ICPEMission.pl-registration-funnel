@@ -22,6 +22,8 @@ export class ParticipantInputDto {
 export class OptionsDto {
   @IsOptional() @IsBoolean() transport?: boolean;
   @IsOptional() @IsBoolean() bedding?: boolean;
+  /** dobrowolna darowizna na dofinansowanie pobytu innych (liczona tylko, gdy event ją włączył) */
+  @IsOptional() @IsNumber() @Min(0) @Max(100000) donation?: number;
 }
 
 export class ConsentsDto {

@@ -240,7 +240,11 @@
     "rodo": "Acconsento al trattamento dei miei dati personali ai fini dell'organizzazione del ritiro formativo (GDPR).",
     "regulamin": "Ho letto e accetto i termini e le condizioni.",
     "rodo_link": "GDPR",
-    "terms_link": "regolamento"
+    "terms_link": "regolamento",
+    "donation_title": "Donazione facoltativa per contribuire al soggiorno di chi non può permettersi di partecipare",
+    "donation_hint": "La donazione è volontaria. Verrà aggiunta all'importo dell'iscrizione.",
+    "donation_custom": "Altro importo",
+    "donation_custom_label": "Importo della donazione"
   },
   "payment_method": {
     "title": "Scegli il metodo di pagamento",
@@ -306,7 +310,8 @@
     "diet": "Dieta",
     "leader_title": "Acconto tramite il responsabile della comunità",
     "leader_desc": "Consegna un acconto di {{deposit}} ({{pct}}%) al responsabile della tua comunità. Il saldo di {{rest}} lo paghi in contanti alla registrazione.",
-    "submit_leader": "Conferma l'iscrizione →"
+    "submit_leader": "Conferma l'iscrizione →",
+    "donation": "Donazione"
   },
   "success": {
     "paid_title": "Grazie!",

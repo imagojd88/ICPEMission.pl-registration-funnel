@@ -21,7 +21,7 @@ export default function StickyPriceBar({ state, pricingConfig, onNext, disabled,
     state.participants,
     state.rooms,
     pricingConfig,
-    { transport: state.options.transport, bedding: state.options.bedding },
+    { transport: state.options.transport, bedding: state.options.bedding, donation: state.options.donation },
     state.discountApplied ? state.discountCode : '',
   )
   const priceResult = computePrice(input, pricingConfig)

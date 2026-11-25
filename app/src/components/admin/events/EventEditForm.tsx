@@ -7,6 +7,7 @@ import DietOptionsSelect from './DietOptionsSelect'
 import { PriceUnitSelect, priceHint } from './RoomPriceFields'
 import RoomStockFields from './RoomStockFields'
 import OptionalStayFields from './OptionalStayFields'
+import DonationToggle from './DonationToggle'
 import { useState, useEffect, type ChangeEvent } from 'react'
 import { Plus, Trash2, Upload, Images } from 'lucide-react'
 import Button from '@/components/ui/Button'
@@ -130,6 +131,8 @@ export default function EventEditForm({
   const [mealsFee, setMealsFee] = useState(String(DEFAULT_PRICING.mealsFee))
   // Nocleg opcjonalny (event dzienny z noclegiem dla przyjezdnych) + posiłki tylko dla nocujących.
   const [optionalStay, setOptionalStay] = useState(false)
+  // Opcjonalna darowizna na dofinansowanie pobytu innych (krok „Opcje" w lejku).
+  const [donationEnabled, setDonationEnabled] = useState(false)
   // Limit pokoi: zajętość z API (publicznie / z rezerwy) i wolne publicznie — do podglądu przy pokojach.
   const [roomUsage, setRoomUsage] = useState<{ pub: Record<string, number>; res: Record<string, number>; free: Record<string, number> }>({ pub: {}, res: {}, free: {} })
   const [overnightMeals, setOvernightMeals] = useState('0')
@@ -271,6 +274,7 @@ export default function EventEditForm({
         setFormationFee(String(pc?.formationFee ?? DEFAULT_PRICING.formationFee))
         setMealsFee(String(pc?.mealsFee ?? DEFAULT_PRICING.mealsFee))
         setOptionalStay(!!pc?.accommodationOptional)
+        setDonationEnabled(!!pc?.donationEnabled)
         setOvernightMeals(String(pc?.overnightMealsFee ?? 0))
         setTransport(String(pc?.options?.transport ?? DEFAULT_PRICING.options.transport))
         setBedding(String(pc?.options?.bedding ?? DEFAULT_PRICING.options.bedding))
@@ -354,6 +358,7 @@ export default function EventEditForm({
       nights: n,
       ...(payLeader ? { leaderDepositPct: Math.min(100, Math.max(1, parseInt(leaderPct) || 50)) } : {}),
       ...(optionalStay ? { accommodationOptional: true } : {}),
+      ...(donationEnabled ? { donationEnabled: true } : {}),
       ...(parseFloat(overnightMeals) > 0 ? { overnightMealsFee: parseFloat(overnightMeals) } : {}),
       childBrackets: bracketsFromRows(brackets),
       rooms: (() => {
@@ -742,6 +747,7 @@ export default function EventEditForm({
             hasRooms={rooms.length > 0}
             onNights={setNights}
           />
+          {!isFree && <DonationToggle enabled={donationEnabled} onChange={setDonationEnabled} />}
           {rooms.map((r) => (
             <div key={r.id} className="flex flex-col gap-1.5 pb-2" style={{ borderBottom: '1px dashed var(--border)' }}>
             <div className="flex items-center gap-2">

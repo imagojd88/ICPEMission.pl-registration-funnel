@@ -99,7 +99,7 @@ export interface StepperState {
   rooms: RoomEntry[]
   /** Nocleg opcjonalny: gość zaznaczył „Nie potrzebuję noclegu" (pokoje wtedy puste). */
   noAccommodation: boolean
-  options: { transport: boolean; bedding: boolean }
+  options: { transport: boolean; bedding: boolean; donation: number }
   discountCode: string
   discountApplied: boolean
   consents: { rodo: boolean; regulamin: boolean }
@@ -136,7 +136,7 @@ function buildInitialStepper(): StepperState {
     extraNotes: '',
     rooms: [],
     noAccommodation: false,
-    options: { transport: false, bedding: false },
+    options: { transport: false, bedding: false, donation: 0 },
     discountCode: '',
     discountApplied: false,
     consents: { rodo: false, regulamin: false },
@@ -882,7 +882,11 @@ export default function PublicFunnel() {
             .filter(Boolean)
             .join('\n') || undefined,
         dietaryTags: [],
-        options: { transport: stepper.options.transport, bedding: stepper.options.bedding },
+        options: {
+          transport: stepper.options.transport,
+          bedding: stepper.options.bedding,
+          ...(pricingConfig.donationEnabled && stepper.options.donation > 0 ? { donation: stepper.options.donation } : {}),
+        },
         discountCode: stepper.discountApplied ? stepper.discountCode : undefined,
         paymentMethod: toPaymentMethod(stepper.paymentMethod),
         consents: stepper.consents,
@@ -959,7 +963,7 @@ export default function PublicFunnel() {
     stepper.participants,
     stepper.rooms,
     pricingConfig,
-    { transport: stepper.options.transport, bedding: stepper.options.bedding },
+    { transport: stepper.options.transport, bedding: stepper.options.bedding, donation: stepper.options.donation },
     stepper.discountApplied ? stepper.discountCode : '',
   )
 

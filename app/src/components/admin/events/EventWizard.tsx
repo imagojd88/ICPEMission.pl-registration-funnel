@@ -3,6 +3,7 @@ import AgeDiscountsEditor, { bracketsFromRows, rowsFromBrackets, type AgeDiscoun
 import DietOptionsSelect from './DietOptionsSelect'
 import { priceHint } from './RoomPriceFields'
 import OptionalStayFields from './OptionalStayFields'
+import DonationToggle from './DonationToggle'
 import { useState, useEffect, type ChangeEvent } from 'react'
 import { X, Plus, CheckCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -149,6 +150,8 @@ interface WizardState {
   noAccommodation: boolean
   // nocleg opcjonalny (event dzienny z noclegiem dla przyjezdnych) — gość może go pominąć
   optionalStay: boolean
+  // opcjonalna darowizna na dofinansowanie pobytu innych (krok „Opcje" w lejku)
+  donationEnabled: boolean
   // posiłki tylko dla nocujących, za osobę za noc (np. kolacja + śniadanie)
   overnightMeals: string
   // program wydarzenia: godzina + punkt
@@ -384,6 +387,7 @@ function mapEditConfigToState(prev: WizardState, cfg: EventEditConfig, slug: str
     formationFee: String(pc?.formationFee ?? prev.formationFee),
     mealsFee: String(pc?.mealsFee ?? prev.mealsFee),
     optionalStay: !!pc?.accommodationOptional,
+    donationEnabled: !!pc?.donationEnabled,
     overnightMeals: String(pc?.overnightMealsFee ?? 0),
     diets: Array.isArray(cfg.customFields?.diets) ? cfg.customFields!.diets! : prev.diets,
     ageBrackets: ageBrackets.length > 0 ? ageBrackets : prev.ageBrackets,
@@ -458,6 +462,7 @@ function buildPricingConfig(state: WizardState): PricingConfig {
     nights,
     ...(state.payLeader ? { leaderDepositPct: Math.min(100, Math.max(1, parseInt(state.leaderPct) || 50)) } : {}),
     ...(state.optionalStay && !state.noAccommodation ? { accommodationOptional: true } : {}),
+    ...(state.donationEnabled ? { donationEnabled: true } : {}),
     ...(state.optionalStay && parseFloat(state.overnightMeals) > 0 ? { overnightMealsFee: parseFloat(state.overnightMeals) } : {}),
     childBrackets: parsedBrackets.length > 0 ? parsedBrackets : DEFAULT_PRICING.childBrackets,
     rooms: roomDefs.length > 0 ? roomDefs : DEFAULT_PRICING.rooms,
@@ -853,6 +858,7 @@ function Step1Details({ state, update }: { state: WizardState; update: (p: Parti
             hasRooms
           />
         )}
+        {!state.payFree && <DonationToggle enabled={state.donationEnabled} onChange={(v) => update({ donationEnabled: v })} />}
       </div>
       <Input
         label={`Miejsce${sfx}`}
@@ -1707,6 +1713,7 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
     confirmedSendMail: true,
     noAccommodation: false,
     optionalStay: false,
+    donationEnabled: false,
     overnightMeals: '0',
     program: [],
     guests: [],

@@ -64,7 +64,7 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
     state.participants,
     state.rooms,
     pricingConfig,
-    { transport: state.options.transport, bedding: state.options.bedding },
+    { transport: state.options.transport, bedding: state.options.bedding, donation: state.options.donation },
     state.discountApplied ? state.discountCode : '',
   )
 
@@ -341,6 +341,18 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
                 </span>
                 <span className="text-sm font-semibold" style={{ color: 'var(--ok)' }}>
                   -{money(price.discount)}
+                </span>
+              </div>
+            )}
+
+            {/* Darowizna (dobrowolna, poza rabatami) */}
+            {(price.donation ?? 0) > 0 && (
+              <div className="flex justify-between items-center px-4 py-3">
+                <span className="text-sm" style={{ color: 'var(--muted)' }}>
+                  {t('summary.donation')}
+                </span>
+                <span className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
+                  {money(price.donation ?? 0)}
                 </span>
               </div>
             )}

@@ -246,7 +246,11 @@
     "rodo": "Wyrażam zgodę na przetwarzanie danych osobowych w celu organizacji wyjazdu formacyjnego (RODO).",
     "regulamin": "Zapoznałem/am się z regulaminem i akceptuję jego warunki.",
     "rodo_link": "RODO",
-    "terms_link": "regulamin"
+    "terms_link": "regulamin",
+    "donation_title": "Opcjonalna darowizna na rzecz dofinansowania pobytu kogoś, kogo nie stać na udział",
+    "donation_hint": "Darowizna jest dobrowolna. Doliczymy ją do kwoty zgłoszenia.",
+    "donation_custom": "Dowolna kwota",
+    "donation_custom_label": "Kwota darowizny"
   },
   "payment_method": {
     "title": "Wybierz metodę płatności",
@@ -312,7 +316,8 @@
     "diet": "Dieta",
     "leader_title": "Zaliczka u lidera wspólnoty",
     "leader_desc": "Zaliczkę {{deposit}} ({{pct}}%) przekaż liderowi swojej wspólnoty. Pozostałe {{rest}} zapłacisz gotówką przy rejestracji na miejscu.",
-    "submit_leader": "Potwierdź rejestrację →"
+    "submit_leader": "Potwierdź rejestrację →",
+    "donation": "Darowizna"
   },
   "success": {
     "paid_title": "Dziękujemy!",
