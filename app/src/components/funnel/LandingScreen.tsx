@@ -5,6 +5,8 @@ import type { EventInstanceDto, PricingConfig } from '@icpe/shared'
 import { pickLang, eventLocation, type EventContent } from '../../lib/api'
 import { formatDateRange } from '../../lib/utils'
 import { SpecialGuestsBlock } from './EventContentBlocks'
+import RegistrationCountdown from './RegistrationCountdown'
+import { notYetOpen } from '../../lib/registrationOpens'
 
 interface Props {
   event: EventInstanceDto
@@ -53,6 +55,8 @@ export default function LandingScreen({ event, onRegister, pricingConfig, conten
   const { t, i18n } = useTranslation()
   const lng = i18n.language
   const [showProgram, setShowProgram] = useState(false)
+  // Zapisy jeszcze nie ruszyły: strona jest widoczna, ale zamiast przycisku jest licznik.
+  const [waiting, setWaiting] = useState(() => notYetOpen(event.registrationOpensAt))
 
   const isOpen = event.status === 'OPEN'
   const capacity = event.capacity ?? 0
@@ -207,26 +211,32 @@ export default function LandingScreen({ event, onRegister, pricingConfig, conten
         </div>
       )}
 
-      {/* CTA button */}
-      <button
-        onClick={onRegister}
-        className="w-full text-white text-base font-semibold transition-all duration-150 active:scale-[0.98] hover:opacity-90"
-        style={{
-          background: 'var(--accent)',
-          borderRadius: 16,
-          padding: '16px 24px',
-          boxShadow: '0 6px 18px rgba(197,106,58,0.32)',
-          border: 'none',
-          cursor: 'pointer',
-        }}
-      >
-        {t('landing.cta')}
-      </button>
+      {/* CTA: licznik do startu zapisów albo przycisk */}
+      {waiting && event.registrationOpensAt ? (
+        <RegistrationCountdown opensAt={event.registrationOpensAt} onOpen={() => setWaiting(false)} />
+      ) : (
+        <>
+          <button
+            onClick={onRegister}
+            className="w-full text-white text-base font-semibold transition-all duration-150 active:scale-[0.98] hover:opacity-90"
+            style={{
+              background: 'var(--accent)',
+              borderRadius: 16,
+              padding: '16px 24px',
+              boxShadow: '0 6px 18px rgba(197,106,58,0.32)',
+              border: 'none',
+              cursor: 'pointer',
+            }}
+          >
+            {t('landing.cta')}
+          </button>
 
-      {/* Hint */}
-      <p className="text-center" style={{ fontSize: 12, color: 'var(--faint)' }}>
-        {t('landing.cta_hint')}
-      </p>
+          {/* Hint */}
+          <p className="text-center" style={{ fontSize: 12, color: 'var(--faint)' }}>
+            {t('landing.cta_hint')}
+          </p>
+        </>
+      )}
 
       {/* Popup: program godzinowy */}
       {showProgram && (

@@ -26,7 +26,10 @@
     "next_date_title": "Najbliższy termin",
     "notify_me": "Powiadom mnie o zapisach",
     "closed_desc": "Rejestracja na tę edycję jest już zamknięta. Zapisz się na listę powiadomień, by nie przegapić kolejnej.",
-    "optional_stay": "nocleg opcjonalny"
+    "optional_stay": "nocleg opcjonalny",
+    "badge_soon": "Rejestracja wkrótce",
+    "opens_title": "Zapisy ruszają za",
+    "opens_at": "Start zapisów: {{date}}"
   },
   "invite": {
     "only_badge": "To jest wydarzenie tylko dla zaproszonych gości",
@@ -493,5 +496,11 @@
     "deposit_desc": "Przekaż tę kwotę liderowi swojej wspólnoty.",
     "rest_title": "Reszta gotówką na miejscu",
     "rest_desc": "Tę kwotę prosimy mieć przy sobie podczas rejestracji (najlepiej odliczoną). Obie kwoty wysłaliśmy też mailem."
+  },
+  "countdown": {
+    "days": "dni",
+    "hours": "godz.",
+    "minutes": "min",
+    "seconds": "sek"
   }
 }

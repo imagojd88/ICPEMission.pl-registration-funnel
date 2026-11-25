@@ -8,6 +8,8 @@ import { PriceUnitSelect, priceHint } from './RoomPriceFields'
 import RoomStockFields from './RoomStockFields'
 import OptionalStayFields from './OptionalStayFields'
 import DonationToggle from './DonationToggle'
+import RegistrationOpensFields from './RegistrationOpensFields'
+import { isoToLocalInputs, localInputsToIso, notYetOpen } from '@/lib/registrationOpens'
 import { useState, useEffect, type ChangeEvent } from 'react'
 import { Plus, Trash2, Upload, Images } from 'lucide-react'
 import Button from '@/components/ui/Button'
@@ -112,6 +114,10 @@ export default function EventEditForm({
   const [editLang, setEditLang] = useState('pl')
   const [dateStart, setDateStart] = useState('')
   const [dateEnd, setDateEnd] = useState('')
+  // Start zapisów (data + godzina, czas lokalny); puste = otwarte od razu.
+  const [regOpenDate, setRegOpenDate] = useState('')
+  const [regOpenTime, setRegOpenTime] = useState('')
+  const [regOpenOrig, setRegOpenOrig] = useState<string | null>(null)
   const [nights, setNights] = useState('1')
   const [location, setLocation] = useState('')
   // Tłumaczenia miejsca (EN/IT). PL = `location` (kanoniczne — kalendarz, maile, mapa).
@@ -252,6 +258,11 @@ export default function EventEditForm({
         setDescMap((cfg.description as Record<string, string>) ?? {})
         setDateStart(cfg.startsAt ? cfg.startsAt.slice(0, 10) : '')
         setDateEnd(cfg.endsAt ? cfg.endsAt.slice(0, 10) : '')
+        // Start zapisów pokazujemy tylko, gdy jest w przyszłości (przeszła data = „otwarte od razu").
+        setRegOpenOrig(cfg.registrationOpensAt ?? null)
+        const ro = notYetOpen(cfg.registrationOpensAt) ? isoToLocalInputs(cfg.registrationOpensAt) : { date: '', time: '' }
+        setRegOpenDate(ro.date)
+        setRegOpenTime(ro.time)
         setNights(String(cfg.nights ?? 1))
         setLocation(cfg.location ?? '')
         {
@@ -470,6 +481,10 @@ export default function EventEditForm({
         description: Object.keys(descClean).length ? descClean : null,
         startsAt,
         endsAt,
+        // Start zapisów: ustawiona data → zapis; wyczyszczona, a była w przyszłości → „teraz" (otwarcie od razu).
+        ...(localInputsToIso(regOpenDate, regOpenTime)
+          ? { registrationOpensAt: localInputsToIso(regOpenDate, regOpenTime)! }
+          : notYetOpen(regOpenOrig) ? { registrationOpensAt: new Date().toISOString() } : {}),
         location: location || null,
         nights: n,
         capacity: capacity ? parseInt(capacity) : null,
@@ -626,6 +641,7 @@ export default function EventEditForm({
             <input type="date" value={dateEnd} min={dateStart || undefined} onChange={(e) => setDateEnd(e.target.value)} className={inputCls} style={inputStyle} />
           </Field>
         </div>
+        <RegistrationOpensFields date={regOpenDate} time={regOpenTime} onDate={setRegOpenDate} onTime={setRegOpenTime} />
         <div className="grid grid-cols-2 gap-3">
           <Field label="Liczba nocy">
             <Input value={nights} onChange={(e) => setNights(e.target.value)} inputMode="numeric" />

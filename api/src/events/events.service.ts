@@ -172,6 +172,8 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       description: instance.description,
       startsAt: instance.startsAt,
       endsAt: instance.endsAt,
+      // Start zapisów: przed tą chwilą strona pokazuje licznik zamiast przycisku „Zapisz się".
+      registrationOpensAt: (instance as { registrationOpensAt?: Date }).registrationOpensAt ?? null,
       location: instance.location,
       nights: instance.nights,
       capacity: instance.capacity,

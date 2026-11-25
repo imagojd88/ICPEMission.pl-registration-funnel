@@ -51,6 +51,16 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — panel admina (kreator eventów)
 
+### Start zapisów z datą i godziną + licznik na stronie eventu (2026-11-25)
+- **Prośba (Jacek):** utworzyć event ze wskazaną datą i godziną otwarcia rejestracji — strona już widoczna, a na niej licznik (countdown) do otwarcia.
+- **Stan zastany:** `EventInstance.registrationOpensAt` istniało w bazie, ale nic go nie używało (kreator wpisywał „teraz”). Bez zmian w schemacie.
+- **API:** `registrations.create` → 403 „Zapisy na to wydarzenie jeszcze się nie rozpoczęły.”, gdy `registrationOpensAt` w przyszłości; `/r/:slug/config` zwraca `registrationOpensAt` (publiczne `/r/:slug` zwracało je już w instancji). Typ `EventInstanceDto.registrationOpensAt?` (+ lustro).
+- **Lejek:** `funnel/RegistrationCountdown.tsx` (dni / godz. / min / sek + „Start zapisów: data, godzina”, odlicza co sekundę, po dojściu do zera sam podmienia się na przycisk „Zapisz się”), `LandingScreen` pokazuje go zamiast przycisku; badge w hero „Rejestracja wkrótce”; `PublicFunnel` blokuje wejście do formularza przed terminem (także z wersji roboczej), podgląd w panelu (`?preview=1`) bez blokady. Helpery `lib/registrationOpens.ts`. Tłumaczenia PL/EN/IT/KO/ZH (`landing.badge_soon`, `landing.opens_title`, `landing.opens_at`, `countdown.*`).
+- **Panel:** `admin/events/RegistrationOpensFields.tsx` — „Otwarcie zapisów” (data + godzina, czas lokalny komputera) w kreatorze (krok z datami) i w „Edytuj event”; puste / przeszła data = otwarte od razu; wyczyszczenie przyszłej daty zapisuje „teraz”.
+- **Ograniczenia:** blokada dotyczy zwykłej rejestracji (nie RSVP ani zaproszeń `/i/:token`); licznik liczy wg zegara urządzenia gościa (serwer i tak pilnuje terminu).
+- **Weryfikacja:** tsc app ✓, api ✓ (poza `src/courses`); `vite build` w sandboxie nie działa (esbuild EPIPE) — NIE przeklikane w przeglądarce.
+- Stan: do pushu + **Manual Deploy `icpe-api`**.
+
 ### Lejek: opcjonalna darowizna na dofinansowanie pobytu innych (2026-11-25)
 - **Prośba (Jacek):** w procesie rejestracji opcja „Opcjonalna darowizna na rzecz dofinansowania pobytu kogoś, kogo nie stać na udział” — 50 zł / 100 zł / 200 zł / Dowolna kwota (otwiera pole do wpisania).
 - **Model (shared + lustro `api/src/_shared`):** `PricingConfig.donationEnabled?` (włącznik per event, domyślnie wyłączone → stare eventy bez zmian), `PriceOptions.donation?` (kwota), `PriceResult.donation?`, `DONATION_PRESETS` (PLN 50/100/200; EUR i USD 10/25/50), `DONATION_MAX` 100 000, `cleanDonation()`. `computePrice`: darowizna doliczana NA KOŃCU — po kodzie rabatowym, ręcznej korekcie i także po „kwocie końcowej” admina; nie wchodzi do `subtotal`. Test w `pricing.test.ts` (17/17).

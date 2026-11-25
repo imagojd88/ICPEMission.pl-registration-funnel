@@ -65,6 +65,8 @@ export interface EventInstanceDto {
   description?: Localized | string;
   startsAt: string; // ISO
   endsAt: string;
+  /** Start zapisów (ISO). W przyszłości = strona widoczna, ale z licznikiem zamiast zapisu. */
+  registrationOpensAt?: string | null;
   location?: string;
   nights: number;
   capacity: number | null;

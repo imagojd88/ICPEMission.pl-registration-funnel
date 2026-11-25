@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { notYetOpen } from '../lib/registrationOpens'
 import { useTranslation } from 'react-i18next'
 import { useParams, useSearchParams } from 'react-router-dom'
 import type { EventInstanceDto, CreateRegistrationDto, RegistrationStatus, PaymentMethod } from '@icpe/shared'
@@ -645,7 +646,15 @@ export default function PublicFunnel() {
     setStepError(null)
   }
 
+  // Zapisy jeszcze nie ruszyły (licznik na stronie) → formularz niedostępny, także z wersji roboczej
+  // albo bezpośredniego wejścia; podgląd w panelu (`preview`) pokazuje wszystkie ekrany.
+  const registrationNotOpenYet = !preview && notYetOpen(event?.registrationOpensAt)
+  useEffect(() => {
+    if (registrationNotOpenYet && screen !== 'landing') setScreen('landing')
+  }, [registrationNotOpenYet, screen])
+
   const handleStartRegister = () => {
+    if (registrationNotOpenYet) return
     track('registration_started', { invited: !!invite, had_draft: !!draft })
     const base = buildInitialStepper()
     if (invite) {
@@ -1049,6 +1058,7 @@ export default function PublicFunnel() {
         <>
           <LandingHero
             isOpen={event.status === 'OPEN'}
+            opensSoon={notYetOpen(event.registrationOpensAt)}
             theme={eventConfig?.theme}
             title={getEventTitle(event.title, lng)}
           />

@@ -24,7 +24,10 @@
     "next_date_title": "Next date",
     "notify_me": "Notify me when registration opens",
     "closed_desc": "Registration for this edition is now closed. Sign up for the notification list so you don't miss the next one.",
-    "optional_stay": "optional accommodation"
+    "optional_stay": "optional accommodation",
+    "badge_soon": "Registration opens soon",
+    "opens_title": "Registration opens in",
+    "opens_at": "Registration opens: {{date}}"
   },
   "invite": {
     "only_badge": "This event is for invited guests only",
@@ -483,5 +486,11 @@
     "deposit_desc": "Hand this amount to your community leader.",
     "rest_title": "Remaining amount in cash on site",
     "rest_desc": "Please bring this amount to the registration desk (exact change if possible). We have also e-mailed both amounts."
+  },
+  "countdown": {
+    "days": "days",
+    "hours": "hrs",
+    "minutes": "min",
+    "seconds": "sec"
   }
 }

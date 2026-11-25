@@ -137,6 +137,10 @@ export class RegistrationsService {
     if (instance.status !== 'OPEN') {
       throw new ForbiddenException('Zapisy na to wydarzenie są już zamknięte.');
     }
+    // Strona eventu może być widoczna wcześniej (licznik do startu) — zapisy dopiero od `registrationOpensAt`.
+    if (instance.registrationOpensAt && instance.registrationOpensAt.getTime() > Date.now()) {
+      throw new ForbiddenException('Zapisy na to wydarzenie jeszcze się nie rozpoczęły.');
+    }
 
     // Event „na zaproszenie": udział potwierdza się wyłącznie zaproszeniem (link /i/:token
     // albo dopasowanie danych do listy gości). Zwykła rejestracja jest zabroniona także

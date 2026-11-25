@@ -24,7 +24,10 @@
     "next_date_title": "Prossima data",
     "notify_me": "Avvisami quando si aprono le iscrizioni",
     "closed_desc": "Le iscrizioni per questa edizione sono già chiuse. Iscriviti alla lista di notifiche per non perdere la prossima.",
-    "optional_stay": "alloggio facoltativo"
+    "optional_stay": "alloggio facoltativo",
+    "badge_soon": "Iscrizioni a breve",
+    "opens_title": "Le iscrizioni aprono tra",
+    "opens_at": "Apertura iscrizioni: {{date}}"
   },
   "invite": {
     "only_badge": "Questo evento è riservato agli ospiti invitati",
@@ -487,5 +490,11 @@
     "deposit_desc": "Consegna questo importo al responsabile della tua comunità.",
     "rest_title": "Saldo in contanti sul posto",
     "rest_desc": "Ti preghiamo di avere con te questo importo al momento della registrazione (possibilmente esatto). Ti abbiamo inviato entrambi gli importi via e-mail."
+  },
+  "countdown": {
+    "days": "giorni",
+    "hours": "ore",
+    "minutes": "min",
+    "seconds": "sec"
   }
 }

@@ -1255,6 +1255,8 @@ export interface UpdateInstancePayload {
   description?: { pl?: string; en?: string; it?: string } | null
   startsAt?: string
   endsAt?: string
+  /** Start zapisów (ISO) — w przyszłości: strona z licznikiem zamiast przycisku zapisu. */
+  registrationOpensAt?: string
   location?: string | null
   nights?: number
   capacity?: number | null
@@ -1283,6 +1285,8 @@ export interface EventEditConfig {
   description?: { pl?: string; en?: string; it?: string } | null
   startsAt: string
   endsAt: string
+  /** Start zapisów (ISO). */
+  registrationOpensAt?: string | null
   location?: string | null
   nights: number
   capacity?: number | null

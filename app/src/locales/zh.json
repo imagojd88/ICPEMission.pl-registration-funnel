@@ -24,7 +24,10 @@
     "next_date_title": "下一期",
     "notify_me": "报名开始时通知我",
     "closed_desc": "本期报名已截止。请登记接收通知，以免错过下一期。",
-    "optional_stay": "住宿可选"
+    "optional_stay": "住宿可选",
+    "badge_soon": "报名即将开始",
+    "opens_title": "距报名开始还有",
+    "opens_at": "报名开始时间：{{date}}"
   },
   "invite": {
     "only_badge": "本活动仅限受邀嘉宾参加",
@@ -483,5 +486,11 @@
     "deposit_desc": "请将这笔金额交给您的团体负责人。",
     "rest_title": "现场以现金支付的余款",
     "rest_desc": "请将这笔金额带到报到处（尽量准备零钱）。两笔金额我们也已通过邮件发送给您。"
+  },
+  "countdown": {
+    "days": "天",
+    "hours": "小时",
+    "minutes": "分",
+    "seconds": "秒"
   }
 }

@@ -8,9 +8,11 @@ interface Props {
   title?: string
   /** Event „na zaproszenie" → badge mówi o zamkniętym gronie, nie o otwartej rejestracji. */
   inviteOnly?: boolean
+  /** Zapisy jeszcze nie ruszyły (licznik na stronie) → badge „Rejestracja wkrótce". */
+  opensSoon?: boolean
 }
 
-export default function LandingHero({ isOpen, theme, title, inviteOnly }: Props) {
+export default function LandingHero({ isOpen, theme, title, inviteOnly, opensSoon }: Props) {
   const { t, i18n } = useTranslation()
 
   const supertitle = pickLang(theme?.supertitle, i18n.language)
@@ -102,7 +104,7 @@ export default function LandingHero({ isOpen, theme, title, inviteOnly }: Props)
               className="text-white text-xs font-semibold px-3 py-1.5"
               style={{ background: 'var(--accent)', borderRadius: 99 }}
             >
-              {t('landing.badge_open')}
+              {opensSoon ? t('landing.badge_soon') : t('landing.badge_open')}
             </span>
           ) : (
             <span

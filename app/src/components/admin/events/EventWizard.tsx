@@ -4,6 +4,8 @@ import DietOptionsSelect from './DietOptionsSelect'
 import { priceHint } from './RoomPriceFields'
 import OptionalStayFields from './OptionalStayFields'
 import DonationToggle from './DonationToggle'
+import RegistrationOpensFields from './RegistrationOpensFields'
+import { isoToLocalInputs, localInputsToIso, notYetOpen } from '@/lib/registrationOpens'
 import { useState, useEffect, type ChangeEvent } from 'react'
 import { X, Plus, CheckCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -107,6 +109,11 @@ interface WizardState {
   description: string
   dateStart: string
   dateEnd: string
+  // start zapisów (data + godzina, czas lokalny); puste = otwarte od razu
+  regOpenDate: string
+  regOpenTime: string
+  // edycja: start zapisów był w przyszłości (wyczyszczenie pól = otwórz od razu)
+  regOpenWasFuture: boolean
   nights: string
   location: string
   capacity: string
@@ -373,6 +380,9 @@ function mapEditConfigToState(prev: WizardState, cfg: EventEditConfig, slug: str
     name: cfg.title?.pl ?? '',
     dateStart: dateInput(cfg.startsAt),
     dateEnd: dateInput(cfg.endsAt),
+    regOpenDate: notYetOpen(cfg.registrationOpensAt) ? isoToLocalInputs(cfg.registrationOpensAt).date : '',
+    regOpenTime: notYetOpen(cfg.registrationOpensAt) ? isoToLocalInputs(cfg.registrationOpensAt).time : '',
+    regOpenWasFuture: notYetOpen(cfg.registrationOpensAt),
     nights: String(cfg.nights ?? 1),
     location: cfg.location ?? '',
     capacity: cfg.capacity != null ? String(cfg.capacity) : '',
@@ -828,6 +838,12 @@ function Step1Details({ state, update }: { state: WizardState; update: (p: Parti
           onChange={(e) => update({ dateEnd: e.target.value })}
         />
       </div>
+      <RegistrationOpensFields
+        date={state.regOpenDate}
+        time={state.regOpenTime}
+        onDate={(v) => update({ regOpenDate: v })}
+        onTime={(v) => update({ regOpenTime: v })}
+      />
       <div className="flex flex-col gap-2">
         <label className="flex items-center gap-2 text-sm font-medium" style={{ color: 'var(--ink)' }}>
           <input
@@ -1673,6 +1689,9 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
     description: '',
     dateStart: '',
     dateEnd: '',
+    regOpenDate: '',
+    regOpenTime: '',
+    regOpenWasFuture: false,
     nights: '1',
     location: '',
     capacity: '',
@@ -1832,6 +1851,9 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
           title: { ...title, pl: state.name.trim() },
           startsAt,
           endsAt,
+          ...(localInputsToIso(state.regOpenDate, state.regOpenTime)
+            ? { registrationOpensAt: localInputsToIso(state.regOpenDate, state.regOpenTime)! }
+            : state.regOpenWasFuture ? { registrationOpensAt: new Date().toISOString() } : {}),
           location: state.location || null,
           nights,
           capacity: state.capacity ? parseInt(state.capacity) : null,
@@ -1862,7 +1884,8 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
         capacity: state.capacity ? parseInt(state.capacity) : undefined,
         paymentMethods,
         pricingConfig,
-        registrationOpensAt: new Date().toISOString(),
+        // Start zapisów: wskazana data i godzina albo „od razu".
+        registrationOpensAt: localInputsToIso(state.regOpenDate, state.regOpenTime) ?? new Date().toISOString(),
         registrationClosesAt: startsAt,
       })
 
