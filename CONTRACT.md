@@ -45,8 +45,9 @@ Jeden RSVP na (event, e-mail) — ponowny zapis z tym samym e-mailem aktualizuje
 | POST/PUT | `/admin/series[/:id]` | tworzenie/edycja serii (one-time/evergreen) |
 | POST | `/admin/series/:id/page` | konfiguracja generatora strony |
 | POST | `/admin/series/:id/publish` | publikacja |
-| GET | `/admin/instances?status=` | `EventInstanceDto[]` |
-| GET | `/admin/instances/:id` | edycja + `roomTypes[]` + obłożenie |
+| GET | `/admin/instances?status=` | `EventInstanceDto[]` — od 2026-11-25 z opcjonalnym polem `unlisted: boolean` (ukryty event; lista admina i Personal OS nadal go zwraca) |
+| GET | `/admin/instances/:id` | edycja + `roomTypes[]` + obłożenie (+ opcjonalne `unlisted`) |
+| PATCH | `/admin/instances/:id` | edycja pól instancji; przyjmuje m.in. opcjonalne `unlisted: boolean` |
 | POST | `/admin/instances/:id/clone` | klon edycji |
 | POST | `/admin/instances/:id/room-types` | dodanie typu pokoju |
 | POST | `/admin/instances/:id/rooms` | generowanie puli pokoi |
@@ -66,3 +67,10 @@ Jeden RSVP na (event, e-mail) — ponowny zapis z tym samym e-mailem aktualizuje
 - `PAYMENTS_MODE=mock` (domyślnie) → płatności online wyłączone (`GET /payments/config` zwraca `[]`); `checkout` zwraca fałszywy `redirectUrl`, webhook symulowany endpointem `/payments/dev/confirm/:regId` (oba tylko dla admina).
 - `PAYMENTS_MODE=tpay` → płatności online przez Tpay (BLIK · szybki przelew), tylko dla zgłoszeń z Polski; zmienne `TPAY_*` i `API_PUBLIC_URL` — patrz `docs/20-plan-wdrozenie-tpay.md`. Admin: `GET /admin/payments/online-status` (auth) — stan konfiguracji bez wartości kluczy.
 - `MAIL_MODE=log` → maile logowane do konsoli.
+
+## Ukryty event (`EventInstance.unlisted`, 2026-11-25)
+- Pole opcjonalne, domyślnie `false`. Zmiana wyłącznie addytywna — klient, który pola nie zna, działa jak dotąd.
+- `unlisted: true` = event działa normalnie pod bezpośrednim linkiem (`GET /r/:slug`, `GET /r/:slug/config`, rejestracja, płatności, maile, strona zgłoszenia, recepcja), ale jest pomijany na listach publicznych: `GET /events` (strona główna rejestracji), `GET /site/events/upcoming` (icpemission.pl) i `GET /icpe-go/events`.
+- Listy z autoryzacją (`GET /admin/instances`, `GET /admin/instances/:id`, `GET /admin/summary`, recepcja) zwracają event jak zwykle; `/admin/instances*` dokłada pole `unlisted`.
+- Zapis: `PATCH /admin/instances/:id` z `{ unlisted: boolean }`; opcjonalnie `unlisted: true` w `POST /admin/series`. Klon (`POST /admin/instances/:id/clone`) dziedziczy flagę.
+- `GET /r/:slug` (pole instancji) i `GET /r/:slug/config` zwracają `unlisted` — publiczny lejek dokłada na tej podstawie `<meta name="robots" content="noindex">`.

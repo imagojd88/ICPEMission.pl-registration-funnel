@@ -89,7 +89,7 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
   /** Kształt instancji wg kontraktu Personal OS (lista). */
   private async toContractInstance(inst: {
     id: string; seriesId: string; title: unknown; startsAt: Date; endsAt: Date;
-    location: string | null; status: string; capacity: number | null;
+    location: string | null; status: string; capacity: number | null; unlisted?: boolean;
   }) {
     const agg = await this.instanceAggregates(inst.id);
     // typ eventu + slug strony (z serii po seriesId) — potrzebne dla listy (kategoria)
@@ -108,6 +108,8 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       endsAt: iso(inst.endsAt),
       location: inst.location ?? '',
       status: mapInstanceStatus(inst.status),
+      // Ukryty event (tylko przez link /r/<slug>) — panel pokazuje znacznik „UKRYTY".
+      unlisted: inst.unlisted === true,
       capacity: inst.capacity ?? 0,
       registeredCount: agg.registeredCount,
       confirmedCount: agg.confirmedCount,
@@ -199,6 +201,8 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       capacity: instance.capacity,
       // Przełącznik „Udostępniaj dane ICPE Go" (edycja eventu w panelu).
       shareWithIcpeGo: (instance as { shareWithIcpeGo?: boolean }).shareWithIcpeGo === true,
+      // Ukryty event: publiczny lejek dokłada <meta name="robots" content="noindex">, panel — przełącznik.
+      unlisted: (instance as { unlisted?: boolean }).unlisted === true,
       paymentMethods: instance.paymentMethods,
       pricingConfig: instance.pricingConfig,
       // Limit pokoi: wolne pokoje per typ (tylko typy z limitem) + zajętość (dla panelu).
@@ -280,17 +284,21 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       instances.map(
         (i: {
           id: string; seriesId: string; title: unknown; startsAt: Date; endsAt: Date;
-          location: string | null; status: string; capacity: number | null;
+          location: string | null; status: string; capacity: number | null; unlisted?: boolean;
         }) => this.toContractInstance(i),
       ),
     );
   }
 
-  /** Publiczna lista aktywnych eventów (OPEN, z opublikowaną stroną) — do strony głównej. */
+  /**
+   * Publiczna lista aktywnych eventów (OPEN, z opublikowaną stroną) — do strony głównej
+   * (GET /events) i strony icpemission.pl (GET /site/events/upcoming).
+   * Eventy ukryte (`unlisted`) są pomijane — działają tylko pod bezpośrednim linkiem /r/<slug>.
+   */
   async listPublicActive() {
     await this.maybeCloseExpired();
     const instances = await this.prisma.eventInstance.findMany({
-      where: { status: 'OPEN' },
+      where: { status: 'OPEN', unlisted: false } as never,
       orderBy: { startsAt: 'asc' },
       include: { series: { select: { type: true } } },
     });
@@ -335,6 +343,7 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
     registrationOpensAt: string;
     registrationClosesAt: string;
     recurrence?: string;
+    unlisted?: boolean;
   }) {
     const series = await this.prisma.eventSeries.create({
       data: {
@@ -355,7 +364,9 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
             registrationClosesAt: new Date(dto.registrationClosesAt),
             // Utworzony event jest od razu OPEN — widoczny publicznie po slug.
             status: (dto as { status?: string }).status === 'DRAFT' ? 'DRAFT' : 'OPEN',
-          },
+            // Ukryty event od utworzenia (opcjonalne; domyślnie widoczny na listach).
+            ...(dto.unlisted === true ? { unlisted: true } : {}),
+          } as never,
         },
       },
       include: { instances: true },
@@ -383,7 +394,9 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
         registrationOpensAt: src.registrationOpensAt,
         registrationClosesAt: src.registrationClosesAt,
         status: 'DRAFT',
-      },
+        // Klon ukrytego eventu też jest ukryty (bezpieczniejsze niż przypadkowe ujawnienie).
+        ...((src as { unlisted?: boolean }).unlisted === true ? { unlisted: true } : {}),
+      } as never,
     });
   }
 
@@ -457,6 +470,7 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       status?: string;
       shareWithIcpeGo?: boolean;
       countryCode?: string | null;
+      unlisted?: boolean;
     },
   ) {
     const data: Record<string, unknown> = {};
@@ -466,6 +480,7 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       data.countryCode = cc || null;
     }
     if (dto.shareWithIcpeGo !== undefined) data.shareWithIcpeGo = dto.shareWithIcpeGo === true;
+    if (dto.unlisted !== undefined) data.unlisted = dto.unlisted === true;
     if (dto.title !== undefined) data.title = dto.title as any;
     if (dto.description !== undefined) data.description = (dto.description ?? null) as any;
     if (dto.startsAt !== undefined) data.startsAt = new Date(dto.startsAt);

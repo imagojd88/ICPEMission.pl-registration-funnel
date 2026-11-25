@@ -77,6 +77,8 @@ export interface EventInstanceDto {
   currency: string;
   paymentMethods: PaymentMethod[];
   slug: string;
+  /** Ukryty event: działa pod bezpośrednim linkiem /r/<slug>, ale nie ma go na publicznych listach. */
+  unlisted?: boolean;
 }
 
 export interface RegistrationDto {

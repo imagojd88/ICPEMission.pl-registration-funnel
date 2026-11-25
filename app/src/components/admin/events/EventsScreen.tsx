@@ -255,7 +255,14 @@ export default function EventsScreen({ onOpenWizard, showWizard, onCloseWizard }
                       style={{ borderBottom: i < filtered.length - 1 ? '1px solid var(--border-2)' : undefined }}
                     >
                       <td className="px-5 py-3.5">
-                        <p className="font-medium" style={{ color: 'var(--ink)' }}>{name}</p>
+                        <p className="font-medium flex items-center gap-2 flex-wrap" style={{ color: 'var(--ink)' }}>
+                          {name}
+                          {ev.unlisted === true && (
+                            <Badge variant="warn" title="Ukryty event — dostępny tylko przez link, niewidoczny na stronie głównej">
+                              UKRYTY
+                            </Badge>
+                          )}
+                        </p>
                         {slug && (
                           <p className="text-xs font-mono mt-0.5" style={{ color: 'var(--faint)', fontSize: 11 }}>
                             /r/{slug}

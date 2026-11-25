@@ -49,7 +49,8 @@ export class IcpeGoService {
 
   async list(scope: IcpeGoScope, lang?: string) {
     const now = new Date();
-    const where: Record<string, unknown> = { shareWithIcpeGo: true, status: { not: 'DRAFT' } };
+    // Ukryty event (`unlisted`) nie trafia na listę nawet przy włączonym „Udostępniaj dane ICPE Go".
+    const where: Record<string, unknown> = { shareWithIcpeGo: true, unlisted: false, status: { not: 'DRAFT' } };
     if (scope === 'open') where.status = 'OPEN';
     else if (scope === 'upcoming') {
       where.status = { in: ['OPEN', 'CLOSED'] };

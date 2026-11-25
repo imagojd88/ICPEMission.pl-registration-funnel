@@ -207,6 +207,10 @@ model EventInstance {
   // Udostępnianie danych aplikacji ICPE Go (GET /icpe-go/events) — włącza admin w edycji eventu.
   // Domyślnie wyłączone: event nie istnieje dla ICPE Go, dopóki ktoś go świadomie nie udostępni.
   shareWithIcpeGo      Boolean         @default(false)
+  // Ukryty event: działa normalnie pod bezpośrednim linkiem /r/<slug> (zapis, płatności, maile,
+  // strona zgłoszenia, recepcja), ale nie trafia na żadną publiczną listę (strona główna,
+  // icpemission.pl, lista ICPE Go). Panel i Personal OS widzą go ze znacznikiem.
+  unlisted             Boolean         @default(false)
   registrationOpensAt  DateTime
   registrationClosesAt DateTime
   paymentMethods       PaymentMethod[]

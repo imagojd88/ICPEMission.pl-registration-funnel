@@ -446,6 +446,18 @@ export default function PublicFunnel() {
     window.addEventListener('online', onOnline)
     return () => window.removeEventListener('online', onOnline)
   }, [submitNetworkError, t])
+  // Ukryty event (`unlisted`): strona działa pod linkiem, ale prosimy wyszukiwarki, żeby jej nie indeksowały.
+  // Znacznik dokładamy dynamicznie i zdejmujemy przy wyjściu ze strony (SPA — <head> jest wspólny).
+  const eventUnlisted = (event as (EventInstanceDto & { unlisted?: boolean }) | null)?.unlisted === true
+  useEffect(() => {
+    if (!eventUnlisted) return
+    const meta = document.createElement('meta')
+    meta.name = 'robots'
+    meta.content = 'noindex'
+    meta.setAttribute('data-unlisted-event', '1')
+    document.head.appendChild(meta)
+    return () => { meta.remove() }
+  }, [eventUnlisted])
   const [stepError, setStepError] = useState<string | null>(null)
   // Krok „Nocleg”: okienko po „Dalej”, gdy wybór noclegu jest niepełny (łatwo przeoczyć komunikat na dole).
   const [roomDialog, setRoomDialog] = useState<RoomDialog | null>(null)

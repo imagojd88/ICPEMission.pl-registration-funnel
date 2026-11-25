@@ -1355,6 +1355,8 @@ export interface UpdateInstancePayload {
   shareWithIcpeGo?: boolean
   /** Kraj eventu — kod ISO 3166-1 alpha-2 („PL”) albo null. */
   countryCode?: string | null
+  /** Ukryty event — dostępny tylko przez link /r/<slug>, pomijany na publicznych listach. */
+  unlisted?: boolean
 }
 
 /** Edycja istniejącego eventu (instancji). */
@@ -1383,6 +1385,8 @@ export interface EventEditConfig {
   capacity?: number | null
   /** „Udostępniaj dane ICPE Go" (EventInstance.shareWithIcpeGo). */
   shareWithIcpeGo?: boolean
+  /** Ukryty event (EventInstance.unlisted). */
+  unlisted?: boolean
   /** Kraj eventu (EventInstance.countryCode, ISO 3166-1 alpha-2). */
   countryCode?: string | null
   paymentMethods: string[]
@@ -1419,6 +1423,8 @@ export interface CreateSeriesPayload {
   registrationOpensAt: string
   registrationClosesAt: string
   recurrence?: string
+  /** Ukryty event od utworzenia (domyślnie widoczny na listach). */
+  unlisted?: boolean
 }
 
 export interface SeriesWithInstance {

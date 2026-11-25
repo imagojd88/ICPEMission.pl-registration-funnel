@@ -119,6 +119,8 @@ interface WizardState {
   nights: string
   location: string
   capacity: string
+  // ukryty event: dostępny tylko przez link /r/<slug>, bez kafelka na stronie głównej
+  unlisted: boolean
   payOnline: boolean
   payTransfer: boolean
   payCash: boolean
@@ -395,6 +397,7 @@ function mapEditConfigToState(prev: WizardState, cfg: EventEditConfig, slug: str
     nights: String(cfg.nights ?? 1),
     location: cfg.location ?? '',
     capacity: cfg.capacity != null ? String(cfg.capacity) : '',
+    unlisted: cfg.unlisted === true,
     payOnline: pm.includes('ONLINE'),
     payTransfer: pm.includes('BANK_TRANSFER'),
     payCash: pm.includes('CASH'),
@@ -926,6 +929,20 @@ function Step1Details({ state, update }: { state: WizardState; update: (p: Parti
         onChange={(e) => update({ capacity: e.target.value })}
         placeholder="80"
       />
+      <div className="flex flex-col gap-1">
+        <label className="flex items-center gap-2 text-sm font-medium" style={{ color: 'var(--ink)' }}>
+          <input
+            type="checkbox"
+            checked={state.unlisted}
+            onChange={(e) => update({ unlisted: e.target.checked })}
+            className="accent-[var(--brand)] w-4 h-4"
+          />
+          Ukryty event (dostępny tylko przez link, niewidoczny na stronie głównej)
+        </label>
+        <p className="text-xs" style={{ color: 'var(--faint)' }}>
+          Np. event testowy. Zapisy i płatności działają normalnie pod linkiem /r/…, ale eventu nie ma na publicznych listach.
+        </p>
+      </div>
 
       {/* Program wydarzenia */}
       <div className="flex flex-col gap-2">
@@ -1711,6 +1728,7 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
     nights: '1',
     location: '',
     capacity: '',
+    unlisted: false,
     payOnline: true,
     payTransfer: true,
     payCash: false,
@@ -1875,6 +1893,7 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
           capacity: state.capacity ? parseInt(state.capacity) : null,
           paymentMethods,
           pricingConfig,
+          unlisted: state.unlisted,
         })
         await configureSeriesPage(editTarget.seriesId, {
           slug: state.slug,
@@ -1903,6 +1922,8 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
         // Start zapisów: wskazana data i godzina albo „od razu".
         registrationOpensAt: localInputsToIso(state.regOpenDate, state.regOpenTime) ?? new Date().toISOString(),
         registrationClosesAt: startsAt,
+        // Ukryty od pierwszej chwili — event nie pojawia się na stronie głównej nawet na moment.
+        ...(state.unlisted ? { unlisted: true } : {}),
       })
 
       const seriesId = series.id

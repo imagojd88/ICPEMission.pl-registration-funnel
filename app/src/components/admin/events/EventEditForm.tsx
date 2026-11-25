@@ -203,6 +203,8 @@ export default function EventEditForm({
   // „Udostępniaj dane ICPE Go" — event widoczny w API /icpe-go/events (tylko liczby, bez danych osób).
   const [shareIcpeGo, setShareIcpeGo] = useState(false)
   const [icpeGoCopied, setIcpeGoCopied] = useState(false)
+  // Ukryty event — działa pod linkiem /r/<slug>, ale nie ma go na stronie głównej ani na innych publicznych listach.
+  const [unlisted, setUnlisted] = useState(false)
 
   const addProgramRow = () => setProgram((p) => [...p, { id: `pg-${Date.now()}`, time: '', item: {} }])
   const setProgramTime = (id: string, time: string) =>
@@ -303,6 +305,7 @@ export default function EventEditForm({
         }
         setCapacity(cfg.capacity != null ? String(cfg.capacity) : '')
         setShareIcpeGo(cfg.shareWithIcpeGo === true)
+        setUnlisted(cfg.unlisted === true)
         const pm = cfg.paymentMethods ?? []
         setPayOnline(pm.includes('ONLINE'))
         setPayTransfer(pm.includes('BANK_TRANSFER'))
@@ -550,6 +553,7 @@ export default function EventEditForm({
         paymentMethods,
         pricingConfig: buildPricing(),
         shareWithIcpeGo: shareIcpeGo,
+        unlisted,
       })
 
       const locales = [...activeLocales]
@@ -1050,6 +1054,25 @@ export default function EventEditForm({
             </p>
           </div>
         </Field>
+      </Section>
+
+      <Section title="Widoczność">
+        <div className="flex flex-col gap-2 px-3 py-3 rounded-[10px]" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
+          <label className="flex items-center gap-2 text-sm font-medium" style={{ color: 'var(--ink)' }}>
+            <input
+              type="checkbox"
+              checked={unlisted}
+              onChange={(e) => setUnlisted(e.target.checked)}
+              className="accent-[var(--brand)] w-4 h-4"
+            />
+            Ukryty event (dostępny tylko przez link, niewidoczny na stronie głównej)
+          </label>
+          <p className="text-xs" style={{ color: 'var(--faint)' }}>
+            Zapisy, płatności, maile, strona zgłoszenia i recepcja działają normalnie pod adresem /r/{slug || '…'}.
+            Eventu nie ma na stronie głównej rejestracji, na icpemission.pl ani na liście ICPE Go, a jego strona prosi
+            wyszukiwarki, żeby jej nie indeksowały. Kto zna link, ten wejdzie. Zmiana działa po kliknięciu „Zapisz".
+          </p>
+        </div>
       </Section>
 
       <Section title="ICPE Go">

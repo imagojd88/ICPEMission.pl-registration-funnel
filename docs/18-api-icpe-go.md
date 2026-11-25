@@ -9,6 +9,7 @@ Panel admina ▸ Eventy ▸ edycja eventu ▸ sekcja **ICPE Go** ▸ zaznacz **�
 
 - Domyślnie wyłączone. Nowy event nie pojawia się w ICPE Go, dopóki ktoś go nie udostępni.
 - Po odznaczeniu event znika z listy, a pod swoim adresem zwraca `404`.
+- **Ukryty event** (edycja eventu ▸ sekcja „Widoczność” ▸ „Ukryty event”, pole `EventInstance.unlisted`) nie trafia na listę `GET /icpe-go/events`, nawet gdy ma zaznaczone „Udostępniaj dane ICPE Go”. Pod własnym adresem `GET /icpe-go/events/<id albo slug>` nadal odpowiada, o ile jest udostępniony — kto zna adres, ten go pobierze.
 - Po zaznaczeniu panel pokazuje adres tego eventu dla ICPE Go z przyciskiem „Kopiuj".
 - W bazie jest to pole `EventInstance.shareWithIcpeGo` (domyślnie `false`). Kolumnę dodaje `prisma db push` przy starcie API.
 - Kraj eventu wybiera się w tej samej edycji, w polu **„Kraj”** pod „Miejsce”. W bazie: `EventInstance.countryCode` (kod ISO, domyślnie `null`).

@@ -51,7 +51,23 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — panel admina (kreator eventów)
 
-### Płatności online Tpay — etapy 0–3 (2026-11-25)
+### Ukryty event — działa pod linkiem, nie ma go na publicznych listach (2026-11-25)
+- **Po co:** event testowy do prób płatności Tpay na produkcji, niewidoczny na https://rejestracja.icpemission.pl/ .
+- **Baza (addytywnie, wejdzie przez `prisma db push`):** `EventInstance.unlisted Boolean @default(false)`.
+- **Gdzie filtr (publiczne listy):** `EventsService.listPublicActive` (`GET /events` — strona główna rejestracji — oraz `GET /site/events/upcoming` — icpemission.pl, ten sam kod) i `IcpeGoService.list` (`GET /icpe-go/events`). Innych publicznych list eventów w API nie ma (brak sitemapy, kanałów, kalendarza zbiorczego, „innych wydarzeń” w lejku).
+- **Świadomie bez filtra:** pojedynczy event po slugu / id (`GET /r/:slug`, `/r/:slug/config`, `GET /icpe-go/events/:idOrSlug` — ten ostatni tylko gdy event ma „Udostępniaj dane ICPE Go”), listy z logowaniem (`/admin/instances`, `/admin/summary`, recepcja), crony przypomnień i lista oczekujących (działają per event).
+- **API:** `PATCH /admin/instances/:id` przyjmuje `unlisted`; `POST /admin/series` przyjmuje opcjonalne `unlisted: true`; klon dziedziczy flagę; `/admin/instances*` i `/r/:slug/config` zwracają `unlisted`. Opis w `CONTRACT.md` (sekcja na końcu) i `docs/18-api-icpe-go.md`.
+- **Panel:** „Edytuj event” ▸ nowa sekcja „Widoczność” ▸ „Ukryty event (dostępny tylko przez link, niewidoczny na stronie głównej)”; ten sam przełącznik w kreatorze (krok „Szczegóły”, pod pojemnością) — event ukryty od pierwszej chwili; na liście eventów znacznik „UKRYTY” przy nazwie.
+- **Lejek `/r/<slug>`:** dla ukrytego eventu dokładany `<meta name="robots" content="noindex">` (zdejmowany przy wyjściu ze strony). Tylko w `PublicFunnel`; strony z tokenem (zgłoszenie, płatności, RSVP, zaproszenie) znacznika nie dostają.
+- **Pliki:** `api/prisma/schema.prisma`, `api/src/events/events.service.ts`, `api/src/icpe-go/icpe-go.service.ts`, `api/src/_shared/types.ts`, `shared/src/types.ts`, `app/src/lib/api.ts`, `app/src/pages/PublicFunnel.tsx`, `app/src/components/admin/events/EventEditForm.tsx`, `app/src/components/admin/events/EventsScreen.tsx`, `app/src/components/admin/events/EventWizard.tsx`, `CONTRACT.md`, `docs/18-api-icpe-go.md`, `session_notes.md`.
+- **Weryfikacja:** testy shared 45/45; `tsc --noEmit` w `app` czysto, w `api` tylko zastane błędy `src/courses`; `vite build` OK. **Nie sprawdzono w działaniu** (brak bazy i przeglądarki): `prisma db push`, faktyczne znikanie kafelka, zapis przełącznika, znacznik noindex w przeglądarce. `prisma validate` nie ruszył w sandboxie (403 przy pobieraniu silnika).
+- **Wdrożenie:** push → frontend sam; **Manual Deploy `icpe-api`** konieczny (nowa kolumna + filtr). Kolejność ma znaczenie: dopóki API nie jest wdrożone, przełącznik w panelu niczego nie zapisuje, a event jest widoczny. Po wdrożeniu: utworzyć / ukryć event, sprawdzić, że nie ma go na stronie głównej ani w `https://icpe-api.onrender.com/events`.
+- **Uwaga:** icpemission.pl (`icpe-site`) to strona statyczna — jeśli lista wydarzeń jest tam wypiekana przy buildzie, a event był wcześniej widoczny, zniknie dopiero po przebudowaniu strony.
+- **Push:**
+```bash
+cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration funnel" && git add -A && git commit -m "Ukryty event: flaga unlisted, filtr na publicznych listach, przełącznik w panelu, noindex" && git push
+```
+
 - **Podstawa:** `docs/20-plan-wdrozenie-tpay.md` (plan zapisany w repo tego dnia) + decyzje Jacka z sekcji 0. Poza zakresem: zwroty z panelu (etap 4), Stripe, testy w sandboxie (etap 5).
 - **Przy okazji (produkcja, bez zmian w kodzie):** w evencie `united-in-mission` ustawiono trzy poziomy cen (Early bird / Pre-Summer od 2027-05-01 / Regular od 2027-07-01) i harmonogram wpłat 20% / 30% do 2027-04-20 / reszta do 2027-07-31.
 - **Etap 0:** `POST payments/:regId/checkout` wymaga `JwtAuthGuard` (trasa zostaje, jest w CONTRACT.md); webhook ogólny nie loguje już ładunku ani podpisu.
