@@ -74,3 +74,9 @@ Jeden RSVP na (event, e-mail) — ponowny zapis z tym samym e-mailem aktualizuje
 - Listy z autoryzacją (`GET /admin/instances`, `GET /admin/instances/:id`, `GET /admin/summary`, recepcja) zwracają event jak zwykle; `/admin/instances*` dokłada pole `unlisted`.
 - Zapis: `PATCH /admin/instances/:id` z `{ unlisted: boolean }`; opcjonalnie `unlisted: true` w `POST /admin/series`. Klon (`POST /admin/instances/:id/clone`) dziedziczy flagę.
 - `GET /r/:slug` (pole instancji) i `GET /r/:slug/config` zwracają `unlisted` — publiczny lejek dokłada na tej podstawie `<meta name="robots" content="noindex">`.
+
+## Kraj zamieszkania zgłaszającego i flaga kodów rabatowych (2026-11-25)
+- `contact.countryCode` (opcjonalne) — kod ISO 3166-1 alpha-2, wielkie litery (np. `PL`). `POST /registrations` przyjmuje też małe litery (zamienia na wielkie), puste traktuje jak brak; inna wartość (nazwa kraju, 3 litery) → 400. Zmiana wyłącznie addytywna — bez pola wszystko działa jak dotąd.
+- Płatność online (Tpay): NAJPIERW kraj (`PL` → dostępna; inny kraj → niedostępna niezależnie od języka), dopiero gdy kraju brak — język zgłoszenia (`locale`). Jedna reguła (`onlineProviderFor`) dla lejka, `GET /registrations/manage/:token/payments`, tworzenia płatności i przycisków „Zapłać online” w mailach.
+- `PATCH /admin/registrations/:id`: `contact.countryCode` z kodem zapisuje kraj, pusty tekst usuwa zapisany kraj. Odpowiedzi ze zgłoszeniem (`contact`) zwracają `countryCode`, gdy jest zapisany.
+- `GET /r/:slug/config` zwraca `hasDiscountCodes: boolean` — czy event ma aktywny kod rabatowy (lejek ukrywa pole „Kod rabatowy”, gdy nie ma).

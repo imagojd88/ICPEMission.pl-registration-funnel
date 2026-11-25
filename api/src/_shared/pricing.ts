@@ -566,14 +566,18 @@ export function formatZl(n: number): string {
 export function formatMoney(n: number, currency: 'PLN' | 'EUR' | 'USD' = 'PLN', lng = 'pl'): string {
   const l = (lng || 'pl').slice(0, 2);
   const locale = l === 'en' ? 'en-GB' : l === 'it' ? 'it-IT' : l === 'ko' ? 'ko-KR' : l === 'zh' ? 'zh-CN' : 'pl-PL';
+  // Pełne kwoty bez groszy („180 zł”), kwoty z groszami z dwoma miejscami („32,50 zł”).
+  const v = Math.round((Number(n) || 0) * 100) / 100;
+  const digits = Number.isInteger(v) ? 0 : 2;
   try {
     return new Intl.NumberFormat(locale, {
       style: 'currency',
       currency,
-      maximumFractionDigits: 0,
-    }).format(Math.round(n));
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits,
+    }).format(v);
   } catch {
-    return `${new Intl.NumberFormat(locale).format(Math.round(n))} ${currency}`;
+    return `${new Intl.NumberFormat(locale, { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(v)} ${currency}`;
   }
 }
 

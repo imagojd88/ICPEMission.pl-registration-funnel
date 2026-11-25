@@ -1254,7 +1254,8 @@ export default function EventEditForm({
       slug={editTarget.slug}
       draft={previewDraft}
       lang={editLang}
-      hasRooms={rooms.length > 0}
+      // Jak na żywej stronie: krok „Nocleg” jest tylko, gdy są pokoje i co najmniej 1 noc (albo nocleg opcjonalny).
+      hasRooms={rooms.length > 0 && ((parseInt(nights) || 0) > 0 || optionalStay)}
       free={isFree}
       simple={eventType === 'STANDALONE' || eventType === 'INVITE'}
     />

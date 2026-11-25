@@ -15,6 +15,7 @@ import RegistrationEditForm from './RegistrationEditForm'
 import UnfinishedRegistrations from './UnfinishedRegistrations'
 import { useAutoRefresh } from '@/hooks/useAutoRefresh'
 import { communityDisplay } from '@/lib/communities'
+import { countryName } from '@/lib/countries'
 
 function formatUpdatedAt(d: Date): string {
   return d.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })
@@ -155,6 +156,7 @@ function RegistrationDrawer({
                 { label: 'Telefon', value: r.contact.phone ?? '—' },
                 // Pola dodatkowe — tylko gdy wypełnione.
                 ...(r.contact.address ? [{ label: 'Adres', value: r.contact.address }] : []),
+                ...(r.contact.countryCode ? [{ label: 'Kraj zamieszkania', value: `${countryName(r.contact.countryCode, 'pl')} (${r.contact.countryCode})` }] : []),
                 ...(r.contact.parish ? [{ label: 'Parafia', value: r.contact.parish }] : []),
                 ...(r.contact.community ? [{ label: 'Wspólnota', value: communityDisplay(r.contact) }] : []),
               ].map((item) => (

@@ -25,7 +25,8 @@ import {
 } from '@/lib/api'
 import { describeHousehold, parseHouseholdLines } from '@/lib/households'
 import { SUPERTITLE_PRESETS, isPresetSupertitle } from '@/lib/supertitles'
-import { DEFAULT_PRICING } from '@icpe/shared'
+import { DEFAULT_PRICING, wizardPricingCore, slugifyEventName } from '@icpe/shared'
+import PaymentPlanEditor, { EMPTY_PLAN_FORM, planToForm, formToPlan, planFormError, type PaymentPlanForm } from './PaymentPlanEditor'
 import type { PricingConfig, AgeBracket } from '@icpe/shared'
 import type { EventEditConfig, Place, InvitationItem, Invitee } from '@/lib/api'
 import AffiliationSelect from '@/components/admin/events/AffiliationSelect'
@@ -139,8 +140,12 @@ interface WizardState {
   ageBrackets: AgeBracketRow[]
   optionsForm: OptionsForm
   discountRows: DiscountRow[]
+  // harmonogram wpłat (zadatek + raty) — ten sam edytor co w „Edytuj event"
+  planForm: PaymentPlanForm
   // step 4
   slug: string
+  /** admin wpisał własny slug → nie nadpisujemy go slugiem z nazwy */
+  slugTouched: boolean
   color: ColorSwatch
   heroImageUrl: string
   titleColor: string
@@ -411,6 +416,7 @@ function mapEditConfigToState(prev: WizardState, cfg: EventEditConfig, slug: str
     optionalStay: !!pc?.accommodationOptional,
     donationEnabled: !!pc?.donationEnabled,
     paymentPlan: pc?.paymentPlan,
+    planForm: planToForm(pc?.paymentPlan),
     priceTiers: pc?.priceTiers,
     baseTierName: pc?.baseTierName,
     overnightMeals: String(pc?.overnightMealsFee ?? 0),
@@ -426,6 +432,7 @@ function mapEditConfigToState(prev: WizardState, cfg: EventEditConfig, slug: str
       pct: String(Math.round((frac as number) * 100)),
     })),
     slug,
+    slugTouched: true,
     color: colorFromHex(cfg.theme?.primaryColor),
     heroImageUrl: cfg.theme?.heroImageUrl ?? '',
     titleColor: cfg.theme?.titleColor ?? '#FFFFFF',
@@ -450,8 +457,6 @@ function mapPricingModel(m: PricingModel): 'PER_PERSON_PER_NIGHT' | 'PER_ROOM' |
 }
 
 function buildPricingConfig(state: WizardState): PricingConfig {
-  const nights = parseInt(state.nights) || 0
-
   const roomDefs = state.rooms.map((r) => ({
     id: r.id,
     // Z tłumaczeniami → mapa {pl, en, it} (jak w edycji); bez — zwykły tekst PL.
@@ -469,37 +474,41 @@ function buildPricingConfig(state: WizardState): PricingConfig {
     ...(r.depositPct ? { depositPct: r.depositPct } : {}),
   }))
 
-  // Parse age brackets (sort by ltAge ascending)
-  const parsedBrackets: AgeBracket[] = bracketsFromRows(state.ageBrackets)
-
-  // Parse discount codes
-  const discountCodes: Record<string, number> = {}
-  for (const row of state.discountRows) {
-    const code = row.code.trim().toUpperCase()
-    const frac = parseFloat(row.pct) / 100
-    if (code && !isNaN(frac)) discountCodes[code] = frac
-  }
+  // Rdzeń cennika: DOKŁADNIE to, co w formularzu — 0 zostaje zerem, pusta lista pokoi / progów
+  // wiekowych / kodów zostaje pusta (bez podstawiania DEFAULT_PRICING). Testy: shared/src/eventWizard.test.ts.
+  const core = wizardPricingCore({
+    formationFee: state.formationFee,
+    mealsFee: state.mealsFee,
+    transport: state.optionsForm.transport,
+    bedding: state.optionsForm.bedding,
+    noAccommodation: state.noAccommodation,
+    nights: state.nights,
+    rooms: roomDefs as PricingConfig['rooms'],
+    // progi posortowane po wieku rosnąco
+    childBrackets: bracketsFromRows(state.ageBrackets) as AgeBracket[],
+    discountRows: state.discountRows,
+  })
+  const free = state.payFree || state.eventType === 'invite'
+  // Harmonogram wpłat z kroku „Cennik” (bezpłatny event go nie ma).
+  const plan = free ? undefined : formToPlan(state.planForm) ?? state.paymentPlan
 
   return {
-    free: state.payFree || state.eventType === 'invite',
+    free,
     currency: state.currency,
-    formationFee: parseFloat(state.formationFee) || DEFAULT_PRICING.formationFee,
-    mealsFee: parseFloat(state.mealsFee) || DEFAULT_PRICING.mealsFee,
-    nights,
+    formationFee: core.formationFee,
+    mealsFee: core.mealsFee,
+    nights: core.nights,
     ...(state.payLeader ? { leaderDepositPct: Math.min(100, Math.max(1, parseInt(state.leaderPct) || 50)) } : {}),
     ...(state.optionalStay && !state.noAccommodation ? { accommodationOptional: true } : {}),
     ...(state.donationEnabled ? { donationEnabled: true } : {}),
-    ...(state.paymentPlan ? { paymentPlan: state.paymentPlan } : {}),
+    ...(plan ? { paymentPlan: plan } : {}),
     ...(state.priceTiers?.length ? { priceTiers: state.priceTiers } : {}),
     ...(state.baseTierName ? { baseTierName: state.baseTierName } : {}),
-    ...(state.optionalStay && parseFloat(state.overnightMeals) > 0 ? { overnightMealsFee: parseFloat(state.overnightMeals) } : {}),
-    childBrackets: parsedBrackets.length > 0 ? parsedBrackets : DEFAULT_PRICING.childBrackets,
-    rooms: roomDefs.length > 0 ? roomDefs : DEFAULT_PRICING.rooms,
-    options: {
-      transport: parseFloat(state.optionsForm.transport) || DEFAULT_PRICING.options.transport,
-      bedding: parseFloat(state.optionsForm.bedding) || DEFAULT_PRICING.options.bedding,
-    },
-    discountCodes: Object.keys(discountCodes).length > 0 ? discountCodes : DEFAULT_PRICING.discountCodes,
+    ...(state.optionalStay && !state.noAccommodation && parseFloat(state.overnightMeals) > 0 ? { overnightMealsFee: parseFloat(state.overnightMeals) } : {}),
+    childBrackets: core.childBrackets,
+    rooms: core.rooms,
+    options: core.options,
+    discountCodes: core.discountCodes,
   }
 }
 
@@ -871,7 +880,7 @@ function Step1Details({ state, update }: { state: WizardState; update: (p: Parti
             onChange={(e) => update({ noAccommodation: e.target.checked })}
             className="accent-[var(--brand)] w-4 h-4"
           />
-          Bez noclegu (spotkanie kilkugodzinne — pomija Pokoje i Cennik)
+          Bez noclegu (spotkanie kilkugodzinne — pomija krok Pokoje; opłaty ustawisz w kroku Cennik)
         </label>
         {!state.noAccommodation && (
           <Input
@@ -1005,7 +1014,7 @@ function Step1Details({ state, update }: { state: WizardState; update: (p: Parti
         <div className="flex gap-3 flex-wrap">
           {(
             [
-              { key: 'payOnline', label: 'Online (karta / Przelewy24)' },
+              { key: 'payOnline', label: 'Płatność online — BLIK · szybki przelew (Tpay)' },
               { key: 'payTransfer', label: 'Przelew bankowy' },
               { key: 'payCash', label: 'Gotówka (na miejscu)' },
             ] as const
@@ -1253,7 +1262,7 @@ function Step3Pricing({ state, update }: { state: WizardState; update: (p: Parti
             min={0}
             value={state.formationFee}
             onChange={(e) => update({ formationFee: e.target.value })}
-            placeholder={String(DEFAULT_PRICING.formationFee)}
+            placeholder="0"
           />
           <Input
             label="Wyżywienie (zł/os, cały pobyt)"
@@ -1261,11 +1270,14 @@ function Step3Pricing({ state, update }: { state: WizardState; update: (p: Parti
             min={0}
             value={state.mealsFee}
             onChange={(e) => update({ mealsFee: e.target.value })}
-            placeholder={String(DEFAULT_PRICING.mealsFee)}
+            placeholder="0"
           />
         </div>
         <p className="text-xs" style={{ color: 'var(--muted)' }}>
-          Nocleg konfigurowany jest per typ pokoju (krok Pokoje). Cena nocna × liczba nocy × mnożnik wiekowy.
+          Puste pole = 0 zł. Zapisuje się dokładnie to, co wpiszesz.
+          {state.noAccommodation
+            ? ' Event bez noclegu: uczestnik płaci opłatę formacyjną i wyżywienie.'
+            : ' Nocleg konfigurowany jest per typ pokoju (krok Pokoje). Cena nocna × liczba nocy × mnożnik wiekowy.'}
         </p>
       </div>
 
@@ -1289,7 +1301,7 @@ function Step3Pricing({ state, update }: { state: WizardState; update: (p: Parti
             min={0}
             value={state.optionsForm.transport}
             onChange={(e) => update({ optionsForm: { ...state.optionsForm, transport: e.target.value } })}
-            placeholder={String(DEFAULT_PRICING.options.transport)}
+            placeholder="0"
           />
           <Input
             label="Pościel (zł / osoba)"
@@ -1297,7 +1309,7 @@ function Step3Pricing({ state, update }: { state: WizardState; update: (p: Parti
             min={0}
             value={state.optionsForm.bedding}
             onChange={(e) => update({ optionsForm: { ...state.optionsForm, bedding: e.target.value } })}
-            placeholder={String(DEFAULT_PRICING.options.bedding)}
+            placeholder="0"
           />
         </div>
       </div>
@@ -1377,6 +1389,19 @@ function Step3Pricing({ state, update }: { state: WizardState; update: (p: Parti
           </p>
         )}
       </div>
+
+      {/* Harmonogram wpłat (zadatek + raty) — ten sam edytor co w „Edytuj event" */}
+      {!state.payFree && state.eventType !== 'invite' && (
+        <PaymentPlanEditor
+          form={state.planForm}
+          onChange={(planForm) => update({ planForm })}
+          rooms={(state.noAccommodation ? [] : state.rooms).map((r) => ({ key: r.id, name: r.name, depositPct: r.depositPct ? String(r.depositPct) : '' }))}
+          onRoomDeposit={(key, pct) => {
+            const n = Math.min(100, Math.max(0, parseFloat(pct.replace(',', '.')) || 0))
+            update({ rooms: state.rooms.map((r) => (r.id === key ? { ...r, depositPct: n > 0 ? n : undefined } : r)) })
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -1402,7 +1427,7 @@ function Step4Page({ state, update }: { state: WizardState; update: (p: Partial<
           </span>
           <input
             value={state.slug}
-            onChange={(e) => update({ slug: e.target.value })}
+            onChange={(e) => update({ slug: e.target.value, slugTouched: e.target.value.trim() !== '' })}
             className="flex-1 h-[46px] px-3 text-sm rounded-r-[12px] border"
             style={{
               borderColor: 'var(--border)',
@@ -1413,6 +1438,11 @@ function Step4Page({ state, update }: { state: WizardState; update: (p: Partial<
             placeholder="nowy-event"
           />
         </div>
+        <p className="text-xs" style={{ color: 'var(--faint)' }}>
+          {state.slugTouched
+            ? 'Własny adres. Wyczyść pole, żeby znów tworzył się z nazwy eventu.'
+            : 'Tworzy się z nazwy eventu (PL). Możesz wpisać własny.'}
+        </p>
       </div>
 
       <div>
@@ -1568,6 +1598,9 @@ function Step4Page({ state, update }: { state: WizardState; update: (p: Partial<
       <div>
         <p className="text-sm font-semibold mb-2" style={{ color: 'var(--ink)' }}>
           Języki strony
+        </p>
+        <p className="text-xs mb-2" style={{ color: 'var(--muted)' }}>
+          PL i EN są zawsze dostępne dla gości. IT, KO, ZH — zaznacz, żeby dodać tę wersję.
         </p>
         <div className="flex gap-2">
           {(
@@ -1746,18 +1779,18 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
       transport: '',
       bedding: '',
     },
-    discountRows: Object.entries(DEFAULT_PRICING.discountCodes).map(([code, frac], i) => ({
-      id: `dc-init-${i}`,
-      code,
-      pct: String(Math.round(frac * 100)),
-    })),
+    // Kody rabatowe startują PUSTE — żaden kod (np. ICPE10) nie jest aktywny, dopóki admin go nie doda.
+    discountRows: [],
+    planForm: EMPTY_PLAN_FORM,
     slug: '',
+    slugTouched: false,
     color: 'blue',
     heroImageUrl: '',
     titleColor: '#FFFFFF',
     supertitle: '',
     langPL: true,
-    langEN: false,
+    // EN jest zawsze dostępny dla gości (jak w edycji eventu) — domyślnie zaznaczony.
+    langEN: true,
     langIT: false,
     langKO: false,
     langZH: false,
@@ -1806,12 +1839,21 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
   }, [editTarget?.slug])
 
   function update(partial: Partial<WizardState>) {
-    setState((prev) => ({ ...prev, ...partial }))
+    setState((prev) => {
+      const next = { ...prev, ...partial }
+      // Slug tworzy się z nazwy PL, dopóki admin nie wpisze własnego (w edycji slug jest już ustalony).
+      if (!isEdit && !next.slugTouched && ('name' in partial || 'slugTouched' in partial)) {
+        next.slug = slugifyEventName(next.name)
+      }
+      return next
+    })
   }
 
-  // „Bez noclegu" → pomijamy Pokoje (2) i Cennik (3).
-  const activeSteps = state.noAccommodation ? [0, 1, 4] : [0, 1, 2, 3, 4]
+  // „Bez noclegu" → pomijamy tylko Pokoje (2); Cennik (3) zostaje, żeby dało się ustawić opłatę formacyjną.
+  const activeSteps = state.noAccommodation ? [0, 1, 3, 4] : [0, 1, 2, 3, 4]
   const curIdx = Math.max(0, activeSteps.indexOf(step))
+  // Krok poza aktywną ścieżką (np. po zaznaczeniu „Bez noclegu") → pokazujemy krok z paska, nie pusty ekran.
+  const shownStep = activeSteps[curIdx]
   const isLast = curIdx === activeSteps.length - 1
   const goNext = () => setStep(activeSteps[Math.min(activeSteps.length - 1, curIdx + 1)])
   const goPrev = () => (curIdx === 0 ? onCancel() : setStep(activeSteps[curIdx - 1]))
@@ -1822,6 +1864,11 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
     if (!state.dateStart) { setSubmitError('Podaj datę rozpoczęcia.'); return }
     if (state.optionalStay && !state.noAccommodation && (parseInt(state.nights) || 0) < 1) {
       setSubmitError('Nocleg opcjonalny wymaga liczby nocy co najmniej 1 (np. nocleg z piątku na sobotę = 1). Przy 0 nocach pokoje kosztują 0 zł.')
+      return
+    }
+    if (!state.payFree && state.eventType !== 'invite' && planFormError(state.planForm)) {
+      setSubmitError(planFormError(state.planForm))
+      setStep(3)
       return
     }
 
@@ -1931,7 +1978,8 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
       if (!instanceId) throw new Error('Backend nie zwrócił instanceId')
 
       // Step 2: add room types
-      for (const r of state.rooms) {
+      // „Bez noclegu” → żadnych typów pokoi, nawet jeśli zostały w kroku „Pokoje”.
+      for (const r of state.noAccommodation ? [] : state.rooms) {
         await addRoomType(instanceId, {
           name: withPl(r.name, r.nameI18n),
           capacity: parseInt(r.capacity) || 1,
@@ -2025,18 +2073,24 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
           {activeSteps.map((si, i) => {
             const label = STEP_LABELS[si]
             const done = i < curIdx
-            const active = si === step
+            const active = si === shownStep
             return (
               <div key={label} className="flex items-center">
                 <button
-                  onClick={() => done && setStep(si)}
+                  type="button"
+                  // Każdy krok z paska prowadzi dokładnie do siebie (wstecz i w przód) — publikacja i tak sprawdza całość.
+                  onClick={() => { setSubmitError(null); setStep(si) }}
+                  disabled={submitting}
+                  title={label}
+                  aria-label={`Krok ${i + 1}: ${label}`}
+                  aria-current={active ? 'step' : undefined}
                   className={cn(
-                    'flex items-center gap-2 text-sm font-medium transition-colors',
+                    'flex items-center gap-2 text-sm font-medium transition-colors cursor-pointer',
                     active
                       ? 'text-[var(--brand)]'
                       : done
-                      ? 'text-[var(--ok)] cursor-pointer'
-                      : 'text-[var(--faint)] cursor-default',
+                      ? 'text-[var(--ok)]'
+                      : 'text-[var(--faint)] hover:text-[var(--ink)]',
                   )}
                 >
                   <span
@@ -2064,11 +2118,11 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
 
         {/* Step content */}
         <div className="flex-1 p-6">
-          {step === 0 && <Step0Type state={state} update={update} />}
-          {step === 1 && <Step1Details state={state} update={update} />}
-          {step === 2 && <Step2Rooms state={state} update={update} />}
-          {step === 3 && <Step3Pricing state={state} update={update} />}
-          {step === 4 && <Step4Page state={state} update={update} />}
+          {shownStep === 0 && <Step0Type state={state} update={update} />}
+          {shownStep === 1 && <Step1Details state={state} update={update} />}
+          {shownStep === 2 && <Step2Rooms state={state} update={update} />}
+          {shownStep === 3 && <Step3Pricing state={state} update={update} />}
+          {shownStep === 4 && <Step4Page state={state} update={update} />}
         </div>
 
         {/* Error */}

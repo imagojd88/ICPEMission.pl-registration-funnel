@@ -8,6 +8,7 @@ import { formatDateRange, bcp47 } from '../../lib/utils'
 import { SpecialGuestsBlock } from './EventContentBlocks'
 import RegistrationCountdown from './RegistrationCountdown'
 import { notYetOpen } from '../../lib/registrationOpens'
+import { showsRoomStep } from '../../lib/funnelPrice'
 
 interface Props {
   event: EventInstanceDto
@@ -65,7 +66,8 @@ export default function LandingScreen({ event, onRegister, pricingConfig, conten
   const free = Math.max(0, capacity - (event.registeredCount ?? 0))
   const filledPct = capacity > 0 ? Math.min(100, Math.round(((event.registeredCount ?? 0) / capacity) * 100)) : 0
 
-  const nights = pricingConfig?.nights ?? 1
+  // Liczbę nocy pokazujemy tylko, gdy event faktycznie oferuje nocleg (są pokoje) — event bez pokoi nie ma „1 noc”.
+  const nights = pricingConfig && !showsRoomStep(pricingConfig) ? 0 : pricingConfig?.nights ?? 1
   const program = content?.program ?? []
 
   if (!isOpen) {

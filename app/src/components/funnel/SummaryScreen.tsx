@@ -208,9 +208,12 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
                       {t('summary.line_formation')}: {money(line.formation)}
                     </span>
                     {line.roomId === '' ? (
+                      // Event w ogóle bez noclegu → nic nie dopisujemy („bez noclegu” ma sens tylko, gdy nocleg jest do wyboru).
+                      (offersRooms || optionalRooms) && (
                       <span className="text-xs" style={{ color: 'var(--muted)' }}>
                         {t('room.no_accommodation_short')}
                       </span>
+                      )
                     ) : (
                       <span className="text-xs" style={{ color: 'var(--muted)' }}>
                         {t('summary.line_accommodation')}: {money(line.accommodation)}
@@ -308,7 +311,7 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
             </div>
 
             {/* Accommodation (ukryte, gdy nikt nie nocuje przy noclegu opcjonalnym) */}
-            {!(optionalRooms && price.accommodation === 0) && (
+            {!(optionalRooms && price.accommodation === 0) && (offersRooms || price.accommodation > 0) && (
             <div className="flex justify-between items-center px-4 py-3">
               <span className="text-sm" style={{ color: 'var(--muted)' }}>
                 {t('summary.accommodation')}

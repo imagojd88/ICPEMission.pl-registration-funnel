@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { formatMoney, DONATION_PRESETS, DONATION_MAX, cleanDonation } from '@icpe/shared'
+import { formatMoney, DONATION_PRESETS, DONATION_MAX, cleanDonation, hasDiscountCodes } from '@icpe/shared'
 import type { PricingConfig } from '@icpe/shared'
 import { Input } from '../../ui/Input'
 
@@ -22,6 +22,8 @@ interface Props {
   discountApplied: boolean
   consents: Consents
   pricingConfig: PricingConfig
+  /** Pole „Kod rabatowy” — tylko gdy event ma aktywny kod (domyślnie: sprawdzamy cennik). */
+  showDiscount?: boolean
   onOptionsChange: (opts: Options) => void
   onDiscountChange: (code: string) => void
   onDiscountApply: (applied: boolean) => void
@@ -93,6 +95,7 @@ export default function Step4Options({
   discountApplied,
   consents,
   pricingConfig,
+  showDiscount,
   onOptionsChange,
   onDiscountChange,
   onDiscountApply,
@@ -101,6 +104,7 @@ export default function Step4Options({
   const { t, i18n } = useTranslation()
   const money = (n: number) => formatMoney(n, pricingConfig.currency, i18n.language)
   const [discountError, setDiscountError] = useState(false)
+  const discountVisible = showDiscount ?? hasDiscountCodes(pricingConfig)
 
   // Darowizna: kwoty proponowane dla waluty eventu + „dowolna kwota" z polem do wpisania.
   const donationPresets = DONATION_PRESETS[pricingConfig.currency ?? 'PLN'] ?? DONATION_PRESETS.PLN
@@ -137,7 +141,7 @@ export default function Step4Options({
 
   const applyDiscount = () => {
     const code = discountCode.trim().toUpperCase()
-    const isValid = code in pricingConfig.discountCodes
+    const isValid = !!code && (pricingConfig.discountCodes?.[code] ?? 0) > 0
     setDiscountError(!isValid)
     onDiscountApply(isValid)
   }
@@ -149,7 +153,7 @@ export default function Step4Options({
   }
 
   const discountPct = discountApplied
-    ? Math.round((pricingConfig.discountCodes[discountCode.trim().toUpperCase()] ?? 0) * 100)
+    ? Math.round((pricingConfig.discountCodes?.[discountCode.trim().toUpperCase()] ?? 0) * 100)
     : 0
 
   const transportPrice = pricingConfig.options.transport
@@ -239,7 +243,8 @@ export default function Step4Options({
         </div>
       )}
 
-      {/* Discount code */}
+      {/* Discount code — ukryte, gdy event nie ma żadnego aktywnego kodu */}
+      {discountVisible && (
       <div className="flex flex-col gap-2">
         <label className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
           {t('options.discount_label')}
@@ -284,6 +289,7 @@ export default function Step4Options({
           </p>
         )}
       </div>
+      )}
 
       {/* Consents */}
       <div className="flex flex-col gap-3 pt-1">

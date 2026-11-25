@@ -476,6 +476,8 @@ export interface EventConfig {
   customFields?: EventContent
   /** Limit pokoi: wolne pokoje per typ (tylko typy z limitem; brak klucza = bez limitu). */
   roomAvailability?: Record<string, number>
+  /** Czy event ma aktywny kod rabatowy (flaga z API; bez niej lejek sprawdza cennik). */
+  hasDiscountCodes?: boolean
 }
 
 export async function getEventConfig(slug: string, locale = 'pl'): Promise<EventConfig> {
@@ -492,6 +494,7 @@ export async function getEventConfig(slug: string, locale = 'pl'): Promise<Event
       paymentInfo: raw.paymentInfo as BankInfo | undefined,
       customFields: raw.customFields as EventContent | undefined,
       roomAvailability: (raw.roomAvailability as Record<string, number> | undefined) ?? {},
+      hasDiscountCodes: typeof raw.hasDiscountCodes === 'boolean' ? raw.hasDiscountCodes : undefined,
     }
   } catch {
     return {
@@ -1174,7 +1177,8 @@ export async function getAdminRegistrations(
 
 /** Admin: pełna edycja zgłoszenia (kontakt, uczestnicy, pokoje, opcje) z przeliczeniem ceny. */
 export interface AdminEditRegistrationDto {
-  contact?: { firstName: string; lastName: string; email: string; phone?: string }
+  /** `countryCode`: kod ISO alpha-2 kraju zamieszkania; '' = usuń zapisany kraj (decyduje wtedy język zgłoszenia). */
+  contact?: { firstName: string; lastName: string; email: string; phone?: string; countryCode?: string }
   participants: Array<{ type: 'adult' | 'child'; firstName: string; lastName?: string; age?: number; gender?: string; dietary?: string }>
   rooms: Array<{ roomId: string; participantIndexes: number[] }>
   options?: {

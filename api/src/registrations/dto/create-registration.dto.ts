@@ -1,5 +1,5 @@
-import { IsString, IsArray, IsOptional, IsBoolean, IsIn, ValidateNested, IsEmail, IsNumber, Min, Max, ArrayNotEmpty, IsInt } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsString, IsArray, IsOptional, IsBoolean, IsIn, ValidateNested, IsEmail, IsNumber, Min, Max, ArrayNotEmpty, IsInt, Matches } from 'class-validator';
+import { Type, Transform } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class ContactDto {
@@ -8,6 +8,19 @@ export class ContactDto {
   @IsEmail() @ApiProperty() email!: string;
   @IsOptional() @IsString() phone?: string;
   @IsOptional() @IsString() address?: string;
+  /**
+   * Kraj zamieszkania zgłaszającego — ISO 3166-1 alpha-2 (np. „PL”). Opcjonalny: stare zgłoszenia
+   * i inne kanały go nie mają (wtedy o płatności online decyduje język). Puste = brak; „pl” → „PL”.
+   */
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (typeof value !== 'string') return value == null ? undefined : value;
+    const v = value.trim().toUpperCase();
+    return v === '' ? undefined : v;
+  })
+  @Matches(/^[A-Z]{2}$/, { message: 'countryCode: podaj dwuliterowy kod kraju (ISO 3166-1 alpha-2), np. PL' })
+  @ApiProperty({ required: false, example: 'PL' })
+  countryCode?: string;
 }
 
 export class ParticipantInputDto {

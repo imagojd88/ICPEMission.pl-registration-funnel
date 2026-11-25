@@ -152,6 +152,9 @@
     "phone": "Telefono",
     "address": "Indirizzo di residenza",
     "address_ph": "es. Via Esempio 1, 00100 Roma",
+    "country": "Paese di residenza",
+    "country_choose": "Seleziona il paese",
+    "country_required": "Seleziona il tuo paese di residenza.",
     "first_ph": "Mario",
     "last_ph": "Rossi",
     "email_ph": "mario@example.com"

@@ -3,10 +3,10 @@ import { notYetOpen } from '../lib/registrationOpens'
 import { useTranslation } from 'react-i18next'
 import { useParams, useSearchParams } from 'react-router-dom'
 import type { EventInstanceDto, CreateRegistrationDto, RegistrationStatus, PaymentMethod } from '@icpe/shared'
-import { computePrice, DEFAULT_PRICING, validateRoomCapacity, roomLabel, hasAccommodation, roomStockShortages, buildSchedule, minDepositPctFor, warsawDate, pricingAt, onlineProviderFor } from '@icpe/shared'
+import { computePrice, DEFAULT_PRICING, validateRoomCapacity, roomLabel, hasAccommodation, roomStockShortages, buildSchedule, minDepositPctFor, warsawDate, pricingAt, onlineProviderFor, isPolishLanguage, normalizeCountryCode, hasDiscountCodes } from '@icpe/shared'
 import type { PricingConfig } from '@icpe/shared'
 import { getEventBySlug, getEventConfig, createRegistration, registerGuest, getInvitation, getRegistrationLead, saveRegistrationLead, pickLang, getPaymentsConfig, startManagedPayment, type EventConfig } from '../lib/api'
-import { funnelPriceInput, isAccommodationOptional } from '../lib/funnelPrice'
+import { funnelPriceInput, isAccommodationOptional, funnelSteps, effectiveStep, showsRoomStep, ROOM_STEP } from '../lib/funnelPrice'
 import { setAnalyticsContext, track } from '../lib/analytics'
 
 /** Nazwy kroków w analityce (stałe, niezależne od języka). */
@@ -67,6 +67,8 @@ export interface Applicant {
   community: string
   /** Nazwa wpisana ręcznie po wyborze „Inna". */
   communityOther: string
+  /** Kraj zamieszkania — kod ISO 3166-1 alpha-2 („PL”); '' = jeszcze nie wybrano (pole wymagane). */
+  countryCode: string
 }
 
 export interface Participant {
@@ -125,10 +127,15 @@ function affiliationContact(a: Applicant, mode: AffiliationField | null): {
   return {}
 }
 
-function buildInitialStepper(): StepperState {
+/** Kraj wstępnie: polski interfejs → Polska; inne języki → puste (gość musi wybrać). */
+function defaultCountryFor(lang?: string): string {
+  return isPolishLanguage(lang) ? 'PL' : ''
+}
+
+function buildInitialStepper(lang?: string): StepperState {
   return {
     step: 0,
-    applicant: { firstName: '', lastName: '', email: '', phone: '', address: '', parish: '', community: '', communityOther: '' },
+    applicant: { firstName: '', lastName: '', email: '', phone: '', address: '', parish: '', community: '', communityOther: '', countryCode: defaultCountryFor(lang) },
     participants: [
       { id: 'p-1', type: 'adult', name: '', age: 0, gender: 'M', diet: '' },
     ],
@@ -229,7 +236,13 @@ function StepperView({
   roomAvailability,
   dietKeys,
   lastStepLabel,
+  steps,
+  showDiscount,
 }: {
+  /** Kroki tego eventu (indeksy logiczne) — event bez pokoi nie ma kroku „Wybór pokoju”. */
+  steps: number[]
+  /** Czy pokazać pole „Kod rabatowy” (event ma aktywny kod). */
+  showDiscount: boolean
   state: StepperState
   event: EventInstanceDto
   pricingConfig: PricingConfig
@@ -298,6 +311,7 @@ function StepperView({
             discountApplied={state.discountApplied}
             consents={state.consents}
             pricingConfig={pricingConfig}
+            showDiscount={showDiscount}
             onOptionsChange={(options) => onChange({ options })}
             onDiscountChange={(discountCode) => onChange({ discountCode })}
             onDiscountApply={(discountApplied) => onChange({ discountApplied })}
@@ -311,7 +325,8 @@ function StepperView({
 
   return (
     <div className="flex flex-col min-h-screen" style={{ background: 'var(--bg)' }}>
-      <StepperHeader step={state.step} totalSteps={STEPS} onBack={onBack} />
+      {/* „Krok X z Y” liczy tylko kroki, które ten event ma. */}
+      <StepperHeader step={Math.max(0, steps.indexOf(state.step))} totalSteps={steps.length} onBack={onBack} />
       <div style={{ paddingBottom: error ? 8 : 80 }}>{renderStep()}</div>
       {error && (
         <div
@@ -405,12 +420,12 @@ function previewStepper(cfg: PricingConfig, diets: string[] | undefined, methods
   const m = methods?.[0]
   return {
     ...base,
-    applicant: { ...base.applicant, firstName: 'Jan', lastName: 'Kowalski', email: 'jan.kowalski@example.com', phone: '600 100 200' },
+    applicant: { ...base.applicant, firstName: 'Jan', lastName: 'Kowalski', email: 'jan.kowalski@example.com', phone: '600 100 200', countryCode: 'PL' },
     participants: [
       { id: 'p-1', type: 'adult', name: 'Jan Kowalski', age: 0, gender: 'M', diet: '' },
       { id: 'p-2', type: 'child', name: 'Ola Kowalska', age: 2, gender: 'F', diet: '', dietKeys: firstDiet ? [firstDiet] : [] },
     ],
-    rooms: room && (cfg.nights ?? 0) > 0 ? [{ uid: 'preview-room', roomId: room.id, participantIndexes: both ? [0, 1] : [0] }] : [],
+    rooms: room && showsRoomStep(cfg) && (cfg.nights ?? 0) > 0 ? [{ uid: 'preview-room', roomId: room.id, participantIndexes: both ? [0, 1] : [0] }] : [],
     consents: { rodo: true, regulamin: true },
     paymentMethod: cfg.free ? 'cash' : m === 'ONLINE' ? 'online' : m === 'BANK_TRANSFER' ? 'transfer' : 'cash',
   }
@@ -638,7 +653,8 @@ export default function PublicFunnel() {
         if (sc === 'landing') {
           setScreen('landing')
         } else if (sc.startsWith('step')) {
-          setStepper({ ...previewStepper(pc, diets ?? undefined, methods), step: Number(sc.slice(4)) })
+          // Krok, którego ten event nie ma (np. „Nocleg” po usunięciu pokoi) → najbliższy następny.
+          setStepper({ ...previewStepper(pc, diets ?? undefined, methods), step: effectiveStep(Number(sc.slice(4)), funnelSteps(pc)) })
           setScreen('stepper')
         } else {
           setStepper({ ...previewStepper(pc, diets ?? undefined, methods), step: STEPS - 1 })
@@ -670,6 +686,21 @@ export default function PublicFunnel() {
     setStepError(null)
   }
 
+  // Kroki lejka dla TEGO eventu: bez pokoi (albo bez nocy) nie ma kroku „Wybór pokoju” — ani na żywej
+  // stronie, ani w podglądzie w panelu. `stepper.step` zostaje indeksem logicznym (0–4): szkice,
+  // analityka i „Zmień” w podsumowaniu wskazują ten sam krok niezależnie od eventu.
+  const steps = funnelSteps(pricingConfig)
+  const roomStepShown = showsRoomStep(pricingConfig)
+  // Szkic zapisany na kroku, którego event już nie ma → najbliższy następny.
+  const curStep = effectiveStep(stepper.step, steps)
+  // Event bez kroku pokoju nie może nieść pokoi (np. ze starego szkicu) — cena i wysyłka liczą się bez nich.
+  useEffect(() => {
+    if (loading || roomStepShown) return
+    setStepper((prev) => (prev.rooms.length > 0 || prev.noAccommodation ? { ...prev, rooms: [], noAccommodation: false } : prev))
+  }, [loading, roomStepShown])
+  // Pole „Kod rabatowy” tylko, gdy event ma aktywny kod (cennik; flaga z API na wypadek, gdy kody przestaną być publiczne).
+  const showDiscount = hasDiscountCodes(pricingConfig) || (!preview && eventConfig?.hasDiscountCodes === true)
+
   // Zapisy jeszcze nie ruszyły (licznik na stronie) → formularz niedostępny, także z wersji roboczej
   // albo bezpośredniego wejścia; podgląd w panelu (`preview`) pokazuje wszystkie ekrany.
   const registrationNotOpenYet = !preview && notYetOpen(event?.registrationOpensAt)
@@ -680,7 +711,7 @@ export default function PublicFunnel() {
   const handleStartRegister = () => {
     if (registrationNotOpenYet) return
     track('registration_started', { invited: !!invite, had_draft: !!draft })
-    const base = buildInitialStepper()
+    const base = buildInitialStepper(lng)
     if (invite) {
       base.applicant = { ...base.applicant, firstName: invite.firstName, lastName: invite.lastName, email: invite.email, phone: invite.phone }
       base.participants = [{ ...base.participants[0], name: `${invite.firstName} ${invite.lastName}`.trim() }]
@@ -696,7 +727,9 @@ export default function PublicFunnel() {
   const handleResumeDraft = () => {
     if (!draft) return
     track('registration_resumed', { step: draft.stepper.step, step_name: STEP_NAMES[draft.stepper.step] })
-    setStepper(draft.stepper)
+    // Szkic sprzed pola „Kraj zamieszkania” (albo z niepoprawną wartością) → wartość wstępna jak przy nowym zgłoszeniu.
+    const draftCountry = normalizeCountryCode(draft.stepper.applicant.countryCode) ?? defaultCountryFor(lng)
+    setStepper({ ...draft.stepper, applicant: { ...draft.stepper.applicant, countryCode: draftCountry } })
     setScreen(draft.screen)
     setDraft(null)
   }
@@ -708,10 +741,11 @@ export default function PublicFunnel() {
 
   const handleStepperBack = () => {
     setStepError(null)
-    if (stepper.step === 0) {
+    const pos = steps.indexOf(curStep)
+    if (pos <= 0) {
       setScreen('landing')
     } else {
-      patchStepper({ step: stepper.step - 1 })
+      patchStepper({ step: steps[pos - 1] })
     }
   }
 
@@ -771,14 +805,19 @@ export default function PublicFunnel() {
 
   const handleStepperNext = (opts?: { partialConfirmed?: boolean }) => {
     setStepError(null)
+    // Krok „Dane" (0): kraj zamieszkania jest wymagany (decyduje m.in. o płatności online).
+    if (curStep === 0 && !normalizeCountryCode(stepper.applicant.countryCode)) {
+      setStepError(t('applicant.country_required'))
+      return
+    }
     // Krok „Dane" (0): wspólnota jest wymagana, gdy event o nią pyta (lista ma opcję „Inna").
-    if (stepper.step === 0 && affiliation === 'community') {
+    if (curStep === 0 && affiliation === 'community') {
       const a = stepper.applicant
       if (!a.community) { setStepError(t('community.err_required')); return }
       if (a.community === COMMUNITY_OTHER && !a.communityOther.trim()) { setStepError(t('community.err_other')); return }
     }
     // Krok „Pokój" (3): nie przepuszczamy dalej bez poprawnego wyboru pokoju.
-    if (stepper.step === 3) {
+    if (curStep === ROOM_STEP) {
       const err = validateRoomStep()
       if (err) {
         setStepError(err)
@@ -818,10 +857,12 @@ export default function PublicFunnel() {
         })
       }
     }
-    track('registration_step_completed', { step: stepper.step, step_name: STEP_NAMES[stepper.step] })
-    saveLead(stepper.step + 1)
-    if (stepper.step < STEPS - 1) {
-      patchStepper({ step: stepper.step + 1 })
+    track('registration_step_completed', { step: curStep, step_name: STEP_NAMES[curStep] })
+    const pos = steps.indexOf(curStep)
+    saveLead((steps[pos + 1] ?? curStep) + (pos < steps.length - 1 ? 0 : 1))
+    if (pos < steps.length - 1) {
+      // Następny krok TEGO eventu (event bez pokoi przeskakuje z „Preferencji” od razu do „Opcji”).
+      patchStepper({ step: steps[pos + 1] })
     } else if (pricingConfig.free) {
       // Wydarzenie bezpłatne → pomijamy wybór płatności.
       patchStepper({ paymentMethod: 'cash' })
@@ -913,6 +954,8 @@ export default function PublicFunnel() {
           email: stepper.applicant.email,
           phone: stepper.applicant.phone || undefined,
           address: stepper.applicant.address || undefined,
+          // Kraj zamieszkania: kod ISO alpha-2 (jedyny klucz kraju w kontakcie — API czyta go przy płatności online).
+          ...(normalizeCountryCode(stepper.applicant.countryCode) ? { countryCode: normalizeCountryCode(stepper.applicant.countryCode) } : {}),
           ...affiliationContact(stepper.applicant, affiliation),
         },
         participants: stepper.participants.map((p) => {
@@ -931,7 +974,7 @@ export default function PublicFunnel() {
           }
         }),
         // Bez noclegu → pusta lista pokoi (API przyjmie ją, gdy nocleg jest opcjonalny).
-        rooms: stepper.noAccommodation
+        rooms: stepper.noAccommodation || !roomStepShown
           ? []
           : stepper.rooms
               .map((r) => ({ roomId: r.roomId, participantIndexes: r.participantIndexes }))
@@ -1012,7 +1055,7 @@ export default function PublicFunnel() {
   }
 
   const handleEditStep = (step: number) => {
-    patchStepper({ step })
+    patchStepper({ step: effectiveStep(step, steps) })
     setScreen('stepper')
   }
 
@@ -1049,9 +1092,11 @@ export default function PublicFunnel() {
     stepper.applicant.community !== COMMUNITY_OTHER
 
   // Płatność online: tylko gdy API zgłasza dostawcę, kwota jest w PLN i reguła kraj / język daje Tpay.
-  // Formularz nie zbiera kraju zamieszkania, więc tu decyduje język interfejsu (ta sama funkcja co w API).
+  // NAJPIERW kraj zamieszkania z kroku „Dane” (Polska → Tpay; inny kraj → brak, niezależnie od języka),
+  // dopiero gdy kraju brak — język interfejsu. Ta sama funkcja co w API, mailach i na stronie zgłoszenia.
   const onlineAvailable =
-    (pricingConfig.currency ?? 'PLN') === 'PLN' && onlineProviderFor(undefined, lng, onlineProviders) === 'tpay'
+    (pricingConfig.currency ?? 'PLN') === 'PLN' &&
+    onlineProviderFor(normalizeCountryCode(stepper.applicant.countryCode), lng, onlineProviders) === 'tpay'
 
   // Sposoby płatności, które ten gość faktycznie zobaczy (jak w PaymentMethodScreen).
   const guestPaymentMethodsRaw = (
@@ -1145,8 +1190,8 @@ export default function PublicFunnel() {
           )}
           {draft && !invite && (
             <DraftBanner
-              step={draft.stepper.step}
-              totalSteps={STEPS}
+              step={Math.max(0, steps.indexOf(effectiveStep(draft.stepper.step, steps)))}
+              totalSteps={steps.length}
               name={draft.stepper.applicant.firstName.trim()}
               onResume={handleResumeDraft}
               onDiscard={handleDiscardDraft}
@@ -1158,7 +1203,9 @@ export default function PublicFunnel() {
 
       {screen === 'stepper' && (
         <StepperView
-          state={stepper}
+          state={curStep === stepper.step ? stepper : { ...stepper, step: curStep }}
+          steps={steps}
+          showDiscount={showDiscount}
           event={event}
           pricingConfig={pricingConfig}
           onChange={patchStepper}

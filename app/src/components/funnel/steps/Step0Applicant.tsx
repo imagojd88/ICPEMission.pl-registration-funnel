@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { Input } from '../../ui/Input'
 import type { Applicant } from '../../../pages/PublicFunnel'
 import { COMMUNITY_GROUPS, COMMUNITY_OTHER, type AffiliationField } from '../../../lib/communities'
+import { countryOptions } from '../../../lib/countries'
 
 interface Props {
   value: Applicant
@@ -11,7 +12,9 @@ interface Props {
 }
 
 export default function Step0Applicant({ value, onChange, affiliation }: Props) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  // Nazwy krajów w języku interfejsu; Polska na górze (pierwsza na liście częstych krajów).
+  const countries = countryOptions((i18n.language || 'pl').slice(0, 2))
 
   const set = (key: keyof Applicant) => (e: React.ChangeEvent<HTMLInputElement>) => {
     onChange({ ...value, [key]: e.target.value })
@@ -80,6 +83,38 @@ export default function Step0Applicant({ value, onChange, affiliation }: Props) 
         autoComplete="street-address"
         placeholder={t('applicant.address_ph')}
       />
+
+      {/* Kraj zamieszkania — wymagany; decyduje m.in. o dostępnych sposobach płatności (kod ISO w contact.countryCode) */}
+      <div className="flex flex-col gap-1.5 w-full">
+        <label htmlFor="applicant-country" className="text-sm font-medium text-[var(--ink)]">
+          {t('applicant.country')}
+        </label>
+        <select
+          id="applicant-country"
+          value={value.countryCode ?? ''}
+          onChange={(e) => onChange({ ...value, countryCode: e.target.value })}
+          autoComplete="country"
+          required
+          aria-required="true"
+          className="w-full rounded-[12px] border border-[var(--border)] bg-[var(--surface-2)] px-3 py-[13px] text-sm focus:outline-none focus:border-[var(--brand)] focus:ring-2 focus:ring-[var(--ring)]"
+          style={{ color: value.countryCode ? 'var(--ink)' : 'var(--faint)' }}
+        >
+          <option value="" disabled>
+            {t('applicant.country_choose')}
+          </option>
+          {countries.common.map((c) => (
+            <option key={c.code} value={c.code} style={{ color: 'var(--ink)' }}>
+              {c.name}
+            </option>
+          ))}
+          <option disabled>──────────</option>
+          {countries.rest.map((c) => (
+            <option key={c.code} value={c.code} style={{ color: 'var(--ink)' }}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+      </div>
 
       {/* Parafia — pole tekstowe */}
       {affiliation === 'parish' && (

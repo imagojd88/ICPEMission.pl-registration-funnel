@@ -36,6 +36,11 @@ export interface Contact {
   /** Wspólnota z listy albo nazwa wpisana ręcznie (wtedy communityOther = true). */
   community?: string;
   communityOther?: boolean;
+  /**
+   * Kraj zamieszkania zgłaszającego — kod ISO 3166-1 alpha-2 wielkimi literami (np. „PL”).
+   * Decyduje o dostępności płatności online (Tpay tylko dla Polski); brak → decyduje język zgłoszenia.
+   */
+  countryCode?: string;
 }
 
 export interface ParticipantDto {

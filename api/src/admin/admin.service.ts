@@ -143,6 +143,10 @@ export class AdminService {
         ...(c.address ? { address: c.address } : {}),
         ...(c.parish ? { parish: c.parish } : {}),
         ...(c.community ? { community: c.community, communityOther: !!c.communityOther } : {}),
+        // Kraj zamieszkania (ISO alpha-2), gdy zgłaszający go podał.
+        ...(typeof (c as { countryCode?: unknown }).countryCode === 'string' && /^[A-Z]{2}$/.test((c as { countryCode: string }).countryCode)
+          ? { countryCode: (c as { countryCode: string }).countryCode }
+          : {}),
       },
       participants: reg.participants.map((p: {
         type: string; firstName: string; lastName: string; age: number | null; gender: string | null; dietary: string | null;

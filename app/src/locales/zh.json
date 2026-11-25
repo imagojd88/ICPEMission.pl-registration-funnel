@@ -150,6 +150,9 @@
     "phone": "电话",
     "address": "住址",
     "address_ph": "例如：ul. Przykładowa 1, 00-001 Warszawa",
+    "country": "居住国家",
+    "country_choose": "请选择国家",
+    "country_required": "请选择您的居住国家。",
     "first_ph": "小明",
     "last_ph": "王",
     "email_ph": "xiaoming@example.com"

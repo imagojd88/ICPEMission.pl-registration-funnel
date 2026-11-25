@@ -1,8 +1,27 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  contactCountry, isPolandCountry, isPolishLanguage, onlinePayAmount, onlinePayBounds, onlineProviderFor, parsePayAmount,
+  contactCountry, isPolandCountry, isPolishLanguage, normalizeCountryCode, onlinePayAmount, onlinePayBounds, onlineProviderFor, parsePayAmount,
 } from './onlinePayments.ts';
+
+test('normalizeCountryCode: tylko 2 litery, wielkie', () => {
+  assert.equal(normalizeCountryCode('pl'), 'PL');
+  assert.equal(normalizeCountryCode(' De '), 'DE');
+  assert.equal(normalizeCountryCode('PL'), 'PL');
+  for (const bad of ['', '  ', 'POL', 'Polska', 'P', '12', 'P1', null, undefined, 616, {}]) {
+    assert.equal(normalizeCountryCode(bad), undefined, String(bad));
+  }
+});
+
+test('kraj z formularza (contact.countryCode) decyduje przed językiem', () => {
+  // Polak mieszkający w Polsce, interfejs po angielsku → Tpay.
+  assert.equal(onlineProviderFor(contactCountry({ countryCode: 'PL' }), 'en', ['tpay']), 'tpay');
+  // Mieszkaniec Niemiec z polskim interfejsem → bez Tpay.
+  assert.equal(onlineProviderFor(contactCountry({ countryCode: 'DE' }), 'pl', ['tpay']), null);
+  // Stare zgłoszenie bez kraju → decyduje język.
+  assert.equal(onlineProviderFor(contactCountry({}), 'pl', ['tpay']), 'tpay');
+  assert.equal(onlineProviderFor(contactCountry({ countryCode: '' }), 'en', ['tpay']), null);
+});
 
 const TPAY = ['tpay'];
 

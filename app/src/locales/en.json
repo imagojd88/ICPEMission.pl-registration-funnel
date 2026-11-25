@@ -150,6 +150,9 @@
     "phone": "Phone",
     "address": "Home address",
     "address_ph": "e.g. 1 Example Street, 00-001 Warsaw",
+    "country": "Country of residence",
+    "country_choose": "Select a country",
+    "country_required": "Please select your country of residence.",
     "first_ph": "John",
     "last_ph": "Smith",
     "email_ph": "john@example.com"

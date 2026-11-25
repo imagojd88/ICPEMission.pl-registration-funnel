@@ -7,7 +7,7 @@ import { buildIcs, googleCalendarUrl } from '../shared';
 import { CreateRegistrationDto } from './dto/create-registration.dto';
 import { v4 as uuid } from 'uuid';
 import { guestInviteConfig, guestInvitePageLink, publicAppUrl } from '../invitations/guest-invite-config';
-import { buildPriceInput, hasAccommodation, roomLabel, leaderDepositSplit, cleanDonation, buildSchedule, hasPaymentPlan, minDepositPctFor, normalizePaymentPlan, warsawDate, pricingAt, contactCountry, onlineProviderFor, PricingConfig, PriceAdjustment } from '../shared';
+import { buildPriceInput, normalizeCountryCode, hasAccommodation, roomLabel, leaderDepositSplit, cleanDonation, buildSchedule, hasPaymentPlan, minDepositPctFor, normalizePaymentPlan, warsawDate, pricingAt, contactCountry, onlineProviderFor, PricingConfig, PriceAdjustment } from '../shared';
 import { configuredOnlineProviders } from '../payments/tpay-config';
 import type { MailAccommodation } from '../notifications/notifications.service';
 import { assertRoomStock, instanceRoomAvailability } from './room-stock';
@@ -64,6 +64,26 @@ function normalizeRooms(rooms: RoomsInput | undefined, n: number, cfg: PricingCo
     if (idx.length) out.push({ roomId: r.roomId, participantIndexes: idx });
   }
   return out;
+}
+
+/**
+ * Kontakt przed zapisem: `countryCode` zawsze jako 2 wielkie litery. Puste / niepoprawne → klucz znika
+ * (przy scalaniu z istniejącym kontaktem `clear` usuwa też zapisany kraj — wtedy decyduje język).
+ * Pola nieobecnego w wejściu nie ruszamy.
+ */
+export function cleanContactCountry<T extends Record<string, unknown>>(incoming: T): { contact: T; clear: boolean } {
+  if (!incoming || typeof incoming !== 'object' || !('countryCode' in incoming)) return { contact: incoming, clear: false };
+  const { countryCode, ...rest } = incoming as Record<string, unknown>;
+  const cc = normalizeCountryCode(countryCode);
+  return cc ? { contact: { ...rest, countryCode: cc } as unknown as T, clear: false } : { contact: rest as unknown as T, clear: true };
+}
+
+/** Scala kontakt zgłoszenia z poprawką (admin / gość), pilnując formatu `countryCode`. */
+function mergeContact(existing: unknown, incoming: Record<string, unknown>): object {
+  const { contact, clear } = cleanContactCountry(incoming);
+  const base = { ...((existing ?? {}) as Record<string, unknown>) };
+  if (clear) delete base.countryCode;
+  return { ...base, ...contact };
 }
 
 /** Walidacja noclegu wg ustawień eventu (nocleg obowiązkowy → każdy w pokoju; pojemność). */
@@ -190,7 +210,8 @@ export class RegistrationsService {
       data: {
         instanceId: dto.instanceId,
         locale: dto.locale,
-        contact: dto.contact as object,
+        // countryCode: 2 wielkie litery albo brak (DTO już to sprawdził; tu tylko porządek zapisu).
+        contact: cleanContactCountry(dto.contact as unknown as Record<string, unknown>).contact as object,
         // roomsJson — skład pokoi (nowy model kompozycji); pole dodane do schematu Prisma
         ...(({ roomsJson: rooms as unknown }) as { roomsJson: unknown }),
         optionsJson: guestOptions as unknown,
@@ -353,7 +374,7 @@ export class RegistrationsService {
         data: {
           // Scalamy z istniejącym kontaktem — formularz admina edytuje tylko część pól
           // (adres, parafia, wspólnota zostają).
-          ...(dto.contact ? { contact: { ...((reg.contact ?? {}) as object), ...dto.contact } as object } : {}),
+          ...(dto.contact ? { contact: mergeContact(reg.contact, dto.contact) } : {}),
           ...(dto.locale ? { locale: dto.locale } : {}),
           roomsJson: rooms as unknown,
           ...(typeof dto.roomsReserved === 'boolean' ? { roomsReserved: dto.roomsReserved } : {}),
@@ -532,7 +553,7 @@ export class RegistrationsService {
       where: { id },
       data: {
         locale: dto.locale ?? reg.locale,
-        contact: dto.contact ? { ...((reg.contact ?? {}) as object), ...dto.contact } as object : reg.contact as object,
+        contact: dto.contact ? mergeContact(reg.contact, dto.contact as unknown as Record<string, unknown>) : reg.contact as object,
         dietaryNotes: dto.dietaryNotes ?? reg.dietaryNotes ?? undefined,
       },
       include: { participants: true, payments: true },
@@ -638,7 +659,7 @@ export class RegistrationsService {
     },
     roomNames?: Map<string, string>,
   ) {
-    const c = (reg.contact ?? {}) as { firstName?: string; lastName?: string; email?: string; phone?: string; address?: string; parish?: string; community?: string; communityOther?: boolean };
+    const c = (reg.contact ?? {}) as { firstName?: string; lastName?: string; email?: string; phone?: string; address?: string; parish?: string; community?: string; communityOther?: boolean; countryCode?: string };
     // Skomponowane pokoje (roomsJson) → czytelne podsumowanie typów pokoi.
     const comp = (Array.isArray(reg.roomsJson) ? reg.roomsJson : []) as Array<{ roomId?: string }>;
     const summaryParts = comp
@@ -668,6 +689,8 @@ export class RegistrationsService {
         ...(c.address ? { address: c.address } : {}),
         ...(c.parish ? { parish: c.parish } : {}),
         ...(c.community ? { community: c.community, communityOther: !!c.communityOther } : {}),
+        // Kraj zamieszkania (ISO alpha-2) — decyduje o płatności online; brak = decyduje język.
+        ...(normalizeCountryCode(c.countryCode) ? { countryCode: normalizeCountryCode(c.countryCode) } : {}),
       },
       participants: reg.participants.map((p) => ({
         type: mapParticipantType(p.type),

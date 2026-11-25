@@ -7,6 +7,7 @@ import { funnelPriceInput, isAccommodationOptional } from '../../../lib/funnelPr
 import type { PricingConfig } from '@icpe/shared'
 import type { RegistrationDto } from '@icpe/shared'
 import { adminUpdateRegistration } from '@/lib/api'
+import { countryOptions } from '@/lib/countries'
 
 interface EditParticipant {
   id: string
@@ -48,7 +49,10 @@ export default function RegistrationEditForm({
     lastName: registration.contact.lastName ?? '',
     email: registration.contact.email ?? '',
     phone: registration.contact.phone ?? '',
+    // Kraj zamieszkania (ISO alpha-2); '' = nie podano → o płatności online decyduje język zgłoszenia.
+    countryCode: registration.contact.countryCode ?? '',
   })
+  const countries = useMemo(() => countryOptions('pl'), [])
   const [participants, setParticipants] = useState<EditParticipant[]>(
     registration.participants.map((p, i) => ({
       id: `p${i}`,
@@ -185,6 +189,8 @@ export default function RegistrationEditForm({
           lastName: contact.lastName.trim(),
           email: contact.email.trim(),
           phone: contact.phone.trim() || undefined,
+          // '' czyści zapisany kraj (API usuwa wtedy pole).
+          countryCode: contact.countryCode,
         },
         participants: participants.map((p) => ({
           type: p.type,
@@ -241,6 +247,32 @@ export default function RegistrationEditForm({
               <Input label="Nazwisko" value={contact.lastName} onChange={(e) => setContact({ ...contact, lastName: e.target.value })} />
               <Input label="E-mail" value={contact.email} onChange={(e) => setContact({ ...contact, email: e.target.value })} />
               <Input label="Telefon" value={contact.phone} onChange={(e) => setContact({ ...contact, phone: e.target.value })} />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="reg-edit-country" className="text-sm font-medium" style={{ color: 'var(--ink)' }}>Kraj zamieszkania</label>
+              <select
+                id="reg-edit-country"
+                value={contact.countryCode}
+                onChange={(e) => setContact({ ...contact, countryCode: e.target.value })}
+                className="w-full rounded-[12px] border px-3 py-[11px] text-sm"
+                style={{ borderColor: 'var(--border)', background: 'var(--surface-2)', color: 'var(--ink)' }}
+              >
+                <option value="">— nie podano —</option>
+                {/* Wartość spoza listy (stare dane) zostaje widoczna, żeby zapis jej nie zgubił po cichu. */}
+                {contact.countryCode && ![...countries.common, ...countries.rest].some((c) => c.code === contact.countryCode) && (
+                  <option value={contact.countryCode}>{contact.countryCode}</option>
+                )}
+                {countries.common.map((c) => (
+                  <option key={c.code} value={c.code}>{c.name}</option>
+                ))}
+                <option disabled>──────────</option>
+                {countries.rest.map((c) => (
+                  <option key={c.code} value={c.code}>{c.name}</option>
+                ))}
+              </select>
+              <p className="text-xs" style={{ color: 'var(--faint)' }}>
+                Płatność online (Tpay) jest tylko dla mieszkańców Polski. „Nie podano” = decyduje język zgłoszenia (polski → Tpay).
+              </p>
             </div>
           </section>
 

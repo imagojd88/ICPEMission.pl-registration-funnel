@@ -50,3 +50,26 @@ export function funnelPriceInput(
 export function isAccommodationOptional(cfg: PricingConfig | null | undefined): boolean {
   return !!cfg?.accommodationOptional && (cfg?.rooms?.length ?? 0) > 0
 }
+
+/** Krok „Wybór pokoju” w lejku (indeks logiczny — stały w szkicach, analityce i „Zmień” w podsumowaniu). */
+export const ROOM_STEP = 3
+
+/**
+ * Czy lejek pokazuje krok „Wybór pokoju”: event ma pokoje i co najmniej 1 noc (tak samo API
+ * decyduje, czy w ogóle sprawdza pokoje — `hasAccommodation`) albo ma nocleg opcjonalny.
+ * Event bez pokoi / bez nocy → kroku nie ma i nie liczy się w „Krok X z Y”.
+ */
+export function showsRoomStep(cfg: PricingConfig | null | undefined): boolean {
+  return hasAccommodation(cfg) || isAccommodationOptional(cfg)
+}
+
+/** Kroki lejka dla eventu (indeksy logiczne 0–4, w kolejności wyświetlania). */
+export function funnelSteps(cfg: PricingConfig | null | undefined): number[] {
+  return showsRoomStep(cfg) ? [0, 1, 2, 3, 4] : [0, 1, 2, 4]
+}
+
+/** Krok do pokazania: gdy zapisany krok nie istnieje w tym evencie → najbliższy następny (albo ostatni). */
+export function effectiveStep(step: number, steps: number[]): number {
+  if (steps.includes(step)) return step
+  return steps.find((s) => s > step) ?? steps[steps.length - 1]
+}

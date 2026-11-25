@@ -156,6 +156,9 @@
     "phone": "Telefon",
     "address": "Adres zamieszkania",
     "address_ph": "ul. Przykładowa 1, 00-001 Warszawa",
+    "country": "Kraj zamieszkania",
+    "country_choose": "Wybierz kraj",
+    "country_required": "Wybierz kraj zamieszkania.",
     "first_ph": "Jan",
     "last_ph": "Kowalski",
     "email_ph": "jan@example.com"

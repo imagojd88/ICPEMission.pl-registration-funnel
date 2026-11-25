@@ -76,6 +76,16 @@ export function contactCountry(contact: unknown): string | undefined {
   return undefined;
 }
 
+/**
+ * Kod kraju z formularza (ISO 3166-1 alpha-2): „pl”, „ PL ” → „PL”. Wszystko inne (puste, nazwa,
+ * 3 litery, cyfry) → undefined. Pole `contact.countryCode` zapisujemy WYŁĄCZNIE w tej postaci.
+ */
+export function normalizeCountryCode(v: unknown): string | undefined {
+  if (typeof v !== 'string') return undefined;
+  const c = v.trim().toUpperCase();
+  return /^[A-Z]{2}$/.test(c) ? c : undefined;
+}
+
 export interface OnlinePayBounds {
   /** kwota przycisku „Zapłać teraz”: wymagana teraz, a gdy nic nie jest wymagalne — najbliższa rata */
   due: number;

@@ -29,7 +29,8 @@ function methodLabel(m?: string): string {
 }
 
 function zl(n: number): string {
-  return `${Math.round(n)} zł`
+  const v = Math.round((Number(n) || 0) * 100) / 100
+  return `${Number.isInteger(v) ? v : v.toFixed(2).replace('.', ',')} zł`
 }
 
 /** Data `YYYY-MM-DD` → `20.04.2027` (bez przesunięć stref czasowych). */

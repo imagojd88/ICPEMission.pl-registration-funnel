@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, Logger, NotFoundException, OnModuleDes
 import { PrismaService } from '../prisma/prisma.service';
 import { instanceRoomStock } from '../registrations/room-stock';
 import type { PricingConfig } from '../shared';
+import { hasDiscountCodes } from '../shared';
 import {
   toLocalized,
   localizedName,
@@ -205,6 +206,8 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       unlisted: (instance as { unlisted?: boolean }).unlisted === true,
       paymentMethods: instance.paymentMethods,
       pricingConfig: instance.pricingConfig,
+      // Czy event ma choć jeden aktywny kod rabatowy — lejek pokazuje pole „Kod rabatowy” tylko wtedy.
+      hasDiscountCodes: hasDiscountCodes(instance.pricingConfig as unknown as PricingConfig | null),
       // Limit pokoi: wolne pokoje per typ (tylko typy z limitem) + zajętość (dla panelu).
       ...(await this.roomStock(instance.id, instance.pricingConfig as unknown as PricingConfig | null)),
       roomTypes: (instance.roomTypes as Array<{

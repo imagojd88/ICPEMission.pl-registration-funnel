@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { computePrice, formatMoney } from '@icpe/shared'
 import type { PricingConfig } from '@icpe/shared'
 import type { StepperState } from '../../pages/PublicFunnel'
-import { funnelPriceInput } from '../../lib/funnelPrice'
+import { funnelPriceInput, showsRoomStep } from '../../lib/funnelPrice'
 
 interface Props {
   state: StepperState
@@ -59,7 +59,7 @@ export default function StickyPriceBar({ state, pricingConfig, onNext, disabled,
           {hasPrice && (
             <span className="text-xs leading-none mt-0.5" style={{ color: 'var(--muted)' }}>
               {money(priceResult.formation)} {t('summary.abbr_formation')}
-              {priceResult.accommodation > 0 || !pricingConfig.accommodationOptional
+              {priceResult.accommodation > 0 || (!pricingConfig.accommodationOptional && showsRoomStep(pricingConfig))
                 ? ` + ${money(priceResult.accommodation)} ${t('summary.abbr_accommodation')}`
                 : ''}{' '}
               + {money(priceResult.meals)} {t('summary.abbr_meals')}
