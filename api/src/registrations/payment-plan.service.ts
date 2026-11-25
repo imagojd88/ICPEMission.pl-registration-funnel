@@ -341,7 +341,7 @@ export class PaymentPlanService implements OnModuleInit, OnModuleDestroy {
       })) as Array<{ id: string; totalPrice: unknown; currency: string; createdAt: Date; roomsJson: unknown; contact: unknown; locale: string; editToken: string }>;
       if (regs.length === 0) continue;
       const paid = await this.paidMap({ instanceId: inst.id });
-      const pay = (inst.series?.page?.paymentInfo ?? null) as { recipient?: string; account?: string } | null;
+      const pay = (inst.series?.page?.paymentInfo ?? null) as { recipient?: string; account?: string; swift?: string; bankName?: string; bankAddress?: string; operator?: string } | null;
       for (const r of regs) {
         const email = String(((r.contact ?? {}) as { email?: string }).email ?? '').trim();
         if (!email) continue;
@@ -372,6 +372,10 @@ export class PaymentPlanService implements OnModuleInit, OnModuleDestroy {
             manageLink: manageRegistrationLink(r.editToken),
             recipient: pay?.recipient,
             account: pay?.account,
+            swift: pay?.swift,
+            bankName: pay?.bankName,
+            bankAddress: pay?.bankAddress,
+            operator: pay?.operator,
           });
           if (type === 'PAYMENT_OVERDUE') result.overdue += 1;
           else result.dueSoon += 1;

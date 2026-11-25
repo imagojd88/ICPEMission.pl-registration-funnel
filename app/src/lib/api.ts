@@ -472,7 +472,7 @@ export interface EventConfig {
   pricing: PricingConfig
   locales: string[]
   theme?: EventTheme
-  paymentInfo?: { recipient?: string; account?: string }
+  paymentInfo?: BankInfo
   customFields?: EventContent
   /** Limit pokoi: wolne pokoje per typ (tylko typy z limitem; brak klucza = bez limitu). */
   roomAvailability?: Record<string, number>
@@ -489,7 +489,7 @@ export async function getEventConfig(slug: string, locale = 'pl'): Promise<Event
       pricing: (raw.pricingConfig as PricingConfig) ?? (raw.pricing as PricingConfig) ?? MOCK_PRICING,
       locales: (raw.locales as string[]) ?? ['pl'],
       theme: raw.theme as EventTheme | undefined,
-      paymentInfo: raw.paymentInfo as { recipient?: string; account?: string } | undefined,
+      paymentInfo: raw.paymentInfo as BankInfo | undefined,
       customFields: raw.customFields as EventContent | undefined,
       roomAvailability: (raw.roomAvailability as Record<string, number> | undefined) ?? {},
     }
@@ -1373,7 +1373,7 @@ export interface EventEditConfig {
   enabledFields?: Record<string, boolean>
   locales: string[]
   theme?: { primaryColor?: string; heroImageUrl?: string; titleColor?: string; badge?: string; supertitle?: LangText }
-  paymentInfo?: { recipient?: string; account?: string } | null
+  paymentInfo?: BankInfo | null
   customFields?: EventContent | null
 }
 
@@ -1419,6 +1419,12 @@ export async function createEventSeries(
 export interface BankInfo {
   recipient?: string
   account?: string
+  /** Dane do przelewów z zagranicy — pokazywane w wersjach innych niż polska, tylko gdy wypełnione. */
+  swift?: string
+  bankName?: string
+  bankAddress?: string
+  /** Podmiot obsługujący wydarzenie (np. „IMAGO Jacek Dudzic") — wypełnione = zdanie pod danymi przelewu. */
+  operator?: string
 }
 
 export interface ConfigurePagePayload {

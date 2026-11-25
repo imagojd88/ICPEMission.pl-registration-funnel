@@ -51,6 +51,15 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — panel admina (kreator eventów)
 
+### Dane przelewu dla gości z zagranicy + podmiot obsługujący wydarzenie (2026-11-25)
+- **Prośba (Jacek):** w wersjach IT / EN / KO przy numerze rachunku dodatkowo Swift, Bank, Bank address (tylko wypełnione); opcjonalne zdanie „Podmiot obsługujący wydarzenie za zgodą Executive Council: IMAGO Jacek Dudzic”.
+- **Model:** `RegistrationPage.paymentInfo` (JSON, bez zmian w bazie) + `swift`, `bankName`, `bankAddress`, `operator` (`BankInfo` w `app/src/lib/api.ts`).
+- **Panel:** „Edytuj event” ▸ dane przelewu: pola SWIFT / BIC, Bank, Adres banku, Podmiot obsługujący wydarzenie.
+- **Lejek (`SummaryScreen`, karta przelewu):** SWIFT / bank / adres banku we wszystkich wersjach poza polską (EN, IT, KO, ZH), tylko wypełnione, SWIFT z przyciskiem kopiowania; zdanie o podmiocie pod danymi przelewu we wszystkich językach, gdy pole wypełnione (`summary.operator_note`, 5 języków).
+- **Maile:** przypomnienia o ratach dostają te same dane (zagraniczne poza PL) i zdanie o podmiocie. Mail potwierdzający nie zawiera danych przelewu (jak dotąd).
+- **Weryfikacja:** tsc app ✓, api ✓ (poza `src/courses`), build ✓; nieprzeklikane.
+- Stan: do pushu + **Manual Deploy `icpe-api`**.
+
 ### Pole „Kraj”: nazwy krajów w języku zakładki (2026-11-25)
 - **Prośba (Jacek):** kraje mają się wyświetlać w wersjach językowych (w EN „Poland”, nie „Polska”).
 - **Zmiana:** `app/src/lib/countries.ts`: `countryName(code, lang)` i `countryOptions(lang)` (Intl.DisplayNames per język, `zh` = `zh-Hans`, sortowanie w danym języku, cache). `EventEditForm.tsx`: lista „Kraj” bierze nazwy z aktywnej zakładki języka (`editLang`): PL Polska, EN Poland, IT Polonia, KO 폴란드, ZH 波兰. Etykieta pola pokazuje język nazw. Kod (`countryCode`) jest jeden dla wszystkich języków, zapis bez zmian.

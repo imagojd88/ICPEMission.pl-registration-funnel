@@ -318,7 +318,11 @@
     "schedule_title": "Piano dei pagamenti",
     "schedule_now": "all'iscrizione",
     "schedule_by": "entro il {{date}}",
-    "schedule_note": "Confermiamo l'iscrizione dopo il pagamento del primo importo. Ti ricorderemo via e-mail le prossime scadenze."
+    "schedule_note": "Confermiamo l'iscrizione dopo il pagamento del primo importo. Ti ricorderemo via e-mail le prossime scadenze.",
+    "swift": "SWIFT / BIC",
+    "bank": "Banca",
+    "bank_address": "Indirizzo della banca",
+    "operator_note": "Soggetto che gestisce l'evento con il consenso dell'Executive Council: {{name}}"
   },
   "success": {
     "paid_title": "Grazie!",

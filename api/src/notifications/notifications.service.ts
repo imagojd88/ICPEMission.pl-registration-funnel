@@ -870,6 +870,22 @@ export class NotificationsService {
               zh: `银行转账：${d.recipient ? `${String(d.recipient)}，` : ''}账号 ${String(d.account)}。请在转账备注中填写报名编号：${regNo}。`,
             })]
           : ['', L(lang, { pl: `Numer zgłoszenia: ${regNo}`, en: `Registration number: ${regNo}`, ko: `신청 번호: ${regNo}`, zh: `报名编号：${regNo}` })]),
+        // Przelewy z zagranicy: SWIFT, bank, adres banku — poza wersją polską i tylko wypełnione.
+        ...(lang !== 'pl' && d.account
+          ? [
+              d.swift ? `SWIFT / BIC: ${String(d.swift)}` : '',
+              d.bankName ? L(lang, { pl: '', en: `Bank: ${String(d.bankName)}`, ko: `은행: ${String(d.bankName)}`, zh: `银行：${String(d.bankName)}` }) : '',
+              d.bankAddress ? L(lang, { pl: '', en: `Bank address: ${String(d.bankAddress)}`, ko: `은행 주소: ${String(d.bankAddress)}`, zh: `银行地址：${String(d.bankAddress)}` }) : '',
+            ].filter(Boolean)
+          : []),
+        ...(d.operator
+          ? [L(lang, {
+              pl: `Podmiot obsługujący wydarzenie za zgodą Executive Council: ${String(d.operator)}`,
+              en: `Event operator, with the consent of the Executive Council: ${String(d.operator)}`,
+              ko: `Executive Council의 동의를 받아 행사를 운영하는 주체: ${String(d.operator)}`,
+              zh: `经 Executive Council 同意承办本次活动的机构：${String(d.operator)}`,
+            })]
+          : []),
         '',
       ];
       const outro = [
@@ -1064,6 +1080,7 @@ export class NotificationsService {
     installmentId: string; label?: string; dueDate: string;
     amount: number; paid: number; total: number; currency: string;
     eventTitle: unknown; manageLink?: string; recipient?: string; account?: string;
+    swift?: string; bankName?: string; bankAddress?: string; operator?: string;
   }) {
     const { kind, eventTitle, ...data } = opts;
     const lang = mailLangOf(opts.locale);

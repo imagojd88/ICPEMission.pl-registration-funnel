@@ -314,7 +314,11 @@
     "schedule_title": "Payment schedule",
     "schedule_now": "on registration",
     "schedule_by": "by {{date}}",
-    "schedule_note": "We confirm your registration once the first amount is paid. We will remind you by e-mail about the next due dates."
+    "schedule_note": "We confirm your registration once the first amount is paid. We will remind you by e-mail about the next due dates.",
+    "swift": "SWIFT / BIC",
+    "bank": "Bank",
+    "bank_address": "Bank address",
+    "operator_note": "Event operator, with the consent of the Executive Council: {{name}}"
   },
   "success": {
     "paid_title": "Thank you!",

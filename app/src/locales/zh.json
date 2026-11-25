@@ -314,7 +314,11 @@
     "schedule_title": "付款时间表",
     "schedule_now": "报名时",
     "schedule_by": "{{date}}前",
-    "schedule_note": "收到首笔款项后，我们将确认您的报名。后续付款期限会通过电子邮件提醒。"
+    "schedule_note": "收到首笔款项后，我们将确认您的报名。后续付款期限会通过电子邮件提醒。",
+    "swift": "SWIFT / BIC",
+    "bank": "银行",
+    "bank_address": "银行地址",
+    "operator_note": "经 Executive Council 同意承办本次活动的机构：{{name}}"
   },
   "success": {
     "paid_title": "谢谢！",

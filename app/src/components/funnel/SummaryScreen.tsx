@@ -4,7 +4,7 @@ import { computePrice, formatMoney, roomLabel, buildIcs, googleCalendarUrl, hasA
 import type { EventInstanceDto, PricingConfig, PriceLine } from '@icpe/shared'
 import type { StepperState } from '../../pages/PublicFunnel'
 import { bcp47 } from '../../lib/utils'
-import { pickLang } from '../../lib/api'
+import { pickLang, type BankInfo } from '../../lib/api'
 import { dietLabel } from '../../lib/diets'
 import { funnelPriceInput, isAccommodationOptional } from '../../lib/funnelPrice'
 
@@ -17,7 +17,7 @@ interface Props {
   onBack: () => void
   submitting?: boolean
   submitError?: string | null
-  bankInfo?: { recipient?: string; account?: string }
+  bankInfo?: BankInfo
 }
 
 function CopyButton({ text }: { text: string }) {
@@ -531,6 +531,24 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
                 {bankInfo?.account && <CopyButton text={bankInfo.account.replace(/\s/g, '')} />}
               </div>
 
+              {/* Przelewy z zagranicy: SWIFT, bank, adres banku — tylko poza wersją polską i tylko wypełnione */}
+              {!i18n.language.startsWith('pl') &&
+                ([
+                  ['summary.swift', bankInfo?.swift, true],
+                  ['summary.bank', bankInfo?.bankName, false],
+                  ['summary.bank_address', bankInfo?.bankAddress, false],
+                ] as Array<[string, string | undefined, boolean]>)
+                  .filter(([, v]) => !!v?.trim())
+                  .map(([key, v, mono]) => (
+                    <div key={key} className="flex items-center justify-between gap-2">
+                      <div className="flex flex-col gap-0.5 min-w-0">
+                        <span className="text-xs" style={{ color: 'var(--muted)' }}>{t(key)}</span>
+                        <span className={`text-sm font-medium${mono ? ' font-mono' : ''}`} style={{ color: 'var(--ink)' }}>{v}</span>
+                      </div>
+                      {mono && <CopyButton text={(v ?? '').replace(/\s/g, '')} />}
+                    </div>
+                  ))}
+
               <div className="flex flex-col gap-0.5">
                 <span className="text-xs" style={{ color: 'var(--muted)' }}>
                   {t('summary.ref_title')}
@@ -558,6 +576,13 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
                     do {transferDeadline}
                   </span>
                 </div>
+              )}
+
+              {/* Podmiot obsługujący wydarzenie — zdanie opcjonalne (gdy wpisany w ustawieniach eventu) */}
+              {bankInfo?.operator?.trim() && (
+                <p className="text-xs pt-1" style={{ color: 'var(--muted)', borderTop: '1px solid var(--border-2)' }}>
+                  {t('summary.operator_note', { name: bankInfo.operator.trim() })}
+                </p>
               )}
             </div>
 

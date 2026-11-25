@@ -163,6 +163,11 @@ export default function EventEditForm({
   const [showGallery, setShowGallery] = useState(false)
   const [bankRecipient, setBankRecipient] = useState('')
   const [bankAccount, setBankAccount] = useState('')
+  // Przelewy z zagranicy (wersje EN / IT / KO / ZH) + opcjonalny podmiot obsługujący wydarzenie.
+  const [bankSwift, setBankSwift] = useState('')
+  const [bankName, setBankName] = useState('')
+  const [bankAddress, setBankAddress] = useState('')
+  const [eventOperator, setEventOperator] = useState('')
   const [badge, setBadge] = useState('')
   const [superMap, setSuperMap] = useState<Record<string, string>>({})
   // Ręcznie wybrana opcja „Inny…" — trzyma otwarte pole tekstowe, gdy jest jeszcze puste.
@@ -331,6 +336,10 @@ export default function EventEditForm({
         setHeroImageUrl(cfg.theme?.heroImageUrl ?? '')
         setBankRecipient(cfg.paymentInfo?.recipient ?? '')
         setBankAccount(cfg.paymentInfo?.account ?? '')
+        setBankSwift(cfg.paymentInfo?.swift ?? '')
+        setBankName(cfg.paymentInfo?.bankName ?? '')
+        setBankAddress(cfg.paymentInfo?.bankAddress ?? '')
+        setEventOperator(cfg.paymentInfo?.operator ?? '')
         setBadge(cfg.theme?.badge || 'ICPE Mission Polska')
         const st = cfg.theme?.supertitle
         setSuperMap(typeof st === 'string' ? (st ? { pl: st } : {}) : (st ?? {}))
@@ -517,7 +526,14 @@ export default function EventEditForm({
         slug,
         theme,
         enabledFields: { phone: true, address: true, dietary: true, children: true },
-        paymentInfo: { recipient: bankRecipient.trim(), account: bankAccount.trim() },
+        paymentInfo: {
+          recipient: bankRecipient.trim(),
+          account: bankAccount.trim(),
+          ...(bankSwift.trim() ? { swift: bankSwift.trim() } : {}),
+          ...(bankName.trim() ? { bankName: bankName.trim() } : {}),
+          ...(bankAddress.trim() ? { bankAddress: bankAddress.trim() } : {}),
+          ...(eventOperator.trim() ? { operator: eventOperator.trim() } : {}),
+        },
         customFields: buildCustomFields(),
         locales,
         isEvergreen: false,
@@ -567,7 +583,14 @@ export default function EventEditForm({
       customFields: buildCustomFields() as EventConfig['customFields'],
       theme: buildTheme() as EventConfig['theme'],
       locales: [...activeLocales],
-      paymentInfo: { recipient: bankRecipient.trim(), account: bankAccount.trim() },
+      paymentInfo: {
+          recipient: bankRecipient.trim(),
+          account: bankAccount.trim(),
+          ...(bankSwift.trim() ? { swift: bankSwift.trim() } : {}),
+          ...(bankName.trim() ? { bankName: bankName.trim() } : {}),
+          ...(bankAddress.trim() ? { bankAddress: bankAddress.trim() } : {}),
+          ...(eventOperator.trim() ? { operator: eventOperator.trim() } : {}),
+        },
     },
   }
 
@@ -1109,6 +1132,24 @@ export default function EventEditForm({
         <Field label="Numer konta (IBAN)">
           <Input value={bankAccount} onChange={(e) => setBankAccount(e.target.value)} placeholder="PL00 0000 0000 0000 0000 0000 0000" />
         </Field>
+        <Field label="SWIFT / BIC (przelewy z zagranicy)">
+          <Input value={bankSwift} onChange={(e) => setBankSwift(e.target.value)} placeholder="np. BREXPLPWMBK" />
+        </Field>
+        <Field label="Bank">
+          <Input value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="nazwa banku" />
+        </Field>
+        <Field label="Adres banku">
+          <Input value={bankAddress} onChange={(e) => setBankAddress(e.target.value)} placeholder="ulica, kod, miasto, kraj" />
+        </Field>
+        <p className="text-xs" style={{ color: 'var(--faint)' }}>
+          SWIFT, bank i adres banku widać tylko w wersjach obcojęzycznych strony (EN, IT, KO, ZH) i tylko te pola, które wypełnisz.
+        </p>
+        <Field label="Podmiot obsługujący wydarzenie (opcjonalnie)">
+          <Input value={eventOperator} onChange={(e) => setEventOperator(e.target.value)} placeholder="np. IMAGO Jacek Dudzic" />
+        </Field>
+        <p className="text-xs" style={{ color: 'var(--faint)' }}>
+          Wypełnione = pod danymi przelewu pojawi się zdanie: „Podmiot obsługujący wydarzenie za zgodą Executive Council: …” (we wszystkich językach). Puste = brak zdania.
+        </p>
         <p className="text-xs" style={{ color: 'var(--faint)' }}>
           Pokazywane na stronie zapisów przy płatności przelewem. Tytuł przelewu (numer zgłoszenia) tworzy się automatycznie.
         </p>
