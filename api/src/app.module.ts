@@ -19,6 +19,7 @@ import { InvitationsModule } from './invitations/invitations.module';
 import { ContentModule } from './content/content.module';
 import { CourseAccessModule } from './courses/course-access.module';
 import { CoursesModule } from './courses/courses.module';
+import { IcpeGoModule } from './icpe-go/icpe-go.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { CoursesModule } from './courses/courses.module';
     ContentModule,
     CourseAccessModule,
     CoursesModule,
+    IcpeGoModule,
   ],
 })
 export class AppModule {}

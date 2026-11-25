@@ -87,5 +87,7 @@ services:
         sync: false
       - key: R2_ENDPOINT               # opcjonalnie: tylko dla bucketu z jurysdykcją UE, np. https://<konto>.eu.r2.cloudflarestorage.com
         sync: false
+      - key: ICPE_GO_API_KEY           # opcjonalnie: klucz dla aplikacji ICPE Go (Authorization: Bearer … lub ?key=); puste = API /icpe-go publiczne
+        sync: false
       - key: CRON_SECRET               # opcjonalnie: wymagany ?key= dla GET /cron/course-releases (publikacja zaplanowanych materiałów)
         sync: false

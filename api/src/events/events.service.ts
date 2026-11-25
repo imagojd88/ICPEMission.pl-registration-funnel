@@ -175,6 +175,8 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       location: instance.location,
       nights: instance.nights,
       capacity: instance.capacity,
+      // Przełącznik „Udostępniaj dane ICPE Go" (edycja eventu w panelu).
+      shareWithIcpeGo: (instance as { shareWithIcpeGo?: boolean }).shareWithIcpeGo === true,
       paymentMethods: instance.paymentMethods,
       pricingConfig: instance.pricingConfig,
       // Limit pokoi: wolne pokoje per typ (tylko typy z limitem) + zajętość (dla panelu).
@@ -430,9 +432,11 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       registrationOpensAt?: string;
       registrationClosesAt?: string;
       status?: string;
+      shareWithIcpeGo?: boolean;
     },
   ) {
     const data: Record<string, unknown> = {};
+    if (dto.shareWithIcpeGo !== undefined) data.shareWithIcpeGo = dto.shareWithIcpeGo === true;
     if (dto.title !== undefined) data.title = dto.title as any;
     if (dto.description !== undefined) data.description = (dto.description ?? null) as any;
     if (dto.startsAt !== undefined) data.startsAt = new Date(dto.startsAt);

@@ -1258,6 +1258,8 @@ export interface UpdateInstancePayload {
   capacity?: number | null
   paymentMethods?: string[]
   pricingConfig?: PricingConfig
+  /** „Udostępniaj dane ICPE Go" — event widoczny w GET /icpe-go/events. */
+  shareWithIcpeGo?: boolean
 }
 
 /** Edycja istniejącego eventu (instancji). */
@@ -1282,6 +1284,8 @@ export interface EventEditConfig {
   location?: string | null
   nights: number
   capacity?: number | null
+  /** „Udostępniaj dane ICPE Go" (EventInstance.shareWithIcpeGo). */
+  shareWithIcpeGo?: boolean
   paymentMethods: string[]
   pricingConfig: PricingConfig
   /** Limit pokoi: wolne publicznie / zajęte publicznie / zajęte z rezerwy (tylko typy z limitem). */

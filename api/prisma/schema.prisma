@@ -181,6 +181,9 @@ model EventInstance {
   // Kiedy admin ręcznie otworzył ponownie zamknięty event — automat (EventsService.closeExpired)
   // nie zamyka wtedy eventu drugi raz, nawet jeśli minęło 7 dni od końca.
   reopenedAt           DateTime?
+  // Udostępnianie danych aplikacji ICPE Go (GET /icpe-go/events) — włącza admin w edycji eventu.
+  // Domyślnie wyłączone: event nie istnieje dla ICPE Go, dopóki ktoś go świadomie nie udostępni.
+  shareWithIcpeGo      Boolean         @default(false)
   registrationOpensAt  DateTime
   registrationClosesAt DateTime
   paymentMethods       PaymentMethod[]

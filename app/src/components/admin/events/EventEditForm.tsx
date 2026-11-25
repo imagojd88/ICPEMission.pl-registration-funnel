@@ -17,6 +17,7 @@ import AffiliationSelect from '@/components/admin/events/AffiliationSelect'
 import SpecialGuestsEditor, { guestRowsFrom, guestsToSave, guestsMissingBio, type GuestRow } from '@/components/admin/events/SpecialGuestsEditor'
 import type { AffiliationField } from '@/lib/communities'
 import {
+  API_URL,
   getEventEditConfig,
   updateEventInstance,
   configureSeriesPage,
@@ -162,6 +163,9 @@ export default function EventEditForm({
   // Diety do wyboru w formularzu (customFields.diets) — domyślnie żadna.
   const [diets, setDiets] = useState<string[]>([])
   const [guestInvitesMax, setGuestInvitesMax] = useState('2')
+  // „Udostępniaj dane ICPE Go" — event widoczny w API /icpe-go/events (tylko liczby, bez danych osób).
+  const [shareIcpeGo, setShareIcpeGo] = useState(false)
+  const [icpeGoCopied, setIcpeGoCopied] = useState(false)
 
   const addProgramRow = () => setProgram((p) => [...p, { id: `pg-${Date.now()}`, time: '', item: {} }])
   const setProgramTime = (id: string, time: string) =>
@@ -255,6 +259,7 @@ export default function EventEditForm({
           setLocTrSrc((cfg.location ?? '').trim())
         }
         setCapacity(cfg.capacity != null ? String(cfg.capacity) : '')
+        setShareIcpeGo(cfg.shareWithIcpeGo === true)
         const pm = cfg.paymentMethods ?? []
         setPayOnline(pm.includes('ONLINE'))
         setPayTransfer(pm.includes('BANK_TRANSFER'))
@@ -465,6 +470,7 @@ export default function EventEditForm({
         capacity: capacity ? parseInt(capacity) : null,
         paymentMethods,
         pricingConfig: buildPricing(),
+        shareWithIcpeGo: shareIcpeGo,
       })
 
       const locales = [...activeLocales]
@@ -894,6 +900,45 @@ export default function EventEditForm({
             </p>
           </div>
         </Field>
+      </Section>
+
+      <Section title="ICPE Go">
+        <div className="flex flex-col gap-2 px-3 py-3 rounded-[10px]" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
+          <label className="flex items-center gap-2 text-sm font-medium" style={{ color: 'var(--ink)' }}>
+            <input
+              type="checkbox"
+              checked={shareIcpeGo}
+              onChange={(e) => setShareIcpeGo(e.target.checked)}
+              className="accent-[var(--brand)] w-4 h-4"
+            />
+            Udostępniaj dane ICPE Go
+          </label>
+          <p className="text-xs" style={{ color: 'var(--faint)' }}>
+            Aplikacja ICPE Go pobierze: nazwę i daty eventu, miejsce, liczbę zgłoszeń (dorośli / dzieci), % zajętych miejsc
+            (gdy ustawiono „Limit miejsc”) i link do rejestracji. Bez imion, e-maili i płatności.
+            Zmiana działa po kliknięciu „Zapisz".
+          </p>
+          {shareIcpeGo && slug && (
+            <div className="flex items-center gap-2 text-xs flex-wrap" style={{ color: 'var(--ink)' }}>
+              <span>Adres dla ICPE Go:</span>
+              <code className="px-2 py-1 rounded" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+                {`${API_URL || 'https://icpe-api.onrender.com'}/icpe-go/events/${slug}`}
+              </code>
+              <button
+                type="button"
+                className="underline"
+                onClick={() => {
+                  void navigator.clipboard
+                    ?.writeText(`${API_URL || 'https://icpe-api.onrender.com'}/icpe-go/events/${slug}`)
+                    .then(() => { setIcpeGoCopied(true); setTimeout(() => setIcpeGoCopied(false), 1500) })
+                    .catch(() => undefined)
+                }}
+              >
+                {icpeGoCopied ? 'Skopiowano' : 'Kopiuj'}
+              </button>
+            </div>
+          )}
+        </div>
       </Section>
 
       {eventType && eventType !== 'STANDALONE' && (
