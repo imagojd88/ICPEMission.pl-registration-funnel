@@ -4,6 +4,7 @@ import Button from '@/components/ui/Button'
 import { getAdminEmail } from '@/lib/api'
 import { getTheme, setTheme as applyTheme } from '@/lib/theme'
 import MailSettings from './MailSettings'
+import OnlinePaymentsSettings from './OnlinePaymentsSettings'
 
 const API_URL =
   (import.meta as ImportMeta & { env: Record<string, string> }).env.VITE_API_URL ?? ''
@@ -126,6 +127,9 @@ export default function SettingsScreen({ onLogout }: { onLogout: () => void }) {
 
       {/* Poczta: dostawca, test, dziennik wysyłek */}
       <MailSettings />
+
+      {/* Płatności online (Tpay): tryb, środowisko, czy klucze ustawione, adres powiadomień */}
+      <OnlinePaymentsSettings />
 
       {/* System */}
       <Section title="System">

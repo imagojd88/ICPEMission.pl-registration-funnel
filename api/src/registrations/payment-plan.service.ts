@@ -4,15 +4,23 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { CourseAccessService } from '../courses/course-access.service';
 import {
   addDays, buildSchedule, hasPaymentPlan, minDepositPctFor, normalizePaymentPlan, paymentState, warsawDate,
-  PaymentPlan, PaymentState, PricingConfig, ScheduleItem,
+  PaymentPlan, PaymentState, PricingConfig, ScheduleItem, contactCountry, onlineProviderFor,
 } from '../shared';
 import { manageRegistrationLink } from './registrations.service';
+// Czysty helper (process.env) — bez importu PaymentsModule, żeby nie tworzyć zależności cyklicznej.
+import { configuredOnlineProviders } from '../payments/tpay-config';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Db = any;
 
 /** Wpłaty wpisane ręcznie w panelu / zaimportowane z wyciągu (w odróżnieniu od „Oznacz opłacone"). */
 export const PARTIAL_PROVIDERS = ['panel', 'bank-import'];
+/**
+ * Źródła wpłat, które mogą być częściowe (zadatek, rata) — przy nich stan płatności liczymy z sumy
+ * wpłat. Wpłaty online z Tpay do nich należą, ale NIE można ich cofnąć w panelu (`voidPayment`
+ * dopuszcza tylko PARTIAL_PROVIDERS) — zwrot robi się w panelu Tpay.
+ */
+export const SUM_PROVIDERS = [...PARTIAL_PROVIDERS, 'tpay'];
 const ACTIVE_STATUSES = ['PENDING_PAYMENT', 'AWAITING_TRANSFER', 'CONFIRMED'];
 const round2 = (n: number) => Math.round(n * 100) / 100;
 const num = (v: unknown) => {
@@ -87,7 +95,7 @@ export class PaymentPlanService implements OnModuleInit, OnModuleDestroy {
     for (const r of rows) {
       const cur = map.get(r.registrationId) ?? { paid: 0, partial: false };
       cur.paid = round2(cur.paid + num(r.amount));
-      if (PARTIAL_PROVIDERS.includes(r.provider)) cur.partial = true;
+      if (SUM_PROVIDERS.includes(r.provider)) cur.partial = true;
       map.set(r.registrationId, cur);
     }
     return map;
@@ -202,7 +210,7 @@ export class PaymentPlanService implements OnModuleInit, OnModuleDestroy {
     });
     if (!reg) throw new NotFoundException('Registration not found');
     const payments = (reg.payments as Array<{ id: string; amount: unknown; currency: string; status: string; provider: string; method: string; externalId: string | null; raw: unknown; createdAt: Date }>).map((p) => {
-      const raw = (p.raw ?? {}) as { paidAt?: string; note?: string; by?: string; sender?: string; title?: string };
+      const raw = (p.raw ?? {}) as { paidAt?: string; note?: string; by?: string; sender?: string; title?: string; testMode?: boolean; mismatch?: boolean; expected?: number };
       return {
         id: p.id,
         amount: num(p.amount),
@@ -215,6 +223,10 @@ export class PaymentPlanService implements OnModuleInit, OnModuleDestroy {
         by: raw.by ?? null,
         sender: raw.sender ?? null,
         title: raw.title ?? null,
+        // Wpłaty online (Tpay): znacznik transakcji testowej i rozbieżności kwoty (wpłacono ≠ oczekiwano).
+        testMode: !!raw.testMode,
+        mismatch: !!raw.mismatch,
+        expected: typeof raw.expected === 'number' ? raw.expected : null,
         createdAt: p.createdAt.toISOString(),
       };
     });
@@ -325,8 +337,10 @@ export class PaymentPlanService implements OnModuleInit, OnModuleDestroy {
     const today = warsawDate();
     const instances = (await this.db.eventInstance.findMany({
       where: { status: 'OPEN' },
-      select: { id: true, title: true, startsAt: true, pricingConfig: true, series: { select: { page: { select: { paymentInfo: true } } } } },
-    })) as Array<{ id: string; title: unknown; startsAt: Date; pricingConfig: unknown; series?: { page?: { paymentInfo?: unknown } | null } | null }>;
+      select: { id: true, title: true, startsAt: true, pricingConfig: true, paymentMethods: true, series: { select: { page: { select: { paymentInfo: true } } } } },
+    })) as Array<{ id: string; title: unknown; startsAt: Date; pricingConfig: unknown; paymentMethods?: string[]; series?: { page?: { paymentInfo?: unknown } | null } | null }>;
+    // Płatność online w przypomnieniach: tylko tryb `tpay` z kompletem kluczy (w trybie mock lista jest pusta).
+    const onlineProviders = configuredOnlineProviders();
     for (const inst of instances) {
       const cfg = (inst.pricingConfig ?? null) as PricingConfig | null;
       const plan = planOf(cfg);
@@ -376,6 +390,11 @@ export class PaymentPlanService implements OnModuleInit, OnModuleDestroy {
             bankName: pay?.bankName,
             bankAddress: pay?.bankAddress,
             operator: pay?.operator,
+            // Przycisk „Zapłać online”: event ma ONLINE, kwota w PLN i reguła kraj / język daje Tpay.
+            payOnline:
+              (inst.paymentMethods ?? []).includes('ONLINE') &&
+              String(r.currency || 'PLN').toUpperCase() === 'PLN' &&
+              onlineProviderFor(contactCountry(r.contact), r.locale, onlineProviders) === 'tpay',
           });
           if (type === 'PAYMENT_OVERDUE') result.overdue += 1;
           else result.dueSoon += 1;

@@ -363,6 +363,43 @@ model Payment {
   updatedAt      DateTime      @updatedAt
 }
 
+/// Próba płatności online (Tpay; później Stripe). Osobna tabela, bo wiersze PENDING w `Payment`
+/// są nadpisywane przy edycji zgłoszenia. Po opłaceniu powstaje zwykły wiersz `Payment`
+/// (provider 'tpay') i jego id trafia do `paymentId`. Bez relacji — tabela w pełni addytywna.
+model OnlinePayment {
+  id             String    @id @default(cuid())
+  registrationId String
+  /// 'tpay' (później 'stripe')
+  provider       String    @default("tpay")
+  /// nasz identyfikator próby — wysyłany do Tpay jako hiddenDescription, wraca jako tr_crc
+  crc            String    @unique
+  /// identyfikator transakcji u dostawcy (Tpay: transactionId)
+  externalId     String?   @unique
+  /// tytuł transakcji u dostawcy (Tpay: TR-…, w powiadomieniu tr_id)
+  title          String?
+  /// kwota, na którą utworzono płatność
+  amount         Decimal   @db.Decimal(10, 2)
+  currency       String    @default("PLN")
+  /// 'due' | 'remaining' | 'custom'
+  purpose        String?
+  /// CREATED | PENDING | PAID | REFUNDED | FAILED | EXPIRED
+  status         String    @default("CREATED")
+  /// kwota faktycznie zapłacona (tr_paid)
+  paidAmount     Decimal?  @db.Decimal(10, 2)
+  paymentUrl     String?
+  /// id zaksięgowanej wpłaty (Payment.id)
+  paymentId      String?   @unique
+  testMode       Boolean   @default(false)
+  /// pola powiadomienia bez e-maila płatnika i bez md5sum
+  raw            Json?
+  paidAt         DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([registrationId, createdAt])
+  @@index([status, createdAt])
+}
+
 model MeetingSeries {
   id          String              @id @default(cuid())
   title       Json

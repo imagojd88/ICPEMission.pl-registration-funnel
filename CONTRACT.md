@@ -13,8 +13,12 @@ Bazowy URL: `VITE_API_URL` (dev: `http://localhost:3000`). Format: JSON. Typy DT
 | PUT | `/registrations/:id?token=` | `CreateRegistrationDto` (partial) | `RegistrationDto` |
 | GET | `/registrations/:id/calendar.ics` | — | `text/calendar` |
 | GET | `/registrations/:id/calendar/google` | — | 302 → Google Calendar |
-| POST | `/payments/:regId/checkout` | `{ method }` | `{ redirectUrl }` (online) / dane przelewu |
-| POST | `/payments/webhook/:provider` | payload operatora | 200 |
+| POST | `/payments/:regId/checkout` (auth, od 25.11.2026) | `{ method }` | `{ redirectUrl }` (mock) / dane przelewu — tylko admin / token serwisowy; lejek jej nie używa |
+| POST | `/payments/webhook/:provider` | payload operatora | 200 (nic nie księguje) |
+| GET | `/payments/config` | — | `{ providers: string[] }` — dostawcy płatności online; w trybie `mock` `[]` |
+| GET | `/registrations/manage/:token/payments` | — | rozliczenie, harmonogram, granice kwot `{ due, min, max }`, wpłaty, ostatnia próba, `online: { available, provider, reason }` |
+| POST | `/registrations/manage/:token/pay` | `{ mode: 'due' \| 'remaining' \| 'custom', amount? }` | `{ redirectUrl, amount, currency }` — kwotę liczy serwer |
+| POST | `/payments/webhook/tpay` | powiadomienie Tpay (`x-www-form-urlencoded` + `X-JWS-Signature`) | tekst `TRUE` (200) / `FALSE` (400 zła weryfikacja, 500 błąd po naszej stronie) |
 | POST | `/attendance/check-in` | `{ token, occurrenceId, status }` | 200 |
 
 ## Standalone event (bez noclegu, bezpłatny — RSVP)
@@ -59,5 +63,6 @@ Jeden RSVP na (event, e-mail) — ponowny zapis z tym samym e-mailem aktualizuje
 - Token serwisowy (Personal OS): nagłówek `Authorization: Bearer <SERVICE_TOKEN>`, scope `admin:read`/`admin:write`, akceptowany przez ten sam guard co JWT na `/admin/*`.
 
 ## Tryby dev
-- `PAYMENTS_MODE=mock` → checkout zwraca fałszywy `redirectUrl`, webhook symulowany endpointem `/payments/dev/confirm/:regId`.
+- `PAYMENTS_MODE=mock` (domyślnie) → płatności online wyłączone (`GET /payments/config` zwraca `[]`); `checkout` zwraca fałszywy `redirectUrl`, webhook symulowany endpointem `/payments/dev/confirm/:regId` (oba tylko dla admina).
+- `PAYMENTS_MODE=tpay` → płatności online przez Tpay (BLIK · szybki przelew), tylko dla zgłoszeń z Polski; zmienne `TPAY_*` i `API_PUBLIC_URL` — patrz `docs/20-plan-wdrozenie-tpay.md`. Admin: `GET /admin/payments/online-status` (auth) — stan konfiguracji bez wartości kluczy.
 - `MAIL_MODE=log` → maile logowane do konsoli.

@@ -8,6 +8,7 @@ import { PriceUnitSelect, priceHint } from './RoomPriceFields'
 import RoomStockFields from './RoomStockFields'
 import OptionalStayFields from './OptionalStayFields'
 import DonationToggle from './DonationToggle'
+import OnlinePaymentWarning from './OnlinePaymentWarning'
 import RegistrationOpensFields from './RegistrationOpensFields'
 import PriceTiersEditor, { tiersToRows, rowsToTiers, tiersError, type PriceTierRow } from './PriceTiersEditor'
 import PaymentPlanEditor, { EMPTY_PLAN_FORM, planToForm, formToPlan, planFormError, type PaymentPlanForm } from './PaymentPlanEditor'
@@ -828,6 +829,7 @@ export default function EventEditForm({
                 {p.label}
               </label>
             ))}
+            <OnlinePaymentWarning enabled={payOnline} currency={currency} />
             <LeaderDepositFields
               enabled={payLeader}
               onEnabled={setPayLeader}

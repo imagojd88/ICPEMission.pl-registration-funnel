@@ -255,7 +255,7 @@
   "payment_method": {
     "title": "결제 방법 선택",
     "online": "온라인 결제",
-    "online_tags": "BLIK · Visa · Mastercard",
+    "online_tags": "BLIK · 빠른 계좌 이체 (Tpay)",
     "transfer": "계좌 이체",
     "transfer_tags": "계좌 이체",
     "cta": "요약으로 이동 →",
@@ -351,7 +351,14 @@
     "status_cash": "현장 결제",
     "leader_msg": "신청이 접수되었습니다. 공동체 리더에게 예약금을 전달하시고, 나머지는 현장에서 현금으로 결제해 주세요.",
     "status_leader": "리더 예약금",
-    "pay_now": "지금 납부할 금액"
+    "pay_now": "지금 납부할 금액",
+    "online_title": "신청이 접수되었습니다",
+    "online_msg": "신청이 접수되었습니다. 신청을 확정하려면 온라인 결제를 완료해 주세요.",
+    "online_redirecting": "결제 페이지로 이동 중…",
+    "online_cta": "온라인 결제",
+    "online_error": "온라인 결제를 시작하지 못했습니다. 다시 시도해 주세요. 신청은 이미 저장되어 있으므로 다시 제출하실 필요가 없습니다.",
+    "status_online": "결제 대기 중",
+    "payments_link": "신청 및 납부 내역 보기"
   },
   "admin": {
     "dashboard": "대시보드",
@@ -670,5 +677,40 @@
       "reopen": "Reopen",
       "err_note": "Describe the request in the note."
     }
+  },
+  "pay": {
+    "title": "납부",
+    "total": "신청 금액",
+    "paid": "납부액",
+    "remaining": "남은 금액",
+    "due_now": "지금 납부할 금액",
+    "schedule": "납부 일정",
+    "at_registration": "신청 시",
+    "due_by": "{{date}}까지",
+    "installment": "납부",
+    "history": "확인된 납부 내역",
+    "no_payments": "아직 확인된 납부 내역이 없습니다.",
+    "src_online": "온라인",
+    "src_transfer": "계좌 이체",
+    "src_cash": "현금",
+    "refunded": "환불됨",
+    "fully_paid": "참가비가 전액 납부되었습니다. 감사합니다!",
+    "online_title": "온라인 결제",
+    "methods": "BLIK · 빠른 계좌 이체 (Tpay)",
+    "pay_now": "지금 결제 {{amount}}",
+    "pay_all": "전액 결제 {{amount}}",
+    "pay_custom": "다른 금액",
+    "custom_label": "결제 금액",
+    "custom_range": "{{min}} ~ {{max}}",
+    "custom_submit": "결제",
+    "custom_invalid": "{{min}}에서 {{max}} 사이의 금액을 입력해 주세요.",
+    "redirecting": "결제 페이지로 이동 중…",
+    "checking": "결제를 확인하고 있습니다…",
+    "confirmed": "결제가 확인되었습니다. 감사합니다!",
+    "still_pending": "아직 결제 확인을 받지 못했습니다. 보통 몇 분 정도 걸리며, 확인되면 이메일로 알려 드립니다. 나중에 페이지를 새로 고쳐 주세요.",
+    "return_error": "결제가 완료되지 않았습니다. 다시 시도하실 수 있습니다.",
+    "start_error": "결제를 시작하지 못했습니다.",
+    "load_error": "납부 내역을 불러오지 못했습니다. 페이지를 새로 고쳐 주세요.",
+    "refresh": "새로 고침"
   }
 }

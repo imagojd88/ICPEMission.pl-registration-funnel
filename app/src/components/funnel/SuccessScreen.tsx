@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { UserPlus, Users, BedDouble } from 'lucide-react'
+import { UserPlus, Users, BedDouble, CreditCard } from 'lucide-react'
 import CashAmountBox from './CashAmountBox'
 import LeaderDepositBox from './LeaderDepositBox'
 import { Link } from 'react-router-dom'
@@ -24,9 +24,17 @@ interface Props {
   leaderDepositPct?: number
   /** Harmonogram wpłat: kwota wymagana teraz (zadatek); brak = cała kwota. */
   payNow?: number
+  /**
+   * Płatność online (Tpay) dla zapisanego już zgłoszenia: `redirecting` = trwa przekierowanie,
+   * `failed` = nie udało się utworzyć płatności → przycisk „Zapłać online” (ponawia samą płatność,
+   * zgłoszenie NIE jest wysyłane drugi raz).
+   */
+  onlinePay?: { state: 'redirecting' | 'failed' | 'idle'; onPay: () => void; busy: boolean }
+  /** Strona zgłoszenia z wpłatami (`/z/:token`). */
+  paymentsHref?: string
 }
 
-export default function SuccessScreen({ paymentMethod, email, total, currency, regNumber, status, onBack, onCreateAccount, guestInviteHref, manageHref, leaderDepositPct, payNow }: Props) {
+export default function SuccessScreen({ paymentMethod, email, total, currency, regNumber, status, onBack, onCreateAccount, guestInviteHref, manageHref, leaderDepositPct, payNow, onlinePay, paymentsHref }: Props) {
   const { t, i18n } = useTranslation()
   const [acct, setAcct] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
 
@@ -34,6 +42,8 @@ export default function SuccessScreen({ paymentMethod, email, total, currency, r
   // Gotówka na miejscu — nie prosimy o przelew.
   const isCash = paymentMethod === 'cash'
   const isLeader = paymentMethod === 'leader'
+  // Wybrano płatność online, a wpłaty jeszcze nie ma (przekierowanie w toku albo się nie udało).
+  const isOnlinePending = paymentMethod === 'online' && !isPaid
   const displayReg = regNumber ?? '—'
 
   async function handleAccount() {
@@ -77,13 +87,32 @@ export default function SuccessScreen({ paymentMethod, email, total, currency, r
         className="font-serif text-center"
         style={{ fontSize: 28, fontWeight: 600, color: 'var(--ink)' }}
       >
-        {isPaid ? t('success.paid_title') : t('success.transfer_title')}
+        {isPaid ? t('success.paid_title') : isOnlinePending ? t('success.online_title') : t('success.transfer_title')}
       </h2>
 
       {/* Message */}
       <p className="text-sm text-center leading-relaxed" style={{ color: 'var(--muted)' }}>
-        {isPaid ? t('success.paid_msg') : isLeader ? t('success.leader_msg') : isCash ? t('success.cash_msg') : t('success.transfer_msg')}
+        {isPaid ? t('success.paid_msg') : isOnlinePending ? t('success.online_msg') : isLeader ? t('success.leader_msg') : isCash ? t('success.cash_msg') : t('success.transfer_msg')}
       </p>
+
+      {/* Płatność online: przekierowanie albo przycisk ponowienia samej płatności */}
+      {isOnlinePending && onlinePay && (
+        <div className="w-full flex flex-col gap-2 rounded-[15px] px-4 py-4" style={{ background: 'var(--brand-soft)', border: '1.5px solid var(--brand)' }}>
+          {onlinePay.state === 'failed' && (
+            <p className="text-sm text-center" role="alert" style={{ color: 'var(--err)' }}>{t('success.online_error')}</p>
+          )}
+          <button
+            onClick={onlinePay.onPay}
+            disabled={onlinePay.busy || onlinePay.state === 'redirecting'}
+            className="w-full flex items-center justify-center gap-2 text-white text-sm font-semibold rounded-[14px] py-3.5 transition-all duration-150 active:scale-[0.98] disabled:opacity-60"
+            style={{ background: 'var(--accent)', border: 'none', cursor: 'pointer' }}
+          >
+            <CreditCard size={16} />
+            {onlinePay.busy || onlinePay.state === 'redirecting' ? t('success.online_redirecting') : t('success.online_cta')}
+          </button>
+          <p className="text-xs text-center" style={{ color: 'var(--muted)' }}>{t('payment_method.online_tags')}</p>
+        </div>
+      )}
 
       {/* Gotówka: kwota, którą trzeba mieć przy sobie (też w mailu z potwierdzeniem) */}
       {isCash && !isPaid && <CashAmountBox total={total} currency={currency} />}
@@ -120,7 +149,7 @@ export default function SuccessScreen({ paymentMethod, email, total, currency, r
                 : { background: 'var(--warn-soft)', color: 'var(--warn)' }
             }
           >
-            {isPaid ? t('success.status_paid') : isLeader ? t('success.status_leader') : isCash ? t('success.status_cash') : t('success.status_pending')}
+            {isPaid ? t('success.status_paid') : isOnlinePending ? t('success.status_online') : isLeader ? t('success.status_leader') : isCash ? t('success.status_cash') : t('success.status_pending')}
           </span>
         </div>
 
@@ -151,6 +180,13 @@ export default function SuccessScreen({ paymentMethod, email, total, currency, r
       <p className="text-xs text-center" style={{ color: 'var(--muted)' }}>
         {t('success.email_sent', { email })}
       </p>
+
+      {/* Strona zgłoszenia: harmonogram i wpłaty (ten sam link jest w mailu) */}
+      {paymentsHref && total > 0 && (
+        <Link to={paymentsHref} className="text-sm font-semibold underline" style={{ color: 'var(--brand)' }}>
+          {t('success.payments_link')}
+        </Link>
+      )}
 
       {/* Zmiana / domówienie noclegu później — ten sam link jest w mailu */}
       {manageHref && (

@@ -384,18 +384,34 @@ export default function PaymentsScreen() {
                             {/* Historia wpłat */}
                             {detail === null ? (
                               <p className="text-xs" style={{ color: 'var(--faint)' }}>Ładowanie wpłat…</p>
-                            ) : detail.payments.filter((p) => p.status === 'PAID' || p.status === 'FAILED').length === 0 ? (
+                            ) : detail.payments.filter((p) => p.status === 'PAID' || p.status === 'FAILED' || p.status === 'REFUNDED').length === 0 ? (
                               <p className="text-xs" style={{ color: 'var(--faint)' }}>Brak zaksięgowanych wpłat.</p>
                             ) : (
                               <div className="flex flex-col gap-1">
-                                {detail.payments.filter((p) => p.status === 'PAID' || p.status === 'FAILED').map((p) => (
+                                {detail.payments.filter((p) => p.status === 'PAID' || p.status === 'FAILED' || p.status === 'REFUNDED').map((p) => (
                                   <div key={p.id} className="flex items-center gap-3 text-sm" style={{ color: p.status === 'PAID' ? 'var(--ink)' : 'var(--faint)', textDecoration: p.status === 'PAID' ? undefined : 'line-through' }}>
                                     <span style={{ width: 86 }}>{plDate(p.paidAt)}</span>
                                     <strong style={{ width: 80 }}>{zl(p.amount)}</strong>
                                     <span className="text-xs" style={{ color: 'var(--muted)' }}>
-                                      {methodLabel(p.method)} · {p.provider === 'bank-import' ? 'z wyciągu' : p.provider === 'panel' ? 'wpis ręczny' : p.provider === 'manual' ? 'oznaczone jako opłacone' : p.provider}
+                                      {p.provider === 'tpay' ? (
+                                        <>online (Tpay){p.title ? ` · ${p.title}` : ''}</>
+                                      ) : (
+                                        <>{methodLabel(p.method)} · {p.provider === 'bank-import' ? 'z wyciągu' : p.provider === 'panel' ? 'wpis ręczny' : p.provider === 'manual' ? 'oznaczone jako opłacone' : p.provider}</>
+                                      )}
                                       {p.note ? ` · ${p.note}` : ''}{p.by ? ` · ${p.by}` : ''}
                                     </span>
+                                    {/* Wpłaty Tpay: znacznik transakcji testowej, rozbieżności kwoty i zwrotu. Bez „cofnij” — zwrot robi się w panelu Tpay. */}
+                                    {p.provider === 'tpay' && p.testMode && (
+                                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" title="Transakcja testowa — pieniądze nie wpłynęły" style={{ background: 'var(--err-soft)', color: 'var(--err)', display: 'inline-block', textDecoration: 'none' }}>TEST</span>
+                                    )}
+                                    {p.provider === 'tpay' && p.mismatch && (
+                                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" title="Wpłacona kwota różni się od kwoty, na którą utworzono płatność" style={{ background: 'var(--warn-soft)', color: 'var(--warn)', display: 'inline-block', textDecoration: 'none' }}>
+                                        INNA KWOTA{typeof p.expected === 'number' ? ` (oczekiwano ${zl(p.expected)})` : ''}
+                                      </span>
+                                    )}
+                                    {p.status === 'REFUNDED' && (
+                                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'var(--surface-2)', color: 'var(--muted)', display: 'inline-block', textDecoration: 'none' }}>ZWRÓCONO</span>
+                                    )}
                                     {p.status === 'PAID' && (p.provider === 'panel' || p.provider === 'bank-import') && (
                                       <button type="button" onClick={() => { void handleVoid(p.id) }} className="inline-flex items-center gap-1 text-xs ml-auto" style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}>
                                         <Undo2 size={12} /> cofnij

@@ -503,6 +503,7 @@ export class NotificationsService {
       const amount = formatMoney(total, (String(d.currency ?? 'PLN') as 'PLN' | 'EUR' | 'USD'), lang);
       const acc = d.accommodation as MailAccommodation | undefined;
       const manageLink = String(d.manageLink ?? '');
+      const statusLink = String(d.statusLink ?? '');
       const donation = Number(d.donation ?? 0) > 0 ? Number(d.donation) : 0;
       const donationAmount = formatMoney(donation, (String(d.currency ?? 'PLN') as 'PLN' | 'EUR' | 'USD'), lang);
       const sig = signature(lang);
@@ -536,6 +537,22 @@ export class NotificationsService {
         ...scheduleLines(d.schedule, String(d.currency ?? 'PLN'), lang),
         '',
         L(lang, { pl: `Numer zgłoszenia: ${regNo}`, en: `Registration number: ${regNo}`, ko: `신청 번호: ${regNo}`, zh: `报名编号：${regNo}` }),
+        // Strona zgłoszenia: stan, harmonogram i wpłaty (a gdy reguła daje Tpay — także płatność online).
+        ...(statusLink
+          ? ['', d.payOnline && total > 0
+              ? L(lang, {
+                  pl: `Zapłać online (BLIK · szybki przelew) i sprawdź stan wpłat na stronie zgłoszenia: ${statusLink}`,
+                  en: `Pay online and check your payments on your registration page: ${statusLink}`,
+                  ko: `신청 페이지에서 온라인으로 결제하고 납부 내역을 확인하실 수 있습니다: ${statusLink}`,
+                  zh: `您可以在报名页面在线付款并查看付款情况：${statusLink}`,
+                })
+              : L(lang, {
+                  pl: `Stan zgłoszenia i wpłat sprawdzisz na stronie zgłoszenia: ${statusLink}`,
+                  en: `You can check your registration and payments here: ${statusLink}`,
+                  ko: `신청 및 납부 내역은 여기에서 확인하실 수 있습니다: ${statusLink}`,
+                  zh: `您可以在这里查看报名和付款情况：${statusLink}`,
+                })]
+          : []),
       ];
       // Link do zmiany noclegu (gdy event oferuje noclegi) — jako tekst, bo przycisk bywa zajęty
       // przez „Zaproś gościa"; bez zaproszeń link dostaje własny przycisk.
@@ -943,12 +960,126 @@ export class NotificationsService {
         ...signature(lang),
       ];
       const link = String(d.manageLink ?? '');
+      // Płatność online (Tpay) — tylko gdy reguła kraj / język ją daje (ustala wołający: `payOnline`).
+      const payOnline = !!d.payOnline && !!link;
       const { text, html } = buttonMail(
-        intro,
-        link ? { label: L(lang, { pl: 'Zobacz zgłoszenie', en: 'View registration', ko: '신청 내역 보기', zh: '查看报名' }), href: link } : null,
+        payOnline
+          ? [...intro.slice(0, -1), '', L(lang, {
+              pl: 'Możesz też zapłacić online (BLIK · szybki przelew) — wpłata zaksięguje się automatycznie:',
+              en: 'You can also pay online — the payment will be recorded automatically:',
+              ko: '온라인으로도 결제하실 수 있으며, 결제는 자동으로 확인됩니다:',
+              zh: '您也可以在线付款——付款将自动入账：',
+            }), '']
+          : intro,
+        link
+          ? payOnline
+            ? { label: L(lang, { pl: 'Zapłać online', en: 'Pay online', ko: '온라인 결제', zh: '在线付款' }), href: `${link}#platnosci` }
+            : { label: L(lang, { pl: 'Zobacz zgłoszenie', en: 'View registration', ko: '신청 내역 보기', zh: '查看报名' }), href: link }
+          : null,
         outro,
         lang,
       );
+      return { subject, text, html };
+    }
+
+    if (payload.type === 'PAYMENT_RECEIVED') {
+      // „Otrzymaliśmy wpłatę” — po zaksięgowaniu płatności online (podpisane powiadomienie operatora).
+      const lang = mailLangOf(payload.locale);
+      const cur = String(d.currency ?? 'PLN') as 'PLN' | 'EUR' | 'USD';
+      const f = (n: unknown) => formatMoney(Number(n ?? 0), cur, lang);
+      const title = String(d.eventTitle ?? L(lang, { pl: 'wydarzenie', en: 'the event', ko: '행사', zh: '活动' }));
+      const regNo = String(payload.registrationId ?? '');
+      const remaining = Number(d.remaining ?? 0);
+      const next = d.nextDue as { amount?: number; dueDate?: string } | null | undefined;
+      const subject = L(lang, {
+        pl: `Otrzymaliśmy wpłatę — ${title}`,
+        en: `Payment received — ${title}`,
+        ko: `납부 확인 — ${title}`,
+        zh: `已收到付款 — ${title}`,
+      });
+      const intro = [
+        greetingLine(lang),
+        '',
+        L(lang, {
+          pl: `Otrzymaliśmy Twoją wpłatę ${f(d.amount)} za udział w wydarzeniu „${title}”. Dziękujemy!`,
+          en: `We have received your payment of ${f(d.amount)} for "${title}". Thank you!`,
+          ko: `「${title}」 참가비 ${f(d.amount)} 납부가 확인되었습니다. 감사합니다!`,
+          zh: `我们已收到您为「${title}」支付的 ${f(d.amount)}。谢谢！`,
+        }),
+        L(lang, {
+          pl: `Dotychczas wpłacono ${f(d.paid)} z ${f(d.total)}.`,
+          en: `Paid so far: ${f(d.paid)} of ${f(d.total)}.`,
+          ko: `현재까지 납부액: ${f(d.total)} 중 ${f(d.paid)}.`,
+          zh: `已付：${f(d.paid)}，总额 ${f(d.total)}。`,
+        }),
+        remaining > 0.005
+          ? next?.dueDate && Number(next.amount) > 0
+            ? L(lang, {
+                pl: `Pozostało do zapłaty: ${f(remaining)}. Najbliższa wpłata: ${f(next.amount)} do ${mailDate(String(next.dueDate), lang)}.`,
+                en: `Remaining: ${f(remaining)}. Next payment: ${f(next.amount)} by ${mailDate(String(next.dueDate), lang)}.`,
+                ko: `남은 금액: ${f(remaining)}. 다음 납부: ${mailDate(String(next.dueDate), lang)}까지 ${f(next.amount)}.`,
+                zh: `待付金额：${f(remaining)}。下一笔付款：${mailDate(String(next.dueDate), lang)}前支付 ${f(next.amount)}。`,
+              })
+            : L(lang, { pl: `Pozostało do zapłaty: ${f(remaining)}.`, en: `Remaining: ${f(remaining)}.`, ko: `남은 금액: ${f(remaining)}.`, zh: `待付金额：${f(remaining)}。` })
+          : L(lang, {
+              pl: 'Zgłoszenie jest opłacone w całości.',
+              en: 'Your registration is now paid in full.',
+              ko: '참가비가 전액 납부되었습니다.',
+              zh: '您的报名费用已全部付清。',
+            }),
+        '',
+        L(lang, { pl: `Numer zgłoszenia: ${regNo}`, en: `Registration number: ${regNo}`, ko: `신청 번호: ${regNo}`, zh: `报名编号：${regNo}` }),
+        ...(d.transactionTitle
+          ? [L(lang, {
+              pl: `Numer transakcji: ${String(d.transactionTitle)}`,
+              en: `Transaction number: ${String(d.transactionTitle)}`,
+              ko: `거래 번호: ${String(d.transactionTitle)}`,
+              zh: `交易编号：${String(d.transactionTitle)}`,
+            })]
+          : []),
+        '',
+      ];
+      const link = String(d.manageLink ?? '');
+      const { text, html } = buttonMail(
+        intro,
+        link ? { label: L(lang, { pl: 'Zobacz zgłoszenie', en: 'View registration', ko: '신청 내역 보기', zh: '查看报名' }), href: link } : null,
+        signature(lang),
+        lang,
+      );
+      return { subject, text, html };
+    }
+
+    if (payload.type === 'ONLINE_PAYMENT_ALERT') {
+      // Do organizatora: zdarzenie płatności online wymagające uwagi (rozbieżność kwoty, zwrot, nieznana transakcja…).
+      const reasons: Record<string, string> = {
+        AMOUNT_MISMATCH: 'Wpłacona kwota różni się od kwoty, na którą utworzono płatność. Zaksięgowaliśmy faktyczny wpływ.',
+        CANCELLED_REGISTRATION: 'Wpłata przyszła do zgłoszenia, które jest anulowane. Wpłata została zaksięgowana — zdecyduj o zwrocie albo przywróceniu zgłoszenia.',
+        UNKNOWN_CRC: 'Przyszło poprawnie podpisane powiadomienie o transakcji, której nie ma w systemie. NIE została zaksięgowana.',
+        CURRENCY: 'Powiadomienie w walucie innej niż PLN. Wpłata NIE została zaksięgowana automatycznie.',
+        BAD_AMOUNT: 'Powiadomienie bez poprawnej kwoty wpłaty. Wpłata NIE została zaksięgowana automatycznie.',
+        REFUND: 'Tpay zgłosił pełny zwrot transakcji. Wpłata została oznaczona jako zwrócona; status zgłoszenia NIE został zmieniony.',
+        REFUND_UNMATCHED: 'Tpay zgłosił zwrot transakcji, dla której nie mamy zaksięgowanej wpłaty. Sprawdź w panelu Tpay.',
+        OVERPAID: 'Po tej wpłacie suma wpłat przekracza kwotę zgłoszenia (np. dwie opłacone próby). Rozważ zwrot nadpłaty z panelu Tpay.',
+      };
+      const reason = String(d.reason ?? '');
+      const regNo = String(payload.registrationId ?? '');
+      const subject = `Płatność online wymaga uwagi${d.transactionTitle ? ` — ${String(d.transactionTitle)}` : ''}`;
+      const amountLine = (label: string, v: unknown) => (v === undefined || v === null || v === '' ? '' : `${label}: ${money(v, d.currency)}`);
+      const intro = [
+        'Dzień dobry,',
+        '',
+        reasons[reason] ?? `Zdarzenie płatności online: ${reason}.`,
+        '',
+        d.eventTitle ? `Wydarzenie: ${String(d.eventTitle)}` : '',
+        regNo ? `Zgłoszenie: ${regNo}${d.guestName ? ` (${String(d.guestName)})` : ''}` : '',
+        d.transactionTitle ? `Transakcja Tpay: ${String(d.transactionTitle)}` : '',
+        amountLine('Kwota wpłacona', d.paidAmount),
+        amountLine('Kwota oczekiwana', d.expectedAmount),
+        d.testMode ? 'Uwaga: transakcja w trybie testowym (sandbox).' : '',
+        '',
+        'Szczegóły: panel ▸ Płatności oraz panel Tpay.',
+      ].filter((l, i, a) => l !== '' || (i > 0 && a[i - 1] !== ''));
+      const { text, html } = buttonMail(intro, null, []);
       return { subject, text, html };
     }
 
@@ -1086,6 +1217,10 @@ export class NotificationsService {
     donation?: number;
     /** Harmonogram wpłat zgłoszenia (gdy event ma plan rat). */
     schedule?: Array<{ label?: string; dueDate: string; amount: number; atRegistration?: boolean }>;
+    /** Link do strony zgłoszenia `/z/:token` (stan i wpłaty) — w każdym potwierdzeniu. */
+    statusLink?: string;
+    /** Zgłoszenie może zapłacić online (reguła kraj / język daje Tpay, event ma ONLINE, PLN). */
+    payOnline?: boolean;
   }) {
     await this.sendMail({
       to: opts.to,
@@ -1125,6 +1260,8 @@ export class NotificationsService {
     amount: number; paid: number; total: number; currency: string;
     eventTitle: unknown; manageLink?: string; recipient?: string; account?: string;
     swift?: string; bankName?: string; bankAddress?: string; operator?: string;
+    /** przycisk „Zapłać online” (reguła kraj / język daje Tpay i tryb `tpay`) */
+    payOnline?: boolean;
   }) {
     const { kind, eventTitle, ...data } = opts;
     const lang = mailLangOf(opts.locale);
@@ -1132,6 +1269,32 @@ export class NotificationsService {
       ? ((eventTitle as Record<string, string>)[lang] ?? (eventTitle as Record<string, string>).pl ?? (eventTitle as Record<string, string>).en ?? Object.values(eventTitle as Record<string, string>)[0])
       : eventTitle;
     return this.sendMail({ to: opts.to, type: kind, locale: opts.locale, registrationId: opts.registrationId, data: { ...data, eventTitle: t ? String(t) : undefined } });
+  }
+
+  /** „Otrzymaliśmy wpłatę” — po zaksięgowaniu płatności online. */
+  async sendPaymentReceived(opts: {
+    to: string; locale: string; registrationId: string; eventTitle?: string;
+    amount: number; paid: number; total: number; remaining: number; currency: string;
+    nextDue?: { amount: number; dueDate: string } | null;
+    transactionTitle?: string; manageLink?: string;
+  }) {
+    return this.sendMail({ to: opts.to, type: 'PAYMENT_RECEIVED', locale: opts.locale, registrationId: opts.registrationId, data: opts });
+  }
+
+  /**
+   * Powiadomienie organizatora o zdarzeniu płatności online wymagającym uwagi. Idzie na `MAIL_REPLY_TO`;
+   * gdy adres nie jest ustawiony, zostaje tylko wpis w logach. W danych NIE MA e-maila płatnika.
+   */
+  async sendOnlinePaymentAlert(opts: {
+    reason: string; registrationId?: string; eventTitle?: string; guestName?: string;
+    transactionTitle?: string; paidAmount?: number; expectedAmount?: number; currency?: string; testMode?: boolean;
+  }): Promise<void> {
+    const admin = this.replyTo();
+    if (!admin) {
+      this.logger.warn(`Płatność online wymaga uwagi (${opts.reason}), ale MAIL_REPLY_TO nie jest ustawiony — brak adresu organizatora.`);
+      return;
+    }
+    await this.sendMail({ to: admin, type: 'ONLINE_PAYMENT_ALERT', locale: 'pl', registrationId: opts.registrationId, data: opts });
   }
 
   async sendPaymentReminder(opts: { to: string; locale: string; registrationId: string; amount: number; transferTitle: string }) {

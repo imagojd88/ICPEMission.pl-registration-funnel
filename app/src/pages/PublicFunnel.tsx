@@ -3,9 +3,9 @@ import { notYetOpen } from '../lib/registrationOpens'
 import { useTranslation } from 'react-i18next'
 import { useParams, useSearchParams } from 'react-router-dom'
 import type { EventInstanceDto, CreateRegistrationDto, RegistrationStatus, PaymentMethod } from '@icpe/shared'
-import { computePrice, DEFAULT_PRICING, validateRoomCapacity, roomLabel, hasAccommodation, roomStockShortages, buildSchedule, minDepositPctFor, warsawDate, pricingAt } from '@icpe/shared'
+import { computePrice, DEFAULT_PRICING, validateRoomCapacity, roomLabel, hasAccommodation, roomStockShortages, buildSchedule, minDepositPctFor, warsawDate, pricingAt, onlineProviderFor } from '@icpe/shared'
 import type { PricingConfig } from '@icpe/shared'
-import { getEventBySlug, getEventConfig, createRegistration, registerGuest, getInvitation, getRegistrationLead, saveRegistrationLead, pickLang, type EventConfig } from '../lib/api'
+import { getEventBySlug, getEventConfig, createRegistration, registerGuest, getInvitation, getRegistrationLead, saveRegistrationLead, pickLang, getPaymentsConfig, startManagedPayment, type EventConfig } from '../lib/api'
 import { funnelPriceInput, isAccommodationOptional } from '../lib/funnelPrice'
 import { setAnalyticsContext, track } from '../lib/analytics'
 
@@ -449,7 +449,18 @@ export default function PublicFunnel() {
   const [stepError, setStepError] = useState<string | null>(null)
   // Krok „Nocleg”: okienko po „Dalej”, gdy wybór noclegu jest niepełny (łatwo przeoczyć komunikat na dole).
   const [roomDialog, setRoomDialog] = useState<RoomDialog | null>(null)
-  const [result, setResult] = useState<{ regId: string; status: RegistrationStatus; total: number; guestInviteHref?: string; manageHref?: string } | null>(null)
+  const [result, setResult] = useState<{ regId: string; status: RegistrationStatus; total: number; guestInviteHref?: string; manageHref?: string; paymentsHref?: string; editToken?: string } | null>(null)
+  // Płatności online: dostawcy skonfigurowani na serwerze (w trybie mock pusta lista → karta „online” ukryta).
+  const [onlineProviders, setOnlineProviders] = useState<string[]>([])
+  useEffect(() => {
+    let alive = true
+    void getPaymentsConfig().then((c) => { if (alive) setOnlineProviders(c.providers) })
+    return () => { alive = false }
+  }, [])
+  // Zgłoszenie zostało już zapisane na serwerze — „Wyślij” nie może pójść drugi raz (np. gdy płatność się nie utworzy).
+  const createdRef = useRef(false)
+  const [onlinePayState, setOnlinePayState] = useState<'idle' | 'redirecting' | 'failed'>('idle')
+  const [onlinePayBusy, setOnlinePayBusy] = useState(false)
   // Osobiste zaproszenie z maila (`?inv=token`): dane gościa wpisujemy w formularz,
   // a token idzie z rejestracją, żeby zgłoszenie spięło się z listą gości w panelu.
   const [searchParams] = useSearchParams()
@@ -820,6 +831,11 @@ export default function PublicFunnel() {
   }
 
   const handlePaymentMethodContinue = () => {
+    // Płatność online przestała być dostępna (np. gość zmienił język po wyborze) → wybór od nowa.
+    if (stepper.paymentMethod === 'online' && !onlineAvailable) {
+      patchStepper({ paymentMethod: null })
+      return
+    }
     // Zaliczka u lidera tylko dla wspólnoty z listy — gdyby gość w międzyczasie zmienił wspólnotę.
     if (stepper.paymentMethod === 'leader' && !leaderEligible) {
       patchStepper({ paymentMethod: null })
@@ -841,8 +857,30 @@ export default function PublicFunnel() {
     setScreen('payment_method')
   }
 
+  /** Tworzy płatność online dla zapisanego zgłoszenia i przekierowuje na stronę Tpay. Zwraca false, gdy się nie udało. */
+  const startOnlinePayment = async (editToken: string): Promise<boolean> => {
+    setOnlinePayBusy(true)
+    try {
+      const p = await startManagedPayment(editToken, { mode: 'due' })
+      track('online_payment_started', { mode: 'due', amount: p.amount, source: 'funnel' })
+      setOnlinePayState('redirecting')
+      window.location.assign(p.redirectUrl)
+      return true
+    } catch {
+      setOnlinePayState('failed')
+      setOnlinePayBusy(false)
+      return false
+    }
+  }
+
   const handleSummarySubmit = async () => {
-    if (!event || submitting) return
+    if (!event || submitting || createdRef.current) return
+    // Wybrana płatność online, ale nie jest (już) dostępna — nie wysyłamy zgłoszenia z metodą, której nie da się opłacić.
+    if (!preview && stepper.paymentMethod === 'online' && !pricingConfig.free && !onlineAvailable) {
+      patchStepper({ paymentMethod: onlyPaymentMethod && onlyPaymentMethod !== 'online' ? onlyPaymentMethod : null })
+      if (!onlyPaymentMethod || onlyPaymentMethod === 'online') setScreen('payment_method')
+      return
+    }
     if (preview) {
       // Podgląd: nic nie wysyłamy — pokazujemy ekran sukcesu z wyliczoną kwotą.
       setResult({ regId: 'PODGLĄD', status: 'AWAITING_TRANSFER' as RegistrationStatus, total: finalPrice?.total ?? 0 })
@@ -903,6 +941,9 @@ export default function PublicFunnel() {
         ...(invite ? { invitationToken: invite.token } : {}),
       }
       const res = await createRegistration(dto)
+      // Od tej chwili zgłoszenie istnieje: żadnej ponownej wysyłki, szkic do kosza.
+      createdRef.current = true
+      if (draftSlug) clearDraft(draftSlug)
       const editToken = (res.registration as { editToken?: string }).editToken
       setResult({
         regId: res.registration.id,
@@ -911,8 +952,18 @@ export default function PublicFunnel() {
         guestInviteHref: res.canInviteGuests && editToken ? `/g/${editToken}` : undefined,
         // Strona zgłoszenia (zmiana / domówienie noclegu) — gdy event oferuje noclegi.
         manageHref: hasAccommodation(pricingConfig) && editToken ? `/z/${editToken}` : undefined,
+        paymentsHref: !pricingConfig.free && editToken ? `/z/${editToken}` : undefined,
+        editToken,
       })
-      setScreen('success')
+      // Płatność online: od razu tworzymy płatność na kwotę wymaganą teraz i przekierowujemy do Tpay.
+      // Ekran sukcesu pokazujemy tak czy inaczej — z „Przekierowujemy…” albo (gdy się nie uda) z przyciskiem „Zapłać online”.
+      if (stepper.paymentMethod === 'online' && !pricingConfig.free && editToken) {
+        setOnlinePayState('redirecting')
+        setScreen('success')
+        void startOnlinePayment(editToken)
+      } else {
+        setScreen('success')
+      }
       // Konwersja: bez danych osobowych — tylko liczby, metoda płatności i nocleg.
       {
         const inRooms = new Set(stepper.rooms.flatMap((r) => r.participantIndexes)).size
@@ -985,10 +1036,17 @@ export default function PublicFunnel() {
     !!stepper.applicant.community &&
     stepper.applicant.community !== COMMUNITY_OTHER
 
+  // Płatność online: tylko gdy API zgłasza dostawcę, kwota jest w PLN i reguła kraj / język daje Tpay.
+  // Formularz nie zbiera kraju zamieszkania, więc tu decyduje język interfejsu (ta sama funkcja co w API).
+  const onlineAvailable =
+    (pricingConfig.currency ?? 'PLN') === 'PLN' && onlineProviderFor(undefined, lng, onlineProviders) === 'tpay'
+
   // Sposoby płatności, które ten gość faktycznie zobaczy (jak w PaymentMethodScreen).
-  const guestPaymentMethods = (
+  const guestPaymentMethodsRaw = (
     event?.paymentMethods && event.paymentMethods.length > 0 ? event.paymentMethods : (['ONLINE', 'BANK_TRANSFER'] as PaymentMethod[])
-  ).filter((m) => m !== 'LEADER_DEPOSIT' || leaderEligible)
+  ).filter((m) => (m !== 'LEADER_DEPOSIT' || leaderEligible) && (m !== 'ONLINE' || onlineAvailable))
+  // Event tylko z płatnością online, a ten gość jej nie dostaje → zostaje przelew (żeby dało się zapisać).
+  const guestPaymentMethods = guestPaymentMethodsRaw.length > 0 ? guestPaymentMethodsRaw : (['BANK_TRANSFER'] as PaymentMethod[])
   const onlyPaymentMethod: StepperState['paymentMethod'] =
     guestPaymentMethods.length === 1
       ? ({ CASH: 'cash', BANK_TRANSFER: 'transfer', ONLINE: 'online', LEADER_DEPOSIT: 'leader' } as const)[guestPaymentMethods[0] as 'CASH']
@@ -1118,7 +1176,7 @@ export default function PublicFunnel() {
           onSelect={(method) => patchStepper({ paymentMethod: method })}
           onContinue={handlePaymentMethodContinue}
           onBack={handlePaymentMethodBack}
-          availableMethods={event.paymentMethods}
+          availableMethods={guestPaymentMethods}
           leaderEligible={leaderEligible}
           leaderDepositPct={pricingConfig.leaderDepositPct}
           total={finalPrice?.total ?? 0}
@@ -1159,6 +1217,12 @@ export default function PublicFunnel() {
           onCreateAccount={handleCreateAccount}
           guestInviteHref={result?.guestInviteHref}
           manageHref={result?.manageHref}
+          paymentsHref={result?.paymentsHref}
+          onlinePay={
+            !preview && stepper.paymentMethod === 'online' && result?.editToken
+              ? { state: onlinePayState, busy: onlinePayBusy, onPay: () => { void startOnlinePayment(result.editToken as string) } }
+              : undefined
+          }
         />
       )}
     </div>

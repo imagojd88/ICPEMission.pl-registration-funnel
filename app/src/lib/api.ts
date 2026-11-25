@@ -1255,6 +1255,12 @@ export interface RegistrationPaymentRow {
   by: string | null
   sender: string | null
   title: string | null
+  /** wpłata online (Tpay): transakcja testowa (sandbox) */
+  testMode?: boolean
+  /** wpłata online (Tpay): wpłacono inną kwotę niż ta, na którą utworzono płatność */
+  mismatch?: boolean
+  /** wpłata online (Tpay): kwota, na którą utworzono płatność */
+  expected?: number | null
   createdAt: string
 }
 
@@ -1548,6 +1554,67 @@ export function updateManagedAccommodation(
     method: 'PUT',
     body: JSON.stringify({ rooms }),
   })
+}
+
+// ---------------------------------------------------------------------------
+// Płatności online (Tpay) — docs/20-plan-wdrozenie-tpay.md
+// ---------------------------------------------------------------------------
+
+/** Dostawcy płatności online skonfigurowani na serwerze (w trybie `mock` pusta lista). Błąd = brak płatności online. */
+export async function getPaymentsConfig(): Promise<{ providers: string[] }> {
+  try {
+    const r = await apiFetch<{ providers?: unknown }>('/payments/config')
+    return { providers: Array.isArray(r?.providers) ? r.providers.filter((x): x is string => typeof x === 'string') : [] }
+  } catch {
+    return { providers: [] }
+  }
+}
+
+export type OnlineUnavailableReason = 'NOT_CONFIGURED' | 'EVENT_DISABLED' | 'CURRENCY' | 'NOT_ELIGIBLE' | 'CANCELLED' | 'NOTHING_TO_PAY'
+
+export interface ManagedPayments {
+  registrationId: string
+  status: RegistrationStatus
+  currency: 'PLN' | 'EUR' | 'USD'
+  summary: NonNullable<RegistrationDto['payment']>
+  /** granice kwoty płatności online: `due` = „Zapłać teraz”, `min`…`max` = „Inna kwota” */
+  bounds: { due: number; min: number; max: number }
+  payments: Array<{ id: string; amount: number; currency: string; status: 'PAID' | 'REFUNDED'; source: 'online' | 'transfer' | 'cash'; paidAt: string }>
+  lastAttempt: { status: 'CREATED' | 'PENDING' | 'PAID' | 'REFUNDED' | 'FAILED' | 'EXPIRED'; amount: number; paidAmount: number | null; createdAt: string } | null
+  online: { available: boolean; provider: 'tpay' | null; reason: OnlineUnavailableReason | null }
+}
+
+/** Strona gościa: rozliczenie zgłoszenia, wpłaty i dostępność płatności online. */
+export function getManagedPayments(token: string): Promise<ManagedPayments> {
+  return apiFetch<ManagedPayments>(`/registrations/manage/${encodeURIComponent(token)}/payments`)
+}
+
+/** Tworzy płatność online; kwotę liczy i sprawdza serwer. Zwraca adres strony płatności Tpay. */
+export function startManagedPayment(
+  token: string,
+  dto: { mode: 'due' | 'remaining' | 'custom'; amount?: number },
+): Promise<{ redirectUrl: string; amount: number; currency: string }> {
+  return apiFetch(`/registrations/manage/${encodeURIComponent(token)}/pay`, { method: 'POST', body: JSON.stringify(dto) })
+}
+
+/** Panel ▸ Ustawienia ▸ Płatności online: tryb, środowisko, czy klucze ustawione (tylko tak / nie). */
+export interface OnlinePaymentsStatus {
+  mode: 'mock' | 'tpay'
+  env: 'sandbox' | 'production'
+  ready: boolean
+  missing: string[]
+  keys: { clientId: boolean; clientSecret: boolean; merchantId: boolean; securityCode: boolean; apiPublicUrl: boolean }
+  rootCa: 'env' | 'file' | 'download'
+  /** TPAY_ALLOW_TEST_MODE */
+  allowTestMode: boolean
+  /** flaga włączona na produkcji: testowe wpłaty potwierdzają zgłoszenia bez pieniędzy */
+  testModeOnProduction: boolean
+  notificationUrl: string | null
+  providers: string[]
+}
+
+export async function getOnlinePaymentsStatus(token?: string): Promise<OnlinePaymentsStatus> {
+  return apiFetch<OnlinePaymentsStatus>('/admin/payments/online-status', { headers: authHeaders(token) })
 }
 
 // ---------------------------------------------------------------------------

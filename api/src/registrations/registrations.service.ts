@@ -7,7 +7,8 @@ import { buildIcs, googleCalendarUrl } from '../shared';
 import { CreateRegistrationDto } from './dto/create-registration.dto';
 import { v4 as uuid } from 'uuid';
 import { guestInviteConfig, guestInvitePageLink, publicAppUrl } from '../invitations/guest-invite-config';
-import { buildPriceInput, hasAccommodation, roomLabel, leaderDepositSplit, cleanDonation, buildSchedule, hasPaymentPlan, minDepositPctFor, normalizePaymentPlan, warsawDate, pricingAt, PricingConfig, PriceAdjustment } from '../shared';
+import { buildPriceInput, hasAccommodation, roomLabel, leaderDepositSplit, cleanDonation, buildSchedule, hasPaymentPlan, minDepositPctFor, normalizePaymentPlan, warsawDate, pricingAt, contactCountry, onlineProviderFor, PricingConfig, PriceAdjustment } from '../shared';
+import { configuredOnlineProviders } from '../payments/tpay-config';
 import type { MailAccommodation } from '../notifications/notifications.service';
 import { assertRoomStock, instanceRoomAvailability } from './room-stock';
 import { LeadsService } from './leads.service';
@@ -266,6 +267,14 @@ export class RegistrationsService {
       })(),
       accommodation: mailAccommodation(cfg, rooms, n, mailLang(dto.locale)),
       manageLink: hasAccommodation(cfg) ? manageRegistrationLink(editToken) : undefined,
+      // Strona zgłoszenia (stan, harmonogram, wpłaty) — w każdym potwierdzeniu płatnego eventu.
+      statusLink: priceResult.total > 0 ? manageRegistrationLink(editToken) : undefined,
+      // Płatność online: event ma ONLINE, PLN i reguła kraj / język daje Tpay (w trybie mock zawsze false).
+      payOnline:
+        priceResult.total > 0 &&
+        ((instance as { paymentMethods?: string[] }).paymentMethods ?? []).includes('ONLINE') &&
+        String(priceResult.currency || 'PLN').toUpperCase() === 'PLN' &&
+        onlineProviderFor(contactCountry(dto.contact), dto.locale, configuredOnlineProviders()) === 'tpay',
     }).catch(console.error);
 
     // Formacja online: kurs z `grantOn = ANY_ACTIVE` daje dostęp już od zapisu.

@@ -13,6 +13,7 @@ import LanguageSwitch from '../components/ui/LanguageSwitch'
 import Step3Room from '../components/funnel/steps/Step3Room'
 import CashAmountBox from '../components/funnel/CashAmountBox'
 import LeaderDepositBox from '../components/funnel/LeaderDepositBox'
+import ManagePayments from '../components/funnel/ManagePayments'
 import type { Participant, RoomEntry } from './PublicFunnel'
 
 let uid = 0
@@ -272,6 +273,15 @@ export default function ManageRegistration() {
           >
             {saving ? t('manage.saving') : t('manage.save')}
           </button>
+        )}
+
+        {/* Płatności: harmonogram, wpłaty i (gdy dostępna) płatność online. Po wpłacie odświeżamy zgłoszenie (status). */}
+        {!cfg.free && token && (
+          <ManagePayments
+            token={token}
+            refreshKey={reg.totalPrice}
+            onChanged={() => { void getManagedRegistration(token).then(apply).catch(() => undefined) }}
+          />
         )}
 
         {!cfg.free && isCash && reg.status !== 'CONFIRMED' && <CashAmountBox total={reg.totalPrice} currency={currency} />}

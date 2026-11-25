@@ -265,7 +265,7 @@
   "payment_method": {
     "title": "Wybierz metodę płatności",
     "online": "Płatność online",
-    "online_tags": "BLIK · Visa · Mastercard",
+    "online_tags": "BLIK · szybki przelew (Tpay)",
     "transfer": "Przelew tradycyjny",
     "transfer_tags": "Przelew bankowy",
     "cta": "Przejdź do podsumowania →",
@@ -361,7 +361,14 @@
     "status_cash": "Płatność na miejscu",
     "leader_msg": "Twoje zgłoszenie zostało przyjęte. Przekaż zaliczkę liderowi wspólnoty, resztę zapłacisz gotówką na miejscu.",
     "status_leader": "Zaliczka u lidera",
-    "pay_now": "Do wpłaty teraz"
+    "pay_now": "Do wpłaty teraz",
+    "online_title": "Zgłoszenie przyjęte",
+    "online_msg": "Twoje zgłoszenie zostało przyjęte. Aby je potwierdzić, dokończ płatność online.",
+    "online_redirecting": "Przekierowujemy do płatności…",
+    "online_cta": "Zapłać online",
+    "online_error": "Nie udało się rozpocząć płatności online. Spróbuj ponownie — zgłoszenie jest już zapisane, nie trzeba wysyłać go drugi raz.",
+    "status_online": "Oczekuje na płatność",
+    "payments_link": "Zobacz zgłoszenie i wpłaty"
   },
   "admin": {
     "dashboard": "Dashboard",
@@ -680,5 +687,40 @@
       "reopen": "Otwórz ponownie",
       "err_note": "Opisz prośbę w notatce."
     }
+  },
+  "pay": {
+    "title": "Płatności",
+    "total": "Kwota zgłoszenia",
+    "paid": "Wpłacono",
+    "remaining": "Pozostało do zapłaty",
+    "due_now": "Do wpłaty teraz",
+    "schedule": "Harmonogram wpłat",
+    "at_registration": "przy rejestracji",
+    "due_by": "do {{date}}",
+    "installment": "Wpłata",
+    "history": "Zaksięgowane wpłaty",
+    "no_payments": "Nie zaksięgowaliśmy jeszcze żadnej wpłaty.",
+    "src_online": "online",
+    "src_transfer": "przelew",
+    "src_cash": "gotówka",
+    "refunded": "zwrócono",
+    "fully_paid": "Zgłoszenie jest opłacone w całości. Dziękujemy!",
+    "online_title": "Zapłać online",
+    "methods": "BLIK · szybki przelew (Tpay)",
+    "pay_now": "Zapłać teraz {{amount}}",
+    "pay_all": "Zapłać całość {{amount}}",
+    "pay_custom": "Inna kwota",
+    "custom_label": "Kwota wpłaty",
+    "custom_range": "Od {{min}} do {{max}}",
+    "custom_submit": "Zapłać",
+    "custom_invalid": "Podaj kwotę od {{min}} do {{max}}.",
+    "redirecting": "Przekierowujemy do płatności…",
+    "checking": "Sprawdzamy płatność…",
+    "confirmed": "Płatność zaksięgowana. Dziękujemy!",
+    "still_pending": "Nie mamy jeszcze potwierdzenia płatności. Zwykle trwa to do kilku minut — gdy wpłata dotrze, wyślemy maila. Możesz odświeżyć stronę później.",
+    "return_error": "Płatność nie została zrealizowana. Możesz spróbować ponownie.",
+    "start_error": "Nie udało się rozpocząć płatności.",
+    "load_error": "Nie udało się wczytać wpłat. Odśwież stronę.",
+    "refresh": "Odśwież"
   }
 }

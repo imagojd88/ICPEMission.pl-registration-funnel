@@ -255,7 +255,7 @@
   "payment_method": {
     "title": "选择付款方式",
     "online": "在线支付",
-    "online_tags": "BLIK · Visa · Mastercard",
+    "online_tags": "BLIK · 快速银行转账 (Tpay)",
     "transfer": "银行转账",
     "transfer_tags": "银行转账",
     "cta": "前往汇总 →",
@@ -351,7 +351,14 @@
     "status_cash": "现场支付",
     "leader_msg": "您的报名已收到。请将定金交给您的团体负责人，其余款项在现场以现金支付。",
     "status_leader": "负责人定金",
-    "pay_now": "现在应付"
+    "pay_now": "现在应付",
+    "online_title": "报名已收到",
+    "online_msg": "我们已收到您的报名。请完成在线付款以确认报名。",
+    "online_redirecting": "正在跳转到付款页面…",
+    "online_cta": "在线付款",
+    "online_error": "无法发起在线付款。请重试——您的报名已保存，无需再次提交。",
+    "status_online": "等待付款",
+    "payments_link": "查看报名和付款情况"
   },
   "admin": {
     "dashboard": "概览",
@@ -670,5 +677,40 @@
       "reopen": "Reopen",
       "err_note": "Describe the request in the note."
     }
+  },
+  "pay": {
+    "title": "付款",
+    "total": "报名总金额",
+    "paid": "已付",
+    "remaining": "待付金额",
+    "due_now": "现在应付",
+    "schedule": "付款时间表",
+    "at_registration": "报名时",
+    "due_by": "{{date}}前",
+    "installment": "付款",
+    "history": "已入账的付款",
+    "no_payments": "我们尚未记录任何付款。",
+    "src_online": "在线",
+    "src_transfer": "银行转账",
+    "src_cash": "现金",
+    "refunded": "已退款",
+    "fully_paid": "您的报名费用已全部付清。谢谢！",
+    "online_title": "在线付款",
+    "methods": "BLIK · 快速银行转账 (Tpay)",
+    "pay_now": "立即支付 {{amount}}",
+    "pay_all": "全额支付 {{amount}}",
+    "pay_custom": "其他金额",
+    "custom_label": "付款金额",
+    "custom_range": "{{min}} 至 {{max}}",
+    "custom_submit": "支付",
+    "custom_invalid": "请输入 {{min}} 至 {{max}} 之间的金额。",
+    "redirecting": "正在跳转到付款页面…",
+    "checking": "正在确认您的付款…",
+    "confirmed": "付款已入账。谢谢！",
+    "still_pending": "我们尚未收到付款确认。通常需要几分钟——到账后我们会发邮件通知您。您可以稍后刷新页面。",
+    "return_error": "付款未完成。您可以重试。",
+    "start_error": "无法发起付款。",
+    "load_error": "无法加载付款记录。请刷新页面。",
+    "refresh": "刷新"
   }
 }

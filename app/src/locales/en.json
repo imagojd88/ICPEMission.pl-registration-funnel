@@ -255,7 +255,7 @@
   "payment_method": {
     "title": "Choose payment method",
     "online": "Online payment",
-    "online_tags": "BLIK · Visa · Mastercard",
+    "online_tags": "BLIK · fast bank transfer (Tpay)",
     "transfer": "Bank transfer",
     "transfer_tags": "Bank transfer",
     "cta": "Proceed to summary →",
@@ -351,7 +351,14 @@
     "status_cash": "Pay on site",
     "leader_msg": "Your registration has been received. Hand the deposit to your community leader and pay the rest in cash on site.",
     "status_leader": "Leader deposit",
-    "pay_now": "To pay now"
+    "pay_now": "To pay now",
+    "online_title": "Registration received",
+    "online_msg": "Your registration has been received. To confirm it, please complete the online payment.",
+    "online_redirecting": "Redirecting to payment…",
+    "online_cta": "Pay online",
+    "online_error": "We could not start the online payment. Please try again — your registration is already saved, there is no need to submit it again.",
+    "status_online": "Awaiting payment",
+    "payments_link": "View registration and payments"
   },
   "admin": {
     "dashboard": "Dashboard",
@@ -670,5 +677,40 @@
       "reopen": "Reopen",
       "err_note": "Describe the request in the note."
     }
+  },
+  "pay": {
+    "title": "Payments",
+    "total": "Registration total",
+    "paid": "Paid",
+    "remaining": "Remaining",
+    "due_now": "Due now",
+    "schedule": "Payment schedule",
+    "at_registration": "on registration",
+    "due_by": "by {{date}}",
+    "installment": "Payment",
+    "history": "Recorded payments",
+    "no_payments": "We have not recorded any payment yet.",
+    "src_online": "online",
+    "src_transfer": "bank transfer",
+    "src_cash": "cash",
+    "refunded": "refunded",
+    "fully_paid": "Your registration is paid in full. Thank you!",
+    "online_title": "Pay online",
+    "methods": "BLIK · fast bank transfer (Tpay)",
+    "pay_now": "Pay now {{amount}}",
+    "pay_all": "Pay in full {{amount}}",
+    "pay_custom": "Other amount",
+    "custom_label": "Payment amount",
+    "custom_range": "From {{min}} to {{max}}",
+    "custom_submit": "Pay",
+    "custom_invalid": "Enter an amount from {{min}} to {{max}}.",
+    "redirecting": "Redirecting to payment…",
+    "checking": "Checking your payment…",
+    "confirmed": "Payment recorded. Thank you!",
+    "still_pending": "We have not received the payment confirmation yet. It usually takes a few minutes — we will email you once it arrives. You can refresh this page later.",
+    "return_error": "The payment was not completed. You can try again.",
+    "start_error": "We could not start the payment.",
+    "load_error": "We could not load your payments. Please refresh the page.",
+    "refresh": "Refresh"
   }
 }

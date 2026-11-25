@@ -71,9 +71,13 @@ export class PaymentsService {
     return { ok: true, regId, paymentId: payment.id };
   }
 
-  async handleWebhook(provider: string, payload: unknown, signature?: string) {
-    // Production: verify signature, update payment + registration
-    console.log(`[WEBHOOK:${provider}]`, payload, 'sig:', signature);
+  /**
+   * Powiadomienia od operatorów innych niż Tpay (Tpay ma własną trasę z weryfikacją podpisu:
+   * `payments/webhook/tpay`). Niczego nie księgujemy i NIE logujemy ładunku ani podpisu —
+   * powiadomienie może zawierać dane płatnika.
+   */
+  async handleWebhook(provider: string) {
+    console.log(`[WEBHOOK] powiadomienie od nieobsługiwanego operatora: ${String(provider).replace(/[^a-z0-9_-]/gi, '').slice(0, 30)}`);
     return { received: true };
   }
 }

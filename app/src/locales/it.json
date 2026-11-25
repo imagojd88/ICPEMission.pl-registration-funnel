@@ -259,7 +259,7 @@
   "payment_method": {
     "title": "Scegli il metodo di pagamento",
     "online": "Pagamento online",
-    "online_tags": "BLIK · Visa · Mastercard",
+    "online_tags": "BLIK · bonifico rapido (Tpay)",
     "transfer": "Bonifico bancario",
     "transfer_tags": "Bonifico bancario",
     "cta": "Vai al riepilogo →",
@@ -355,7 +355,14 @@
     "status_cash": "Pagamento sul posto",
     "leader_msg": "La tua iscrizione è stata ricevuta. Consegna l’acconto al responsabile della comunità e paga il saldo in contanti sul posto.",
     "status_leader": "Acconto al responsabile",
-    "pay_now": "Da pagare ora"
+    "pay_now": "Da pagare ora",
+    "online_title": "Iscrizione ricevuta",
+    "online_msg": "La tua iscrizione è stata ricevuta. Per confermarla, completa il pagamento online.",
+    "online_redirecting": "Reindirizzamento al pagamento…",
+    "online_cta": "Paga online",
+    "online_error": "Non è stato possibile avviare il pagamento online. Riprova — la tua iscrizione è già salvata, non è necessario inviarla di nuovo.",
+    "status_online": "In attesa di pagamento",
+    "payments_link": "Vedi iscrizione e pagamenti"
   },
   "admin": {
     "dashboard": "Dashboard",
@@ -674,5 +681,40 @@
       "reopen": "Riapri",
       "err_note": "Descrivi la richiesta nella nota."
     }
+  },
+  "pay": {
+    "title": "Pagamenti",
+    "total": "Totale iscrizione",
+    "paid": "Pagato",
+    "remaining": "Da pagare",
+    "due_now": "Da pagare ora",
+    "schedule": "Piano dei pagamenti",
+    "at_registration": "all'iscrizione",
+    "due_by": "entro il {{date}}",
+    "installment": "Pagamento",
+    "history": "Pagamenti registrati",
+    "no_payments": "Non abbiamo ancora registrato alcun pagamento.",
+    "src_online": "online",
+    "src_transfer": "bonifico",
+    "src_cash": "contanti",
+    "refunded": "rimborsato",
+    "fully_paid": "L'iscrizione è stata pagata per intero. Grazie!",
+    "online_title": "Paga online",
+    "methods": "BLIK · bonifico rapido (Tpay)",
+    "pay_now": "Paga ora {{amount}}",
+    "pay_all": "Paga tutto {{amount}}",
+    "pay_custom": "Altro importo",
+    "custom_label": "Importo del pagamento",
+    "custom_range": "Da {{min}} a {{max}}",
+    "custom_submit": "Paga",
+    "custom_invalid": "Inserisci un importo da {{min}} a {{max}}.",
+    "redirecting": "Reindirizzamento al pagamento…",
+    "checking": "Stiamo verificando il pagamento…",
+    "confirmed": "Pagamento registrato. Grazie!",
+    "still_pending": "Non abbiamo ancora ricevuto la conferma del pagamento. Di solito bastano pochi minuti — ti invieremo una e-mail appena arriva. Puoi aggiornare la pagina più tardi.",
+    "return_error": "Il pagamento non è stato completato. Puoi riprovare.",
+    "start_error": "Non è stato possibile avviare il pagamento.",
+    "load_error": "Non è stato possibile caricare i pagamenti. Aggiorna la pagina.",
+    "refresh": "Aggiorna"
   }
 }

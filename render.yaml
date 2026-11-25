@@ -40,8 +40,30 @@ services:
       # w mailach z zaproszeniem. Gdy pusty, fallback: CORS_ORIGIN.
       - key: PUBLIC_APP_URL
         value: https://rejestracja.icpemission.pl
-      - key: PAYMENTS_MODE
-        value: mock
+      # ── Płatności online (Tpay) — docs/20-plan-wdrozenie-tpay.md ──
+      # Wszystkie wartości ustawiasz w panelu Render (sync:false — Blueprint ich nie nadpisuje;
+      # dotąd PAYMENTS_MODE miało tu wpisane `mock`, co przy każdym pushu cofałoby przełączenie na `tpay`).
+      # Brak wartości = `mock` (płatności online wyłączone, GET /payments/config zwraca pustą listę).
+      - key: PAYMENTS_MODE             # 'mock' (domyślnie) | 'tpay'
+        sync: false
+      - key: TPAY_ENV                  # 'sandbox' (domyślnie) | 'production'
+        sync: false
+      - key: TPAY_CLIENT_ID            # klucz Open API (panel Tpay ▸ Integracja ▸ API)
+        sync: false
+      - key: TPAY_CLIENT_SECRET        # sekret Open API (widoczny w panelu Tpay tylko raz)
+        sync: false
+      - key: TPAY_MERCHANT_ID          # ID sprzedawcy — porównywane z polem `id` powiadomienia
+        sync: false
+      - key: TPAY_SECURITY_CODE        # kod bezpieczeństwa (panel Tpay ▸ Ustawienia ▸ Powiadomienia) do md5sum
+        sync: false
+      - key: API_PUBLIC_URL            # publiczny adres API (https://…, bez końcowego /) — z niego powstaje adres powiadomień
+        sync: false
+      - key: TPAY_ALLOW_TEST_MODE      # 'true' | 'false' (domyślnie false): na PRODUKCJI przyjmuj powiadomienia z test_mode=1 (tryb testowy konta); po testach ustaw false
+        sync: false
+      - key: TPAY_ROOT_CA_PEM          # opcjonalnie: treść root CA Tpay (PEM); bez niej root CA pobierany z oficjalnego adresu
+        sync: false
+      - key: TPAY_ROOT_CA_FILE         # opcjonalnie: ścieżka do pliku z root CA Tpay (zamiast TPAY_ROOT_CA_PEM)
+        sync: false
       # Mail: ustaw w panelu Render (Blueprint nie nadpisuje — sync:false).
       # Zalecane: Resend — wklej RESEND_API_KEY, a MAIL_MODE ustaw na 'resend' (albo zostaw puste:
       # sam klucz włącza Resend). Stan i mail testowy: panel ▸ Ustawienia ▸ E-mail.
