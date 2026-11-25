@@ -1,6 +1,6 @@
 /**
  * Kraje do wyboru w edycji eventu (EventInstance.countryCode = ISO 3166-1 alpha-2).
- * Zapisujemy wyłącznie kod; nazwę wyświetlamy po polsku przez Intl.DisplayNames.
+ * Zapisujemy wyłącznie kod; nazwę wyświetlamy w języku aktywnej zakładki (Intl.DisplayNames).
  */
 
 /** Kraje, w których ICPE najczęściej organizuje eventy — na górze listy. */
@@ -17,27 +17,48 @@ export const ALL_COUNTRY_CODES = (
   'UM US UY UZ VA VC VE VG VI VN VU WF WS YE YT ZA ZM ZW'
 ).split(' ')
 
-let displayNames: Intl.DisplayNames | null = null
-try {
-  displayNames = new Intl.DisplayNames(['pl'], { type: 'region' })
-} catch {
-  displayNames = null
+/** Nazwy krajów per język interfejsu (pl, en, it, ko, zh) — tworzone leniwie i trzymane w pamięci. */
+const displayNamesCache = new Map<string, Intl.DisplayNames | null>()
+
+function namesFor(lang: string): Intl.DisplayNames | null {
+  const l = (lang || 'pl').toLowerCase()
+  if (!displayNamesCache.has(l)) {
+    let dn: Intl.DisplayNames | null = null
+    try {
+      // zh = chiński uproszczony (jak w zapisach).
+      dn = new Intl.DisplayNames([l === 'zh' ? 'zh-Hans' : l], { type: 'region' })
+    } catch {
+      dn = null
+    }
+    displayNamesCache.set(l, dn)
+  }
+  return displayNamesCache.get(l) ?? null
 }
 
-/** Nazwa kraju po polsku (np. „Polska”); bez wsparcia Intl → sam kod. */
-export function countryName(code: string): string {
+/** Nazwa kraju w danym języku (np. PL → „Polska” / „Poland” / „Polonia”); bez wsparcia Intl → sam kod. */
+export function countryName(code: string, lang = 'pl'): string {
   try {
-    return displayNames?.of(code) ?? code
+    return namesFor(lang)?.of(code) ?? code
   } catch {
     return code
   }
 }
 
-/** Opcje listy: najpierw częste kraje, potem wszystkie pozostałe alfabetycznie po polskiej nazwie. */
-export function countryOptions(): { common: { code: string; name: string }[]; rest: { code: string; name: string }[] } {
-  const common = COMMON_COUNTRY_CODES.map((code) => ({ code, name: countryName(code) }))
+export type CountryOption = { code: string; name: string }
+
+const optionsCache = new Map<string, { common: CountryOption[]; rest: CountryOption[] }>()
+
+/** Opcje listy w danym języku: najpierw częste kraje, potem pozostałe alfabetycznie. */
+export function countryOptions(lang = 'pl'): { common: CountryOption[]; rest: CountryOption[] } {
+  const l = (lang || 'pl').toLowerCase()
+  const hit = optionsCache.get(l)
+  if (hit) return hit
+  const collator = l === 'zh' ? 'zh-Hans' : l
+  const common = COMMON_COUNTRY_CODES.map((code) => ({ code, name: countryName(code, l) }))
   const rest = ALL_COUNTRY_CODES.filter((c) => !COMMON_COUNTRY_CODES.includes(c))
-    .map((code) => ({ code, name: countryName(code) }))
-    .sort((a, b) => a.name.localeCompare(b.name, 'pl'))
-  return { common, rest }
+    .map((code) => ({ code, name: countryName(code, l) }))
+    .sort((a, b) => a.name.localeCompare(b.name, collator))
+  const out = { common, rest }
+  optionsCache.set(l, out)
+  return out
 }

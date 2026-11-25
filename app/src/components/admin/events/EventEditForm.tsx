@@ -36,9 +36,6 @@ import { SUPERTITLE_PRESETS, isPresetSupertitle } from '@/lib/supertitles'
 import { DEFAULT_PRICING } from '@icpe/shared'
 import type { PricingConfig } from '@icpe/shared'
 
-/** Lista krajów (pole „Kraj”) — liczona raz, nazwy po polsku. */
-const COUNTRY_OPTIONS = countryOptions()
-
 /** Języki dodatkowe eventu (PL i EN są zawsze). */
 const OPTIONAL_LANGS = ['it', 'ko', 'zh'] as const
 const OPTIONAL_LANG_TITLE: Record<string, string> = { it: 'Włoski', ko: 'Koreański', zh: 'Chiński (uproszczony)' }
@@ -723,7 +720,7 @@ export default function EventEditForm({
           </div>
           )}
         </Field>
-        <Field label="Kraj">
+        <Field label={`Kraj${multi ? ` — nazwy: ${LANG_LABEL[editLang]}` : ''}`}>
           <div className="flex flex-col gap-1">
             <select
               value={countryCode}
@@ -733,18 +730,18 @@ export default function EventEditForm({
             >
               <option value="">— nie wybrano —</option>
               <optgroup label="Najczęstsze">
-                {COUNTRY_OPTIONS.common.map((c) => (
+                {countryOptions(editLang).common.map((c) => (
                   <option key={c.code} value={c.code}>{c.name}</option>
                 ))}
               </optgroup>
               <optgroup label="Wszystkie kraje">
-                {COUNTRY_OPTIONS.rest.map((c) => (
+                {countryOptions(editLang).rest.map((c) => (
                   <option key={c.code} value={c.code}>{c.name}</option>
                 ))}
               </optgroup>
             </select>
             <p className="text-xs" style={{ color: 'var(--faint)' }}>
-              Kraj miejsca eventu. Zapisujemy kod (np. PL), ICPE Go pokazuje nazwę w swoim języku.
+              Kraj miejsca eventu — jeden dla wszystkich wersji językowych; nazwy na liście zmieniają się z zakładką języka. Zapisujemy kod (np. PL), ICPE Go pokazuje nazwę w swoim języku.
             </p>
           </div>
         </Field>

@@ -51,6 +51,12 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — panel admina (kreator eventów)
 
+### Pole „Kraj”: nazwy krajów w języku zakładki (2026-11-25)
+- **Prośba (Jacek):** kraje mają się wyświetlać w wersjach językowych (w EN „Poland”, nie „Polska”).
+- **Zmiana:** `app/src/lib/countries.ts`: `countryName(code, lang)` i `countryOptions(lang)` (Intl.DisplayNames per język, `zh` = `zh-Hans`, sortowanie w danym języku, cache). `EventEditForm.tsx`: lista „Kraj” bierze nazwy z aktywnej zakładki języka (`editLang`): PL Polska, EN Poland, IT Polonia, KO 폴란드, ZH 波兰. Etykieta pola pokazuje język nazw. Kod (`countryCode`) jest jeden dla wszystkich języków, zapis bez zmian.
+- **Weryfikacja:** `tsc` app czysto. Backend bez zmian.
+- **Stan:** niewypchnięte; po pushu front wdroży się sam (bez Manual Deploy API).
+
 ### Event „United In Mission” utworzony na produkcji (2026-11-25)
 - **Adres:** https://rejestracja.icpemission.pl/r/united-in-mission · utworzony przez agenta w panelu (kreator + poprawki w „Edytuj event”). Zapisy zablokowane licznikiem do 16.01.2027 10:00 (status „Otwarty”).
 - **Ustawienia:** 22–27.08.2027, 5 nocy, Ośrodek h2o Kiczyce, limit 170, PLN, tylko przelew, języki PL/EN/IT, nadtytuł „Międzynarodowe Rekolekcje ICPE Mission”. Cennik early bird: formacja 0, wyżywienie 575; pokoje: miejsce w pokoju 125 zł/os/noc (cap 8), pokój dla dwóch osób 250 zł/pokój/noc (limit 18), jednoosobowy 365 zł/os/noc (limit 4), domek na wyłączność 1000 zł/pokój/noc (cap 11, limit 4). Progi: do 3 lat gratis; do 10 lat wyżywienie −26%. Diety: bez mięsa, wegańska, bez glutenu, bez laktozy. Darowizna włączona. Bez kodów rabatowych, transport i pościel 0.
