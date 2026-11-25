@@ -51,6 +51,33 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — panel admina (kreator eventów)
 
+### Event „United In Mission” utworzony na produkcji (2026-11-25)
+- **Adres:** https://rejestracja.icpemission.pl/r/united-in-mission · utworzony przez agenta w panelu (kreator + poprawki w „Edytuj event”). Zapisy zablokowane licznikiem do 16.01.2027 10:00 (status „Otwarty”).
+- **Ustawienia:** 22–27.08.2027, 5 nocy, Ośrodek h2o Kiczyce, limit 170, PLN, tylko przelew, języki PL/EN/IT, nadtytuł „Międzynarodowe Rekolekcje ICPE Mission”. Cennik early bird: formacja 0, wyżywienie 575; pokoje: miejsce w pokoju 125 zł/os/noc (cap 8), pokój dla dwóch osób 250 zł/pokój/noc (limit 18), jednoosobowy 365 zł/os/noc (limit 4), domek na wyłączność 1000 zł/pokój/noc (cap 11, limit 4). Progi: do 3 lat gratis; do 10 lat wyżywienie −26%. Diety: bez mięsa, wegańska, bez glutenu, bez laktozy. Darowizna włączona. Bez kodów rabatowych, transport i pościel 0.
+- **Do zrobienia:** zdjęcie hero (plik `docs/united-in-mission-hero.jpg`, wgrać ręcznie w „Edytuj event”), numer konta i odbiorca przelewu, harmonogram wpłat (po wdrożeniu: 20% / 30% do 20.04.2027 / reszta do 31.07.2027, 50% dla pokoi i domku — propozycja, niepotwierdzona), progi Pre-Summer / Regular i EUR (funkcje niezbudowane).
+- **Błędy panelu wykryte przy okazji:** kreator zamienia 0 na domyślne (formacja 50, transport 40, pościel 15) i dodaje kod `ICPE10`; pole zniżki wiekowej nie przyjmuje ułamków (dziecko 3–9 wychodzi 1 051 zł zamiast 1 050 zł); podgląd w edycji ignoruje datę otwarcia zapisów; etykieta „Wyżywienie / doba” przy kwocie za cały pobyt; pole kodu rabatowego widoczne mimo braku kodów; nieistniejący slug pokazuje przykładowy event z `MOCK_INSTANCE` zamiast błędu; brak pola tagu pokoju w edycji.
+
+### API ICPE Go: kraj eventu `countryCode` (2026-11-25)
+- **Prośba:** ICPE Go pokazuje adres eventu i potrzebuje kraju; `location` to jeden tekst bez kraju.
+- **Baza:** `EventInstance.countryCode String?` (ISO 3166-1 alpha-2, null = nie ustawiono; obok `location`, które też siedzi na instancji). Wchodzi przez `prisma db push`. `cloneInstance` kopiuje kraj.
+- **Panel:** edycja eventu ▸ pole „Kraj” pod „Miejsce”: lista z polskimi nazwami (`Intl.DisplayNames`), najpierw częste (PL, IT, MT, DE, FR, ES, GB, IE, US, KR, CN, PH), potem wszystkie. Zapisuje kod. Lista kodów: `app/src/lib/countries.ts`.
+- **API:** `PATCH /admin/instances/:id` przyjmuje `countryCode` (wielkie litery; inny format niż 2 litery = 400; pusty = null); `GET /r/:slug/config` zwraca `countryCode`. ICPE Go: `countryCode` w obiekcie eventu (`/icpe-go/events`, `/icpe-go/events/:idOrSlug`), dodatkowo normalizowany do `^[A-Z]{2}$` albo null. `location` bez zmian.
+- **Swagger:** `api/src/icpe-go/icpe-go.dto.ts` + `@ApiOkResponse` na obu endpointach — tag `icpe-go` ma teraz pełny schemat odpowiedzi, w tym `countryCode`.
+- **Dokumentacja:** `docs/18-api-icpe-go.md` (wiersz `countryCode`, przykład, sekcja „Zmiany”), też w Projekcie Claude `plany/18-api-icpe-go.md`.
+- **Weryfikacja:** `tsc` app czysto; api tylko 3 stare błędy w `courses/*`. Na żywej bazie nietestowane.
+- **Stan:** niewypchnięte. W repo leżą też niezacommitowane zmiany z innej pracy (plan płatności, licznik miejsc w `events.service.ts`) — commit obejmie oba tematy, jeśli użyć `git add -A`. Po pushu **Manual Deploy `icpe-api`**, potem ustawić kraj przy udostępnionych eventach.
+
+### Harmonogram wpłat: dowolne % i terminy, wpłaty częściowe, przypomnienia (2026-11-25)
+- **Prośba (Jacek):** dowolny % i dowolne daty wymagalności w ustawieniach eventu, mail przypominający 3 dni przed terminem i 7 dni po terminie; import wyciągu PDF (mBank, Erste) do automatycznego księgowania wpłat.
+- **Model (shared `paymentPlan.ts` + lustro, bez zmian w bazie):** `PricingConfig.paymentPlan { enabled, installments[{ id, label?, pct, due: 'registration' | 'YYYY-MM-DD' }], remindBeforeDays (3), remindAfterDays (7) }`, `RoomTypeDef.depositPct?` (wyższy zadatek typu zakwaterowania, np. 50). Funkcje: `buildSchedule(total, plan, dataZapisu, minDepositPct)`, `paymentState(total, paid, schedule, today)`, `normalizePaymentPlan`, `minDepositPctFor`, `warsawDate`, `addDays`. Zasady: ostatnia rata domyka do 100%; rata z terminem sprzed daty zapisu jest wymagalna od razu (skleja się z zadatkiem); terminy wg Europe/Warsaw. Testy `paymentPlan.test.ts` (7) + silnik cen: razem 24/24.
+- **API:** `registrations/payment-plan.service.ts` (`PaymentPlanService`): `decorate` (lista zgłoszeń dostaje `paidAmount` + `payment { paid, dueNow, overdue, nextDue, depositPaid, schedule… }`; `paymentStatus` liczony z sumy wpłat tylko przy evencie z planem albo wpłatach z panelu/importu), `finance`, `paymentsOf`, `addPayment` (Payment `provider: 'panel' | 'bank-import'`, `raw { paidAt, by, note, sender, title }`, ochrona przed duplikatem po `externalId`), `voidPayment` (status FAILED, zostaje w historii), `syncStatus` (zadatek wpłacony → CONFIRMED; bez planu dopiero pełna kwota; nigdy nie cofa statusu), `runReminders`. Endpointy: `GET /admin/instances/:id/finance`, `GET|POST /admin/registrations/:id/payments`, `DELETE /admin/payments/:id`, `GET /cron/payment-reminders` (CRON_SECRET jak przy leadach). `markPaid` (oba miejsca) księguje brakującą RESZTĘ, nie drugi raz całość.
+- **Przypomnienia:** co godzinę (timer w API) dla eventów OPEN z planem; do zgłoszeń PENDING_PAYMENT / AWAITING_TRANSFER / CONFIRMED z niedopłatą najwcześniejszego progu: `PAYMENT_DUE_SOON` w oknie [termin − N dni, termin) i `PAYMENT_OVERDUE` od termin + M dni; każdy raz na ratę (deduplikacja po `Notification.type` + `payload.installmentId`); nie wysyła po rozpoczęciu wydarzenia. Treści PL/EN/KO/ZH z kwotą, sumą wpłat, danymi do przelewu z `paymentInfo` i numerem zgłoszenia. Mail potwierdzający ma blok „Harmonogram wpłat”.
+- **Panel:** `admin/events/PaymentPlanEditor.tsx` w „Edytuj event” (pod darowizną): włącznik, raty (nazwa, %, „przy rejestracji” / „do dnia”), dni przypomnień, wyższy zadatek per typ zakwaterowania; kreator tylko przenosi plan i `depositPct`. „Płatności”: kolumny Wpłacono / Najbliższy termin, statusy (Zadatek wpłacony, Częściowo, Zaległe X), filtr „Zaległe”, przycisk „Wpłaty” (harmonogram, historia, „Zaksięguj wpłatę” z kwotą/datą/metodą/notatką, „cofnij”), kafle Zadatki wpłacone / Wymagalne teraz / Po terminie + lista „Prognozowane wpłaty wg terminów”.
+- **Lejek:** podsumowanie pokazuje „Harmonogram wpłat”, ekran sukcesu „Do wpłaty teraz” (zadatek). Tłumaczenia PL/EN/IT/KO/ZH.
+- **Nie zrobione:** (1) import wyciągu PDF — brak przykładowych plików mBank / Erste, bez nich parser byłby zgadywaniem; potrzebna też biblioteka do PDF (npm install po stronie Jacka). (2) Strona gościa `/z/:token` nie pokazuje jeszcze wpłat i harmonogramu. (3) Progi cenowe z datami (early bird itd.) i druga waluta — nadal do zrobienia (dokument 19, sekcja 6).
+- **Weryfikacja:** tsc app ✓, api ✓ (poza `src/courses`), testy 24/24, `vite build` ✓ (obejście sandboxa: binarka esbuild w `node_modules/@esbuild/linux-arm64` ma 0 bajtów → `npm pack @esbuild/linux-arm64@0.21.5` do /tmp i `ESBUILD_BINARY_PATH=/tmp/esb/package/bin/esbuild npx vite build --outDir /tmp/icpe-build`). NIE przeklikane w przeglądarce (brak przeglądarki w sandboxie) i NIE uruchomione na bazie — filtr JSON deduplikacji przypomnień i księgowanie sprawdzić na evencie testowym.
+- Stan: do pushu + **Manual Deploy `icpe-api`**. Plan jest domyślnie wyłączony, więc istniejące eventy działają bez zmian.
+
 ### Start zapisów z datą i godziną + licznik na stronie eventu (2026-11-25)
 - **Prośba (Jacek):** utworzyć event ze wskazaną datą i godziną otwarcia rejestracji — strona już widoczna, a na niej licznik (countdown) do otwarcia.
 - **Stan zastany:** `EventInstance.registrationOpensAt` istniało w bazie, ale nic go nie używało (kreator wpisywał „teraz”). Bez zmian w schemacie.
@@ -941,6 +968,12 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 ### Panel — dodatkowe moduły
 - `AttendanceScreen.tsx` (obecność/check-in, `toggleRegistrationCheckIn`), `SettingsScreen.tsx` (Light/Dark, konto, API URL). Wpięte w `AdminPanel`.
 - `PublicHome.tsx` (route `/`) — strona główna z aktywnymi eventami; backend `listPublicActive()`.
+
+
+### 2026-11-25 — licznik wolnych miejsc na landingu
+- Bug: landing pokazywał „100 wolnych miejsc z 100" mimo zapisów. Przyczyna: `GET /r/:slug` (`EventsService.findBySlug`) zwracał surową instancję bez `registeredCount`, a `LandingScreen` liczy `capacity − (registeredCount ?? 0)`.
+- Fix (tylko API): `findBySlug` dokłada `registeredCount` = zajęte miejsca z nowej metody `takenSpots()` — suma **uczestników** (osób, min. 1 na zgłoszenie) zgłoszeń o statusie innym niż `CANCELLED`/`WAITLIST`. Front bez zmian.
+- Wdrożenie: push + Manual Deploy `icpe-api`.
 
 ---
 

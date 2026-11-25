@@ -11,6 +11,7 @@ Panel admina ▸ Eventy ▸ edycja eventu ▸ sekcja **ICPE Go** ▸ zaznacz **�
 - Po odznaczeniu event znika z listy, a pod swoim adresem zwraca `404`.
 - Po zaznaczeniu panel pokazuje adres tego eventu dla ICPE Go z przyciskiem „Kopiuj".
 - W bazie jest to pole `EventInstance.shareWithIcpeGo` (domyślnie `false`). Kolumnę dodaje `prisma db push` przy starcie API.
+- Kraj eventu wybiera się w tej samej edycji, w polu **„Kraj”** pod „Miejsce”. W bazie: `EventInstance.countryCode` (kod ISO, domyślnie `null`).
 
 ## Adres bazowy
 
@@ -73,6 +74,7 @@ Event nieudostępniony albo nieistniejący: `404`. API nie zdradza, czy taki eve
   "title": { "pl": "Rekolekcje wspólnot", "en": "Communities' Retreat", "it": "…" },
   "titleText": "Rekolekcje wspólnot",
   "location": "Ośrodek h2o, Kiczyce",
+  "countryCode": "PL",
   "startsAt": "2027-08-22T12:00:00.000Z",
   "endsAt": "2027-08-27T20:00:00.000Z",
   "status": "OPEN",
@@ -107,6 +109,8 @@ Event nieudostępniony albo nieistniejący: `404`. API nie zdradza, czy taki eve
 | `type` | `ONE_TIME` (zwykły z rejestracją), `STANDALONE` (bez rejestracji, potwierdzenie TAK/NIE), `INVITE` (na zaproszenie), `EVERGREEN`. |
 | `title` | Tytuł we wszystkich wpisanych językach (tylko niepuste). |
 | `titleText` | Tylko z `?lang=`. |
+| `location` | Miejsce jako jeden tekst, tak jak wpisano w panelu (bez kraju). |
+| `countryCode` | Kraj eventu: kod ISO 3166-1 alpha-2, wielkie litery, dokładnie 2 znaki (np. `"PL"`, `"IT"`, `"MT"`). `null`, gdy w panelu nie wybrano kraju. Bez nazwy kraju: ICPE Go tłumaczy ją sam. Ustawia się w edycji eventu, pole „Kraj” pod „Miejsce”. |
 | `startsAt`, `endsAt` | Początek i koniec, ISO 8601 w UTC. Do wyświetlania przelicz na `Europe/Warsaw`. |
 | `status` | `OPEN` (zapisy otwarte) albo `CLOSED` (zamknięte, zakończone lub zarchiwizowane). |
 | `registration.open` | Czy formularz przyjmuje zgłoszenia. Tak samo jak w publicznym formularzu: decyduje status eventu. |
@@ -125,7 +129,7 @@ Event nieudostępniony albo nieistniejący: `404`. API nie zdradza, czy taki eve
 
 ### Kogo liczymy
 
-Zgłoszenia w każdym statusie **poza anulowanymi i listą rezerwową**, czyli potwierdzone oraz czekające na wpłatę lub przelew. Tak samo liczy system przy przypomnieniach „zostały wolne miejsca". Potwierdzeni goście z eventów na zaproszenie są liczeni, bo po potwierdzeniu dostają zwykłe zgłoszenie z uczestnikami.
+Zgłoszenia w każdym statusie **poza anulowanymi i listą rezerwową**, czyli potwierdzone oraz czekające na wpłatę lub przelew. Osoby z listy rezerwowej nie zajmują miejsca, więc ich tu nie ma. Potwierdzeni goście z eventów na zaproszenie są liczeni, bo po potwierdzeniu dostają zwykłe zgłoszenie z uczestnikami.
 
 ## Przykłady
 
@@ -147,12 +151,17 @@ const { events } = await res.json()
 ## Uwagi dla ICPE Go
 
 - **Pierwsze żądanie bywa wolne.** API na Renderze potrafi się uśpić, więc pierwsze wywołanie po przerwie może trwać kilkanaście sekund. Warto pokazać stan ładowania i ustawić timeout na ok. 30 s.
-- Swagger z pełną listą: `https://icpe-api.onrender.com/docs`, tag **icpe-go**.
+- Swagger z pełną listą i schematem odpowiedzi: `https://icpe-api.onrender.com/docs`, tag **icpe-go**.
+
+## Zmiany
+
+- **2026-11-25:** nowe pole `countryCode` (ISO 3166-1 alpha-2 albo `null`). `location` bez zmian.
 
 ## Pliki w repo
 
-- `api/src/icpe-go/` — moduł (`icpe-go.controller.ts`, `icpe-go.service.ts`, `icpe-go.module.ts`)
-- `api/prisma/schema.prisma` — `EventInstance.shareWithIcpeGo`
+- `api/src/icpe-go/` — moduł (`icpe-go.controller.ts`, `icpe-go.service.ts`, `icpe-go.module.ts`, `icpe-go.dto.ts` = opis odpowiedzi w Swaggerze)
+- `api/prisma/schema.prisma` — `EventInstance.shareWithIcpeGo`, `EventInstance.countryCode`
 - `api/src/events/events.service.ts` — zapis przełącznika (`PATCH /admin/instances/:id`, pole `shareWithIcpeGo`) i odczyt w `GET /r/:slug/config`
-- `app/src/components/admin/events/EventEditForm.tsx` — sekcja „ICPE Go" w edycji eventu
+- `app/src/components/admin/events/EventEditForm.tsx` — sekcja „ICPE Go" i pole „Kraj” w edycji eventu
+- `app/src/lib/countries.ts` — lista kodów ISO i polskie nazwy krajów (Intl.DisplayNames)
 - `render.yaml`, `.env.example` — `ICPE_GO_API_KEY`

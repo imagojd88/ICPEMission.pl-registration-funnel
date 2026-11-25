@@ -120,6 +120,41 @@ function paymentLines(method: unknown, amount: string, lang: MailLang, total: nu
   })];
 }
 
+/** Data `YYYY-MM-DD` → zapis czytelny w języku maila (bez przesunięć stref czasowych). */
+function mailDate(date: string, lang: MailLang): string {
+  const [y, m, d] = String(date).split('-').map(Number);
+  if (!y || !m || !d) return String(date);
+  const locale = lang === 'pl' ? 'pl-PL' : lang === 'ko' ? 'ko-KR' : lang === 'zh' ? 'zh-CN' : 'en-GB';
+  return new Date(Date.UTC(y, m - 1, d, 12)).toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+}
+
+/** Harmonogram wpłat w mailu potwierdzającym (gdy event ma plan rat). */
+function scheduleLines(schedule: unknown, currency: string, lang: MailLang): string[] {
+  const items = (Array.isArray(schedule) ? schedule : []) as Array<{ label?: string; dueDate: string; amount: number; atRegistration?: boolean }>;
+  if (items.length === 0) return [];
+  const f = (n: number) => formatMoney(n, currency as 'PLN' | 'EUR' | 'USD', lang);
+  return [
+    '',
+    L(lang, { pl: 'Harmonogram wpłat:', en: 'Payment schedule:', ko: '납부 일정:', zh: '付款时间表：' }),
+    ...items.map((it) => {
+      const name = it.label ? `${it.label}: ` : '';
+      return it.atRegistration
+        ? L(lang, {
+            pl: `• ${name}${f(it.amount)} — przy rejestracji`,
+            en: `• ${name}${f(it.amount)} — on registration`,
+            ko: `• ${name}${f(it.amount)} — 신청 시`,
+            zh: `• ${name}${f(it.amount)} — 报名时`,
+          })
+        : L(lang, {
+            pl: `• ${name}${f(it.amount)} — do ${mailDate(it.dueDate, lang)}`,
+            en: `• ${name}${f(it.amount)} — by ${mailDate(it.dueDate, lang)}`,
+            ko: `• ${name}${f(it.amount)} — ${mailDate(it.dueDate, lang)}까지`,
+            zh: `• ${name}${f(it.amount)} — ${mailDate(it.dueDate, lang)}前`,
+          });
+    }),
+  ];
+}
+
 function buttonMail(intro: string[], button: { label: string; href: string } | null, outro: string[], lang: MailLang = 'pl'): { text: string; html: string } {
   const text = [...intro, ...(button ? [button.href, ''] : []), ...outro].join('\n');
   const p = (l: string) => (l === '' ? '<br/>' : `<p style="margin:0 0 6px">${esc(l)}</p>`);
@@ -498,6 +533,7 @@ export class NotificationsService {
           : []),
         ...accommodationLines(acc, lang),
         ...paymentLines(d.paymentMethod, amount, lang, total, String(d.currency ?? 'PLN'), d.leaderDepositPct as number | undefined),
+        ...scheduleLines(d.schedule, String(d.currency ?? 'PLN'), lang),
         '',
         L(lang, { pl: `Numer zgłoszenia: ${regNo}`, en: `Registration number: ${regNo}`, ko: `신청 번호: ${regNo}`, zh: `报名编号：${regNo}` }),
       ];
@@ -790,6 +826,72 @@ export class NotificationsService {
       return { subject, text, html };
     }
 
+    if (payload.type === 'PAYMENT_DUE_SOON' || payload.type === 'PAYMENT_OVERDUE') {
+      // Przypomnienie o racie: 3 dni przed terminem / ponaglenie 7 dni po terminie (liczby dni z planu eventu).
+      const lang = mailLangOf(payload.locale);
+      const overdue = payload.type === 'PAYMENT_OVERDUE';
+      const cur = String(d.currency ?? 'PLN') as 'PLN' | 'EUR' | 'USD';
+      const f = (n: unknown) => formatMoney(Number(n ?? 0), cur, lang);
+      const title = String(d.eventTitle ?? L(lang, { pl: 'wydarzenie', en: 'the event', ko: '행사', zh: '活动' }));
+      const due = mailDate(String(d.dueDate ?? ''), lang);
+      const regNo = String(payload.registrationId ?? '');
+      const subject = overdue
+        ? L(lang, { pl: `Zaległa wpłata — ${title}`, en: `Overdue payment — ${title}`, ko: `미납 안내 — ${title}`, zh: `逾期付款提醒 — ${title}` })
+        : L(lang, { pl: `Przypomnienie o wpłacie — ${title}`, en: `Payment reminder — ${title}`, ko: `납부 안내 — ${title}`, zh: `付款提醒 — ${title}` });
+      const lead = overdue
+        ? L(lang, {
+            pl: `Termin wpłaty za udział w wydarzeniu „${title}” minął ${due}, a nie odnotowaliśmy jeszcze pełnej kwoty.`,
+            en: `The payment for "${title}" was due on ${due} and we have not yet recorded the full amount.`,
+            ko: `「${title}」 참가비 납부 기한(${due})이 지났으나 아직 전액이 확인되지 않았습니다.`,
+            zh: `「${title}」的付款期限（${due}）已过，我们尚未收到全部应付款项。`,
+          })
+        : L(lang, {
+            pl: `Przypominamy, że ${due} mija termin kolejnej wpłaty za udział w wydarzeniu „${title}”.`,
+            en: `A reminder that the next payment for "${title}" is due on ${due}.`,
+            ko: `「${title}」 참가비의 다음 납부 기한은 ${due}입니다.`,
+            zh: `提醒您：「${title}」的下一笔付款将于 ${due} 到期。`,
+          });
+      const intro = [
+        greetingLine(lang),
+        '',
+        lead,
+        L(lang, { pl: `Do wpłaty: ${f(d.amount)}.`, en: `Amount due: ${f(d.amount)}.`, ko: `납부하실 금액: ${f(d.amount)}.`, zh: `应付金额：${f(d.amount)}。` }),
+        L(lang, {
+          pl: `Dotychczas wpłacono ${f(d.paid)} z ${f(d.total)}.`,
+          en: `Paid so far: ${f(d.paid)} of ${f(d.total)}.`,
+          ko: `현재까지 납부액: ${f(d.total)} 중 ${f(d.paid)}.`,
+          zh: `已付：${f(d.paid)}，总额 ${f(d.total)}。`,
+        }),
+        ...(d.account
+          ? ['', L(lang, {
+              pl: `Przelew: ${d.recipient ? `${String(d.recipient)}, ` : ''}rachunek ${String(d.account)}. W tytule podaj numer zgłoszenia: ${regNo}.`,
+              en: `Bank transfer: ${d.recipient ? `${String(d.recipient)}, ` : ''}account ${String(d.account)}. Please put your registration number in the transfer title: ${regNo}.`,
+              ko: `계좌 이체: ${d.recipient ? `${String(d.recipient)}, ` : ''}계좌 ${String(d.account)}. 이체 메모에 신청 번호를 적어 주세요: ${regNo}.`,
+              zh: `银行转账：${d.recipient ? `${String(d.recipient)}，` : ''}账号 ${String(d.account)}。请在转账备注中填写报名编号：${regNo}。`,
+            })]
+          : ['', L(lang, { pl: `Numer zgłoszenia: ${regNo}`, en: `Registration number: ${regNo}`, ko: `신청 번호: ${regNo}`, zh: `报名编号：${regNo}` })]),
+        '',
+      ];
+      const outro = [
+        L(lang, {
+          pl: 'Jeśli wpłata została już wysłana, prosimy zignorować tę wiadomość — księgowanie może potrwać kilka dni.',
+          en: 'If you have already sent the payment, please ignore this message — it can take a few days to be recorded.',
+          ko: '이미 납부하셨다면 이 메일은 무시하셔도 됩니다. 입금 확인에는 며칠이 걸릴 수 있습니다.',
+          zh: '如果您已付款，请忽略此邮件——入账可能需要几天时间。',
+        }),
+        '',
+        ...signature(lang),
+      ];
+      const link = String(d.manageLink ?? '');
+      const { text, html } = buttonMail(
+        intro,
+        link ? { label: L(lang, { pl: 'Zobacz zgłoszenie', en: 'View registration', ko: '신청 내역 보기', zh: '查看报名' }), href: link } : null,
+        outro,
+        lang,
+      );
+      return { subject, text, html };
+    }
+
     if (payload.type === 'PAYMENT_REMINDER') {
       const subject = `Przypomnienie o płatności — ${String(d.transferTitle ?? '')}`;
       const text = `Dzień dobry,\n\nPrzypominamy o płatności na kwotę ${money(d.amount, 'PLN')} (tytuł: ${String(
@@ -922,6 +1024,8 @@ export class NotificationsService {
     leaderDepositPct?: number;
     /** Dobrowolna darowizna gościa (już wliczona w totalPrice) — mail za nią dziękuje. */
     donation?: number;
+    /** Harmonogram wpłat zgłoszenia (gdy event ma plan rat). */
+    schedule?: Array<{ label?: string; dueDate: string; amount: number; atRegistration?: boolean }>;
   }) {
     await this.sendMail({
       to: opts.to,
@@ -950,6 +1054,23 @@ export class NotificationsService {
         data: { ...opts, guestEmail: opts.to, eventTitle: opts.eventTitle },
       });
     }
+  }
+
+  /** Przypomnienie o racie przed terminem / ponaglenie po terminie (harmonogram wpłat eventu). */
+  async sendInstallmentReminder(opts: {
+    kind: 'PAYMENT_DUE_SOON' | 'PAYMENT_OVERDUE';
+    to: string; locale: string; registrationId: string;
+    /** identyfikator raty — po nim sprawdzamy, czy przypomnienie już poszło */
+    installmentId: string; label?: string; dueDate: string;
+    amount: number; paid: number; total: number; currency: string;
+    eventTitle: unknown; manageLink?: string; recipient?: string; account?: string;
+  }) {
+    const { kind, eventTitle, ...data } = opts;
+    const lang = mailLangOf(opts.locale);
+    const t = eventTitle && typeof eventTitle === 'object'
+      ? ((eventTitle as Record<string, string>)[lang] ?? (eventTitle as Record<string, string>).pl ?? (eventTitle as Record<string, string>).en ?? Object.values(eventTitle as Record<string, string>)[0])
+      : eventTitle;
+    return this.sendMail({ to: opts.to, type: kind, locale: opts.locale, registrationId: opts.registrationId, data: { ...data, eventTitle: t ? String(t) : undefined } });
   }
 
   async sendPaymentReminder(opts: { to: string; locale: string; registrationId: string; amount: number; transferTitle: string }) {

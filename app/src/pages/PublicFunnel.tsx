@@ -3,7 +3,7 @@ import { notYetOpen } from '../lib/registrationOpens'
 import { useTranslation } from 'react-i18next'
 import { useParams, useSearchParams } from 'react-router-dom'
 import type { EventInstanceDto, CreateRegistrationDto, RegistrationStatus, PaymentMethod } from '@icpe/shared'
-import { computePrice, DEFAULT_PRICING, validateRoomCapacity, roomLabel, hasAccommodation, roomStockShortages } from '@icpe/shared'
+import { computePrice, DEFAULT_PRICING, validateRoomCapacity, roomLabel, hasAccommodation, roomStockShortages, buildSchedule, minDepositPctFor, warsawDate } from '@icpe/shared'
 import type { PricingConfig } from '@icpe/shared'
 import { getEventBySlug, getEventConfig, createRegistration, registerGuest, getInvitation, getRegistrationLead, saveRegistrationLead, pickLang, type EventConfig } from '../lib/api'
 import { funnelPriceInput, isAccommodationOptional } from '../lib/funnelPrice'
@@ -1143,6 +1143,12 @@ export default function PublicFunnel() {
         <SuccessScreen
           paymentMethod={stepper.paymentMethod}
           leaderDepositPct={pricingConfig.leaderDepositPct}
+          payNow={buildSchedule(
+            preview ? finalPrice?.total ?? 0 : result?.total ?? finalPrice?.total ?? 0,
+            pricingConfig.paymentPlan,
+            warsawDate(),
+            minDepositPctFor(pricingConfig.rooms, stepper.rooms.map((r) => r.roomId)),
+          )[0]?.amount}
           email={stepper.applicant.email}
           total={preview ? finalPrice?.total ?? 0 : result?.total ?? finalPrice?.total ?? 0}
           currency={pricingConfig.currency}

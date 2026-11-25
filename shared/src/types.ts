@@ -93,6 +93,15 @@ export interface RegistrationDto {
   currency: string;
   paymentMethod?: PaymentMethod;
   paymentStatus: PaymentStatus;
+  /** Suma zaksięgowanych wpłat (panel admina). */
+  paidAmount?: number;
+  /** Stan względem harmonogramu wpłat eventu (panel admina). */
+  payment?: {
+    total: number; paid: number; remaining: number; dueNow: number; overdue: number;
+    nextDue: { id: string; label: string; dueDate: string; amount: number } | null;
+    depositPaid: boolean; fullyPaid: boolean; hasPlan: boolean;
+    schedule: Array<{ id: string; label: string; dueDate: string; atRegistration: boolean; cumulativePct: number; cumulativeAmount: number; amount: number }>;
+  };
   /** Obecność: znacznik check-in (ISO) lub null, gdy nieobecny. */
   checkedInAt?: string | null;
   /** Zakwaterowanie: numer/nazwa przydzielonego pokoju i komentarz. */

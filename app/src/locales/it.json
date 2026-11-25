@@ -314,7 +314,11 @@
     "leader_title": "Acconto tramite il responsabile della comunità",
     "leader_desc": "Consegna un acconto di {{deposit}} ({{pct}}%) al responsabile della tua comunità. Il saldo di {{rest}} lo paghi in contanti alla registrazione.",
     "submit_leader": "Conferma l'iscrizione →",
-    "donation": "Donazione"
+    "donation": "Donazione",
+    "schedule_title": "Piano dei pagamenti",
+    "schedule_now": "all'iscrizione",
+    "schedule_by": "entro il {{date}}",
+    "schedule_note": "Confermiamo l'iscrizione dopo il pagamento del primo importo. Ti ricorderemo via e-mail le prossime scadenze."
   },
   "success": {
     "paid_title": "Grazie!",
@@ -339,7 +343,8 @@
     "cash_msg": "La tua iscrizione è stata ricevuta. Pagherai in contanti sul posto.",
     "status_cash": "Pagamento sul posto",
     "leader_msg": "La tua iscrizione è stata ricevuta. Consegna l’acconto al responsabile della comunità e paga il saldo in contanti sul posto.",
-    "status_leader": "Acconto al responsabile"
+    "status_leader": "Acconto al responsabile",
+    "pay_now": "Da pagare ora"
   },
   "admin": {
     "dashboard": "Dashboard",

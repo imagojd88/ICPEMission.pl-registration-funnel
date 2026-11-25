@@ -310,7 +310,11 @@
     "leader_title": "通过团体负责人交定金",
     "leader_desc": "请将定金 {{deposit}}（{{pct}}%）交给您的团体负责人，其余 {{rest}} 在报到处以现金支付。",
     "submit_leader": "确认报名 →",
-    "donation": "捐款"
+    "donation": "捐款",
+    "schedule_title": "付款时间表",
+    "schedule_now": "报名时",
+    "schedule_by": "{{date}}前",
+    "schedule_note": "收到首笔款项后，我们将确认您的报名。后续付款期限会通过电子邮件提醒。"
   },
   "success": {
     "paid_title": "谢谢！",
@@ -335,7 +339,8 @@
     "cash_msg": "您的报名已收到。请在现场以现金支付。",
     "status_cash": "现场支付",
     "leader_msg": "您的报名已收到。请将定金交给您的团体负责人，其余款项在现场以现金支付。",
-    "status_leader": "负责人定金"
+    "status_leader": "负责人定金",
+    "pay_now": "现在应付"
   },
   "admin": {
     "dashboard": "概览",

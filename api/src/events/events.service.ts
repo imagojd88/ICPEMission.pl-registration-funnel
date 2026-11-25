@@ -147,12 +147,30 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
     // WAŻNE: typ eventu (ONE_TIME/STANDALONE/INVITE) siedzi na serii, a publiczny front
     // czyta go z instancji (`event.type`). Bez tego gałęzie STANDALONE/INVITE nigdy się
     // nie uruchamiały i event „na zaproszenie" pokazywał zwykły lejek rejestracji.
+    // Zajęte miejsca dla licznika na landingu („X wolnych miejsc z N"). Bez tego pola front
+    // liczył capacity − 0 i event wyglądał na pusty mimo zapisów.
+    const registeredCount = await this.takenSpots(raw.id);
     const instance = {
       ...raw,
       type: (page.series as { type?: string }).type ?? 'ONE_TIME',
       slug: page.slug,
+      registeredCount,
     };
     return { page, instance };
+  }
+
+  /**
+   * Liczba zajętych miejsc (osób) — do publicznego licznika wolnych miejsc.
+   * Liczymy uczestników zgłoszeń, które trzymają miejsce: wszystkie poza anulowanymi
+   * i listą rezerwową (spójnie z limitem pokoi, który też pomija tylko CANCELLED).
+   * Zgłoszenie bez listy uczestników liczy się jako 1 osoba.
+   */
+  private async takenSpots(instanceId: string): Promise<number> {
+    const regs = (await this.prisma.registration.findMany({
+      where: { instanceId, status: { notIn: ['CANCELLED', 'WAITLIST'] } },
+      select: { _count: { select: { participants: true } } },
+    })) as Array<{ _count: { participants: number } }>;
+    return regs.reduce((s, r) => s + Math.max(1, r._count.participants), 0);
   }
 
   private roomStock(instanceId: string, cfg: PricingConfig | null) {
@@ -175,6 +193,8 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       // Start zapisów: przed tą chwilą strona pokazuje licznik zamiast przycisku „Zapisz się".
       registrationOpensAt: (instance as { registrationOpensAt?: Date }).registrationOpensAt ?? null,
       location: instance.location,
+      // Kraj eventu (ISO 3166-1 alpha-2) — lista wyboru w edycji eventu.
+      countryCode: (instance as { countryCode?: string | null }).countryCode ?? null,
       nights: instance.nights,
       capacity: instance.capacity,
       // Przełącznik „Udostępniaj dane ICPE Go" (edycja eventu w panelu).
@@ -355,6 +375,7 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
         startsAt: src.startsAt,
         endsAt: src.endsAt,
         location: src.location ?? undefined,
+        countryCode: (src as { countryCode?: string | null }).countryCode ?? undefined,
         nights: src.nights,
         capacity: src.capacity ?? undefined,
         paymentMethods: src.paymentMethods,
@@ -435,9 +456,15 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       registrationClosesAt?: string;
       status?: string;
       shareWithIcpeGo?: boolean;
+      countryCode?: string | null;
     },
   ) {
     const data: Record<string, unknown> = {};
+    if (dto.countryCode !== undefined) {
+      const cc = typeof dto.countryCode === 'string' ? dto.countryCode.trim().toUpperCase() : '';
+      if (cc && !/^[A-Z]{2}$/.test(cc)) throw new BadRequestException('Kraj: oczekiwany kod ISO 3166-1 alpha-2, np. PL');
+      data.countryCode = cc || null;
+    }
     if (dto.shareWithIcpeGo !== undefined) data.shareWithIcpeGo = dto.shareWithIcpeGo === true;
     if (dto.title !== undefined) data.title = dto.title as any;
     if (dto.description !== undefined) data.description = (dto.description ?? null) as any;

@@ -310,7 +310,11 @@
     "leader_title": "Deposit via your community leader",
     "leader_desc": "Hand a deposit of {{deposit}} ({{pct}}%) to your community leader. Pay the remaining {{rest}} in cash at the registration desk.",
     "submit_leader": "Confirm registration →",
-    "donation": "Donation"
+    "donation": "Donation",
+    "schedule_title": "Payment schedule",
+    "schedule_now": "on registration",
+    "schedule_by": "by {{date}}",
+    "schedule_note": "We confirm your registration once the first amount is paid. We will remind you by e-mail about the next due dates."
   },
   "success": {
     "paid_title": "Thank you!",
@@ -335,7 +339,8 @@
     "cash_msg": "Your registration has been received. You will pay in cash on site.",
     "status_cash": "Pay on site",
     "leader_msg": "Your registration has been received. Hand the deposit to your community leader and pay the rest in cash on site.",
-    "status_leader": "Leader deposit"
+    "status_leader": "Leader deposit",
+    "pay_now": "To pay now"
   },
   "admin": {
     "dashboard": "Dashboard",

@@ -1,9 +1,10 @@
 import {
-  Controller, Get, Post, Put, Patch, Param, Query, Body, Res, UseGuards, UnauthorizedException,
+  Controller, Get, Post, Put, Patch, Delete, Param, Query, Body, Req, Res, UseGuards, UnauthorizedException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { RegistrationsService } from './registrations.service';
 import { LeadsService } from './leads.service';
+import { PaymentPlanService } from './payment-plan.service';
 import { CreateRegistrationDto, UpdateAccommodationDto } from './dto/create-registration.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import type { Response } from 'express';
@@ -14,6 +15,7 @@ export class RegistrationsController {
   constructor(
     private readonly regs: RegistrationsService,
     private readonly leads: LeadsService,
+    private readonly paymentPlan: PaymentPlanService,
   ) {}
 
   // ── Niedokończone zgłoszenia + przypomnienie po 3 h ─────────────────────────
@@ -113,11 +115,58 @@ export class RegistrationsController {
   @ApiBearerAuth()
   @Get('admin/instances/:id/registrations')
   @ApiOperation({ summary: 'List registrations for instance (admin)' })
-  listForInstance(
+  async listForInstance(
     @Param('id') id: string,
     @Query('status') status?: string,
     @Query('q') q?: string,
   ) {
-    return this.regs.listForInstance(id, status, q);
+    // Suma wpłat + stan względem harmonogramu (zadatek, zaległość, najbliższa rata).
+    return this.paymentPlan.decorate(id, (await this.regs.listForInstance(id, status, q)) as never);
+  }
+
+  // ── Wpłaty (także częściowe) i harmonogram ─────────────────────────────────
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Get('admin/instances/:id/finance')
+  @ApiOperation({ summary: 'Finanse eventu: wpłacone, zadatki, zaległości, prognoza wg terminów, darowizny' })
+  finance(@Param('id') id: string) {
+    return this.paymentPlan.finance(id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Get('admin/registrations/:id/payments')
+  @ApiOperation({ summary: 'Wpłaty zgłoszenia + harmonogram' })
+  paymentsOf(@Param('id') id: string) {
+    return this.paymentPlan.paymentsOf(id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Post('admin/registrations/:id/payments')
+  @ApiOperation({ summary: 'Zaksięguj wpłatę (także częściową)' })
+  addPayment(
+    @Param('id') id: string,
+    @Body() dto: { amount?: unknown; paidAt?: string; method?: string; note?: string },
+    @Req() req: { user?: { email?: string; realm?: string } },
+  ) {
+    return this.paymentPlan.addPayment(id, { amount: dto?.amount, paidAt: dto?.paidAt, method: dto?.method, note: dto?.note }, req.user?.email ?? req.user?.realm ?? 'admin');
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Delete('admin/payments/:id')
+  @ApiOperation({ summary: 'Cofnij błędnie wpisaną wpłatę (zostaje w historii jako anulowana)' })
+  voidPayment(@Param('id') id: string, @Req() req: { user?: { email?: string; realm?: string } }) {
+    return this.paymentPlan.voidPayment(id, req.user?.email ?? req.user?.realm ?? 'admin');
+  }
+
+  /** Zewnętrzny wyzwalacz przypomnień o ratach (np. UptimeRobot). Gdy ustawiono CRON_SECRET, wymaga ?key=. */
+  @Get('cron/payment-reminders')
+  async cronPaymentReminders(@Query('key') key?: string) {
+    const secret = (process.env.CRON_SECRET ?? '').trim();
+    if (secret && key !== secret) throw new UnauthorizedException();
+    return { ok: true, ...(await this.paymentPlan.runReminders()) };
   }
 }

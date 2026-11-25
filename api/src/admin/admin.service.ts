@@ -89,17 +89,21 @@ export class AdminService {
   async markPaid(registrationId: string) {
     const reg = await this.prisma.registration.findUnique({
       where: { id: registrationId },
-      include: { payments: { where: { status: 'PAID' }, take: 1 } },
+      include: { payments: { where: { status: 'PAID' } } },
     });
     if (!reg) throw new NotFoundException('Registration not found');
 
-    if (reg.payments.length === 0) {
+    // Księgujemy brakującą resztę: przy wpłatach częściowych (zadatek, raty) nie dublujemy całej kwoty.
+    const total = parseFloat(reg.totalPrice.toString());
+    const paid = (reg.payments as Array<{ amount: { toString(): string } }>).reduce((s, p) => s + parseFloat(p.amount.toString()), 0);
+    const rest = Math.round((total - paid) * 100) / 100;
+    if (reg.payments.length === 0 || rest > 0) {
       await this.prisma.payment.create({
         data: {
           registrationId,
           provider: 'manual',
           method: 'BANK_TRANSFER',
-          amount: reg.totalPrice,
+          amount: reg.payments.length === 0 ? reg.totalPrice : rest,
           currency: reg.currency,
           status: 'PAID',
         },

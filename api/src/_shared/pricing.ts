@@ -18,6 +18,7 @@
  */
 
 import type { ParticipantType } from './types';
+import type { PaymentPlan } from './paymentPlan';
 
 export interface PricedParticipant {
   type: ParticipantType;
@@ -51,6 +52,11 @@ export interface RoomTypeDef {
    * zapisie; przydziela je admin w panelu — zgłoszenie oznaczone „z rezerwy").
    */
   reserved?: number;
+  /**
+   * Wyższy zadatek przy zapisie dla tego typu zakwaterowania, w % (np. 50 za pokój / domek
+   * na wyłączność). Działa tylko z włączonym `PricingConfig.paymentPlan`. Brak = zadatek z planu.
+   */
+  depositPct?: number;
   tag?: string;
 }
 
@@ -114,6 +120,8 @@ export interface PricingConfig {
    * gość wybiera kwotę w kroku „Opcje” (50 / 100 / 200 albo dowolna). Brak / false = opcja ukryta.
    */
   donationEnabled?: boolean;
+  /** Harmonogram wpłat: zadatek przy rejestracji + raty z terminami (patrz `paymentPlan.ts`). */
+  paymentPlan?: PaymentPlan;
 }
 
 /** Proponowane kwoty darowizny per waluta (ostatnia opcja w formularzu to „dowolna kwota”). */

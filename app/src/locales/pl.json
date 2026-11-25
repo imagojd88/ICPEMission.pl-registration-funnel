@@ -320,7 +320,11 @@
     "leader_title": "Zaliczka u lidera wspólnoty",
     "leader_desc": "Zaliczkę {{deposit}} ({{pct}}%) przekaż liderowi swojej wspólnoty. Pozostałe {{rest}} zapłacisz gotówką przy rejestracji na miejscu.",
     "submit_leader": "Potwierdź rejestrację →",
-    "donation": "Darowizna"
+    "donation": "Darowizna",
+    "schedule_title": "Harmonogram wpłat",
+    "schedule_now": "przy rejestracji",
+    "schedule_by": "do {{date}}",
+    "schedule_note": "Zgłoszenie potwierdzamy po wpłacie pierwszej kwoty. O kolejnych terminach przypomnimy mailem."
   },
   "success": {
     "paid_title": "Dziękujemy!",
@@ -345,7 +349,8 @@
     "cash_msg": "Twoje zgłoszenie zostało przyjęte. Opłatę uiścisz gotówką na miejscu.",
     "status_cash": "Płatność na miejscu",
     "leader_msg": "Twoje zgłoszenie zostało przyjęte. Przekaż zaliczkę liderowi wspólnoty, resztę zapłacisz gotówką na miejscu.",
-    "status_leader": "Zaliczka u lidera"
+    "status_leader": "Zaliczka u lidera",
+    "pay_now": "Do wpłaty teraz"
   },
   "admin": {
     "dashboard": "Dashboard",

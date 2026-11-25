@@ -1,5 +1,6 @@
 import { Controller, Get, Header, Headers, Param, Query, UnauthorizedException } from '@nestjs/common';
-import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { IcpeGoEventListDto, IcpeGoEventOneDto } from './icpe-go.dto';
 import { timingSafeEqual } from 'crypto';
 import { IcpeGoService, IcpeGoScope } from './icpe-go.service';
 
@@ -17,6 +18,7 @@ export class IcpeGoController {
   @Get('events')
   @Header('Cache-Control', 'public, max-age=60')
   @ApiOperation({ summary: 'ICPE Go: lista udostępnionych eventów z liczbą zgłoszeń i zajętością' })
+  @ApiOkResponse({ type: IcpeGoEventListDto })
   @ApiQuery({ name: 'scope', required: false, enum: ['upcoming', 'open', 'all'] })
   @ApiQuery({ name: 'lang', required: false, description: 'pl | en | it | ko | zh — dodaje pole titleText' })
   @ApiQuery({ name: 'key', required: false })
@@ -34,6 +36,7 @@ export class IcpeGoController {
   @Get('events/:idOrSlug')
   @Header('Cache-Control', 'public, max-age=60')
   @ApiOperation({ summary: 'ICPE Go: jeden udostępniony event (id instancji albo slug /r/<slug>)' })
+  @ApiOkResponse({ type: IcpeGoEventOneDto })
   @ApiQuery({ name: 'lang', required: false })
   @ApiQuery({ name: 'key', required: false })
   one(

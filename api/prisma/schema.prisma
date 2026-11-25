@@ -175,6 +175,8 @@ model EventInstance {
   startsAt             DateTime
   endsAt               DateTime
   location             String?
+  // Kraj eventu: kod ISO 3166-1 alpha-2 („PL”, „IT”, „MT”); null = nie ustawiono. API ICPE Go → countryCode.
+  countryCode          String?
   nights               Int             @default(0)
   capacity             Int?
   status               InstanceStatus  @default(DRAFT)

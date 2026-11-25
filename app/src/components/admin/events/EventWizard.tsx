@@ -74,6 +74,8 @@ interface RoomRow {
   tag?: string
   /** Tłumaczenia nazwy pokoju (en/it); PL = `name`. */
   nameI18n?: Tr
+  /** wyższy zadatek typu zakwaterowania (ustawiany w „Edytuj event") — kreator tylko go przenosi */
+  depositPct?: number
 }
 
 /** Tłumaczenia pola na języki obce: { en?, it? }. Wersja PL siedzi w polu podstawowym. */
@@ -159,6 +161,8 @@ interface WizardState {
   optionalStay: boolean
   // opcjonalna darowizna na dofinansowanie pobytu innych (krok „Opcje" w lejku)
   donationEnabled: boolean
+  // harmonogram wpłat (edytowany w „Edytuj event") — kreator przenosi go bez zmian
+  paymentPlan?: PricingConfig['paymentPlan']
   // posiłki tylko dla nocujących, za osobę za noc (np. kolacja + śniadanie)
   overnightMeals: string
   // program wydarzenia: godzina + punkt
@@ -371,6 +375,7 @@ function mapEditConfigToState(prev: WizardState, cfg: EventEditConfig, slug: str
     quantity: r.stock ? String(r.stock) : '',
     reserved: r.reserved ? String(r.reserved) : '',
     tag: r.tag || '',
+    ...(r.depositPct ? { depositPct: r.depositPct } : {}),
   }))
   const ageBrackets: AgeBracketRow[] = rowsFromBrackets(pc?.childBrackets, 'edit-b')
   const pm = cfg.paymentMethods ?? []
@@ -398,6 +403,7 @@ function mapEditConfigToState(prev: WizardState, cfg: EventEditConfig, slug: str
     mealsFee: String(pc?.mealsFee ?? prev.mealsFee),
     optionalStay: !!pc?.accommodationOptional,
     donationEnabled: !!pc?.donationEnabled,
+    paymentPlan: pc?.paymentPlan,
     overnightMeals: String(pc?.overnightMealsFee ?? 0),
     diets: Array.isArray(cfg.customFields?.diets) ? cfg.customFields!.diets! : prev.diets,
     ageBrackets: ageBrackets.length > 0 ? ageBrackets : prev.ageBrackets,
@@ -451,6 +457,7 @@ function buildPricingConfig(state: WizardState): PricingConfig {
     ...((parseInt(r.quantity) || 0) > 0 && (parseInt(r.reserved ?? '') || 0) > 0
       ? { reserved: Math.min(parseInt(r.reserved ?? ''), parseInt(r.quantity)) }
       : {}),
+    ...(r.depositPct ? { depositPct: r.depositPct } : {}),
   }))
 
   // Parse age brackets (sort by ltAge ascending)
@@ -473,6 +480,7 @@ function buildPricingConfig(state: WizardState): PricingConfig {
     ...(state.payLeader ? { leaderDepositPct: Math.min(100, Math.max(1, parseInt(state.leaderPct) || 50)) } : {}),
     ...(state.optionalStay && !state.noAccommodation ? { accommodationOptional: true } : {}),
     ...(state.donationEnabled ? { donationEnabled: true } : {}),
+    ...(state.paymentPlan ? { paymentPlan: state.paymentPlan } : {}),
     ...(state.optionalStay && parseFloat(state.overnightMeals) > 0 ? { overnightMealsFee: parseFloat(state.overnightMeals) } : {}),
     childBrackets: parsedBrackets.length > 0 ? parsedBrackets : DEFAULT_PRICING.childBrackets,
     rooms: roomDefs.length > 0 ? roomDefs : DEFAULT_PRICING.rooms,

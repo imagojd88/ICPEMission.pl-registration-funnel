@@ -1203,6 +1203,74 @@ export async function adminUpdateRegistration(
   })
 }
 
+/** Finanse eventu: wpłacone, zadatki, zaległości, prognoza wpływów wg terminów, darowizny. */
+export interface InstanceFinance {
+  hasPlan: boolean
+  currency: string
+  registrations: number
+  people: number
+  expected: number
+  paid: number
+  remaining: number
+  dueNow: number
+  overdue: number
+  overdueCount: number
+  depositRequired: number
+  depositPaid: number
+  depositPaidCount: number
+  fullyPaidCount: number
+  donations: number
+  donationsCount: number
+  forecast: Array<{ dueDate: string; amount: number; count: number; overdue: boolean }>
+}
+
+export async function getInstanceFinance(instanceId: string, token?: string): Promise<InstanceFinance> {
+  return apiFetch<InstanceFinance>(`/admin/instances/${instanceId}/finance`, { headers: authHeaders(token) })
+}
+
+export interface RegistrationPaymentRow {
+  id: string
+  amount: number
+  currency: string
+  status: string
+  provider: string
+  method: string
+  paidAt: string
+  note: string | null
+  by: string | null
+  sender: string | null
+  title: string | null
+  createdAt: string
+}
+
+export interface RegistrationPayments {
+  registrationId: string
+  payments: RegistrationPaymentRow[]
+  summary: NonNullable<RegistrationDto['payment']>
+}
+
+export async function getRegistrationPayments(id: string, token?: string): Promise<RegistrationPayments> {
+  return apiFetch<RegistrationPayments>(`/admin/registrations/${id}/payments`, { headers: authHeaders(token) })
+}
+
+/** Księguje wpłatę (także częściową: zadatek, rata). */
+export async function addRegistrationPayment(
+  id: string,
+  dto: { amount: number; paidAt?: string; method?: 'BANK_TRANSFER' | 'CASH' | 'ONLINE'; note?: string },
+  token?: string,
+): Promise<RegistrationPayments> {
+  return apiFetch<RegistrationPayments>(`/admin/registrations/${id}/payments`, {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: JSON.stringify(dto),
+  })
+}
+
+/** Cofa błędnie wpisaną wpłatę (zostaje w historii jako anulowana). */
+export async function voidRegistrationPayment(paymentId: string, token?: string): Promise<RegistrationPayments> {
+  return apiFetch<RegistrationPayments>(`/admin/payments/${paymentId}`, { method: 'DELETE', headers: authHeaders(token) })
+}
+
 export async function markRegistrationPaid(id: string, token?: string): Promise<void> {
   await apiFetch(`/admin/registrations/${id}/mark-paid`, {
     method: 'POST',
@@ -1264,6 +1332,8 @@ export interface UpdateInstancePayload {
   pricingConfig?: PricingConfig
   /** „Udostępniaj dane ICPE Go" — event widoczny w GET /icpe-go/events. */
   shareWithIcpeGo?: boolean
+  /** Kraj eventu — kod ISO 3166-1 alpha-2 („PL”) albo null. */
+  countryCode?: string | null
 }
 
 /** Edycja istniejącego eventu (instancji). */
@@ -1292,6 +1362,8 @@ export interface EventEditConfig {
   capacity?: number | null
   /** „Udostępniaj dane ICPE Go" (EventInstance.shareWithIcpeGo). */
   shareWithIcpeGo?: boolean
+  /** Kraj eventu (EventInstance.countryCode, ISO 3166-1 alpha-2). */
+  countryCode?: string | null
   paymentMethods: string[]
   pricingConfig: PricingConfig
   /** Limit pokoi: wolne publicznie / zajęte publicznie / zajęte z rezerwy (tylko typy z limitem). */

@@ -9,6 +9,7 @@ import RoomStockFields from './RoomStockFields'
 import OptionalStayFields from './OptionalStayFields'
 import DonationToggle from './DonationToggle'
 import RegistrationOpensFields from './RegistrationOpensFields'
+import PaymentPlanEditor, { EMPTY_PLAN_FORM, planToForm, formToPlan, planFormError, type PaymentPlanForm } from './PaymentPlanEditor'
 import { isoToLocalInputs, localInputsToIso, notYetOpen } from '@/lib/registrationOpens'
 import { useState, useEffect, type ChangeEvent } from 'react'
 import { Plus, Trash2, Upload, Images } from 'lucide-react'
@@ -19,6 +20,7 @@ import InvitedGuestsSection from '@/components/admin/events/InvitedGuestsSection
 import AffiliationSelect from '@/components/admin/events/AffiliationSelect'
 import SpecialGuestsEditor, { guestRowsFrom, guestsToSave, guestsMissingBio, type GuestRow } from '@/components/admin/events/SpecialGuestsEditor'
 import type { AffiliationField } from '@/lib/communities'
+import { countryOptions } from '@/lib/countries'
 import {
   API_URL,
   getEventEditConfig,
@@ -33,6 +35,9 @@ import {
 import { SUPERTITLE_PRESETS, isPresetSupertitle } from '@/lib/supertitles'
 import { DEFAULT_PRICING } from '@icpe/shared'
 import type { PricingConfig } from '@icpe/shared'
+
+/** Lista krajów (pole „Kraj”) — liczona raz, nazwy po polsku. */
+const COUNTRY_OPTIONS = countryOptions()
 
 /** Języki dodatkowe eventu (PL i EN są zawsze). */
 const OPTIONAL_LANGS = ['it', 'ko', 'zh'] as const
@@ -61,6 +66,8 @@ interface RoomRow {
   stock: string
   /** ile z nich zablokowanych dla gości specjalnych */
   reserved: string
+  /** wyższy zadatek przy rejestracji dla tego typu, w % (puste = z harmonogramu) */
+  depositPct?: string
 }
 interface DiscountRow { id: string; code: string; pct: string }
 
@@ -120,6 +127,8 @@ export default function EventEditForm({
   const [regOpenOrig, setRegOpenOrig] = useState<string | null>(null)
   const [nights, setNights] = useState('1')
   const [location, setLocation] = useState('')
+  // Kraj eventu (ISO 3166-1 alpha-2) — dla ICPE Go; '' = nie ustawiono.
+  const [countryCode, setCountryCode] = useState('')
   // Tłumaczenia miejsca (EN/IT). PL = `location` (kanoniczne — kalendarz, maile, mapa).
   const [locI18n, setLocI18n] = useState<Record<string, string>>({})
   // Wersja PL, z której zrobiono tłumaczenia miejsca — gdy PL się zmieni, ostrzegamy.
@@ -139,6 +148,8 @@ export default function EventEditForm({
   const [optionalStay, setOptionalStay] = useState(false)
   // Opcjonalna darowizna na dofinansowanie pobytu innych (krok „Opcje" w lejku).
   const [donationEnabled, setDonationEnabled] = useState(false)
+  // Harmonogram wpłat: zadatek + raty z terminami, przypomnienia mailowe.
+  const [planForm, setPlanForm] = useState<PaymentPlanForm>(EMPTY_PLAN_FORM)
   // Limit pokoi: zajętość z API (publicznie / z rezerwy) i wolne publicznie — do podglądu przy pokojach.
   const [roomUsage, setRoomUsage] = useState<{ pub: Record<string, number>; res: Record<string, number>; free: Record<string, number> }>({ pub: {}, res: {}, free: {} })
   const [overnightMeals, setOvernightMeals] = useState('0')
@@ -265,6 +276,7 @@ export default function EventEditForm({
         setRegOpenTime(ro.time)
         setNights(String(cfg.nights ?? 1))
         setLocation(cfg.location ?? '')
+        setCountryCode(cfg.countryCode ?? '')
         {
           // Tłumaczenie miejsca bierzemy tylko, jeśli powstało z obecnej wersji PL.
           const li = cfg.customFields?.locationI18n
@@ -286,6 +298,7 @@ export default function EventEditForm({
         setMealsFee(String(pc?.mealsFee ?? DEFAULT_PRICING.mealsFee))
         setOptionalStay(!!pc?.accommodationOptional)
         setDonationEnabled(!!pc?.donationEnabled)
+        setPlanForm(planToForm(pc?.paymentPlan))
         setOvernightMeals(String(pc?.overnightMealsFee ?? 0))
         setTransport(String(pc?.options?.transport ?? DEFAULT_PRICING.options.transport))
         setBedding(String(pc?.options?.bedding ?? DEFAULT_PRICING.options.bedding))
@@ -301,6 +314,7 @@ export default function EventEditForm({
             priceUnit: r.priceUnit === 'room' ? 'room' : 'person',
             stock: r.stock ? String(r.stock) : '',
             reserved: r.reserved ? String(r.reserved) : '',
+            depositPct: r.depositPct ? String(r.depositPct) : '',
           })),
         )
         setRoomUsage({ pub: cfg.roomUsage ?? {}, res: cfg.roomUsageReserved ?? {}, free: cfg.roomAvailability ?? {} })
@@ -370,6 +384,7 @@ export default function EventEditForm({
       ...(payLeader ? { leaderDepositPct: Math.min(100, Math.max(1, parseInt(leaderPct) || 50)) } : {}),
       ...(optionalStay ? { accommodationOptional: true } : {}),
       ...(donationEnabled ? { donationEnabled: true } : {}),
+      ...(formToPlan(planForm) ? { paymentPlan: formToPlan(planForm) } : {}),
       ...(parseFloat(overnightMeals) > 0 ? { overnightMealsFee: parseFloat(overnightMeals) } : {}),
       childBrackets: bracketsFromRows(brackets),
       rooms: (() => {
@@ -396,6 +411,9 @@ export default function EventEditForm({
             tag: r.tag || '',
             ...(stock > 0 ? { stock } : {}),
             ...(stock > 0 && reserved > 0 ? { reserved } : {}),
+            ...((parseFloat((r.depositPct ?? '').replace(',', '.')) || 0) > 0
+              ? { depositPct: Math.min(100, parseFloat((r.depositPct ?? '').replace(',', '.'))) }
+              : {}),
           }
         })
       })(),
@@ -463,6 +481,7 @@ export default function EventEditForm({
     if (!Object.keys(titleClean).length) { setError('Podaj nazwę eventu.'); return }
     if (!slug) { setError('Podaj slug (adres strony).'); return }
     if (!dateStart) { setError('Podaj datę rozpoczęcia.'); return }
+    if (planFormError(planForm)) { setError(planFormError(planForm)); return }
     // Nocleg przy 0 nocach: pokoje kosztowałyby 0 zł, a gość nie widziałby wyboru noclegu.
     if (optionalStay && rooms.length > 0 && (parseInt(nights) || 0) < 1) {
       setError('Nocleg opcjonalny wymaga liczby nocy co najmniej 1 (np. nocleg z piątku na sobotę = 1). Wpisz ją w polu „Liczba nocy” w sekcji Szczegóły (obok „Limit miejsc”) albo w polu pod „Nocleg opcjonalny” w Cenniku. Przy 0 nocach pokoje kosztują 0 zł.')
@@ -486,6 +505,7 @@ export default function EventEditForm({
           ? { registrationOpensAt: localInputsToIso(regOpenDate, regOpenTime)! }
           : notYetOpen(regOpenOrig) ? { registrationOpensAt: new Date().toISOString() } : {}),
         location: location || null,
+        countryCode: countryCode || null,
         nights: n,
         capacity: capacity ? parseInt(capacity) : null,
         paymentMethods,
@@ -703,6 +723,31 @@ export default function EventEditForm({
           </div>
           )}
         </Field>
+        <Field label="Kraj">
+          <div className="flex flex-col gap-1">
+            <select
+              value={countryCode}
+              onChange={(e) => setCountryCode(e.target.value)}
+              className={inputCls}
+              style={{ ...inputStyle, maxWidth: 340 }}
+            >
+              <option value="">— nie wybrano —</option>
+              <optgroup label="Najczęstsze">
+                {COUNTRY_OPTIONS.common.map((c) => (
+                  <option key={c.code} value={c.code}>{c.name}</option>
+                ))}
+              </optgroup>
+              <optgroup label="Wszystkie kraje">
+                {COUNTRY_OPTIONS.rest.map((c) => (
+                  <option key={c.code} value={c.code}>{c.name}</option>
+                ))}
+              </optgroup>
+            </select>
+            <p className="text-xs" style={{ color: 'var(--faint)' }}>
+              Kraj miejsca eventu. Zapisujemy kod (np. PL), ICPE Go pokazuje nazwę w swoim języku.
+            </p>
+          </div>
+        </Field>
       </Section>
 
       <Section title="Metody płatności">
@@ -764,6 +809,14 @@ export default function EventEditForm({
             onNights={setNights}
           />
           {!isFree && <DonationToggle enabled={donationEnabled} onChange={setDonationEnabled} />}
+          {!isFree && (
+            <PaymentPlanEditor
+              form={planForm}
+              onChange={setPlanForm}
+              rooms={rooms.map((r) => ({ key: r.id, name: r.name.pl ?? Object.values(r.name)[0] ?? '', depositPct: r.depositPct ?? '' }))}
+              onRoomDeposit={(key, pct) => setRooms((p) => p.map((x) => (x.id === key ? { ...x, depositPct: pct } : x)))}
+            />
+          )}
           {rooms.map((r) => (
             <div key={r.id} className="flex flex-col gap-1.5 pb-2" style={{ borderBottom: '1px dashed var(--border)' }}>
             <div className="flex items-center gap-2">

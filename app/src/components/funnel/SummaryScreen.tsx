@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { computePrice, formatMoney, roomLabel, buildIcs, googleCalendarUrl, hasAccommodation, leaderDepositSplit } from '@icpe/shared'
+import { computePrice, formatMoney, roomLabel, buildIcs, googleCalendarUrl, hasAccommodation, leaderDepositSplit, buildSchedule, minDepositPctFor, warsawDate } from '@icpe/shared'
 import type { EventInstanceDto, PricingConfig, PriceLine } from '@icpe/shared'
 import type { StepperState } from '../../pages/PublicFunnel'
 import { bcp47 } from '../../lib/utils'
@@ -69,6 +69,14 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
   )
 
   const price = computePrice(priceInput, pricingConfig)
+  // Harmonogram wpłat (zadatek + raty z terminami) — gdy event go ma.
+  const schedule = free
+    ? []
+    : buildSchedule(price.total, pricingConfig.paymentPlan, warsawDate(), minDepositPctFor(pricingConfig.rooms, state.rooms.map((r) => r.roomId)))
+  const scheduleDate = (d: string) => {
+    const [y, m, day] = d.split('-').map(Number)
+    return new Date(Date.UTC(y, m - 1, day, 12)).toLocaleDateString(bcp47(i18n.language), { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
+  }
   const offersRooms = hasAccommodation(pricingConfig)
   const optionalRooms = isAccommodationOptional(pricingConfig)
 
@@ -376,6 +384,22 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
             </div>
           </div>
         </div>
+        )}
+
+        {/* Harmonogram wpłat */}
+        {schedule.length > 0 && (
+          <div className="rounded-[15px] px-4 py-3 flex flex-col gap-2" style={{ border: '1px solid var(--border)', background: 'var(--surface)' }}>
+            <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>{t('summary.schedule_title')}</p>
+            {schedule.map((it, i) => (
+              <div key={it.id} className="flex justify-between items-baseline gap-3">
+                <span className="text-sm" style={{ color: 'var(--muted)' }}>
+                  {it.label ? `${it.label} · ` : ''}{it.atRegistration ? t('summary.schedule_now') : t('summary.schedule_by', { date: scheduleDate(it.dueDate) })}
+                </span>
+                <span className="text-sm font-semibold whitespace-nowrap" style={{ color: i === 0 ? 'var(--brand)' : 'var(--ink)' }}>{money(it.amount)}</span>
+              </div>
+            ))}
+            <p className="text-xs" style={{ color: 'var(--muted)' }}>{t('summary.schedule_note')}</p>
+          </div>
         )}
 
         {/* Bezpłatne — bez kosztów */}

@@ -7,7 +7,7 @@ import { buildIcs, googleCalendarUrl } from '../shared';
 import { CreateRegistrationDto } from './dto/create-registration.dto';
 import { v4 as uuid } from 'uuid';
 import { guestInviteConfig, guestInvitePageLink, publicAppUrl } from '../invitations/guest-invite-config';
-import { buildPriceInput, hasAccommodation, roomLabel, leaderDepositSplit, cleanDonation, PricingConfig, PriceAdjustment } from '../shared';
+import { buildPriceInput, hasAccommodation, roomLabel, leaderDepositSplit, cleanDonation, buildSchedule, hasPaymentPlan, minDepositPctFor, normalizePaymentPlan, warsawDate, PricingConfig, PriceAdjustment } from '../shared';
 import type { MailAccommodation } from '../notifications/notifications.service';
 import { assertRoomStock, instanceRoomAvailability } from './room-stock';
 import { LeadsService } from './leads.service';
@@ -257,6 +257,13 @@ export class RegistrationsService {
       guestInviteLink,
       leaderDepositPct: cfg?.leaderDepositPct,
       donation: priceResult.donation ?? 0,
+      // Harmonogram wpłat (zadatek + raty z terminami), gdy event go ma.
+      schedule: (() => {
+        const plan = normalizePaymentPlan(cfg?.paymentPlan);
+        if (!hasPaymentPlan(plan)) return undefined;
+        return buildSchedule(priceResult.total, plan, warsawDate(), minDepositPctFor(cfg?.rooms, rooms.map((r) => r.roomId)))
+          .map((it) => ({ label: it.label, dueDate: it.dueDate, amount: it.amount, atRegistration: it.atRegistration }));
+      })(),
       accommodation: mailAccommodation(cfg, rooms, n, mailLang(dto.locale)),
       manageLink: hasAccommodation(cfg) ? manageRegistrationLink(editToken) : undefined,
     }).catch(console.error);
@@ -692,13 +699,18 @@ export class RegistrationsService {
   async markPaid(id: string) {
     await this.prisma.registration.update({ where: { id }, data: { status: 'CONFIRMED' } });
     this.courseAccess.syncRegistrationSafe(id);
+    // Księgujemy brakującą resztę (wcześniejsze wpłaty częściowe zostają), a nie drugi raz całość.
+    const reg = await this.prisma.registration.findUniqueOrThrow({ where: { id }, include: { payments: { where: { status: 'PAID' } } } });
+    const total = parseFloat(reg.totalPrice.toString());
+    const paid = (reg.payments as Array<{ amount: { toString(): string } }>).reduce((s, p) => s + parseFloat(p.amount.toString()), 0);
+    const rest = Math.round((total - paid) * 100) / 100;
     return this.prisma.payment.create({
       data: {
         registrationId: id,
         provider: 'manual',
         method: 'BANK_TRANSFER',
-        amount: (await this.prisma.registration.findUniqueOrThrow({ where: { id } })).totalPrice,
-        currency: 'PLN',
+        amount: reg.payments.length === 0 ? reg.totalPrice : Math.max(0, rest),
+        currency: reg.currency,
         status: 'PAID',
       },
     });

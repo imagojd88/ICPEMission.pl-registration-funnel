@@ -20,6 +20,7 @@ type InstanceRow = {
   startsAt: Date;
   endsAt: Date;
   location: string | null;
+  countryCode: string | null;
   status: string;
   capacity: number | null;
   registrationOpensAt: Date;
@@ -34,6 +35,7 @@ const INSTANCE_SELECT = {
   startsAt: true,
   endsAt: true,
   location: true,
+  countryCode: true,
   status: true,
   capacity: true,
   registrationOpensAt: true,
@@ -122,6 +124,7 @@ export class IcpeGoService {
       title,
       ...(lang ? { titleText: pickLang(title, lang) } : {}),
       location: inst.location ?? null,
+      countryCode: isoCountry(inst.countryCode),
       startsAt: inst.startsAt.toISOString(),
       endsAt: inst.endsAt.toISOString(),
       status: inst.status === 'OPEN' ? 'OPEN' : 'CLOSED',
@@ -149,6 +152,12 @@ export class IcpeGoService {
       },
     };
   }
+}
+
+/** Kod kraju ISO 3166-1 alpha-2: wielkie litery, dokładnie 2 znaki — inaczej null. */
+function isoCountry(v: string | null | undefined): string | null {
+  const c = (v ?? '').trim().toUpperCase();
+  return /^[A-Z]{2}$/.test(c) ? c : null;
 }
 
 /** Mapa tytułów {pl, en, it, ko, zh, …} — tylko niepuste napisy. */

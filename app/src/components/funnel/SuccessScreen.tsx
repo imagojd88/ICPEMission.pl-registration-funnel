@@ -22,9 +22,11 @@ interface Props {
   manageHref?: string
   /** % zaliczki u lidera (metoda „leader”). */
   leaderDepositPct?: number
+  /** Harmonogram wpłat: kwota wymagana teraz (zadatek); brak = cała kwota. */
+  payNow?: number
 }
 
-export default function SuccessScreen({ paymentMethod, email, total, currency, regNumber, status, onBack, onCreateAccount, guestInviteHref, manageHref, leaderDepositPct }: Props) {
+export default function SuccessScreen({ paymentMethod, email, total, currency, regNumber, status, onBack, onCreateAccount, guestInviteHref, manageHref, leaderDepositPct, payNow }: Props) {
   const { t, i18n } = useTranslation()
   const [acct, setAcct] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
 
@@ -131,6 +133,18 @@ export default function SuccessScreen({ paymentMethod, email, total, currency, r
             {formatMoney(total, currency, i18n.language)}
           </span>
         </div>
+
+        {/* Zadatek do wpłaty teraz (event z harmonogramem wpłat) */}
+        {typeof payNow === 'number' && payNow > 0 && payNow < total && (
+          <div className="flex items-center justify-between">
+            <span className="text-xs" style={{ color: 'var(--muted)' }}>
+              {t('success.pay_now')}
+            </span>
+            <span className="text-sm font-semibold" style={{ color: 'var(--brand)' }}>
+              {formatMoney(payNow, currency, i18n.language)}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Email note */}
