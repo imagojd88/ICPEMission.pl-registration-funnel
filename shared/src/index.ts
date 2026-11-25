@@ -8,3 +8,4 @@ export * from './eventWizard';
 export * from './refunds';
 export * from './leads';
 export * from './registrationStatus';
+export * from './guestGroups';

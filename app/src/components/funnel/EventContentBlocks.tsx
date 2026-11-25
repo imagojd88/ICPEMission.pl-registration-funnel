@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next'
+import { groupGuests, guestGroupI18nKey, pickHeadingText } from '@icpe/shared'
 import { pickLang, eventGuests, type EventContent } from '../../lib/api'
 
 /** Renderuje gości specjalnych i program wydarzenia (jeśli ustawione). */
@@ -37,12 +38,36 @@ export function SpecialGuestsBlock({ content }: { content?: EventContent | null 
     .map((g) => ({ ...g, nameText: pickLang(g.name, i18n.language), bioText: pickLang(g.bio, i18n.language) }))
     .filter((g) => g.nameText)
   if (guests.length === 0) return null
-  // „Goście specjalni”, gdy jest kilka wpisów albo jeden wpis to para / kilka osób.
-  const pluralLabel = guests.length > 1 || guests.some((g) => g.plural)
+  // Goście pod nagłówkami („Goście specjalni”, „Wykładowcy”, „Paneliści” albo własny tekst), w kolejności
+  // pierwszego wystąpienia grupy. Bez ustawionych nagłówków wychodzi jedna grupa — dokładnie jak dawniej.
+  // Liczba mnoga nagłówka: kilka wpisów w grupie albo wpis oznaczony jako para / kilka osób.
+  const groups = groupGuests(guests)
+  const titleOf = (grp: (typeof groups)[number]) => {
+    const key = guestGroupI18nKey(grp)
+    return key ? t(key) : pickHeadingText(grp.text, i18n.language)
+  }
+  // Jedna grupa → ten sam układ co przed wprowadzeniem nagłówków (bez dodatkowego opakowania).
+  if (groups.length === 1) return <GuestGroupBlock title={titleOf(groups[0])} guests={groups[0].guests} />
+  return (
+    <div className="flex flex-col gap-4">
+      {groups.map((grp) => (
+        <GuestGroupBlock key={grp.key} title={titleOf(grp)} guests={grp.guests} />
+      ))}
+    </div>
+  )
+}
+
+function GuestGroupBlock({
+  title,
+  guests,
+}: {
+  title: string
+  guests: Array<{ photoUrl?: string; nameText: string; bioText: string }>
+}) {
   return (
     <div className="flex flex-col gap-2">
       <p className="text-xs uppercase tracking-wider" style={{ color: 'var(--faint)' }}>
-        {t(pluralLabel ? 'content.special_guests' : 'content.special_guest')}
+        {title}
       </p>
       {guests.map((g, i) => (
         <div

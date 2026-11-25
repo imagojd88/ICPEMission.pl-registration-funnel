@@ -127,6 +127,10 @@
   "content": {
     "special_guest": "특별 손님",
     "special_guests": "특별 손님",
+    "speaker": "초청 강사",
+    "speakers": "초청 강사",
+    "panelist": "패널",
+    "panelists": "패널",
     "program": "프로그램",
     "see_program": "프로그램 보기"
   },

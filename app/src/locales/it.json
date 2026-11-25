@@ -129,6 +129,10 @@
   "content": {
     "special_guest": "Ospite speciale",
     "special_guests": "Ospiti speciali",
+    "speaker": "Relatore",
+    "speakers": "Relatori",
+    "panelist": "Panelista",
+    "panelists": "Panelisti",
     "program": "Programma",
     "see_program": "Vedi il programma"
   },

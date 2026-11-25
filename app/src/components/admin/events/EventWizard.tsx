@@ -660,7 +660,7 @@ function Step0Type({ state, update }: { state: WizardState; update: (p: Partial<
         {(
           [
             { id: 'one_time', label: 'Event jednorazowy', desc: 'Konkretna data, jedna edycja' },
-            { id: 'evergreen', label: 'Event cykliczny (evergreen)', desc: 'Powtarza się automatycznie wg harmonogramu' },
+            { id: 'evergreen', label: 'Event cykliczny (evergreen)', desc: 'Na razie działa jak jednorazowy — harmonogram powtórzeń nie jest jeszcze wdrożony' },
             { id: 'standalone', label: 'Standalone (bez noclegu)', desc: 'Bezpłatne, proste RSVP „Będę / Nie będę"' },
             { id: 'invite', label: 'Na zaproszenie', desc: 'Imienne zaproszenia z unikalnym linkiem; potwierdzenie udziału' },
           ] as const
@@ -744,48 +744,19 @@ function Step0Type({ state, update }: { state: WizardState; update: (p: Partial<
 
       {state.eventType === 'evergreen' && (
         <div
-          className="mt-2 p-4 rounded-[12px] border flex flex-col gap-3"
-          style={{ borderColor: 'var(--border)', background: 'var(--surface-2)' }}
+          className="mt-2 p-4 rounded-[12px] border flex flex-col gap-2"
+          style={{ borderColor: 'var(--warn)', background: 'var(--warn-soft)' }}
         >
           <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-            Konfiguracja cykliczności
+            Cykliczność nie jest jeszcze wdrożona
           </p>
-          {/* Makieta: poniższe pola nie mają jeszcze zapisu — wyłączone, żeby nie udawały działania. */}
-          <p className="text-xs" style={{ color: 'var(--muted)' }}>
-            Harmonogram powtórzeń nie jest jeszcze obsługiwany — te ustawienia nie są zapisywane. Event utworzy się jak pojedyncza edycja.
+          {/* Bez pól harmonogramu: system niczego takiego nie zapisuje (makieta usunięta, żeby nie udawała funkcji). */}
+          <p className="text-xs" style={{ color: 'var(--ink)' }}>
+            Ten typ działa dziś tak samo jak „Event jednorazowy”: powstanie jeden termin, kolejne nie utworzą się same,
+            a zapisy nie przełączą się na następny termin. Różni się tylko etykietą „cykliczny” na liście eventów.
+            Dla powtarzającego się wydarzenia utwórz na razie osobny event na każdy termin. Szczegóły: „Pomoc” ▸ „Eventy” ▸
+            „Event cykliczny (evergreen) — stan obecny”.
           </p>
-          <div className="flex gap-3">
-            {['Tygodniowo', 'Miesięcznie'].map((f) => (
-              <button
-                key={f}
-                type="button"
-                disabled
-                title="Jeszcze nieobsługiwane"
-                className="px-3 py-1.5 rounded-[8px] text-sm border disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ borderColor: 'var(--border)', color: 'var(--ink)' }}
-              >
-                {f}
-              </button>
-            ))}
-          </div>
-          <div className="flex gap-1.5 flex-wrap">
-            {['Pon', 'Wt', 'Śr', 'Czw', 'Pt', 'Sob', 'Nd'].map((d) => (
-              <button
-                key={d}
-                type="button"
-                disabled
-                title="Jeszcze nieobsługiwane"
-                className="px-2.5 py-1 rounded-[8px] text-xs border disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ borderColor: 'var(--border)', color: 'var(--muted)' }}
-              >
-                {d}
-              </button>
-            ))}
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Input label="Otwórz rejestrację (dni przed)" type="number" placeholder="30" disabled />
-            <Input label="Zamknij rejestrację (dni przed)" type="number" placeholder="3" disabled />
-          </div>
         </div>
       )}
     </div>

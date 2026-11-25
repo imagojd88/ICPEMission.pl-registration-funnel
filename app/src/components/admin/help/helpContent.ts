@@ -312,8 +312,23 @@ export const HELP_SECTIONS: HelpSection[] = [
             ['Event jednorazowy', 'Konkretna data, jedna edycja. Zwykły formularz zapisu z ceną, pokojami i płatnością.'],
             ['Standalone (bez noclegu)', 'Bezpłatne spotkanie z prostym potwierdzeniem „Będę / Nie będę”.'],
             ['Na zaproszenie', 'Imienne zaproszenia z osobistym linkiem. Gości wpisujesz w kreatorze (jedna osoba na wiersz) albo później w „Edytuj” ▸ „Zaproszeni goście”.'],
-            ['Event cykliczny (evergreen)', 'Typ jest na liście, ale harmonogram powtórzeń nie jest jeszcze obsługiwany: pola „Konfiguracja cykliczności” w kreatorze są wyłączone i nic nie zapisują. Przed użyciem ustal z osobą rozwijającą system, jak ma działać.'],
+            ['Event cykliczny (evergreen)', 'Na razie działa jak „Event jednorazowy”: jeden termin, nic się samo nie powtarza. Różni się tylko etykietą i filtrem „Cykliczne” na liście. Patrz „Event cykliczny (evergreen) — stan obecny”.'],
           ] },
+        ],
+      },
+      {
+        id: 'eventy-cykliczny',
+        title: 'Event cykliczny (evergreen) — stan obecny',
+        blocks: [
+          { type: 'note', tone: 'warn', text: 'Cykliczność nie jest jeszcze wdrożona. Event utworzony jako „Event cykliczny (evergreen)” działa dokładnie tak samo jak „Event jednorazowy”: ma jeden termin i nic się samo nie powtarza.' },
+          { type: 'list', items: [
+            'Jedyna różnica to etykieta: na liście eventów trafia pod filtr „Cykliczne”.',
+            'System nie tworzy kolejnych terminów, nie zamyka zapisów na miniony termin i nie otwiera następnego.',
+            'W kreatorze nie ma ustawień harmonogramu (dni tygodnia, częstotliwość) — niczego takiego system nie zapisuje.',
+            'Panel nie ma przycisku do skopiowania eventu na kolejny termin.',
+          ] },
+          { type: 'p', text: 'Jeżeli wydarzenie się powtarza, na razie utwórz dla każdego terminu osobny „Event jednorazowy” z własnym adresem strony (np. z miesiącem w adresie). Gości specjalnych i miejsce wstawisz szybko z „Biblioteki”.' },
+          { type: 'p', text: 'Wdrożenie cykliczności wymaga kilku decyzji organizatora (m.in. czy zapisy są na jeden najbliższy termin, czy na kilka naraz, i co robić z terminami rat oraz poziomami cen). Do tego czasu nie wybieraj tego typu dla prawdziwych zapisów.' },
         ],
       },
       {
@@ -351,6 +366,36 @@ export const HELP_SECTIONS: HelpSection[] = [
             'Otwartego eventu nie da się zarchiwizować: system poprosi, żeby najpierw go zamknąć.',
           ] },
           { type: 'note', tone: 'info', text: 'Personal OS i ICPE Go widzą zarchiwizowany event tak samo jak zamknięty — archiwizacja niczego tam nie zmienia.' },
+        ],
+      },
+      {
+        id: 'eventy-naglowki-gosci',
+        title: 'Nagłówki nad gośćmi specjalnymi (np. Wykładowcy, Paneliści)',
+        blocks: [
+          { type: 'p', text: 'Każdy gość specjalny może mieć własny nagłówek, pod którym pokaże się na stronie wydarzenia. Goście z tym samym nagłówkiem tworzą jedną grupę.' },
+          { type: 'table', head: ['Wybór w polu „Nagłówek na stronie:”', 'Co zobaczy gość'], rows: [
+            ['„Goście specjalni (domyślny)”', '„Gość specjalny” albo „Goście specjalni” — jak dotychczas.'],
+            ['„Wykładowcy (Guest Speakers)”', 'Po polsku „Wykładowca” / „Wykładowcy”, po angielsku „Guest Speaker” / „Guest Speakers”.'],
+            ['„Paneliści (Panelists)”', 'Po polsku „Panelista” / „Paneliści”, po angielsku „Panelist” / „Panelists”.'],
+            ['„Własny nagłówek…”', 'Tekst, który wpiszesz w polu obok.'],
+          ] },
+          { type: 'steps', items: [
+            '„Eventy” ▸ „Edytuj” ▸ sekcja „Program i goście specjalni” (w kreatorze: krok „Szczegóły”).',
+            'Przy gościu wybierz wariant w polu „Nagłówek na stronie:”.',
+            'Dla „Własny nagłówek…” wpisz tekst w polu obok. Potem przełącz „Język treści” i wpisz tłumaczenie dla każdego języka strony.',
+            'Kliknij „Zapisz zmiany” na dole formularza.',
+          ] },
+          { type: 'p', text: 'Dwie grupy, np. „Guest Speakers” i niżej „Panelists”: ustaw wykładowcom „Wykładowcy (Guest Speakers)”, a panelistom „Paneliści (Panelists)”. Grupy pojawią się na stronie w takiej kolejności, w jakiej ich pierwszy gość stoi na liście — kolejność zmienisz strzałkami „W górę” / „W dół”.' },
+          { type: 'list', items: [
+            'Nowo dodany gość dostaje taki sam nagłówek jak ostatni gość na liście.',
+            '„Zastosuj do gości poniżej” ustawia ten sam nagłówek wszystkim gościom poniżej.',
+            'Liczba pojedyncza albo mnoga gotowych nagłówków dobiera się sama: mnoga, gdy w grupie jest kilka wpisów albo wpis ma zaznaczone „Para / kilka osób w jednym wpisie”.',
+            'Własny nagłówek pokazuje się dokładnie tak, jak go wpiszesz. Bez tłumaczenia na język strony pokaże się wersja angielska, a gdy jej brak — polska.',
+            'Poprawka tekstu własnego nagłówka u jednego gościa zmienia go u wszystkich gości z tym samym nagłówkiem.',
+            'Własny nagłówek bez wpisanego tekstu działa jak domyślny „Goście specjalni”.',
+            'Nagłówek jest ustawieniem eventu. Biblioteka gości go nie przechowuje — po wstawieniu gościa z Biblioteki ustaw go w evencie.',
+            'Efekt widać od razu w podglądzie obok formularza („Strona”).',
+          ] },
         ],
       },
       {
@@ -881,6 +926,687 @@ export const HELP_SECTIONS: HelpSection[] = [
           ] },
           { type: 'p', text: 'Historię wysyłek i stan poczty sprawdzisz w „Ustawienia”, w części o poczcie: lista „Ostatnie maile” ze statusem „Wysłany”, „Błąd” lub „Nie wysłany” oraz przycisk „Wyślij test”.' },
           { type: 'note', tone: 'info', text: 'Maile do organizatora idą na adres odpowiedzi ustawiony na serwerze („Odpowiedzi na:” w ustawieniach poczty). Gdy jest pusty, alert trafia tylko do logów serwera.' },
+        ],
+      },
+    ],
+  },
+
+  // ────────────────────────────────────────────────────────────────────────────
+  {
+    id: 'panel',
+    title: 'Dashboard i podstawy panelu',
+    intro: 'Logowanie, menu boczne, ekran startowy i sama zakładka „Pomoc”.',
+    articles: [
+      {
+        id: 'panel-logowanie',
+        title: 'Logowanie i wylogowanie',
+        blocks: [
+          { type: 'steps', items: [
+            'Otwórz `https://rejestracja.icpemission.pl/admin`.',
+            'Wpisz adres e-mail i hasło administratora.',
+            'Na własnym komputerze możesz zaznaczyć „Zapamiętaj mnie na tym urządzeniu”. Na cudzym komputerze zostaw to pole puste.',
+            'Kliknij „Zaloguj się”.',
+          ] },
+          { type: 'list', items: [
+            'Bez zaznaczenia sesja trwa 12 godzin, z zaznaczeniem 30 dni i przedłuża się sama, gdy korzystasz z panelu.',
+            'Po wygaśnięciu sesji panel sam wraca do ekranu logowania.',
+            'Wylogujesz się ikoną „Wyloguj” obok swojego adresu na dole menu bocznego albo przyciskiem „Wyloguj” w „Ustawienia” ▸ „Konto”.',
+            'Błędne dane dają komunikat „Nieprawidłowy e-mail lub hasło. Spróbuj ponownie.”',
+          ] },
+          { type: 'note', tone: 'warn', text: 'Ekran logowania nie ma przypomnienia hasła, a panel nie ma zmiany hasła administratora ani dodawania kolejnych administratorów. Takie zmiany robi osoba rozwijająca system.' },
+        ],
+      },
+      {
+        id: 'panel-menu',
+        title: 'Menu boczne — co gdzie jest',
+        blocks: [
+          { type: 'table', head: ['Pozycja', 'Do czego służy'], rows: [
+            ['Dashboard', 'Ekran startowy: kilka liczb i skróty. Opis w następnej instrukcji.'],
+            ['Eventy', 'Lista wydarzeń, kreator nowego eventu, „Edytuj”, zamykanie i archiwum. Sekcja „Eventy”.'],
+            ['Biblioteka', 'Zapisani goście specjalni i miejsca do ponownego użycia w eventach. Sekcja „Biblioteka”.'],
+            ['Zgłoszenia', 'Lista zgłoszeń wybranego eventu, szczegóły, edycja, anulowanie, eksport. Sekcja „Zgłoszenia”.'],
+            ['Zakwaterowanie', 'Wpisywanie numeru pokoju przy zgłoszeniu. Sekcja „Zakwaterowanie”.'],
+            ['Płatności', 'Wpłaty, raty, zwroty. Sekcja „Płatności”.'],
+            ['Obecność', 'Lista obecności wybranego eventu. Sekcja „Obecność”.'],
+            ['Recepcja', 'Prośby dodatkowe gości i dziennik działań stanowiska przyjęć. Sekcja „Recepcja”.'],
+            ['Formacja online', 'Kursy z filmami i plikami PDF oraz ich kursanci. Sekcja „Formacja online”.'],
+            ['Ustawienia', 'Motyw, konto, poczta, stan płatności online. Sekcja „Ustawienia”.'],
+            ['Pomoc', 'Te instrukcje.'],
+          ] },
+          { type: 'list', items: [
+            'Pod menu jest przełącznik motywu („Jasny” / „Ciemny”). Napis „PL” obok niego to tylko informacja — panel administratora działa wyłącznie po polsku.',
+            'Ekrany „Zgłoszenia”, „Zakwaterowanie”, „Płatności”, „Obecność” i „Recepcja” zaczynają się od wyboru eventu z listy „Event:”.',
+            'Panel nie ma osobnych adresów dla ekranów. Po odświeżeniu strony wracasz na „Dashboard” (wyjątek: adres z `#pomoc` otwiera „Pomoc”).',
+          ] },
+        ],
+      },
+      {
+        id: 'dashboard-kafle',
+        title: 'Dashboard — co pokazują kafle i listy',
+        blocks: [
+          { type: 'p', text: 'Dashboard jest tylko do podglądu: niczego się na nim nie zmienia. Dane odświeżają się same co 30 sekund, a przycisk „Odśwież” robi to od razu. Obok widać godzinę ostatniego odświeżenia („Zaktualizowano …”).' },
+          { type: 'table', head: ['Element', 'Co naprawdę pokazuje'], rows: [
+            ['„Otwarte edycje”', 'Liczba eventów ze statusem otwartym — wszystkich typów, także ukrytych.'],
+            ['„Zgłoszenia dziś”', 'Zgłoszenia utworzone od północy we wszystkich eventach razem. Doba jest liczona według zegara serwera, więc granica dnia może wypaść godzinę lub dwie po polskiej północy.'],
+            ['„Przychód (bieżący)”', 'Suma kwot zgłoszeń potwierdzonych ze wszystkich eventów. To kwoty zgłoszeń, a nie zaksięgowane wpłaty: zadatki, raty i zwroty jej nie zmieniają. Prawdziwe wpłaty sprawdzaj w „Płatności”.'],
+            ['„Obłożenie pokoi”', 'Mimo nazwy nie liczy pokoi. To liczba zgłoszeń w otwartych eventach, które mają ustawioną „Pojemność (max osób)”, podzielona przez sumę tych pojemności. Liczone są zgłoszenia, nie osoby, i także zgłoszenia anulowane — traktuj wynik jako orientacyjny. Zajętość pokoi sprawdzisz w „Edytuj” przy evencie.'],
+            ['„Najbliższe terminy”', 'Najwyżej 5 otwartych eventów, ułożonych od najpóźniejszej daty rozpoczęcia.'],
+            ['„Ostatnie zgłoszenia”', 'Pięć najnowszych zgłoszeń, ale tylko z jednego eventu — pierwszego na liście „Najbliższe terminy”. Kolumna „Status”: „Opłacone”, „Oczekuje” albo „Lista oczek.”.'],
+          ] },
+          { type: 'note', tone: 'warn', text: 'Wykres „Trend zgłoszeń” jest nieczynny: pokazuje stałe, przykładowe słupki, a nie dane z systemu. Nie wyciągaj z niego wniosków.' },
+          { type: 'p', text: 'Dokładne liczby dla jednego eventu (zgłoszenia, wpłaty, zadatki, prognoza) są w „Zgłoszenia” i w kaflach zakładki „Płatności”.' },
+        ],
+      },
+      {
+        id: 'pomoc-jak-korzystac',
+        title: 'Jak korzystać z „Pomocy”',
+        blocks: [
+          { type: 'list', items: [
+            'Pole „Szukaj” przeszukuje tytuły i treść instrukcji. Polskie znaki i wielkość liter nie mają znaczenia.',
+            '„Rozwiń wszystkie” otwiera wszystkie instrukcje naraz, „Zwiń wszystkie” je zamyka.',
+            '„Drukuj” otwiera okno drukowania przeglądarki z rozwiniętymi instrukcjami (można też zapisać jako PDF).',
+            'Każda instrukcja ma własny adres w postaci `/admin#pomoc/<nazwa>` — można go skopiować i wysłać innemu administratorowi.',
+            '„Spis treści” prowadzi do sekcji i pojedynczych instrukcji.',
+          ] },
+          { type: 'p', text: 'Instrukcje opisują stan systemu z dnia podanego u góry zakładki. Jeżeli ekran wygląda inaczej niż w opisie, zgłoś to osobie rozwijającej system — instrukcja wymaga poprawki.' },
+        ],
+      },
+    ],
+  },
+
+  // ────────────────────────────────────────────────────────────────────────────
+  {
+    id: 'zaproszenia',
+    title: 'Zaproszenia i goście',
+    intro: 'Event „Na zaproszenie”, lista gości, potwierdzeni przez organizatora, zapraszanie przez uczestników, spotkania „Będę / Nie będę”.',
+    articles: [
+      {
+        id: 'zaproszenia-rodzaje',
+        title: 'Trzy sposoby zapraszania',
+        blocks: [
+          { type: 'table', head: ['Sytuacja', 'Jak to działa'], rows: [
+            ['Event typu „Na zaproszenie”', 'Nie ma publicznego formularza zapisu. Każdy gość ma osobisty link i sam potwierdza udział albo zostaje potwierdzony przez organizatora. Eventu nie ma na stronie głównej. Lista gości: „Eventy” ▸ „Edytuj” ▸ „Zaproszeni goście”.'],
+            ['Zwykły event z gośćmi z listy', 'W „Edytuj” ▸ „Goście z zaproszeniem” wpisujesz osoby, które dostają osobisty link do rejestracji z wpisanymi danymi. Przechodzą zwykły formularz z ceną i płatnością, a potem są w „Zgłoszenia” jak każdy uczestnik.'],
+            ['Event „Standalone (bez noclegu)”', 'Bez listy gości. Każdy, kto otworzy stronę, klika „Będę” albo „Nie będę”. Patrz ostatnia instrukcja tej sekcji.'],
+          ] },
+          { type: 'p', text: 'Wszystkie osobiste linki są imienne. Kto ma link, ten działa w imieniu gościa — nie publikuj ich i nie wysyłaj do grup.' },
+        ],
+      },
+      {
+        id: 'zaproszenia-dodawanie',
+        title: 'Dodanie gościa i wysłanie zaproszenia',
+        blocks: [
+          { type: 'p', text: 'Pierwszych gości eventu „Na zaproszenie” można wpisać już w kreatorze (pole „Zaproszeni goście”, jedna osoba na wiersz: imię i nazwisko, e-mail, telefon). Kolejnych dodajesz w edycji eventu:' },
+          { type: 'steps', items: [
+            '„Eventy” ▸ przy wydarzeniu „Edytuj” ▸ sekcja „Zaproszeni goście” (w zwykłym evencie: „Goście z zaproszeniem”).',
+            'W ramce „Dodaj gościa” w evencie „Na zaproszenie” zostaw tryb „Zaproś (gość potwierdza)” (zwykły event nie ma wyboru trybu).',
+            'Wpisz „Imię”, „Nazwisko”, „E-mail (opcjonalnie)” i „Telefon” (z numerem kierunkowym, np. +48…).',
+            'Opcjonalnie rozwiń „Personalizuj treść maila (opcjonalnie)” — opis w instrukcji „Własna treść maila”.',
+            'Kliknij „Dodaj i wyślij zaproszenie”. Mail z osobistym linkiem wychodzi od razu. „Dodaj bez wysyłania” tylko dopisuje osobę do listy.',
+          ] },
+          { type: 'list', items: [
+            'Gość bez adresu e-mail nie dostanie maila. Przekaż mu link przyciskiem „Kopiuj link”, „WhatsApp” albo „iMessage” przy jego wierszu.',
+            '„WhatsApp” i „iMessage” tylko otwierają aplikację z gotową treścią — wiadomość wysyłasz ręcznie.',
+            '„Wyślij niewysłane (liczba)” nad listą wysyła zaproszenia wszystkim, którzy jeszcze nie dostali maila (pomija odmowy i osoby, które już same potwierdziły).',
+            'Sekcja zapisuje się sama, od razu — nie trzeba klikać „Zapisz zmiany” na dole formularza eventu.',
+          ] },
+          { type: 'note', tone: 'warn', text: 'Komunikat „Mail NIE został wysłany — serwer nie ma skonfigurowanej poczty” oznacza, że poczta systemu jest wyłączona. Sprawdź „Ustawienia” ▸ „E-mail”, a link przekaż ręcznie.' },
+        ],
+      },
+      {
+        id: 'zaproszenia-lista',
+        title: 'Lista gości: statusy i przyciski',
+        blocks: [
+          { type: 'table', head: ['Status przy nazwisku', 'Znaczenie'], rows: [
+            ['„Czeka”', 'Zaproszony, bez odpowiedzi.'],
+            ['„Potwierdził”', 'Gość sam potwierdził udział swoim linkiem.'],
+            ['„Potwierdzony · organizator”', 'Dodany lub potwierdzony przez administratora — gość nie musiał nic klikać.'],
+            ['„Nie przyjdzie”', 'Odmowa. Osoba nie liczy się do posiłków.'],
+            ['„Zarejestrowany”', 'Tylko w zwykłym evencie: gość przeszedł formularz rejestracji.'],
+          ] },
+          { type: 'table', head: ['Przycisk przy gościu', 'Co robi'], rows: [
+            ['„Kopiuj link”', 'Kopiuje osobisty link gościa.'],
+            ['„WhatsApp”, „iMessage”', 'Otwiera aplikację z gotową treścią zaproszenia.'],
+            ['„Wyślij mail” / „Wyślij ponownie”', 'Wysyła zaproszenie na adres gościa. U osoby potwierdzonej przez organizatora przycisk nazywa się „Wyślij mail z potwierdzeniem” / „Wyślij potwierdzenie ponownie”.'],
+            ['„Treść maila”', 'Własny zwrot, dodatkowe zdania, temat, forma grzecznościowa.'],
+            ['„Potwierdź ręcznie”', 'Gość potwierdził poza linkiem, np. telefonicznie: wpisujesz skład (małżonek, dzieci, diety) i klikasz „Potwierdź udział”.'],
+            ['„Edytuj skład i diety”', 'Zmiana małżonka, dzieci, diet i notatki u osoby już potwierdzonej.'],
+            ['„Cofnij potwierdzenie” / „Cofnij odmowę”', 'Osoba wraca do „Czeka”. Przy cofnięciu potwierdzenia jej zgłoszenie zostaje anulowane.'],
+            ['„Nie przyjdzie”', 'Oznacza odmowę zgłoszoną poza systemem.'],
+            ['„Usuń”', 'Usuwa osobę z listy. Potwierdzone zgłoszenie zostaje anulowane.'],
+          ] },
+          { type: 'list', items: [
+            'Lista odświeża się sama; przycisk „Odśwież” robi to od razu.',
+            'Ostrzeżenie o potwierdzeniach, których „jeszcze nie widać w module Zgłoszenia/Obecność”, usuwa przycisk „Synchronizuj z listą zgłoszeń”.',
+            'Potwierdzeni goście eventu „Na zaproszenie” są też w „Zgłoszenia”, „Obecność” i w Recepcji.',
+          ] },
+        ],
+      },
+      {
+        id: 'zaproszenia-potwierdzeni',
+        title: 'Dodanie osób od razu potwierdzonych',
+        blocks: [
+          { type: 'p', text: 'Tylko w evencie „Na zaproszenie”. Służy do wpisania osób, które nie muszą niczego klikać: organizatorów, prowadzących, rodzin, które potwierdziły ustnie.' },
+          { type: 'steps', items: [
+            'W ramce „Dodaj gościa” przełącz tryb na „Dodaj jako potwierdzonego”.',
+            'Wpisz osobę główną — tę, do której należy e-mail i link.',
+            'Wybierz skład: osoba, „Małżeństwo” albo „Rodzina”. Uzupełnij małżonka, dzieci z wiekiem, diety i ewentualną notatkę wewnętrzną (gość jej nie widzi).',
+            'Zdecyduj o polu „Wyślij mail z potwierdzeniem i prośbą o dietę”. Odznaczone = ciche dodanie, bez maila.',
+            'Kliknij „Dodaj jako potwierdzonego”.',
+          ] },
+          { type: 'list', items: [
+            'Cała rodzina to jeden wpis na liście — tak liczą się posiłki.',
+            '„Wklej listę” przyjmuje wiele rodzin naraz, jedna w wierszu: `Imię Nazwisko, e-mail, telefon, małżonek, dzieci`. Puste kolumny można pominąć, dzieci rozdziela się średnikiem (imię opcjonalne, liczba = wiek). Wiersze z błędem są pomijane.',
+            'Jeśli osoba albo jej małżonek już jest na liście, system niczego nie dodaje i pokazuje „możliwy duplikat” z wyborem: „Potwierdź istniejące zaproszenie” albo „Usuń osobny rekord i dodaj rodzinę”. Chodzi o to, żeby posiłki nie policzyły się podwójnie.',
+            '„Zamień osobę główną z małżonkiem” zmienia, do kogo należy e-mail i link.',
+            'To samo można zrobić już w kreatorze, w polu „Uczestnicy od razu potwierdzeni (bez zaproszenia)”.',
+          ] },
+        ],
+      },
+      {
+        id: 'zaproszenia-posilki',
+        title: 'Licznik posiłków i diety',
+        blocks: [
+          { type: 'p', text: 'Nad listą gości eventu „Na zaproszenie” jest podsumowanie „Potwierdzeni: X dorosłych + Y dzieci = Z posiłków”, a pod nim liczby „Jeszcze niepotwierdzeni” i „Nie przyjdzie”. To liczba do zamówienia u cateringu.' },
+          { type: 'list', items: [
+            'Przy każdej osobie widać dietę: wpisane wymagania, „bez wymagań żywieniowych ✓” albo „dieta: czeka na odpowiedź”.',
+            'Pasek „Diety nieznane” pokazuje rodziny potwierdzone przez Ciebie, które jeszcze nie odpowiedziały w sprawie diety.',
+            '„Przypomnij o diecie (liczba)” wysyła im mail z prośbą o podanie wymagań żywieniowych (z pytaniem o potwierdzenie przed wysyłką).',
+            'Dietę możesz też wpisać sam: „Edytuj skład i diety”.',
+          ] },
+        ],
+      },
+      {
+        id: 'zaproszenia-tresc-maila',
+        title: 'Własna treść maila dla jednej osoby',
+        blocks: [
+          { type: 'steps', items: [
+            'Przy gościu kliknij „Treść maila” (przy dodawaniu: „Personalizuj treść maila (opcjonalnie)”).',
+            'Ustaw, czego potrzebujesz: „Forma grzecznościowa (bez „Ty”, np. dla biskupa, gościa honorowego)”, własny zwrot na początku, dodatkowe zdania od organizatora, temat.',
+            'Kliknij „Podgląd maila” — zobaczysz dokładnie ten mail, który wyjdzie. Przycisk w podglądzie jest nieaktywny.',
+            'Kliknij „Zapisz i wyślij” (albo „Zapisz i wyślij ponownie”) lub „Zapisz bez wysyłania”.',
+          ] },
+          { type: 'p', text: 'Gość z własną treścią ma na liście znacznik „własna treść maila”.' },
+        ],
+      },
+      {
+        id: 'zaproszenia-gosc',
+        title: 'Co widzi zaproszony gość',
+        blocks: [
+          { type: 'list', items: [
+            'Event „Na zaproszenie”: link z maila otwiera stronę zaproszenia. Gość wybiera, czy przyjeżdża sam, czy z małżonkiem, może dopisać dzieci i wymagania żywieniowe, i klika „Potwierdzam udział”. Odpowiedź może potem zmienić.',
+            'Osoba potwierdzona przez organizatora widzi „Jesteś na liście gości” i może tylko podać wymagania żywieniowe.',
+            'Kto wejdzie na stronę eventu „Na zaproszenie” bez osobistego linku, zobaczy informację, że wydarzenie jest tylko dla zaproszonych, i formularz „Potwierdź udział”: imię, nazwisko i e-mail muszą się zgadzać z listą gości.',
+            'Zwykły event: osobisty link otwiera formularz rejestracji z wpisanymi danymi gościa.',
+          ] },
+        ],
+      },
+      {
+        id: 'zaproszenia-zapros-goscia',
+        title: 'Uczestnicy zapraszają swoich gości',
+        blocks: [
+          { type: 'steps', items: [
+            '„Eventy” ▸ „Edytuj” ▸ sekcja „Zaproszeni goście” albo „Goście z zaproszeniem”.',
+            'Zaznacz „Uczestnicy mogą sami zapraszać gości” i ustaw „Maks. gości na uczestnika”.',
+            'Kliknij „Zapisz zmiany” na dole formularza — to ustawienie zapisuje się razem z eventem.',
+          ] },
+          { type: 'list', items: [
+            'Event „Na zaproszenie”: po potwierdzeniu udziału gość dostaje link „Zaproś gościa”. Zaproszona osoba dostaje imienne zaproszenie mailem i sama potwierdza udział.',
+            'Zwykły event: po rejestracji uczestnik widzi przycisk „Zaproś gościa” (także w mailu z potwierdzeniem). Jego gość dostaje link do rejestracji z wpisanymi danymi i przechodzi zwykły formularz z ceną.',
+            'Goście uczestników nie mogą zapraszać dalej.',
+            '„Wyślij linki „Zaproś gościa”” wysyła link osobom, które zapisały się lub potwierdziły przed włączeniem tej opcji.',
+            'Przy osobie na liście jest przycisk „Link „Zaproś gościa”” — kopiuje jej link do ręcznego przekazania.',
+            'Licznik „od uczestników” nad listą pokazuje, ile osób zaprosili uczestnicy.',
+          ] },
+        ],
+      },
+      {
+        id: 'zaproszenia-standalone',
+        title: 'Spotkanie „Będę / Nie będę” (Standalone)',
+        blocks: [
+          { type: 'p', text: 'Event typu „Standalone (bez noclegu)” jest bezpłatny i nie ma formularza zapisu. Na stronie eventu gość wpisuje imię i nazwisko, opcjonalnie e-mail, i klika „Będę” albo „Nie będę”. Po odpowiedzi „Będę” może dodać termin do kalendarza.' },
+          { type: 'list', items: [
+            'Jedna odpowiedź na adres e-mail: ponowna odpowiedź z tym samym adresem zastępuje poprzednią. Bez e-maila każda odpowiedź to nowy wpis.',
+            'Taki event nie ma sekcji gości, pokoi, cennika ani płatności.',
+          ] },
+          { type: 'note', tone: 'warn', text: 'Panel administratora nie pokazuje listy odpowiedzi „Będę / Nie będę” ani ich liczby — te osoby nie są zgłoszeniami, więc nie ma ich w „Zgłoszenia” ani w „Obecność”. Serwer je zapisuje i udostępnia aplikacji Personal OS; w panelu takiego ekranu jeszcze nie ma.' },
+        ],
+      },
+    ],
+  },
+
+  // ────────────────────────────────────────────────────────────────────────────
+  {
+    id: 'biblioteka',
+    title: 'Biblioteka',
+    intro: 'Goście specjalni i miejsca zapisane do ponownego użycia w eventach.',
+    articles: [
+      {
+        id: 'biblioteka-do-czego',
+        title: 'Do czego służy Biblioteka',
+        blocks: [
+          { type: 'p', text: 'Biblioteka to dwie listy do wielokrotnego użytku, w zakładkach „Goście specjalni” i „Miejsca” (obok nazwy zakładki jest liczba wpisów). Z tych samych list korzysta kreator eventu i formularz „Edytuj”.' },
+          { type: 'note', tone: 'info', text: 'Event zawsze dostaje kopię wpisu. Zmiana albo usunięcie w Bibliotece nie zmienia eventów, które już z niego skorzystały — tam poprawiasz dane osobno, w „Edytuj”.' },
+        ],
+      },
+      {
+        id: 'biblioteka-goscie',
+        title: 'Goście specjalni',
+        blocks: [
+          { type: 'steps', items: [
+            '„Biblioteka” ▸ zakładka „Goście specjalni” ▸ „Dodaj gościa”.',
+            'Wpisz imię i nazwisko po polsku — to jedyne pole wymagane.',
+            'Kliknij „Wgraj portret” i wybierz zdjęcie (tylko obrazki, najwyżej 5 MB). „Zmień portret” podmienia je, krzyżyk obok usuwa.',
+            'Dla małżeństwa lub kilku osób w jednym wpisie zaznacz „Para / kilka osób w jednym wpisie (np. małżeństwo — wspólne zdjęcie i opis)”.',
+            'W polu opisu napisz 1–2 zdania o gościu.',
+            'Przełącz język przyciskami „PL”, „EN”, „IT” i dopisz tłumaczenia imion oraz opisu. Puste pole w danym języku oznacza, że strona pokaże wersję polską. Portret i oznaczenie pary są wspólne dla wszystkich języków.',
+            'Kliknij „Zapisz w bibliotece”.',
+          ] },
+          { type: 'list', items: [
+            'Na liście przy każdym gościu widać znaczniki języków, w których ma wpisane dane.',
+            'Ołówek („Edytuj”) otwiera wpis do zmiany, kosz („Usuń z biblioteki”) usuwa go po potwierdzeniu „Tak”.',
+            'W evencie gościa wstawiasz przyciskiem „Wybierz z biblioteki” w części o gościach specjalnych (kreator: krok „Szczegóły”; edycja: „Program i goście specjalni”).',
+            'Gościa wpisanego ręcznie w evencie można stamtąd dodać do Biblioteki przyciskiem „Zapisz w bibliotece”.',
+            'Biblioteka nie przechowuje nagłówka, pod którym gość występuje na stronie (np. „Wykładowcy”) — to ustawia się w evencie; patrz „Nagłówki nad gośćmi specjalnymi”.',
+          ] },
+        ],
+      },
+      {
+        id: 'biblioteka-miejsca',
+        title: 'Miejsca',
+        blocks: [
+          { type: 'steps', items: [
+            '„Biblioteka” ▸ zakładka „Miejsca”.',
+            'W polu u góry wpisz nazwę z adresem, np. nazwę ośrodka, ulicę i miejscowość.',
+            'Kliknij „Dodaj miejsce”.',
+          ] },
+          { type: 'list', items: [
+            'Ołówek („Zmień nazwę”) pozwala poprawić wpis — potwierdź przyciskiem „Zapisz”. Kosz („Usuń miejsce”) usuwa go po potwierdzeniu „Tak”.',
+            'W evencie miejsce wybierasz z listy „— wybierz zapisane miejsce —” przy polu miejsca (kreator i „Edytuj”).',
+            'Biblioteka przechowuje tylko polski tekst miejsca. Tłumaczenia adresu (EN / IT) wpisuje się w samym evencie.',
+          ] },
+        ],
+      },
+    ],
+  },
+
+  // ────────────────────────────────────────────────────────────────────────────
+  {
+    id: 'zakwaterowanie',
+    title: 'Zakwaterowanie',
+    intro: 'Numery pokoi przy zgłoszeniach.',
+    articles: [
+      {
+        id: 'zakwaterowanie-numery',
+        title: 'Wpisywanie numerów pokoi',
+        blocks: [
+          { type: 'steps', items: [
+            'Wejdź w „Zakwaterowanie” i wybierz wydarzenie z listy „Event:”.',
+            'Znajdź gościa. Pole „Szukaj gościa lub pokoju...” szuka po imieniu, nazwisku i wpisanym numerze pokoju.',
+            'W polu „Nr pokoju” wpisz numer albo nazwę pokoju (dowolny tekst, np. 12, Domek 3, Hotel 204).',
+            'W polu „Komentarz (opcjonalnie)” możesz dopisać uwagę, np. o dostawce.',
+            'Kliknij „Zapisz” przy tym gościu. Przycisk jest aktywny tylko wtedy, gdy coś zmieniłeś; po zapisie pokazuje „Zapisano”.',
+          ] },
+          { type: 'list', items: [
+            'Każdy wiersz zapisuje się osobno. Zmiany w wierszu bez kliknięcia „Zapisz” przepadają po zmianie eventu lub ekranu.',
+            'Pod nazwiskiem widać liczbę osób w zgłoszeniu oraz „wybrany: …” — typ pokoju, który gość wybrał w formularzu.',
+            'Licznik „Przydzielono: X / Y” pokazuje, ile zgłoszeń ma wpisany pokój.',
+            'Lista pomija zgłoszenia anulowane. Aby zdjąć przydział, wyczyść pole „Nr pokoju” i kliknij „Zapisz”.',
+            'Jedno zgłoszenie ma jedno pole numeru. Gdy rodzina zajmuje dwa pokoje, wpisz oba, np. 12 i 13.',
+          ] },
+        ],
+      },
+      {
+        id: 'zakwaterowanie-zasady',
+        title: 'Co ten ekran robi, a czego nie',
+        blocks: [
+          { type: 'table', head: ['Pytanie', 'Odpowiedź'], rows: [
+            ['Gdzie widać wpisany numer?', 'W Recepcji: na liście i na karcie zgłoszenia, razem z komentarzem. Gdy pole jest puste, Recepcja pokazuje „bez przydziału”.'],
+            ['Czy gość dostaje wiadomość?', 'Nie. System nie wysyła maila po wpisaniu numeru i nie pokazuje numeru pokoju na stronie zgłoszenia gościa.'],
+            ['Czy system pilnuje, żeby numer się nie powtórzył?', 'Nie. To zwykłe pole tekstowe: ten sam numer można wpisać przy kilku zgłoszeniach i nikt nie sprawdza liczby miejsc w pokoju.'],
+            ['Czym to się różni od typu pokoju?', 'Typ pokoju (np. pokój dla małżeństwa) gość wybiera w formularzu, a jego cenę i limit ustawiasz w evencie. Typ zmienisz w „Zgłoszenia” przyciskiem „Zmień pokoje”. Numer konkretnego pokoju wpisuje się tylko tutaj.'],
+          ] },
+          { type: 'note', tone: 'info', text: 'Panel nie ma listy pokoi ośrodka ani tablicy do przeciągania gości między pokojami. Przydział to wyłącznie numer wpisany przy zgłoszeniu.' },
+        ],
+      },
+    ],
+  },
+
+  // ────────────────────────────────────────────────────────────────────────────
+  {
+    id: 'obecnosc',
+    title: 'Obecność',
+    intro: 'Lista obecności wybranego eventu w panelu.',
+    articles: [
+      {
+        id: 'obecnosc-lista',
+        title: 'Odprawianie gości w panelu',
+        blocks: [
+          { type: 'steps', items: [
+            'Wejdź w „Obecność” i wybierz wydarzenie z listy „Event:”.',
+            'Znajdź osobę. Pole „Szukaj uczestnika...” szuka po imieniu, nazwisku i adresie e-mail zgłaszającego.',
+            'Kliknij „Odpraw”. Przy zgłoszeniu pojawi się znacznik „Obecny”.',
+            'Pomyłkę poprawia przycisk „Cofnij” — znacznik wraca na „Nieobecny”. Panel nie pyta tu o potwierdzenie.',
+          ] },
+          { type: 'list', items: [
+            'Obecność dotyczy całego zgłoszenia, czyli wszystkich osób, które ono obejmuje. Nie da się odprawić pojedynczej osoby z rodziny.',
+            'Kafel u góry pokazuje: „zgłoszeń obecnych” (odprawione / wszystkie), „osób na miejscu” (osoby z odprawionych zgłoszeń / wszystkie osoby) i pasek „% odprawionych”.',
+            'Lista pomija tylko zgłoszenia anulowane. Zgłoszenia z listy rezerwowej i nieopłacone są na liście.',
+            'Ekran nie odświeża się sam. Gdy równolegle pracuje Recepcja, przełącz event albo wejdź na ekran ponownie, żeby zobaczyć aktualny stan.',
+          ] },
+        ],
+      },
+      {
+        id: 'obecnosc-a-recepcja',
+        title: 'Obecność w panelu a Recepcja',
+        blocks: [
+          { type: 'p', text: 'To jedno i to samo oznaczenie: „Odpraw” w panelu i „Oznacz przyjazd” w Recepcji zapisują przyjazd tego samego zgłoszenia. Wystarczy zrobić to w jednym miejscu.' },
+          { type: 'list', items: [
+            'W dniu przyjazdu wygodniejsza jest Recepcja: działa na telefonie, pokazuje dopłatę, pokój, klucz i prośby.',
+            'Działania w Recepcji trafiają do dziennika („Recepcja” ▸ „Dziennik działań”). Kliknięcia „Odpraw” i „Cofnij” w tej zakładce nie są w dzienniku zapisywane.',
+            'Zakładka „Obecność” przydaje się do szybkiej korekty i do sprawdzenia frekwencji po wydarzeniu.',
+          ] },
+          { type: 'note', tone: 'info', text: 'Panel nie ma osobnych list obecności dla spotkań cyklicznych (np. cotygodniowych spotkań wspólnoty) ani samodzielnego zgłaszania obecności przez gości kodem QR. Obecność działa tylko dla zgłoszeń na eventy.' },
+        ],
+      },
+    ],
+  },
+
+  // ────────────────────────────────────────────────────────────────────────────
+  {
+    id: 'formacja',
+    title: 'Formacja online',
+    intro: 'Kursy z filmami i plikami PDF, dostęp kursantów, postępy i strona kursanta.',
+    articles: [
+      {
+        id: 'formacja-przeglad',
+        title: 'Jak to działa w skrócie',
+        blocks: [
+          { type: 'list', items: [
+            'Każdy kurs ma własną stronę pod adresem `https://icpemission.pl/formacja/<adres-kursu>`. Kursant loguje się tam adresem e-mail i hasłem.',
+            'Kurs składa się z materiałów: filmów i plików PDF. Materiały można pogrupować w moduły.',
+            'Dostęp dostają uczestnicy wskazanych eventów (automatycznie) oraz osoby dodane ręcznie.',
+            'Może działać wiele kursów jednocześnie. Jedna osoba ma jedno konto i jedno hasło do wszystkich swoich kursów.',
+          ] },
+          { type: 'table', head: ['Status kursu', 'Znaczenie'], rows: [
+            ['„Szkic”', 'Strona kursu jeszcze nie działa, maile do kursantów nie wychodzą. Można spokojnie wgrywać materiały i dodawać osoby.'],
+            ['„Opublikowany”', 'Kursanci mogą się logować i oglądać materiały.'],
+            ['„Zarchiwizowany”', 'Strona kursu pokazuje informację o zakończeniu, logowanie jest zablokowane.'],
+          ] },
+          { type: 'p', text: 'Na liście kursów przy każdym kursie widać liczbę materiałów, liczbę kursantów i zajęte miejsce. „Otwórz” otwiera stronę kursu od razu zalogowaną jako Ty — działa także dla szkicu.' },
+        ],
+      },
+      {
+        id: 'formacja-nowy-kurs',
+        title: 'Nowy kurs',
+        blocks: [
+          { type: 'steps', items: [
+            '„Formacja online” ▸ „Nowy kurs”.',
+            'Wpisz „Nazwa kursu (PL)” i, jeśli chcesz, „Nazwa (EN, opcjonalnie)”.',
+            'Sprawdź pole „Adres kursu”. Tworzy się z nazwy i można go zmienić; pod polem widać pełny adres albo powód, dla którego adres jest niedozwolony.',
+            'Kliknij „Utwórz kurs”. Kurs powstaje jako szkic i od razu otwiera się jego edycja.',
+          ] },
+          { type: 'p', text: 'Edycja kursu ma cztery zakładki: „Zawartość”, „Kursanci”, „Aktywność” i „Ustawienia”. Do listy wraca się linkiem „Wszystkie kursy”. Przycisk „Podgląd jako kursant” pokazuje stronę kursu tak, jak widzi ją kursant (także szkic); Twoje wejścia nie liczą się w „Aktywność”.' },
+        ],
+      },
+      {
+        id: 'formacja-filmy',
+        title: 'Dodawanie filmów',
+        blocks: [
+          { type: 'steps', items: [
+            'Edycja kursu ▸ zakładka „Zawartość” ▸ ramka „Dodaj film”.',
+            'Wpisz „Tytuł filmu (PL)” i opcjonalnie „Tytuł filmu (EN, opcjonalnie)”.',
+            'Jeśli kurs ma moduły, wybierz właściwy w polu „Moduł” (domyślnie ostatni).',
+            'Pole „Publikacja” zostaw puste, żeby film był widoczny od razu, albo ustaw datę i godzinę — patrz „Publikacja materiału z datą”.',
+            'Wybierz plik. Panel sprawdzi, czy przeglądarka potrafi go odtworzyć, i pokaże długość.',
+            'Kliknij „Wyślij film” i poczekaj na znacznik „Gotowy”.',
+          ] },
+          { type: 'list', items: [
+            'Najlepszy format to MP4 (H.264), 720p lub 1080p. Filmy z iPhone’a w formacie HEVC / H.265 zwykle się nie odtwarzają — wyeksportuj je najpierw do MP4.',
+            'Podczas wysyłki możesz przechodzić między ekranami panelu, ale nie zamykaj i nie odświeżaj karty przeglądarki.',
+            'Przerwaną wysyłkę wznowisz: kliknij ikonę wysyłania przy filmie i wybierz ten sam plik — wyślą się tylko brakujące części.',
+            'Plik filmu podmienisz tą samą ikoną („Podmień plik filmu”). Do końca wysyłki kursanci oglądają starą wersję.',
+            'Ikona „Sprawdź odtwarzanie” przy filmie testuje, czy plik da się odtworzyć.',
+            'Jeśli wysyłka kończy się błędem ustawień, użyj „Napraw ustawienia wysyłki (CORS)” na liście kursów albo „Napraw ustawienia wysyłki” przy filmie i spróbuj ponownie.',
+          ] },
+          { type: 'note', tone: 'warn', text: 'Gdy na liście kursów widać ostrzeżenie „Hosting wideo (Cloudflare R2) nie jest jeszcze skonfigurowany”, filmów nie da się wysyłać. Pliki PDF, moduły i kursantów można dodawać normalnie. Konfigurację hostingu ustawia się na Renderze.' },
+        ],
+      },
+      {
+        id: 'formacja-pdf',
+        title: 'Dodawanie plików PDF',
+        blocks: [
+          { type: 'steps', items: [
+            'Zakładka „Zawartość” ▸ ramka „Dodaj PDF”.',
+            'Wpisz „Tytuł materiału (PL)” i opcjonalnie tytuł angielski.',
+            'Wybierz moduł i ewentualną datę w polu „Publikacja”.',
+            'Wskaż „Plik PDF — wersja polska” i, jeśli jest, „Plik PDF — wersja angielska (opcjonalnie)”.',
+            'Kliknij „Wyślij PDF”.',
+          ] },
+          { type: 'list', items: [
+            'Limit to 25 MB na plik.',
+            'Kursant dostaje wersję w języku swojej strony (PL / EN), a gdy jej brak — tę drugą.',
+            'Przy materiale na liście są wiersze obu wersji językowych z przyciskami „Zamień”, „Dodaj …” i „Usuń” — wersję angielską można dołożyć później.',
+          ] },
+        ],
+      },
+      {
+        id: 'formacja-lista-materialow',
+        title: 'Kolejność, ukrywanie i usuwanie materiałów',
+        blocks: [
+          { type: 'list', items: [
+            'Kursanci widzą materiały w tej kolejności, co Ty. Kolejność zmieniasz strzałkami „W górę” / „W dół” albo przeciągając wiersz myszką — także między modułami.',
+            'Ołówek („Edytuj tytuł”) otwiera tytuły i krótkie opisy w PL i EN oraz pole „Publikacja”. Moduł materiału zmieniasz listą „Moduł” w jego wierszu.',
+            'Oko ukrywa materiał przed kursantami („Ukryj przed kursantami”) albo pokazuje go z powrotem („Pokaż kursantom”). Ukryty materiał nie jest wymagany do ukończenia modułu.',
+            'Kosz („Usuń”) usuwa materiał po potwierdzeniu. Plik filmu jest wtedy usuwany także z hostingu — tego nie da się cofnąć.',
+            'Dopisek „brak tytułu EN” przypomina o brakującym tłumaczeniu.',
+          ] },
+        ],
+      },
+      {
+        id: 'formacja-moduly',
+        title: 'Moduły i tryb sekwencyjny',
+        blocks: [
+          { type: 'p', text: 'Moduł grupuje materiały, np. „Konferencja 1” = film i notatki PDF.' },
+          { type: 'steps', items: [
+            'Zakładka „Zawartość” ▸ „Dodaj moduł”.',
+            'Wpisz „Nazwa modułu (PL)” (opcjonalnie EN) i kliknij „Dodaj moduł”. Moduł pojawi się na końcu listy.',
+            'Przypisz materiały: polem „Moduł” przy dodawaniu, listą „Moduł” w wierszu materiału albo przeciągając wiersz do modułu.',
+          ] },
+          { type: 'list', items: [
+            'Strzałki „Moduł wyżej” / „Moduł niżej” zmieniają kolejność modułów, ołówek zmienia nazwę i krótki opis.',
+            'Usunięcie modułu nie usuwa jego materiałów — trafiają do grupy „Materiały bez modułu”.',
+            '„Materiały bez modułu” są zawsze dostępne dla kursanta, niezależnie od kolejności modułów.',
+            'Gdy tytuły filmów zawierają numery (np. „Konferencja 2 …”), panel proponuje automatyczny podział: „Pokaż podział” ▸ sprawdź podgląd ▸ przycisk „Utwórz …” z liczbą modułów. Pliki zostają, zmienia się tylko grupowanie.',
+          ] },
+          { type: 'p', text: 'Tryb sekwencyjny włączasz w zakładce „Ustawienia” ▸ „Kolejność przechodzenia”: zaznacz „Tryb sekwencyjny” i kliknij „Zapisz ustawienia”. Kursant widzi wtedy kolejny moduł dopiero po ukończeniu poprzedniego.' },
+          { type: 'list', items: [
+            'Materiał jest ukończony, gdy kursant obejrzy film w 90%, otworzy PDF albo kliknie „Oznaczam jako ukończone”.',
+            'Moduł jest ukończony, gdy ukończono wszystkie jego widoczne materiały.',
+            'Pierwszy moduł i materiały bez modułu są dostępne od razu. Z zablokowanych kursant widzi tylko nazwę najbliższego.',
+            'Moduł bez żadnego widocznego materiału (np. wszystko zaplanowane na później) blokuje kolejne, dopóki coś się w nim nie pojawi.',
+            'W kursie bez modułów tryb sekwencyjny niczego nie zmienia.',
+          ] },
+        ],
+      },
+      {
+        id: 'formacja-publikacja-z-data',
+        title: 'Publikacja materiału z datą',
+        blocks: [
+          { type: 'p', text: 'Pole „Publikacja” przy filmie i pliku PDF pozwala wgrać materiał wcześniej i pokazać go kursantom w wybranym dniu i o wybranej godzinie.' },
+          { type: 'list', items: [
+            'Puste pole = materiał widoczny od razu.',
+            'Data w przyszłości = materiał pojawi się sam, a kursanci dostaną wtedy mail „Nowe materiały czekają na Ciebie”.',
+            'Na liście taki materiał ma znacznik „Zaplanowany: …”. Po publikacji znacznik zmienia się w „opublikowany …” z liczbą wysłanych maili.',
+            'Link „publikuj od razu” czyści datę.',
+            'Dopóki kurs jest szkicem, maile o nowych materiałach nie wychodzą — są wysyłane tylko dla kursu opublikowanego.',
+          ] },
+        ],
+      },
+      {
+        id: 'formacja-publikacja-kursu',
+        title: 'Publikacja, zakończenie i usunięcie kursu',
+        blocks: [
+          { type: 'steps', items: [
+            'Sprawdź kurs przyciskiem „Podgląd jako kursant”.',
+            'Kliknij „Opublikuj kurs” u góry edycji kursu.',
+            'Potwierdź. Okno pokazuje, ile osób dostanie mail powitalny.',
+            'Poczekaj 1–3 minuty — tyle trwa przebudowa strony, zanim adres kursu zacznie działać w pełnej wersji.',
+          ] },
+          { type: 'list', items: [
+            'Mail powitalny zawiera link do ustawienia hasła. Osoby dodane do szkicu dostają go dopiero w chwili publikacji („… powitań czeka na publikację”).',
+            '„Kopiuj link dla kursantów” kopiuje adres kursu z ekranem logowania.',
+            'W „Ustawienia” ▸ „Publikacja” są przyciski stanu kursu. „Zakończ (archiwizuj)” zamyka kurs: strona pokazuje informację o zakończeniu, logowanie jest zablokowane. „Opublikuj ponownie” go przywraca.',
+            '„Cofnij do szkicu” wyłącza stronę kursu bez usuwania czegokolwiek.',
+            'Przyciski w „Ustawienia” ▸ „Publikacja” działają od razu, bez pytania o potwierdzenie.',
+            'Nazwę, opis i adres kursu zmieniasz w „Ustawienia” ▸ „Nazwa, opis i adres” i zatwierdzasz przyciskiem „Zapisz ustawienia”. Po zmianie adresu opublikowanego kursu stary adres przekierowuje na nowy.',
+          ] },
+          { type: 'note', tone: 'err', text: '„Usuń kurs” jest nieodwracalne: znikają materiały (także filmy z hostingu) i dostęp wszystkich kursantów. Panel prosi o wpisanie adresu kursu dla potwierdzenia.' },
+        ],
+      },
+      {
+        id: 'formacja-dostep-z-eventu',
+        title: 'Dostęp automatyczny z eventu',
+        blocks: [
+          { type: 'steps', items: [
+            'Edycja kursu ▸ „Ustawienia” ▸ „Kto ma dostęp automatycznie”.',
+            'Zaznacz eventy, których uczestnicy mają dostać kurs.',
+            'Wybierz „Dostęp od:” — od „potwierdzenia zgłoszenia” (opłacone lub zatwierdzone przez administratora) albo od „samego zapisu” (także zgłoszenia czekające na płatność; dobre dla kursu bezpłatnego).',
+            'Opcjonalnie ustaw „Dostęp wygasa (opcjonalnie)” — po tym dniu dostęp kończy się wszystkim kursantom.',
+            'Kliknij „Zapisz ustawienia”.',
+          ] },
+          { type: 'list', items: [
+            'Dostęp nadaje się sam, gdy zgłoszenie spełni warunek. Konto zakłada się na adres e-mail zgłaszającego.',
+            'Anulowanie zgłoszenia odbiera dostęp nadany z eventu (na liście kursantów: „Zgłoszenie anulowane”).',
+            'Dostęp osób dodanych ręcznie nigdy nie jest odbierany automatycznie.',
+            'Przycisk „Synchronizuj z eventami” w zakładce „Kursanci” sprawdza od nowa wszystkie zgłoszenia powiązanych eventów — użyj go po zaznaczeniu eventu, który ma już zgłoszenia.',
+          ] },
+        ],
+      },
+      {
+        id: 'formacja-kursanci',
+        title: 'Kursanci: dodawanie, hasła, odbieranie dostępu',
+        blocks: [
+          { type: 'steps', items: [
+            'Edycja kursu ▸ zakładka „Kursanci” ▸ „Dodaj osobę”.',
+            'Wpisz „E-mail”, „Imię”, „Nazwisko” i wybierz „Język maili”.',
+            'Zostaw zaznaczone „Wyślij mail powitalny” albo je odznacz, a potem zatwierdź formularz.',
+          ] },
+          { type: 'list', items: [
+            '„Importuj listę” przyjmuje do 500 osób naraz, jedna w linii: `e-mail; imię; nazwisko` (średnik, przecinek albo tabulator — można wkleić kolumny z Excela). Po imporcie panel podaje, ile osób dodano, ile już miało dostęp i które wiersze pominięto.',
+            'Kolumna „Źródło”: „Z eventu” albo „Ręcznie”. Kolumna „Konto”: „Hasło ustawione”, „Zaproszony …” albo „Powitanie niewysłane”.',
+            'Ikona klucza otwiera hasło: „Wyślij link” (mail z linkiem ważnym 48 godzin) albo „Ustaw hasło ręcznie” (co najmniej 8 znaków) — gdy kursant nie odbiera maili. Ustawione hasło widać tylko raz i działa we wszystkich kursach tej osoby.',
+            'Ikona koperty wysyła ponownie mail powitalny osobie, która nie ustawiła jeszcze hasła.',
+            'Ikona „Odbierz dostęp” blokuje kursanta (z pytaniem o potwierdzenie), „Przywróć dostęp” go oddaje.',
+            'Komunikat „NIE wysłany — poczta wyłączona” albo „błąd wysyłki” oznacza problem z pocztą systemu: sprawdź „Ustawienia” ▸ „E-mail”.',
+            'W kursie będącym szkicem dodane osoby dostaną mail powitalny dopiero po publikacji kursu.',
+          ] },
+        ],
+      },
+      {
+        id: 'formacja-absolwenci',
+        title: 'Absolwenci',
+        blocks: [
+          { type: 'p', text: 'Zakładka „Kursanci” ma dwie listy: „Bieżący” i „Absolwenci”. Przeniesienie do absolwentów porządkuje listę — dostęp do materiałów zostaje.' },
+          { type: 'list', items: [
+            'Ikona czapki absolwenta przy osobie przenosi ją do absolwentów. Jeśli nie ukończyła kursu, panel zapyta o potwierdzenie.',
+            '„Przenieś do absolwentów wszystkich, którzy ukończyli kurs (liczba)” robi to zbiorczo.',
+            '„Przywróć do bieżących kursantów” cofa przeniesienie.',
+            'Jeśli absolwenci mają stracić dostęp, odbierz go pojedynczo albo ustaw datę „Dostęp wygasa” w ustawieniach kursu.',
+          ] },
+        ],
+      },
+      {
+        id: 'formacja-aktywnosc',
+        title: 'Postępy kursantów',
+        blocks: [
+          { type: 'p', text: 'Zakładka „Aktywność” pokazuje tabelę „Postępy kursantów”: kursant w wierszu, materiały w kolumnach.' },
+          { type: 'list', items: [
+            'Przy filmie widać procent obejrzenia. Liczą się tylko fragmenty obejrzane po raz pierwszy — przewijanie i powtórki nie zawyżają wyniku. Film „obejrzany” to co najmniej 90%.',
+            'Znak ✓ oznacza materiał ukończony; dopisek „ręcznie” — że kursant sam kliknął „Oznaczam jako ukończone”.',
+            'Przy pliku PDF widać, czy został otwarty lub pobrany.',
+            'Kolumna „Moduły” (gdy kurs ma moduły) pokazuje ukończone moduły.',
+            'Kliknięcie kursanta rozwija jego historię. Pod adresem widać liczbę logowań albo „nie ustawił(a) hasła”.',
+            '„tylko z dostępem” ukrywa osoby z odebranym dostępem. „CSV” pobiera tabelę do arkusza.',
+          ] },
+        ],
+      },
+      {
+        id: 'formacja-kursant',
+        title: 'Co widzi kursant',
+        blocks: [
+          { type: 'steps', items: [
+            'Dostaje mail powitalny z linkiem „Ustaw hasło” i ustawia własne hasło.',
+            'Wchodzi na adres kursu i loguje się adresem e-mail oraz hasłem („Zaloguj się”).',
+            'Ogląda filmy i otwiera lub pobiera pliki PDF.',
+            'W trybie sekwencyjnym kolejny moduł odblokowuje się po ukończeniu poprzedniego; materiał może też zamknąć przyciskiem „Oznaczam jako ukończone”.',
+          ] },
+          { type: 'list', items: [
+            'Zapomniane hasło kursant odzyskuje sam linkiem „Nie pamiętam hasła” na stronie kursu.',
+            'Osoba, która ma już konto z innego kursu, używa tego samego hasła.',
+            'Gdy film nie ma jeszcze pliku, kursant widzi „Film będzie wkrótce dostępny”.',
+            'Strona kursu działa po polsku i po angielsku.',
+            'Osoba z odebranym albo wygasłym dostępem nie otworzy materiałów kursu.',
+          ] },
+        ],
+      },
+      {
+        id: 'formacja-miejsce',
+        title: 'Zajęte miejsce na pliki',
+        blocks: [
+          { type: 'list', items: [
+            'Pasek „Filmy w Cloudflare R2: … z 10 GB darmowych” na liście kursów sumuje filmy wszystkich kursów. Zmienia kolor na ostrzegawczy od 70% i na czerwony od 90%.',
+            'Pliki PDF są liczone osobno („PDF-y (w bazie danych)”).',
+            'W zakładce „Zawartość” jest podsumowanie plików jednego kursu.',
+            'Miejsce zwalnia usunięcie filmu albo podmiana na mniejszy plik. Do kursu zwykle wystarcza 720p–1080p.',
+          ] },
+        ],
+      },
+    ],
+  },
+
+  // ────────────────────────────────────────────────────────────────────────────
+  {
+    id: 'ustawienia',
+    title: 'Ustawienia',
+    intro: 'Motyw, konto, poczta systemu i podgląd płatności online.',
+    articles: [
+      {
+        id: 'ustawienia-przeglad',
+        title: 'Co jest w „Ustawieniach”',
+        blocks: [
+          { type: 'table', head: ['Część', 'Co zawiera'], rows: [
+            ['„Wygląd”', 'Przełącznik „Motyw”: „Jasny” albo „Ciemny”. Dotyczy tylko Twojej przeglądarki.'],
+            ['„Konto”', 'Adres zalogowanego administratora i przycisk „Wyloguj”.'],
+            ['„E-mail”', 'Stan poczty systemu, mail testowy i lista ostatnich wysyłek. Patrz następna instrukcja.'],
+            ['„Płatności online”', 'Podgląd konfiguracji Tpay. Patrz „Gdzie sprawdzić stan płatności online” w sekcji o Tpay.'],
+            ['„System”', '„Adres API” — adres serwera, z którym łączy się panel. Tylko do odczytu.'],
+          ] },
+          { type: 'note', tone: 'info', text: 'W „Ustawieniach” niczego nie konfiguruje się na stałe poza motywem. Klucze poczty i płatności oraz adres nadawcy ustawia się na Renderze, w usłudze `icpe-api` ▸ Environment. Panel pokazuje tylko, czy są ustawione.' },
+        ],
+      },
+      {
+        id: 'ustawienia-poczta',
+        title: 'Poczta: stan, mail testowy, ostatnie wysyłki',
+        blocks: [
+          { type: 'p', text: 'Część „E-mail” odpowiada na pytanie, czy system naprawdę wysyła maile.' },
+          { type: 'table', head: ['Wiersz', 'Znaczenie'], rows: [
+            ['„Dostawca:”', 'Usługa, która wysyła maile, z końcówką klucza albo nazwą serwera. „Wyłączona (tylko log)” oznacza, że maile NIE wychodzą.'],
+            ['„Nadawca:”', 'Adres, z którego goście dostają wiadomości.'],
+            ['„Odpowiedzi na:”', 'Adres, na który trafiają odpowiedzi gości oraz alerty do organizatora. Wiersz jest widoczny tylko wtedy, gdy taki adres ustawiono.'],
+          ] },
+          { type: 'steps', items: [
+            'W polu pod „Mail testowy” wpisz swój adres.',
+            'Kliknij „Wyślij test”.',
+            'Przeczytaj wynik: „Wysłano na … przez …” — sprawdź skrzynkę, także SPAM; „Wysyłka jest wyłączona” — brak klucza poczty na serwerze; „Dostawca odrzucił wysyłkę: …” — treść błędu od dostawcy.',
+          ] },
+          { type: 'list', items: [
+            'Lista „Ostatnie maile” pokazuje rodzaj wiadomości, adresata, datę i status: „Wysłany”, „Błąd” (z treścią błędu) albo „Nie wysłany” (poczta wyłączona).',
+            'Przycisk „Odśwież” wczytuje stan i listę ponownie.',
+            'Rozwijana instrukcja „Jak podłączyć Resend” na dole opisuje podłączenie dostawcy poczty krok po kroku.',
+            'Gdy poczta jest wyłączona, nie wychodzą potwierdzenia zgłoszeń, zaproszenia, przypomnienia o ratach ani maile kursowe — zgłoszenia i wpłaty zapisują się normalnie.',
+          ] },
+          { type: 'note', tone: 'warn', text: 'Po każdej zmianie ustawień poczty na Renderze wyślij mail testowy. To jedyny pewny sposób sprawdzenia, czy goście dostaną wiadomości.' },
         ],
       },
     ],

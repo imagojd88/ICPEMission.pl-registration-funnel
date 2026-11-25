@@ -1,6 +1,7 @@
 import { useEffect, useState, type ChangeEvent } from 'react'
 import { ArrowDown, ArrowUp, BookUser, Check, Plus, Trash2 } from 'lucide-react'
 import Button from '@/components/ui/Button'
+import { cleanHeadingText, guestGroupKey, headingFieldsToSave } from '@icpe/shared'
 import {
   uploadImage,
   eventGuests,
@@ -16,6 +17,15 @@ import {
 type Lang = 'pl' | 'en' | 'it' | 'ko' | 'zh'
 const LANG_LABEL: Record<Lang, string> = { pl: 'PL', en: 'EN', it: 'IT', ko: 'KO', zh: 'ZH' }
 
+export type GuestHeadingChoice = '' | 'speakers' | 'panelists' | 'custom'
+
+const HEADING_OPTIONS: { id: GuestHeadingChoice; label: string }[] = [
+  { id: '', label: 'Goście specjalni (domyślny)' },
+  { id: 'speakers', label: 'Wykładowcy (Guest Speakers)' },
+  { id: 'panelists', label: 'Paneliści (Panelists)' },
+  { id: 'custom', label: 'Własny nagłówek…' },
+]
+
 /** Wiersz edytora: imiona i opis jako mapy językowe {pl, en, it}. */
 export interface GuestRow {
   id: string
@@ -24,6 +34,14 @@ export interface GuestRow {
   photoUrl: string
   /** Para / kilka osób w jednym wpisie (np. małżeństwo) — jedno zdjęcie, wspólny opis. */
   plural: boolean
+  /**
+   * Nagłówek, pod którym gość pokazuje się na stronie: '' = „Goście specjalni” (domyślny),
+   * 'speakers' = „Wykładowcy”, 'panelists' = „Paneliści”, 'custom' = własny tekst (`headingText`).
+   * To ustawienie eventu — nie trafia do biblioteki gości.
+   */
+  heading: GuestHeadingChoice
+  /** Własny nagłówek w językach strony (używany tylko przy `heading: 'custom'`). */
+  headingText: Record<string, string>
   /** Powiązanie z biblioteką gości (tylko w panelu — nie zapisuje się w evencie). */
   libraryId?: string
   /** Stan z chwili zapisu w bibliotece — różnica = „Zaktualizuj w bibliotece”. */
@@ -44,7 +62,13 @@ const clean = (m: Record<string, string>): Record<string, string> =>
   Object.fromEntries(Object.entries(m).map(([k, v]) => [k, (v ?? '').trim()]).filter(([, v]) => v))
 
 let seq = 0
-export const newGuestRow = (): GuestRow => ({ id: `g-${Date.now()}-${++seq}`, name: {}, bio: {}, photoUrl: '', plural: false })
+export const newGuestRow = (): GuestRow => ({ id: `g-${Date.now()}-${++seq}`, name: {}, bio: {}, photoUrl: '', plural: false, heading: '', headingText: {} })
+
+/** Nagłówek dla nowo dodawanego gościa: taki sam jak u ostatniego na liście (wygodne przy seriach). */
+const headingOfLast = (rows: GuestRow[]): Pick<GuestRow, 'heading' | 'headingText'> => {
+  const last = rows[rows.length - 1]
+  return last ? { heading: last.heading, headingText: { ...last.headingText } } : { heading: '', headingText: {} }
+}
 
 /** Goście z ustawień eventu (nowy `specialGuests` albo stary `specialGuest`) → wiersze edytora. */
 export function guestRowsFrom(content: EventContent | null | undefined): GuestRow[] {
@@ -54,13 +78,16 @@ export function guestRowsFrom(content: EventContent | null | undefined): GuestRo
     bio: asMap(g.bio),
     photoUrl: g.photoUrl ?? '',
     plural: !!g.plural,
+    heading: g.heading === 'speakers' || g.heading === 'panelists' || g.heading === 'custom' ? g.heading : '',
+    headingText: cleanHeadingText(g.headingText),
   }))
 }
 
 /** Wiersze → `customFields.specialGuests` (puste wpisy pomijamy). */
 export function guestsToSave(rows: GuestRow[]): SpecialGuest[] {
   return rows
-    .map((r) => ({ name: clean(r.name), bio: clean(r.bio), photoUrl: r.photoUrl, plural: r.plural }))
+    // Domyślny nagłówek nie dokłada pól — zapis gościa bez nagłówka jest identyczny jak dawniej.
+    .map((r) => ({ name: clean(r.name), bio: clean(r.bio), photoUrl: r.photoUrl, plural: r.plural, ...headingFieldsToSave(r) }))
     .filter((g) => Object.keys(g.name).length || g.photoUrl)
 }
 
@@ -135,6 +162,7 @@ export default function SpecialGuestsEditor({
       ...rows,
       {
         ...newGuestRow(),
+        ...headingOfLast(rows),
         name: { ...g.name },
         bio: { ...(g.bio ?? {}) },
         photoUrl: g.photoUrl ?? '',
@@ -163,6 +191,25 @@ export default function SpecialGuestsEditor({
   const patch = (id: string, p: Partial<GuestRow>) => onChange(rows.map((r) => (r.id === id ? { ...r, ...p } : r)))
   const setText = (id: string, key: 'name' | 'bio', v: string) =>
     onChange(rows.map((r) => (r.id === id ? { ...r, [key]: { ...r[key], [lang]: v } } : r)))
+  /** Zmiana rodzaju nagłówka jednego gościa. */
+  const setHeading = (id: string, heading: GuestHeadingChoice) => patch(id, { heading })
+  /**
+   * Tekst własnego nagłówka w bieżącym języku. Zmiana dotyczy całej grupy — wszystkich gości,
+   * którzy mają ten sam własny nagłówek — żeby poprawka literówki nie rozbiła grupy na dwie.
+   */
+  const setHeadingText = (id: string, v: string) => {
+    const row = rows.find((r) => r.id === id)
+    if (!row) return
+    const sig = JSON.stringify(cleanHeadingText(row.headingText))
+    // Pusty tekst nie jest jeszcze grupą — wtedy zmieniamy tylko ten wiersz.
+    const sameGroup = (r: GuestRow) => r.id === id || (sig !== '{}' && r.heading === 'custom' && JSON.stringify(cleanHeadingText(r.headingText)) === sig)
+    onChange(rows.map((r) => (sameGroup(r) ? { ...r, headingText: { ...r.headingText, [lang]: v } } : r)))
+  }
+  /** Ten sam nagłówek dla wszystkich gości poniżej wskazanego. */
+  const applyHeadingBelow = (i: number) => {
+    const src = rows[i]
+    onChange(rows.map((r, j) => (j > i ? { ...r, heading: src.heading, headingText: { ...src.headingText } } : r)))
+  }
   const move = (i: number, d: -1 | 1) => {
     const j = i + d
     if (j < 0 || j >= rows.length) return
@@ -303,6 +350,48 @@ export default function SpecialGuestsEditor({
             />
             Para / kilka osób w jednym wpisie (np. małżeństwo — wspólne zdjęcie i opis)
           </label>
+          <div className="flex items-center gap-2 flex-wrap">
+            <label className="flex items-center gap-2 text-xs" style={{ color: 'var(--muted)' }}>
+              Nagłówek na stronie:
+              <select
+                value={r.heading}
+                onChange={(e) => setHeading(r.id, e.target.value as GuestHeadingChoice)}
+                aria-label={`Gość ${i + 1} — nagłówek na stronie`}
+                className="rounded-[10px] px-2 py-1.5 text-xs"
+                style={inputStyle}
+              >
+                {HEADING_OPTIONS.map((o) => (
+                  <option key={o.id} value={o.id}>{o.label}</option>
+                ))}
+              </select>
+            </label>
+            {r.heading === 'custom' && (
+              <input
+                value={r.headingText[lang] ?? ''}
+                onChange={(e) => setHeadingText(r.id, e.target.value)}
+                placeholder={ph(r.headingText.pl, 'Tekst nagłówka, np. Prowadzący')}
+                aria-label={`Gość ${i + 1} — własny nagłówek (${LANG_LABEL[lang]})`}
+                className="rounded-[10px] px-3 py-1.5 text-xs"
+                style={{ ...inputStyle, flex: 1, minWidth: 180 }}
+              />
+            )}
+            {rows.slice(i + 1).some((x) => guestGroupKey(x) !== guestGroupKey(r)) && (
+              <button
+                type="button"
+                onClick={() => applyHeadingBelow(i)}
+                className="text-xs font-medium"
+                style={{ color: 'var(--brand)', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+                title="Ustawia ten sam nagłówek wszystkim gościom poniżej"
+              >
+                Zastosuj do gości poniżej
+              </button>
+            )}
+          </div>
+          {r.heading === 'custom' && !Object.keys(cleanHeadingText(r.headingText)).length && (
+            <p className="text-xs -mt-1" style={{ color: 'var(--warn)' }}>
+              Wpisz tekst nagłówka — bez niego gość pokaże się pod „Goście specjalni”.
+            </p>
+          )}
           <div className="flex items-center gap-2 -mt-1">
             {r.libraryId && r.librarySig === sigOf(r) ? (
               <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--ok)' }}>
@@ -333,12 +422,18 @@ export default function SpecialGuestsEditor({
         </div>
       ))}
 
-      <Button size="sm" variant="outline" onClick={() => onChange([...rows, newGuestRow()])} className="self-start">
+      <Button size="sm" variant="outline" onClick={() => onChange([...rows, { ...newGuestRow(), ...headingOfLast(rows) }])} className="self-start">
         <Plus size={14} /> {rows.length ? 'Dodaj kolejnego gościa' : 'Dodaj gościa specjalnego'}
       </Button>
       {!isPl && rows.length > 0 && (
         <p className="text-xs" style={{ color: 'var(--faint)' }}>
-          Imiona: puste = jak po polsku. Portret i „para” są wspólne dla wszystkich języków.
+          Imiona: puste = jak po polsku. Portret, „para” i rodzaj nagłówka są wspólne dla wszystkich języków.
+          Własny nagłówek bez tłumaczenia pokaże się po angielsku, a gdy go brak — po polsku.
+        </p>
+      )}
+      {rows.length > 1 && (
+        <p className="text-xs" style={{ color: 'var(--faint)' }}>
+          Goście z tym samym nagłówkiem tworzą na stronie jedną grupę. Grupy idą w kolejności, w jakiej ich pierwszy gość stoi na liście.
         </p>
       )}
     </div>

@@ -127,6 +127,10 @@
   "content": {
     "special_guest": "特邀嘉宾",
     "special_guests": "特邀嘉宾",
+    "speaker": "主讲嘉宾",
+    "speakers": "主讲嘉宾",
+    "panelist": "座谈嘉宾",
+    "panelists": "座谈嘉宾",
     "program": "日程",
     "see_program": "查看日程"
   },

@@ -925,6 +925,14 @@ export interface SpecialGuest {
   plural?: boolean
   /** Krótkie 1–2 zdania: kim są. Wielojęzyczne jak program. */
   bio?: LangText
+  /**
+   * Nagłówek, pod którym gość jest pokazany na stronie (ustawienie eventu, nie biblioteki):
+   * brak = „Goście specjalni”, 'speakers' = „Wykładowcy”, 'panelists' = „Paneliści”,
+   * 'custom' = własny tekst z `headingText`. Grupowanie: `groupGuests` z `@icpe/shared`.
+   */
+  heading?: 'speakers' | 'panelists' | 'custom'
+  /** Tekst własnego nagłówka w językach strony (tylko przy `heading: 'custom'`). */
+  headingText?: Record<string, string>
 }
 
 /** Lista gości specjalnych eventu — nowy format `specialGuests` albo starszy pojedynczy `specialGuest`. */
