@@ -25,8 +25,12 @@ export class PaymentsController {
     return this.payments.handleWebhook(provider, payload, signature);
   }
 
+  // Tylko dla zalogowanego admina: bez tego w trybie mock każdy, kto zna numer zgłoszenia,
+  // mógł sam oznaczyć je jako opłacone i potwierdzone (checkout + dev/confirm).
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @Post('payments/dev/confirm/:regId')
-  @ApiOperation({ summary: '[DEV] Confirm mock payment' })
+  @ApiOperation({ summary: '[DEV] Confirm mock payment (admin only)' })
   devConfirm(@Param('regId') regId: string) {
     return this.payments.devConfirm(regId);
   }
