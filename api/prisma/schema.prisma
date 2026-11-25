@@ -196,6 +196,7 @@ model EventInstance {
   rooms                Room[]
   registrations        Registration[]
   leads                RegistrationLead[]
+  waitlist             WaitlistEntry[]
   rsvps                EventRsvp[]
   invitations          Invitation[]
   createdAt            DateTime        @default(now())
@@ -727,6 +728,22 @@ model VideoProgress {
 /// Rozpoczęte, niedokończone zgłoszenie (gość przeszedł krok „Dane”, ale nie wysłał formularza).
 /// Tylko dane potrzebne do JEDNEGO przypomnienia po 3 h — bez uczestników, diet i wieku.
 /// Usuwane dzień po zakończeniu eventu.
+// Lista oczekujących na otwarcie zapisów (strona eventu z licznikiem): jeden mail w chwili startu rejestracji.
+model WaitlistEntry {
+  id           String        @id @default(cuid())
+  instanceId   String
+  instance     EventInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  email        String        // małe litery
+  locale       String        @default("pl")
+  notifiedAt   DateTime?
+  /// SENT | FAILED | LOGGED
+  notifyStatus String?
+  createdAt    DateTime      @default(now())
+
+  @@unique([instanceId, email])
+  @@index([instanceId, notifiedAt])
+}
+
 model RegistrationLead {
   id             String        @id @default(cuid())
   instanceId     String

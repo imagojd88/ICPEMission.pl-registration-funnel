@@ -27,7 +27,14 @@
     "optional_stay": "住宿可选",
     "badge_soon": "报名即将开始",
     "opens_title": "距报名开始还有",
-    "opens_at": "报名开始时间：{{date}}"
+    "opens_at": "报名开始时间：{{date}}",
+    "levels_title": "费用",
+    "level_default": "费用",
+    "level_range": "{{from}} – {{until}}",
+    "level_until": "截至 {{date}}",
+    "level_from": "自 {{date}} 起",
+    "level_price": "每人 {{price}} 起",
+    "levels_note": "按报名当日的价格计费。费用包含住宿和全部餐食。"
   },
   "invite": {
     "only_badge": "本活动仅限受邀嘉宾参加",
@@ -501,5 +508,14 @@
     "hours": "小时",
     "minutes": "分",
     "seconds": "秒"
+  },
+  "waitlist": {
+    "title": "加入候补名单",
+    "desc": "报名开放时，我们会第一时间通知您——名额有限。",
+    "email_placeholder": "您的电子邮箱",
+    "submit": "通知我",
+    "done": "谢谢！报名一开放我们就会通知您。",
+    "error": "保存失败，请检查邮箱地址后重试。",
+    "consent": "填写邮箱即表示您同意在本次活动开放报名时收到一封通知邮件。"
   }
 }

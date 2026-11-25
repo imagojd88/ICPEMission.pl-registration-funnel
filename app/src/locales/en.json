@@ -27,7 +27,14 @@
     "optional_stay": "optional accommodation",
     "badge_soon": "Registration opens soon",
     "opens_title": "Registration opens in",
-    "opens_at": "Registration opens: {{date}}"
+    "opens_at": "Registration opens: {{date}}",
+    "levels_title": "Prices",
+    "level_default": "Price",
+    "level_range": "{{from}} – {{until}}",
+    "level_until": "until {{date}}",
+    "level_from": "from {{date}}",
+    "level_price": "from {{price}} / person",
+    "levels_note": "The price on the day you register applies. The amount covers accommodation and full board."
   },
   "invite": {
     "only_badge": "This event is for invited guests only",
@@ -501,5 +508,14 @@
     "hours": "hrs",
     "minutes": "min",
     "seconds": "sec"
+  },
+  "waitlist": {
+    "title": "Join the waiting list",
+    "desc": "You will be among the first people we notify when registration opens – the number of places will be limited.",
+    "email_placeholder": "Your e-mail",
+    "submit": "Notify me",
+    "done": "Thank you! We will let you know as soon as registration opens.",
+    "error": "Could not save your address. Please check it and try again.",
+    "consent": "By entering your e-mail you agree to receive a one-off message when registration for this event opens."
   }
 }

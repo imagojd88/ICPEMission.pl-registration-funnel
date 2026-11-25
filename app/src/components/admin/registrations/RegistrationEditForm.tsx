@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { X, Plus, Trash2 } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
-import { computePrice, formatMoney, roomLabel, cleanDonation } from '@icpe/shared'
+import { computePrice, formatMoney, roomLabel, cleanDonation, pricingAt, warsawDate } from '@icpe/shared'
 import { funnelPriceInput, isAccommodationOptional } from '../../../lib/funnelPrice'
 import type { PricingConfig } from '@icpe/shared'
 import type { RegistrationDto } from '@icpe/shared'
@@ -28,7 +28,7 @@ const nextUid = () => `x-${++uid}-${Date.now()}`
 
 export default function RegistrationEditForm({
   registration,
-  pricingConfig,
+  pricingConfig: eventPricing,
   onClose,
   onSaved,
 }: {
@@ -37,6 +37,9 @@ export default function RegistrationEditForm({
   onClose: () => void
   onSaved: () => void
 }) {
+  // Cennik z poziomem cen z dnia zapisu — tak samo liczy API (cena z dnia rejestracji nie rośnie).
+  const pricingConfig = useMemo(() => pricingAt(eventPricing, warsawDate(registration.createdAt)), [eventPricing, registration.createdAt])
+
   const roomTypes = pricingConfig.rooms ?? []
   const money = (n: number) => formatMoney(n, pricingConfig.currency, 'pl')
 

@@ -3,7 +3,7 @@ import { notYetOpen } from '../lib/registrationOpens'
 import { useTranslation } from 'react-i18next'
 import { useParams, useSearchParams } from 'react-router-dom'
 import type { EventInstanceDto, CreateRegistrationDto, RegistrationStatus, PaymentMethod } from '@icpe/shared'
-import { computePrice, DEFAULT_PRICING, validateRoomCapacity, roomLabel, hasAccommodation, roomStockShortages, buildSchedule, minDepositPctFor, warsawDate } from '@icpe/shared'
+import { computePrice, DEFAULT_PRICING, validateRoomCapacity, roomLabel, hasAccommodation, roomStockShortages, buildSchedule, minDepositPctFor, warsawDate, pricingAt } from '@icpe/shared'
 import type { PricingConfig } from '@icpe/shared'
 import { getEventBySlug, getEventConfig, createRegistration, registerGuest, getInvitation, getRegistrationLead, saveRegistrationLead, pickLang, type EventConfig } from '../lib/api'
 import { funnelPriceInput, isAccommodationOptional } from '../lib/funnelPrice'
@@ -562,7 +562,8 @@ export default function PublicFunnel() {
         }
         setEvent(e)
         setEventConfig(cfg)
-        setPricingConfig(cfg.pricing)
+        // Poziom cen obowiązujący dziś (early bird / kolejne progi) — cały lejek liczy już po nim.
+        setPricingConfig(pricingAt(cfg.pricing))
         setLoading(false)
         // Kontekst analityki: każde kolejne zdarzenie w tej wizycie ma slug i typ eventu.
         setAnalyticsContext({
@@ -598,7 +599,7 @@ export default function PublicFunnel() {
       if (d.event) setEvent((prev) => ({ ...(prev ?? ({} as EventInstanceDto)), ...d.event }) as EventInstanceDto)
       if (d.config) {
         setEventConfig((prev) => ({ ...(prev ?? ({} as EventConfig)), ...d.config }) as EventConfig)
-        if (d.config.pricing) setPricingConfig(d.config.pricing)
+        if (d.config.pricing) setPricingConfig(pricingAt(d.config.pricing))
       }
       setLoading(false)
       setError(false)
@@ -606,7 +607,7 @@ export default function PublicFunnel() {
         const sc = d.screen
         // Stan z tej samej wiadomości (setState powyżej jest asynchroniczny).
         const cur = previewLatest.current
-        const pc = d.config?.pricing ?? cur.pricingConfig
+        const pc = d.config?.pricing ? pricingAt(d.config.pricing) : cur.pricingConfig
         const diets = d.config?.customFields?.diets ?? cur.eventConfig?.customFields?.diets ?? []
         const methods = (d.event?.paymentMethods ?? cur.event?.paymentMethods) as PaymentMethod[] | undefined
         setSubmitError(null)

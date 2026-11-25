@@ -560,14 +560,14 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
 
               <div className="flex flex-col gap-0.5">
                 <span className="text-xs" style={{ color: 'var(--muted)' }}>
-                  {t('summary.amount_label')}
+                  {schedule.length > 1 ? t('success.pay_now') : t('summary.amount_label')}
                 </span>
                 <span className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-                  {money(price.total)}
+                  {money(schedule.length > 1 ? schedule[0].amount : price.total)}
                 </span>
               </div>
 
-              {transferDeadline && (
+              {transferDeadline && schedule.length <= 1 && (
                 <div className="flex flex-col gap-0.5">
                   <span className="text-xs" style={{ color: 'var(--muted)' }}>
                     {t('summary.deadline')}

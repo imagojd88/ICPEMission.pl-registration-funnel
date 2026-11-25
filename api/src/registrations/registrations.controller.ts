@@ -5,6 +5,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { RegistrationsService } from './registrations.service';
 import { LeadsService } from './leads.service';
 import { PaymentPlanService } from './payment-plan.service';
+import { WaitlistService } from './waitlist.service';
 import { CreateRegistrationDto, UpdateAccommodationDto } from './dto/create-registration.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import type { Response } from 'express';
@@ -16,7 +17,32 @@ export class RegistrationsController {
     private readonly regs: RegistrationsService,
     private readonly leads: LeadsService,
     private readonly paymentPlan: PaymentPlanService,
+    private readonly waitlist: WaitlistService,
   ) {}
+
+  // ── Lista oczekujących na otwarcie zapisów (strona z licznikiem) ────────────
+
+  @Post('registrations/waitlist')
+  @ApiOperation({ summary: 'Landing z licznikiem: e-mail do jednorazowego powiadomienia o starcie zapisów' })
+  joinWaitlist(@Body() dto: { instanceId?: string; email?: string; locale?: string }) {
+    return this.waitlist.join(dto ?? {});
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Get('admin/instances/:id/waitlist')
+  @ApiOperation({ summary: 'Lista oczekujących na otwarcie zapisów (admin)' })
+  waitlistFor(@Param('id') id: string) {
+    return this.waitlist.listForInstance(id);
+  }
+
+  /** Zewnętrzny wyzwalacz powiadomień listy oczekujących. Gdy ustawiono CRON_SECRET, wymaga ?key=. */
+  @Get('cron/waitlist')
+  async cronWaitlist(@Query('key') key?: string) {
+    const secret = (process.env.CRON_SECRET ?? '').trim();
+    if (secret && key !== secret) throw new UnauthorizedException();
+    return { ok: true, ...(await this.waitlist.runDue()) };
+  }
 
   // ── Niedokończone zgłoszenia + przypomnienie po 3 h ─────────────────────────
 

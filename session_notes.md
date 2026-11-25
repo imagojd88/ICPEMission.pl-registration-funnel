@@ -51,6 +51,18 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — panel admina (kreator eventów)
 
+### Poziomy cen z datami, zniżka kwotowa dziecka, lista oczekujących pod licznikiem (2026-11-25)
+- **Prośby (Jacek):** kolejne poziomy cenowe (Pre-Summer, Regular) dla United In Mission; pod licznikiem „Zapisz się na listę oczekującą”.
+- **Poziomy cen (shared `pricing.ts` + lustro, bez zmian w bazie):** `PricingConfig.priceTiers[{ id, name, from: 'YYYY-MM-DD', mealsFee?, formationFee?, overnightMealsFee?, rooms?: { idTypu: cena } }]` + `baseTierName` (ceny w cenniku = pierwszy poziom). `pricingAt(config, data)` zwraca cennik z nadpisaniami aktywnego poziomu, `activeTier`, `priceLevels` (lista dla gości z ceną „od”). **Cena wg dnia zapisu:** `PricingService.quote(input, instanceId, at)` — nowe zgłoszenie = dziś, edycja admina i zmiana noclegu przez gościa = `reg.createdAt`; strona gościa dostaje cennik z poziomem z dnia zapisu; lejek stosuje `pricingAt` przy wczytaniu; „Edytuj zgłoszenie” liczy po poziomie z dnia zapisu.
+- **Zniżka kwotowa:** `AgeBracket.mealsDiscountAmount` (np. 150 zł na wyżywienie, stała przy każdym poziomie) + kolumna „albo − zł” w progach wiekowych. Rozwiązuje 1 051 zł zamiast 1 050 zł.
+- **Panel:** `admin/events/PriceTiersEditor.tsx` w „Edytuj event” (nad harmonogramem wpłat): nazwa pierwszego poziomu, kolejne poziomy (nazwa, od dnia, wyżywienie, opłata formacyjna, cena każdego typu zakwaterowania z podglądem ceny za pobyt). Kreator przenosi poziomy bez zmian; przy okazji naprawione: kreator w trybie edycji zmieniał id typów pokoi na `edit-room-N`.
+- **Strona eventu:** blok „Ceny” z poziomami (okres, cena od, aktualny wyróżniony).
+- **Lista oczekujących:** nowa tabela `WaitlistEntry` (dojdzie przez `prisma db push`), `registrations/waitlist.service.ts`: `POST /registrations/waitlist` (tylko gdy event OPEN i zapisy jeszcze nie ruszyły), `GET /admin/instances/:id/waitlist`, `GET /cron/waitlist`; co 2 min sprawdza eventy, których start zapisów właśnie minął (okno 3 dni), i wysyła JEDEN mail `WAITLIST_OPEN` (PL/EN/KO/ZH) z przyciskiem „Zapisz się”. Formularz pod licznikiem (`RegistrationCountdown`), tłumaczenia 5 języków; w „Edytuj event” licznik adresów + „kopiuj adresy”.
+- **Poprawka:** karta przelewu w podsumowaniu przy harmonogramie pokazuje „Do wpłaty teraz” (zadatek) zamiast pełnej kwoty i terminu = start wydarzenia.
+- **Nadal brak:** ceny w EUR (druga waluta), import wyciągów PDF, wpłaty na stronie gościa.
+- **Weryfikacja:** testy shared 25/25 (w tym pełny cennik United In Mission dla trzech poziomów), tsc app ✓, api ✓ (poza `src/courses`), build ✓; `prisma validate` nie do uruchomienia w sandboxie (brak silnika); nieprzeklikane, nieuruchomione na bazie.
+- Stan: do pushu + **Manual Deploy `icpe-api`**. Potem w United In Mission: próg „do 10 lat” wyżywienie 0% i −150 zł; poziomy Pre-Summer (od 2027-05-01: wyżywienie 625; 135 / 250 / 375 / 1110) i Regular (od 2027-07-01: wyżywienie 650; 150 / 290 / 420 / 1300).
+
 ### Dane przelewu dla gości z zagranicy + podmiot obsługujący wydarzenie (2026-11-25)
 - **Prośba (Jacek):** w wersjach IT / EN / KO przy numerze rachunku dodatkowo Swift, Bank, Bank address (tylko wypełnione); opcjonalne zdanie „Podmiot obsługujący wydarzenie za zgodą Executive Council: IMAGO Jacek Dudzic”.
 - **Model:** `RegistrationPage.paymentInfo` (JSON, bez zmian w bazie) + `swift`, `bankName`, `bankAddress`, `operator` (`BankInfo` w `app/src/lib/api.ts`).

@@ -29,7 +29,14 @@
     "optional_stay": "nocleg opcjonalny",
     "badge_soon": "Rejestracja wkrótce",
     "opens_title": "Zapisy ruszają za",
-    "opens_at": "Start zapisów: {{date}}"
+    "opens_at": "Start zapisów: {{date}}",
+    "levels_title": "Ceny",
+    "level_default": "Cena",
+    "level_range": "{{from}} – {{until}}",
+    "level_until": "do {{date}}",
+    "level_from": "od {{date}}",
+    "level_price": "od {{price}} / os.",
+    "levels_note": "Obowiązuje cena z dnia zapisu. Podana kwota obejmuje noclegi i pełne wyżywienie."
   },
   "invite": {
     "only_badge": "To jest wydarzenie tylko dla zaproszonych gości",
@@ -511,5 +518,14 @@
     "hours": "godz.",
     "minutes": "min",
     "seconds": "sek"
+  },
+  "waitlist": {
+    "title": "Zapisz się na listę oczekującą",
+    "desc": "Będziesz jedną z pierwszych osób, jaką powiadomimy o otwarciu rejestracji – liczba miejsc będzie ograniczona.",
+    "email_placeholder": "Twój e-mail",
+    "submit": "Zapisz mnie",
+    "done": "Dziękujemy! Damy Ci znać, gdy tylko ruszą zapisy.",
+    "error": "Nie udało się zapisać. Sprawdź adres i spróbuj ponownie.",
+    "consent": "Podając e-mail, zgadzasz się na jednorazową wiadomość o otwarciu zapisów na to wydarzenie."
   }
 }

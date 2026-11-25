@@ -27,7 +27,14 @@
     "optional_stay": "alloggio facoltativo",
     "badge_soon": "Iscrizioni a breve",
     "opens_title": "Le iscrizioni aprono tra",
-    "opens_at": "Apertura iscrizioni: {{date}}"
+    "opens_at": "Apertura iscrizioni: {{date}}",
+    "levels_title": "Prezzi",
+    "level_default": "Prezzo",
+    "level_range": "{{from}} – {{until}}",
+    "level_until": "fino al {{date}}",
+    "level_from": "dal {{date}}",
+    "level_price": "da {{price}} / persona",
+    "levels_note": "Vale il prezzo del giorno dell'iscrizione. L'importo comprende alloggio e pensione completa."
   },
   "invite": {
     "only_badge": "Questo evento è riservato agli ospiti invitati",
@@ -505,5 +512,14 @@
     "hours": "ore",
     "minutes": "min",
     "seconds": "sec"
+  },
+  "waitlist": {
+    "title": "Iscriviti alla lista d'attesa",
+    "desc": "Sarai tra le prime persone che avviseremo all'apertura delle iscrizioni – i posti saranno limitati.",
+    "email_placeholder": "La tua e-mail",
+    "submit": "Avvisami",
+    "done": "Grazie! Ti avviseremo appena apriranno le iscrizioni.",
+    "error": "Non è stato possibile salvare l'indirizzo. Controllalo e riprova.",
+    "consent": "Inserendo la tua e-mail accetti di ricevere un unico messaggio all'apertura delle iscrizioni a questo evento."
   }
 }

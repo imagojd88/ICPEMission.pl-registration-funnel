@@ -9,6 +9,7 @@ import RoomStockFields from './RoomStockFields'
 import OptionalStayFields from './OptionalStayFields'
 import DonationToggle from './DonationToggle'
 import RegistrationOpensFields from './RegistrationOpensFields'
+import PriceTiersEditor, { tiersToRows, rowsToTiers, tiersError, type PriceTierRow } from './PriceTiersEditor'
 import PaymentPlanEditor, { EMPTY_PLAN_FORM, planToForm, formToPlan, planFormError, type PaymentPlanForm } from './PaymentPlanEditor'
 import { isoToLocalInputs, localInputsToIso, notYetOpen } from '@/lib/registrationOpens'
 import { useState, useEffect, type ChangeEvent } from 'react'
@@ -24,6 +25,8 @@ import { countryOptions } from '@/lib/countries'
 import {
   API_URL,
   getEventEditConfig,
+  getInstanceWaitlist,
+  type WaitlistInfo,
   updateEventInstance,
   configureSeriesPage,
   uploadImage,
@@ -122,6 +125,13 @@ export default function EventEditForm({
   const [regOpenDate, setRegOpenDate] = useState('')
   const [regOpenTime, setRegOpenTime] = useState('')
   const [regOpenOrig, setRegOpenOrig] = useState<string | null>(null)
+  // Lista oczekujących na otwarcie zapisów (e-maile zostawione pod licznikiem).
+  const [waitlist, setWaitlist] = useState<WaitlistInfo | null>(null)
+  useEffect(() => {
+    let off = false
+    getInstanceWaitlist(editTarget.instanceId).then((w) => { if (!off) setWaitlist(w) }).catch(() => undefined)
+    return () => { off = true }
+  }, [editTarget.instanceId])
   const [nights, setNights] = useState('1')
   const [location, setLocation] = useState('')
   // Kraj eventu (ISO 3166-1 alpha-2) — dla ICPE Go; '' = nie ustawiono.
@@ -147,6 +157,9 @@ export default function EventEditForm({
   const [donationEnabled, setDonationEnabled] = useState(false)
   // Harmonogram wpłat: zadatek + raty z terminami, przypomnienia mailowe.
   const [planForm, setPlanForm] = useState<PaymentPlanForm>(EMPTY_PLAN_FORM)
+  // Poziomy cen z datami (ceny w cenniku = pierwszy poziom).
+  const [tierRows, setTierRows] = useState<PriceTierRow[]>([])
+  const [baseTierName, setBaseTierName] = useState('')
   // Limit pokoi: zajętość z API (publicznie / z rezerwy) i wolne publicznie — do podglądu przy pokojach.
   const [roomUsage, setRoomUsage] = useState<{ pub: Record<string, number>; res: Record<string, number>; free: Record<string, number> }>({ pub: {}, res: {}, free: {} })
   const [overnightMeals, setOvernightMeals] = useState('0')
@@ -301,6 +314,12 @@ export default function EventEditForm({
         setOptionalStay(!!pc?.accommodationOptional)
         setDonationEnabled(!!pc?.donationEnabled)
         setPlanForm(planToForm(pc?.paymentPlan))
+        // Klucz wiersza pokoju w formularzu to `r-<indeks>` (patrz setRooms niżej).
+        setTierRows(tiersToRows(pc?.priceTiers, (id) => {
+          const i = (pc?.rooms ?? []).findIndex((r) => String(r.id) === String(id))
+          return i >= 0 ? `r-${i}` : undefined
+        }))
+        setBaseTierName(typeof pc?.baseTierName === 'string' ? pc.baseTierName : pc?.baseTierName?.pl ?? '')
         setOvernightMeals(String(pc?.overnightMealsFee ?? 0))
         setTransport(String(pc?.options?.transport ?? DEFAULT_PRICING.options.transport))
         setBedding(String(pc?.options?.bedding ?? DEFAULT_PRICING.options.bedding))
@@ -379,8 +398,24 @@ export default function EventEditForm({
     }
   }
 
+  /** Stałe id typów zakwaterowania: zapisane zostają, nowe dostają pierwszy wolny numer. */
+  function roomIdMap(): Map<string, string> {
+    const used = new Set(rooms.map((r) => r.origId).filter(Boolean) as string[])
+    let next = 1
+    const out = new Map<string, string>()
+    for (const r of rooms) {
+      if (r.origId) { out.set(r.id, r.origId); continue }
+      while (used.has(String(next))) next++
+      used.add(String(next))
+      out.set(r.id, String(next))
+    }
+    return out
+  }
+
   function buildPricing(): PricingConfig {
     const n = parseInt(nights) || 0
+    const roomIds = roomIdMap()
+    const tiers = rowsToTiers(tierRows, (key) => roomIds.get(key))
     return {
       free: isFree,
       currency,
@@ -391,23 +426,18 @@ export default function EventEditForm({
       ...(optionalStay ? { accommodationOptional: true } : {}),
       ...(donationEnabled ? { donationEnabled: true } : {}),
       ...(formToPlan(planForm) ? { paymentPlan: formToPlan(planForm) } : {}),
+      ...(tiers.length ? { priceTiers: tiers } : {}),
+      ...(baseTierName.trim() ? { baseTierName: baseTierName.trim() } : {}),
       ...(parseFloat(overnightMeals) > 0 ? { overnightMealsFee: parseFloat(overnightMeals) } : {}),
       childBrackets: bracketsFromRows(brackets),
       rooms: (() => {
-        // Id typu pokoju musi zostać stały (zgłoszenia i limit pokoi liczą po id) —
+        // Id typu pokoju musi zostać stały (zgłoszenia, limit pokoi i poziomy cen liczą po id) —
         // wcześniej numerowane od nowa, więc usunięcie pokoju przesuwało id pozostałych.
-        const used = new Set(rooms.map((r) => r.origId).filter(Boolean) as string[])
-        let next = 1
-        const freshId = () => {
-          while (used.has(String(next))) next++
-          used.add(String(next))
-          return String(next)
-        }
         return rooms.map((r) => {
           const stock = parseInt(r.stock) || 0
           const reserved = Math.min(parseInt(r.reserved) || 0, stock || Infinity)
           return {
-            id: r.origId ?? freshId(),
+            id: roomIds.get(r.id)!,
             name: cleanMap(r.name),
             cap: parseInt(r.capacity) || 1,
             perPerson: parseFloat(r.price) || 0,
@@ -488,6 +518,7 @@ export default function EventEditForm({
     if (!slug) { setError('Podaj slug (adres strony).'); return }
     if (!dateStart) { setError('Podaj datę rozpoczęcia.'); return }
     if (planFormError(planForm)) { setError(planFormError(planForm)); return }
+    if (tiersError(tierRows)) { setError(tiersError(tierRows)); return }
     // Nocleg przy 0 nocach: pokoje kosztowałyby 0 zł, a gość nie widziałby wyboru noclegu.
     if (optionalStay && rooms.length > 0 && (parseInt(nights) || 0) < 1) {
       setError('Nocleg opcjonalny wymaga liczby nocy co najmniej 1 (np. nocleg z piątku na sobotę = 1). Wpisz ją w polu „Liczba nocy” w sekcji Szczegóły (obok „Limit miejsc”) albo w polu pod „Nocleg opcjonalny” w Cenniku. Przy 0 nocach pokoje kosztują 0 zł.')
@@ -682,6 +713,15 @@ export default function EventEditForm({
           </Field>
         </div>
         <RegistrationOpensFields date={regOpenDate} time={regOpenTime} onDate={setRegOpenDate} onTime={setRegOpenTime} />
+        {waitlist && waitlist.count > 0 && (
+          <p className="text-xs flex items-center gap-2 flex-wrap" style={{ color: 'var(--muted)' }}>
+            Lista oczekujących: <strong style={{ color: 'var(--ink)' }}>{waitlist.count}</strong> adresów
+            {waitlist.notified > 0 ? ` (powiadomionych: ${waitlist.notified})` : ' — dostaną jeden mail w chwili otwarcia zapisów'}
+            <button type="button" className="underline" style={{ background: 'none', border: 'none', color: 'var(--brand)', cursor: 'pointer' }} onClick={() => { void navigator.clipboard?.writeText(waitlist.entries.map((e) => e.email).join('\n')) }}>
+              kopiuj adresy
+            </button>
+          </p>
+        )}
         <div className="grid grid-cols-2 gap-3">
           <Field label="Liczba nocy">
             <Input value={nights} onChange={(e) => setNights(e.target.value)} inputMode="numeric" />
@@ -829,6 +869,18 @@ export default function EventEditForm({
             onNights={setNights}
           />
           {!isFree && <DonationToggle enabled={donationEnabled} onChange={setDonationEnabled} />}
+          {!isFree && (
+            <PriceTiersEditor
+              baseName={baseTierName}
+              onBaseName={setBaseTierName}
+              rows={tierRows}
+              onChange={setTierRows}
+              rooms={rooms.map((r) => ({ key: r.id, name: r.name.pl ?? Object.values(r.name)[0] ?? '', basePrice: r.price, unit: r.priceUnit }))}
+              baseMeals={mealsFee}
+              baseFormation={formationFee}
+              nights={parseInt(nights) || 0}
+            />
+          )}
           {!isFree && (
             <PaymentPlanEditor
               form={planForm}

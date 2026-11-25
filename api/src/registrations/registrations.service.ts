@@ -7,7 +7,7 @@ import { buildIcs, googleCalendarUrl } from '../shared';
 import { CreateRegistrationDto } from './dto/create-registration.dto';
 import { v4 as uuid } from 'uuid';
 import { guestInviteConfig, guestInvitePageLink, publicAppUrl } from '../invitations/guest-invite-config';
-import { buildPriceInput, hasAccommodation, roomLabel, leaderDepositSplit, cleanDonation, buildSchedule, hasPaymentPlan, minDepositPctFor, normalizePaymentPlan, warsawDate, PricingConfig, PriceAdjustment } from '../shared';
+import { buildPriceInput, hasAccommodation, roomLabel, leaderDepositSplit, cleanDonation, buildSchedule, hasPaymentPlan, minDepositPctFor, normalizePaymentPlan, warsawDate, pricingAt, PricingConfig, PriceAdjustment } from '../shared';
 import type { MailAccommodation } from '../notifications/notifications.service';
 import { assertRoomStock, instanceRoomAvailability } from './room-stock';
 import { LeadsService } from './leads.service';
@@ -326,7 +326,8 @@ export class RegistrationsService {
       adminOptions,
       dto.discountCode,
     );
-    const priceResult = await this.pricing.quote(priceInput, reg.instanceId);
+    // Poziom cen z dnia zapisu — edycja zgłoszenia nie przenosi go na droższy próg.
+    const priceResult = await this.pricing.quote(priceInput, reg.instanceId, reg.createdAt);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const p: any = this.prisma;
@@ -430,7 +431,8 @@ export class RegistrationsService {
         locales: page?.locales ?? null,
         theme: page?.theme ?? null,
       },
-      pricing: cfg,
+      // Cennik z poziomem cen z dnia zapisu (strona gościa liczy zmianę noclegu po tych samych cenach).
+      pricing: pricingAt(cfg, warsawDate(reg.createdAt)),
       // Wolne pokoje dla TEGO zgłoszenia (jego własne pokoje wracają do puli).
       // Gość specjalny (pokoje z rezerwy) — bez ograniczeń puli publicznej.
       roomAvailability: (reg as { roomsReserved?: boolean }).roomsReserved
@@ -459,6 +461,7 @@ export class RegistrationsService {
     const priceResult = await this.pricing.quote(
       buildPriceInput(people, rooms, storedOptions(reg.optionsJson), reg.discountCode ?? undefined),
       reg.instanceId,
+      reg.createdAt, // poziom cen z dnia zapisu
     );
     const before = normalizeRooms((reg.roomsJson ?? []) as RoomsInput, n, null);
     const oldTotal = parseFloat(reg.totalPrice.toString());

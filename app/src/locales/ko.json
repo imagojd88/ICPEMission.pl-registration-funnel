@@ -27,7 +27,14 @@
     "optional_stay": "숙박 선택 가능",
     "badge_soon": "신청 곧 시작",
     "opens_title": "신청 시작까지",
-    "opens_at": "신청 시작: {{date}}"
+    "opens_at": "신청 시작: {{date}}",
+    "levels_title": "참가비",
+    "level_default": "참가비",
+    "level_range": "{{from}} – {{until}}",
+    "level_until": "{{date}}까지",
+    "level_from": "{{date}}부터",
+    "level_price": "1인 {{price}}부터",
+    "levels_note": "신청일 기준 요금이 적용됩니다. 숙박과 전 일정 식사가 포함된 금액입니다."
   },
   "invite": {
     "only_badge": "초대받은 분만 참석할 수 있는 행사입니다",
@@ -501,5 +508,14 @@
     "hours": "시간",
     "minutes": "분",
     "seconds": "초"
+  },
+  "waitlist": {
+    "title": "대기자 명단에 등록하기",
+    "desc": "신청이 시작되면 가장 먼저 알려 드립니다. 자리는 한정되어 있습니다.",
+    "email_placeholder": "이메일 주소",
+    "submit": "알림 받기",
+    "done": "감사합니다! 신청이 시작되면 바로 알려 드리겠습니다.",
+    "error": "등록하지 못했습니다. 주소를 확인하고 다시 시도해 주세요.",
+    "consent": "이메일을 입력하시면 이 행사의 신청 시작을 알리는 메일을 한 번 받는 데 동의하게 됩니다."
   }
 }

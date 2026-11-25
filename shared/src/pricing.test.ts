@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { computePrice, validateRoomCapacity, buildPriceInput, countRoomsByType, roomAvailability, roomStockShortages, leaderDepositSplit, DEFAULT_PRICING, type PricingConfig } from './pricing.ts';
+import { computePrice, validateRoomCapacity, buildPriceInput, countRoomsByType, roomAvailability, roomStockShortages, leaderDepositSplit, pricingAt, activeTier, priceLevels, DEFAULT_PRICING, type PricingConfig } from './pricing.ts';
 
 test('ojciec + dziecko 8 + maluch 2 w pokoju 2-os. (1 noc)', () => {
   const r = computePrice({
@@ -225,4 +225,65 @@ test('darowizna: doliczana po rabatach i korekcie, tylko gdy event ją włączy�
   assert.equal(over.total, 299);
   assert.equal(computePrice({ rooms: [], withoutRoom: people, options: { donation: -5 } }, on).total, 260);
   assert.equal(computePrice({ rooms: [], withoutRoom: people, options: { donation: Number.NaN } }, on).total, 260);
+});
+
+test('poziomy cen: United In Mission (early bird / pre-summer / regular) + zniżka kwotowa dziecka', () => {
+  const cfg: PricingConfig = {
+    ...DEFAULT_PRICING, formationFee: 0, mealsFee: 575, nights: 5, discountCodes: {},
+    childBrackets: [
+      { ltAge: 3, multiplier: 0 },
+      { ltAge: 10, multiplier: 1, eventMultiplier: 1, mealsMultiplier: 1, mealsDiscountAmount: 150 },
+    ],
+    rooms: [
+      { id: '1', name: 'Miejsce', cap: 8, perPerson: 125 },
+      { id: '2', name: 'Pokój 2-os.', cap: 2, perPerson: 250, priceUnit: 'room' },
+      { id: '3', name: 'Jedynka', cap: 1, perPerson: 365 },
+      { id: '4', name: 'Domek', cap: 11, perPerson: 1000, priceUnit: 'room' },
+    ],
+    baseTierName: 'Early bird',
+    priceTiers: [
+      { id: 'reg', name: 'Regular', from: '2027-07-01', mealsFee: 650, rooms: { '1': 150, '2': 290, '3': 400, '4': 1300 } },
+      { id: 'pre', name: 'Pre-Summer', from: '2027-05-01', mealsFee: 625, rooms: { '1': 135, '2': 250, '3': 375, '4': 1110 } },
+    ],
+  };
+  const adult = { type: 'adult' as const, age: 40 };
+  const kid = { type: 'child' as const, age: 5 };
+  const price = (date: string, roomId: string, people: Array<typeof adult | typeof kid>) =>
+    computePrice({ rooms: [{ roomId, participants: people }] }, pricingAt(cfg, date)).total;
+  // osoba
+  assert.equal(price('2027-01-16', '1', [adult]), 1200);
+  assert.equal(price('2027-04-30', '1', [adult]), 1200);
+  assert.equal(price('2027-05-01', '1', [adult]), 1300);
+  assert.equal(price('2027-06-30', '1', [adult]), 1300);
+  assert.equal(price('2027-07-01', '1', [adult]), 1400);
+  // dziecko 3–9: zawsze 150 zł taniej; do 3 lat gratis; 10 lat jak dorosły
+  assert.equal(price('2027-01-16', '1', [kid]), 1050);
+  assert.equal(price('2027-05-10', '1', [kid]), 1150);
+  assert.equal(price('2027-07-10', '1', [kid]), 1250);
+  assert.equal(price('2027-07-10', '1', [{ type: 'child', age: 2 }]), 0);
+  assert.equal(price('2027-07-10', '1', [{ type: 'child', age: 10 }]), 1400);
+  // pokój dla dwóch osób: 2 400 / 2 500 / 2 750
+  assert.equal(price('2027-02-01', '2', [adult, adult]), 2400);
+  assert.equal(price('2027-05-01', '2', [adult, adult]), 2500);
+  assert.equal(price('2027-08-01', '2', [adult, adult]), 2750);
+  // pokój jednoosobowy: 2 400 / 2 500 / 2 650 (375×5+625; 400×5+650)
+  assert.equal(price('2027-02-01', '3', [adult]), 2400);
+  assert.equal(price('2027-05-01', '3', [adult]), 2500);
+  assert.equal(price('2027-08-01', '3', [adult]), 2650);
+  // domek: 5 000 / 5 550 / 6 500 + wyżywienie
+  assert.equal(price('2027-02-01', '4', [adult, adult, kid, kid]), 5000 + 2 * 575 + 2 * 425);
+  assert.equal(price('2027-05-01', '4', [adult, adult, kid, kid]), 5550 + 2 * 625 + 2 * 475);
+  assert.equal(price('2027-08-01', '4', [adult, adult, kid, kid]), 6500 + 2 * 650 + 2 * 500);
+  // aktywny poziom i lista dla gości
+  assert.equal(activeTier(cfg, '2027-04-30'), null);
+  assert.equal(activeTier(cfg, '2027-05-01')?.id, 'pre');
+  assert.equal(activeTier(cfg, '2027-12-01')?.id, 'reg');
+  assert.deepEqual(priceLevels(cfg, '2027-05-15').map((l) => [l.name, l.from, l.until, l.fromPrice, l.active]), [
+    ['Early bird', null, '2027-04-30', 1200, false],
+    ['Pre-Summer', '2027-05-01', '2027-06-30', 1300, true],
+    ['Regular', '2027-07-01', null, 1400, false],
+  ]);
+  assert.deepEqual(priceLevels({ ...cfg, priceTiers: [] }), []);
+  // bez poziomów cennik wraca bez zmian (stare eventy)
+  assert.equal(pricingAt(DEFAULT_PRICING, '2030-01-01'), DEFAULT_PRICING);
 });

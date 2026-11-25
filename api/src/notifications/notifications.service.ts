@@ -826,6 +826,50 @@ export class NotificationsService {
       return { subject, text, html };
     }
 
+    if (payload.type === 'WAITLIST_OPEN') {
+      // Lista oczekujących: zapisy właśnie ruszyły.
+      const lang = mailLangOf(payload.locale);
+      const title = String(d.eventTitle ?? L(lang, { pl: 'wydarzenie', en: 'the event', ko: '행사', zh: '活动' }));
+      const subject = L(lang, {
+        pl: `Zapisy otwarte — ${title}`,
+        en: `Registration is open — ${title}`,
+        ko: `신청이 시작되었습니다 — ${title}`,
+        zh: `报名已开放 — ${title}`,
+      });
+      const { text, html } = buttonMail(
+        [
+          greetingLine(lang),
+          '',
+          L(lang, {
+            pl: `Zapisy na wydarzenie „${title}” właśnie ruszyły. Jesteś na liście oczekujących, dlatego piszemy do Ciebie w pierwszej kolejności.`,
+            en: `Registration for "${title}" has just opened. You are on the waiting list, so we are letting you know first.`,
+            ko: `「${title}」 신청이 방금 시작되었습니다. 대기자 명단에 등록하셨기에 가장 먼저 알려 드립니다.`,
+            zh: `「${title}」的报名刚刚开放。您在候补名单上，所以我们第一时间通知您。`,
+          }),
+          L(lang, {
+            pl: 'Liczba miejsc jest ograniczona.',
+            en: 'The number of places is limited.',
+            ko: '자리가 한정되어 있습니다.',
+            zh: '名额有限。',
+          }),
+          '',
+        ],
+        { label: L(lang, { pl: 'Zapisz się', en: 'Register', ko: '신청하기', zh: '立即报名' }), href: String(d.link ?? '') },
+        [
+          L(lang, {
+            pl: 'To jednorazowa wiadomość — nie będziemy pisać w tej sprawie ponownie.',
+            en: "This is a one-off message — we won't write about this again.",
+            ko: '이 메일은 한 번만 발송됩니다.',
+            zh: '此邮件仅发送一次。',
+          }),
+          '',
+          ...signature(lang),
+        ],
+        lang,
+      );
+      return { subject, text, html };
+    }
+
     if (payload.type === 'PAYMENT_DUE_SOON' || payload.type === 'PAYMENT_OVERDUE') {
       // Przypomnienie o racie: 3 dni przed terminem / ponaglenie 7 dni po terminie (liczby dni z planu eventu).
       const lang = mailLangOf(payload.locale);

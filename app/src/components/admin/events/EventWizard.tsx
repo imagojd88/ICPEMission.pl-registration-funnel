@@ -163,6 +163,9 @@ interface WizardState {
   donationEnabled: boolean
   // harmonogram wpłat (edytowany w „Edytuj event") — kreator przenosi go bez zmian
   paymentPlan?: PricingConfig['paymentPlan']
+  // poziomy cen z datami (edytowane w „Edytuj event") — kreator przenosi je bez zmian
+  priceTiers?: PricingConfig['priceTiers']
+  baseTierName?: PricingConfig['baseTierName']
   // posiłki tylko dla nocujących, za osobę za noc (np. kolacja + śniadanie)
   overnightMeals: string
   // program wydarzenia: godzina + punkt
@@ -366,7 +369,8 @@ function LangTabs({ state, update }: { state: WizardState; update: (p: Partial<W
 function mapEditConfigToState(prev: WizardState, cfg: EventEditConfig, slug: string): WizardState {
   const pc = cfg.pricingConfig
   const rooms: RoomRow[] = (pc?.rooms ?? []).map((r, i) => ({
-    id: `edit-room-${i}`,
+    // Id typu zostaje takie jak w cenniku — zgłoszenia, limity i poziomy cen wskazują pokoje po id.
+    id: String(r.id ?? `edit-room-${i}`),
     name: typeof r.name === 'string' ? r.name : (r.name?.pl ?? Object.values(r.name ?? {})[0] ?? ''),
     // Jednostka ceny (za osobę / za pokój) → wybór w kreatorze (pole „Cena za”).
     model: r.priceUnit === 'room' ? 'za pokój' : 'os/noc',
@@ -404,6 +408,8 @@ function mapEditConfigToState(prev: WizardState, cfg: EventEditConfig, slug: str
     optionalStay: !!pc?.accommodationOptional,
     donationEnabled: !!pc?.donationEnabled,
     paymentPlan: pc?.paymentPlan,
+    priceTiers: pc?.priceTiers,
+    baseTierName: pc?.baseTierName,
     overnightMeals: String(pc?.overnightMealsFee ?? 0),
     diets: Array.isArray(cfg.customFields?.diets) ? cfg.customFields!.diets! : prev.diets,
     ageBrackets: ageBrackets.length > 0 ? ageBrackets : prev.ageBrackets,
@@ -481,6 +487,8 @@ function buildPricingConfig(state: WizardState): PricingConfig {
     ...(state.optionalStay && !state.noAccommodation ? { accommodationOptional: true } : {}),
     ...(state.donationEnabled ? { donationEnabled: true } : {}),
     ...(state.paymentPlan ? { paymentPlan: state.paymentPlan } : {}),
+    ...(state.priceTiers?.length ? { priceTiers: state.priceTiers } : {}),
+    ...(state.baseTierName ? { baseTierName: state.baseTierName } : {}),
     ...(state.optionalStay && parseFloat(state.overnightMeals) > 0 ? { overnightMealsFee: parseFloat(state.overnightMeals) } : {}),
     childBrackets: parsedBrackets.length > 0 ? parsedBrackets : DEFAULT_PRICING.childBrackets,
     rooms: roomDefs.length > 0 ? roomDefs : DEFAULT_PRICING.rooms,

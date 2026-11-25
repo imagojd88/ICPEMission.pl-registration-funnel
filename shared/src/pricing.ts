@@ -20,6 +20,19 @@
 import type { ParticipantType } from './types';
 import type { PaymentPlan } from './paymentPlan';
 
+// Lokalne kopie pomocników dat z `paymentPlan.ts` — bez importu wykonywalnego, żeby `node --test`
+// (uruchamiany na plikach .ts bez bundlera) nie musiał rozwiązywać ścieżek bez rozszerzeń.
+function warsawDate(d: Date | string | number = new Date()): string {
+  const dt = d instanceof Date ? d : new Date(d);
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Warsaw', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(dt);
+  const get = (t: string) => parts.find((x) => x.type === t)?.value ?? '';
+  return `${get('year')}-${get('month')}-${get('day')}`;
+}
+function addDays(date: string, days: number): string {
+  const [y, m, d] = date.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
+}
+
 export interface PricedParticipant {
   type: ParticipantType;
   age: number;
@@ -76,6 +89,29 @@ export interface AgeBracket {
   eventMultiplier?: number;
   /** Mnożnik WYŻYWIENIA dziennego (obiady itp.), np. 1 = bez zniżki. Brak = jak `eventMultiplier`. */
   mealsMultiplier?: number;
+  /**
+   * Zniżka KWOTOWA na wyżywienie za cały pobyt (np. 150 = dziecko płaci o 150 mniej, niezależnie
+   * od poziomu cen). Odejmowana po mnożniku; wyżywienie nie spada poniżej zera.
+   */
+  mealsDiscountAmount?: number;
+}
+
+/**
+ * Poziom cen obowiązujący od wskazanego dnia (np. „Pre-Summer" od 1 maja). Ceny bazowe cennika
+ * to pierwszy poziom (np. „Early bird"); każdy kolejny nadpisuje tylko podane kwoty.
+ * Cena zgłoszenia jest liczona wg poziomu z DNIA ZAPISU i nie zmienia się po przejściu progu.
+ */
+export interface PriceTier {
+  id: string;
+  /** nazwa pokazywana gościom — tekst albo mapa językowa */
+  name?: string | Record<string, string>;
+  /** pierwszy dzień obowiązywania `YYYY-MM-DD` (Europe/Warsaw, włącznie) */
+  from: string;
+  mealsFee?: number;
+  formationFee?: number;
+  overnightMealsFee?: number;
+  /** ceny typów zakwaterowania: id typu → cena za noc (jednostka jak w typie: osoba / pokój) */
+  rooms?: Record<string, number>;
 }
 
 export interface PricingConfig {
@@ -122,6 +158,81 @@ export interface PricingConfig {
   donationEnabled?: boolean;
   /** Harmonogram wpłat: zadatek przy rejestracji + raty z terminami (patrz `paymentPlan.ts`). */
   paymentPlan?: PaymentPlan;
+  /** Kolejne poziomy cen z datami (ceny bazowe = pierwszy poziom). */
+  priceTiers?: PriceTier[];
+  /** Nazwa pierwszego poziomu (cen bazowych), np. „Early bird". */
+  baseTierName?: string | Record<string, string>;
+}
+
+const TIER_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Poziomy cen z poprawną datą, posortowane rosnąco. */
+export function sortedTiers(config: PricingConfig | null | undefined): PriceTier[] {
+  return [...(config?.priceTiers ?? [])].filter((t) => t && TIER_DATE.test(String(t.from))).sort((a, b) => a.from.localeCompare(b.from));
+}
+
+/** Poziom obowiązujący w danym dniu (`YYYY-MM-DD`) albo null = ceny bazowe. */
+export function activeTier(config: PricingConfig | null | undefined, date: string = warsawDate()): PriceTier | null {
+  let hit: PriceTier | null = null;
+  for (const t of sortedTiers(config)) if (t.from <= date) hit = t;
+  return hit;
+}
+
+/**
+ * Cennik obowiązujący w danym dniu: ceny bazowe z nadpisanymi kwotami aktywnego poziomu.
+ * Używać WSZĘDZIE przed `computePrice` — z datą zapisu zgłoszenia (cena „zamrożona")
+ * albo z dzisiejszą datą (nowe zgłoszenie).
+ */
+export function pricingAt<T extends PricingConfig | null | undefined>(config: T, date: string = warsawDate()): T {
+  const tier = activeTier(config, date);
+  if (!config || !tier) return config;
+  const n = (v: unknown, fallback: number) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : fallback);
+  return {
+    ...config,
+    mealsFee: n(tier.mealsFee, config.mealsFee),
+    formationFee: n(tier.formationFee, config.formationFee),
+    ...(typeof tier.overnightMealsFee === 'number' ? { overnightMealsFee: n(tier.overnightMealsFee, config.overnightMealsFee ?? 0) } : {}),
+    rooms: config.rooms.map((r) => ({ ...r, perPerson: n(tier.rooms?.[String(r.id)], r.perPerson) })),
+  };
+}
+
+export interface PriceLevelInfo {
+  id: string;
+  name: string | Record<string, string> | undefined;
+  /** pierwszy dzień (null = od początku zapisów) */
+  from: string | null;
+  /** ostatni dzień (null = do końca zapisów) */
+  until: string | null;
+  /** cena „od": najtańsze miejsce liczone za osobę + wyżywienie + opłata formacyjna, za cały pobyt */
+  fromPrice: number;
+  active: boolean;
+}
+
+/** Lista poziomów cen do pokazania gościom (pusta, gdy event ma tylko ceny bazowe). */
+export function priceLevels(config: PricingConfig | null | undefined, date: string = warsawDate()): PriceLevelInfo[] {
+  const tiers = sortedTiers(config);
+  if (!config || tiers.length === 0) return [];
+  const current = activeTier(config, date);
+  const fromPrice = (cfg: PricingConfig) => {
+    const perPerson = cfg.rooms.filter((r) => r.priceUnit !== 'room').map((r) => r.perPerson * cfg.nights);
+    const stay = perPerson.length ? Math.min(...perPerson) : 0;
+    return Math.round((stay + cfg.mealsFee + cfg.formationFee + (cfg.overnightMealsFee ?? 0) * cfg.nights) * 100) / 100;
+  };
+  const base: PricingConfig = { ...config, priceTiers: [] };
+  const out: PriceLevelInfo[] = [
+    { id: 'base', name: config.baseTierName, from: null, until: addDays(tiers[0].from, -1), fromPrice: fromPrice(base), active: !current },
+  ];
+  tiers.forEach((t, i) => {
+    out.push({
+      id: t.id,
+      name: t.name,
+      from: t.from,
+      until: tiers[i + 1] ? addDays(tiers[i + 1].from, -1) : null,
+      fromPrice: fromPrice(pricingAt(config, t.from)),
+      active: current?.id === t.id,
+    });
+  });
+  return out;
 }
 
 /** Proponowane kwoty darowizny per waluta (ostatnia opcja w formularzu to „dowolna kwota”). */
@@ -263,15 +374,16 @@ export function ageBracketFor(p: PricedParticipant, brackets: AgeBracket[]): Age
  *  - `formation` — opłata formacyjna po zniżce,
  *  - `dayMeals` — mnożnik wyżywienia dziennego.
  */
-function personFactors(p: PricedParticipant, config: PricingConfig): { stay: number; formation: number; dayMeals: number } {
+function personFactors(p: PricedParticipant, config: PricingConfig): { stay: number; formation: number; dayMeals: number; mealsOff: number } {
   const b = ageBracketFor(p, config.childBrackets);
   const stay = b ? b.multiplier : 1;
+  const mealsOff = Math.max(0, Number(b?.mealsDiscountAmount) || 0);
   if (b && typeof b.eventMultiplier === 'number') {
     const meals = typeof b.mealsMultiplier === 'number' ? b.mealsMultiplier : b.eventMultiplier;
-    return { stay, formation: config.formationFee * b.eventMultiplier, dayMeals: meals };
+    return { stay, formation: config.formationFee * b.eventMultiplier, dayMeals: meals, mealsOff };
   }
   // Dotychczasowe zasady: próg „gratis" (mnożnik 0) zeruje całą cenę osoby.
-  return { stay, formation: stay === 0 ? 0 : config.formationFee, dayMeals: stay };
+  return { stay, formation: stay === 0 ? 0 : config.formationFee, dayMeals: stay, mealsOff };
 }
 
 /**
@@ -301,7 +413,7 @@ export function computePrice(input: PriceInput, config: PricingConfig = DEFAULT_
       const accommodation = perRoom
         ? (occupants > 0 ? (room.perPerson * config.nights) / occupants : 0)
         : room.perPerson * config.nights * m;
-      const meals = config.mealsFee * f.dayMeals + overnightMeals * m;
+      const meals = Math.max(0, config.mealsFee * f.dayMeals - f.mealsOff) + overnightMeals * m;
       lines.push({
         ...p,
         roomId: room.id,
@@ -319,7 +431,7 @@ export function computePrice(input: PriceInput, config: PricingConfig = DEFAULT_
     const f = personFactors(p, config);
     const m = f.stay;
     const formation = f.formation;
-    const meals = config.mealsFee * f.dayMeals;
+    const meals = Math.max(0, config.mealsFee * f.dayMeals - f.mealsOff);
     lines.push({ ...p, roomId: '', multiplier: m, formation, accommodation: 0, meals, total: formation + meals });
   }
 

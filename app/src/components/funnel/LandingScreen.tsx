@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { Calendar, MapPin, Clock, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { priceLevels, formatMoney } from '@icpe/shared'
 import type { EventInstanceDto, PricingConfig } from '@icpe/shared'
 import { pickLang, eventLocation, type EventContent } from '../../lib/api'
-import { formatDateRange } from '../../lib/utils'
+import { formatDateRange, bcp47 } from '../../lib/utils'
 import { SpecialGuestsBlock } from './EventContentBlocks'
 import RegistrationCountdown from './RegistrationCountdown'
 import { notYetOpen } from '../../lib/registrationOpens'
@@ -211,9 +212,41 @@ export default function LandingScreen({ event, onRegister, pricingConfig, conten
         </div>
       )}
 
+      {/* Poziomy cen z datami (np. Early bird → Regular) — gdy event je ma */}
+      {(() => {
+        const levels = pricingConfig && !pricingConfig.free ? priceLevels(pricingConfig) : []
+        if (levels.length === 0) return null
+        const fmt = (d: string) => {
+          const [y, m, day] = d.split('-').map(Number)
+          return new Date(Date.UTC(y, m - 1, day, 12)).toLocaleDateString(bcp47(lng), { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
+        }
+        return (
+          <div className="flex flex-col gap-1.5 rounded-[15px] p-4" style={{ border: '1px solid var(--border)', background: 'var(--surface)' }}>
+            <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>{t('landing.levels_title')}</p>
+            {levels.map((l) => (
+              <div key={l.id} className="flex items-baseline justify-between gap-3">
+                <span className="text-sm" style={{ color: l.active ? 'var(--ink)' : 'var(--muted)', fontWeight: l.active ? 600 : 400 }}>
+                  {pickLang(l.name as string | Record<string, string> | undefined, lng) || t('landing.level_default')}
+                  <span className="text-xs" style={{ color: 'var(--muted)', fontWeight: 400 }}>
+                    {' · '}
+                    {l.until && l.from
+                      ? t('landing.level_range', { from: fmt(l.from), until: fmt(l.until) })
+                      : l.until ? t('landing.level_until', { date: fmt(l.until) }) : t('landing.level_from', { date: fmt(l.from ?? '') })}
+                  </span>
+                </span>
+                <span className="text-sm whitespace-nowrap" style={{ color: l.active ? 'var(--brand)' : 'var(--ink)', fontWeight: l.active ? 700 : 500 }}>
+                  {t('landing.level_price', { price: formatMoney(l.fromPrice, pricingConfig?.currency, lng) })}
+                </span>
+              </div>
+            ))}
+            <p className="text-xs" style={{ color: 'var(--muted)' }}>{t('landing.levels_note')}</p>
+          </div>
+        )
+      })()}
+
       {/* CTA: licznik do startu zapisów albo przycisk */}
       {waiting && event.registrationOpensAt ? (
-        <RegistrationCountdown opensAt={event.registrationOpensAt} onOpen={() => setWaiting(false)} />
+        <RegistrationCountdown opensAt={event.registrationOpensAt} onOpen={() => setWaiting(false)} instanceId={event.id} />
       ) : (
         <>
           <button

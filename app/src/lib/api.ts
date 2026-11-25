@@ -1203,6 +1203,21 @@ export async function adminUpdateRegistration(
   })
 }
 
+/** Strona z licznikiem: zapis e-maila na listę oczekujących (jeden mail w chwili startu zapisów). */
+export async function joinWaitlist(input: { instanceId: string; email: string; locale?: string }): Promise<{ ok: boolean }> {
+  return apiFetch<{ ok: boolean }>('/registrations/waitlist', { method: 'POST', body: JSON.stringify(input) })
+}
+
+export interface WaitlistInfo {
+  count: number
+  notified: number
+  entries: Array<{ id: string; email: string; locale: string; createdAt: string; notifiedAt: string | null; notifyStatus: string | null }>
+}
+
+export async function getInstanceWaitlist(instanceId: string, token?: string): Promise<WaitlistInfo> {
+  return apiFetch<WaitlistInfo>(`/admin/instances/${instanceId}/waitlist`, { headers: authHeaders(token) })
+}
+
 /** Finanse eventu: wpłacone, zadatki, zaległości, prognoza wpływów wg terminów, darowizny. */
 export interface InstanceFinance {
   hasPlan: boolean

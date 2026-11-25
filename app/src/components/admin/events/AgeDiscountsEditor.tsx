@@ -19,6 +19,8 @@ export interface AgeDiscountRow {
   eventPct: string
   /** % zniżki na wyżywienie dzienne */
   mealsPct: string
+  /** zniżka kwotowa na wyżywienie za cały pobyt ('' = brak) */
+  mealsOff?: string
 }
 
 const pct = (mult: number) => String(Math.round((1 - mult) * 100))
@@ -34,6 +36,7 @@ export function rowsFromBrackets(brackets: AgeBracket[] | undefined, idPrefix = 
       typeof b.mealsMultiplier === 'number'
         ? pct(b.mealsMultiplier)
         : typeof b.eventMultiplier === 'number' ? pct(b.eventMultiplier) : '',
+    mealsOff: b.mealsDiscountAmount ? String(b.mealsDiscountAmount) : '',
   }))
 }
 
@@ -44,6 +47,12 @@ export function bracketsFromRows(rows: AgeDiscountRow[]): AgeBracket[] {
       if (r.eventPct.trim() !== '' || r.mealsPct.trim() !== '') {
         b.eventMultiplier = mult(r.eventPct)
         b.mealsMultiplier = mult(r.mealsPct)
+      }
+      const off = parseFloat((r.mealsOff ?? '').replace(',', '.')) || 0
+      if (off > 0) {
+        // Zniżka kwotowa działa po mnożniku wyżywienia — ustawiamy jawne mnożniki, żeby nie wpadła w „dotychczasowe zasady".
+        if (typeof b.eventMultiplier !== 'number') { b.eventMultiplier = 1; b.mealsMultiplier = 1 }
+        b.mealsDiscountAmount = off
       }
       return b
     })
@@ -79,7 +88,7 @@ export default function AgeDiscountsEditor({
       <p className="text-xs" style={{ color: 'var(--muted)' }}>
         Zniżka w % osobno na <strong>nocleg</strong> (pokój liczony za osobę + posiłki dla nocujących), <strong>opłatę formacyjną</strong> i{' '}
         <strong>wyżywienie</strong> (obiady w dniu wydarzenia). „Do wieku” wyłącznie: 4 = dzieci 0–3 lata.
-        Pokój liczony „za pokój” kosztuje tyle samo bez względu na wiek.
+        Pokój liczony „za pokój” kosztuje tyle samo bez względu na wiek. Zniżka kwotowa na wyżywienie (np. 150 zł) jest stała przy każdym poziomie cen.
       </p>
       {rows.map((r, i) => (
         <div key={r.id} className="flex items-center gap-2 flex-wrap text-sm" style={{ color: 'var(--ink)' }}>
@@ -96,6 +105,9 @@ export default function AgeDiscountsEditor({
           <span>· wyżywienie −</span>
           <input value={r.mealsPct} onChange={(e) => set(r.id, { mealsPct: e.target.value.replace(/[^\d]/g, '') })} inputMode="numeric" placeholder={r.eventPct ? '0' : 'jak dotąd'} className={box} style={{ ...boxStyle, width: 80 }} aria-label="Zniżka na wyżywienie w %" />
           <span>%</span>
+          <span>albo −</span>
+          <input value={r.mealsOff ?? ''} onChange={(e) => set(r.id, { mealsOff: e.target.value.replace(/[^\d.,]/g, '') })} inputMode="decimal" placeholder="kwota" className={box} style={{ ...boxStyle, width: 80 }} aria-label="Zniżka kwotowa na wyżywienie" />
+          <span>zł</span>
           <button type="button" onClick={() => onChange(rows.filter((x) => x.id !== r.id))} className="p-2 rounded-[8px]" style={{ color: 'var(--err)', background: 'none', border: 'none', cursor: 'pointer' }} aria-label="Usuń próg">
             <Trash2 size={15} />
           </button>
