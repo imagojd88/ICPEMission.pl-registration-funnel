@@ -51,6 +51,15 @@ cd "/Users/jacekdudzic/Documents/Claude/Projects/ICPEMission.pl registration fun
 
 ## Dziennik prac — panel admina (kreator eventów)
 
+### 26.11.2026 — nieudany build API na Renderze i PRAWDZIWE sprawdzanie typów Prisma
+- Build `icpe-api` po commicie `d1bcc0e` padł: `registrations.service.ts` — wynik `registration.create(createArgs)` bez `participants` (zgubione wnioskowanie `include` po wyniesieniu argumentów do zmiennej). Poprawka: `include: { participants: true as const }` + wspólna funkcja `createRegistration(client)`.
+- WAŻNE dla kolejnych sesji: zwykłe `npx tsc --noEmit` w `api` NIE sprawdza typów Prisma (w `api/node_modules/.prisma/client` jest tylko atrapa, `PrismaClient` = any). Prawdziwe sprawdzenie (bez pobierania silników):
+  1. `cd api && mkdir -p node_modules/.pcgen && sed 's#provider *= *"prisma-client-js"#provider = "prisma-client-js"\n  output   = "./client-real"#' prisma/schema.prisma > node_modules/.pcgen/schema.prisma`
+  2. `echo x > /tmp/dummy.node; cp /tmp/dummy.node /tmp/dummy-schema; PRISMA_QUERY_ENGINE_LIBRARY=/tmp/dummy.node PRISMA_SCHEMA_ENGINE_BINARY=/tmp/dummy-schema PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1 npx prisma generate --no-engine --schema node_modules/.pcgen/schema.prisma` (to także waliduje schemat)
+  3. `npx tsc -p node_modules/.pcgen/tsconfig.json` (plik już jest; mapuje `.prisma/client/*` na `node_modules/.pcgen/client-real/*`). Dopuszczalny jedyny błąd: `courses.public.controller.ts(135)` (zastany, na Renderze nie występuje).
+  Krok 1–3 wykonywać po KAŻDEJ zmianie w `api/` lub `schema.prisma`, przed podaniem komendy push.
+
+
 ### 26.11.2026 — Diety („Bez mleka”, zestawienie dla ośrodka), dodatki z limitem (dostawka, łóżeczko), ochrona cennika przed starą kartą panelu + historia konfiguracji
 - **Zlecenie (Jacek):** (1) dieta bezmleczna ma się nazywać „Bez mleka”; (2) zestawienie liczby osób na dietach dla ośrodka (termin: 1–2 tygodnie przed pobytem); (3) dostawki (8 szt., tylko hotel) i łóżeczka turystyczne (5 szt.) z limitem — „tylko pierwsze 8 zamówień realizujemy”; (4) PILNE, dopisane w trakcie: event `united-in-mission` stracił na produkcji `priceTiers`, `baseTierName` i `mealsDiscountAmount` — najpewniej zapis „Edytuj event” z karty ze starą wersją frontu (formularz składał cały `pricingConfig` od zera).
 - **(1) Diety.** Katalog przeniesiony do `shared/src/diets.ts` (`app/src/lib/diets.ts` tylko re-eksportuje). Klucz `lactose_free` bez zmian; etykiety: PL „Bez mleka”, EN “Dairy-free”, IT „Senza latticini”, KO „유제품 제외”, ZH „不含乳制品”. W bazie nie ma kluczy — `Participant.dietary` to tekst z polskimi etykietami — więc zgodność wstecz jest w `parseDietary` (`DIET_ALIASES`): „Bez laktozy” (i dawne etykiety EN / IT / KO / ZH) liczą się do tej samej diety. Bez migracji danych. `displayDietary` pokazuje stare zapisy pod nową nazwą: szczegóły i edycja zgłoszenia, Recepcja (API `/desk`), eksport CSV, zestawienie. Nieużywane listy `prefs.diets` w 5 plikach locale też poprawione.

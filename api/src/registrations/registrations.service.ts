@@ -281,8 +281,11 @@ export class RegistrationsService {
           })),
         },
       } as any,
-      include: { participants: true },
+      include: { participants: true as const },
     };
+    // Jedna funkcja zapisu dla obu ścieżek — typ wyniku (z `participants`) wynika z `include`.
+    const createRegistration = (client: PrismaService) =>
+      client.registration.create(createArgs);
     // Bez dodatków: zapis dokładnie jak dotąd. Z dodatkami: blokada eventu + ponowne przeliczenie
     // zajętości i zapis w JEDNEJ transakcji — dwa równoczesne zgłoszenia nie wezmą tej samej sztuki.
     // Gdy limit wyczerpał się w międzyczasie → 409 z nazwą dodatku; nic nie zostaje zapisane.
@@ -292,9 +295,9 @@ export class RegistrationsService {
           const tx = txc as any;
           await lockInstanceAddons(tx, dto.instanceId);
           await assertAddonStock(tx, dto.instanceId, addonDefs, addons, addonPeople, dto.locale);
-          return tx.registration.create(createArgs) as ReturnType<typeof this.prisma.registration.create>;
+          return createRegistration(tx);
         }, { maxWait: 10_000, timeout: 15_000 })
-      : await this.prisma.registration.create(createArgs);
+      : await createRegistration(this.prisma);
 
     // Rejestracja z osobistego zaproszenia (gość dodany przez uczestnika lub admina na zwykłym
     // evencie): spinamy zaproszenie ze zgłoszeniem, żeby lista gości pokazała „zarejestrowany".
