@@ -7,12 +7,12 @@ import { buildIcs, googleCalendarUrl } from '../shared';
 import { CreateRegistrationDto } from './dto/create-registration.dto';
 import { v4 as uuid } from 'uuid';
 import { guestInviteConfig, guestInvitePageLink, publicAppUrl } from '../invitations/guest-invite-config';
-import { eventAddons, cleanAddonSelection, validateAddonSelection, addonProblemMessage, addonLines, nextAddonTimes, buildPriceInput, normalizeCountryCode, hasAccommodation, roomLabel, leaderDepositSplit, cleanDonation, buildSchedule, hasPaymentPlan, minDepositPctFor, normalizePaymentPlan, warsawDate, pricingAt, contactCountry, onlineProviderFor, PricingConfig, PriceAdjustment } from '../shared';
+import { eventAddons, touchesRoomStock, cleanAddonSelection, validateAddonSelection, addonProblemMessage, addonLines, nextAddonTimes, buildPriceInput, normalizeCountryCode, hasAccommodation, roomLabel, leaderDepositSplit, cleanDonation, buildSchedule, hasPaymentPlan, minDepositPctFor, normalizePaymentPlan, warsawDate, pricingAt, contactCountry, onlineProviderFor, PricingConfig, PriceAdjustment } from '../shared';
 import { configuredOnlineProviders } from '../payments/tpay-config';
 import { netPaidByPayment } from '../payments/refund-ledger';
 import type { MailAccommodation } from '../notifications/notifications.service';
 import { assertRoomStock, instanceRoomAvailability } from './room-stock';
-import { assertAddonStock, lockInstanceAddons } from './addon-stock';
+import { assertAddonStock, lockInstanceStock } from './addon-stock';
 import { LeadsService } from './leads.service';
 
 type RoomsInput = Array<{ roomId: string; participantIndexes: number[] }>;
@@ -218,8 +218,11 @@ export class RegistrationsService {
     const n = dto.participants.length;
     const rooms = normalizeRooms(dto.rooms, n, cfg);
     assertRooms(rooms, n, cfg);
-    // Limit pokoi: nie przyjmujemy zgłoszenia na wyczerpany typ pokoju (409).
-    await assertRoomStock(this.prisma, dto.instanceId, cfg, rooms);
+    // Limit pokoi: nie przyjmujemy zgłoszenia na wyczerpany typ pokoju (409 z nazwą pokoju w języku gościa).
+    // To jest sprawdzenie WSTĘPNE (bez blokady) — żeby nie liczyć ceny dla zgłoszenia, które i tak odpadnie.
+    // Wiążące sprawdzenie jest niżej, w transakcji z blokadą eventu.
+    await assertRoomStock(this.prisma, dto.instanceId, cfg, rooms, undefined, dto.locale);
+    const limitedRooms = touchesRoomStock(cfg, rooms);
     // Darowizna na dofinansowanie pobytu innych — tylko gdy event ją włączył.
     const donation = cfg?.donationEnabled ? cleanDonation(dto.options?.donation) : 0;
     // Dodatki z limitem (np. dostawka) — tylko gdy event je skonfigurował; inaczej nic się nie zmienia.
@@ -286,15 +289,18 @@ export class RegistrationsService {
     // Jedna funkcja zapisu dla obu ścieżek — typ wyniku (z `participants`) wynika z `include`.
     const createRegistration = (client: PrismaService) =>
       client.registration.create(createArgs);
-    // Bez dodatków: zapis dokładnie jak dotąd. Z dodatkami: blokada eventu + ponowne przeliczenie
-    // zajętości i zapis w JEDNEJ transakcji — dwa równoczesne zgłoszenia nie wezmą tej samej sztuki.
-    // Gdy limit wyczerpał się w międzyczasie → 409 z nazwą dodatku; nic nie zostaje zapisane.
-    const registration = hasAddons
+    // Bez pokoju z limitem i bez dodatków: zapis dokładnie jak dotąd (najkrótsza ścieżka, bez blokady).
+    // Z pokojem z limitem (`stock`) albo z dodatkiem: blokada eventu + ponowne przeliczenie zajętości
+    // i zapis w JEDNEJ transakcji — dwa równoczesne zgłoszenia nie wezmą tego samego ostatniego pokoju
+    // ani tej samej sztuki dodatku. Gdy limit wyczerpał się w międzyczasie → 409 z nazwą pokoju /
+    // dodatku w języku gościa; nic nie zostaje zapisane.
+    const registration = hasAddons || limitedRooms
       ? await this.prisma.$transaction(async (txc: unknown) => {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const tx = txc as any;
-          await lockInstanceAddons(tx, dto.instanceId);
-          await assertAddonStock(tx, dto.instanceId, addonDefs, addons, addonPeople, dto.locale);
+          await lockInstanceStock(tx, dto.instanceId);
+          if (limitedRooms) await assertRoomStock(tx, dto.instanceId, cfg, rooms, undefined, dto.locale);
+          if (hasAddons) await assertAddonStock(tx, dto.instanceId, addonDefs, addons, addonPeople, dto.locale);
           return createRegistration(tx);
         }, { maxWait: 10_000, timeout: 15_000 })
       : await createRegistration(this.prisma);
@@ -487,7 +493,7 @@ export class RegistrationsService {
       await this.prisma.$transaction(async (txc: unknown) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const tx = txc as any;
-        await lockInstanceAddons(tx, reg.instanceId);
+        await lockInstanceStock(tx, reg.instanceId);
         // Sprawdzamy tylko dodatki, których admin zamawia więcej niż dotąd (pozostałe już trzymają swoje sztuki).
         const increased = Object.fromEntries(Object.entries(addons).filter(([k, q]) => q > (prevAddons[k] ?? 0)));
         await assertAddonStock(tx, reg.instanceId, addonDefs, increased, [], 'pl', {
@@ -587,9 +593,12 @@ export class RegistrationsService {
     const rooms = normalizeRooms(dto.rooms, n, cfg);
     assertRooms(rooms, n, cfg);
     // Gość specjalny (pokoje z rezerwy) nie jest ograniczany pulą publiczną.
-    if (!(reg as { roomsReserved?: boolean }).roomsReserved) {
-      await assertRoomStock(this.prisma, reg.instanceId, cfg, rooms, reg.id);
+    const stockChecked = !(reg as { roomsReserved?: boolean }).roomsReserved;
+    if (stockChecked) {
+      // Sprawdzenie wstępne (bez blokady); wiążące — niżej, w transakcji z blokadą eventu.
+      await assertRoomStock(this.prisma, reg.instanceId, cfg, rooms, reg.id, reg.locale);
     }
+    const limitedRooms = stockChecked && touchesRoomStock(cfg, rooms);
     const people = reg.participants.map((p: { type: string; age: number | null }) => ({ type: (p.type === 'ADULT' ? 'adult' : 'child') as 'adult' | 'child', age: p.age ?? 0 }));
     // Zachowujemy ręczną korektę admina (rabat / kwota ustalona z gościem).
     const priceResult = await this.pricing.quote(
@@ -601,8 +610,7 @@ export class RegistrationsService {
     const oldTotal = parseFloat(reg.totalPrice.toString());
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const p: any = this.prisma;
-    await this.prisma.$transaction([
+    const writes = (p: any) => [
       p.payment.updateMany({
         where: { registrationId: reg.id, status: 'PENDING' },
         data: { amount: priceResult.total, currency: priceResult.currency },
@@ -611,7 +619,22 @@ export class RegistrationsService {
         where: { id: reg.id },
         data: { roomsJson: rooms as unknown, totalPrice: priceResult.total, currency: priceResult.currency },
       }),
-    ]);
+    ];
+    if (limitedRooms) {
+      // Nowy skład bierze pokój z limitem: blokada eventu + ponowne przeliczenie zajętości (bez własnych
+      // pokoi tego zgłoszenia — wracają do puli) + zapis w jednej transakcji. Równoczesne nowe zgłoszenie
+      // albo zmiana noclegu innego gościa nie weźmie tego samego ostatniego pokoju → 409, nic się nie zmienia.
+      await this.prisma.$transaction(async (txc: unknown) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const tx = txc as any;
+        await lockInstanceStock(tx, reg.instanceId);
+        await assertRoomStock(tx, reg.instanceId, cfg, rooms, reg.id, reg.locale);
+        for (const op of writes(tx)) await op;
+      }, { maxWait: 10_000, timeout: 15_000 });
+    } else {
+      // Bez pokoju z limitem (także rezygnacja z noclegu / przejście na typ bez limitu): jak dotąd.
+      await this.prisma.$transaction(writes(this.prisma));
+    }
 
     const titleMap = inst.title as Record<string, string>;
     const c = (reg.contact ?? {}) as { firstName?: string; lastName?: string; email?: string };

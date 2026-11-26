@@ -20,3 +20,6 @@ api/prisma/*.db
 book-src-assets/
 .book-src.tgz
 _to_delete/
+
+# pliki robocze z sesji Claude (informatory PDF itp.)
+Claude outputs/

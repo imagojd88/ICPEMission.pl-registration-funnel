@@ -42,13 +42,18 @@ export async function instanceAddonAvailability(
  * równoczesne zgłoszenia nie zajmą tej samej ostatniej sztuki: drugie czeka, po czym
  * liczy zajętość już z pierwszym.
  *
- * Różnica względem limitu pokoi (`assertRoomStock`): tam sprawdzenie i zapis są osobnymi
- * operacjami bez blokady, więc przy równoczesnych zgłoszeniach limit pokoi może zostać
- * przekroczony o jedno zgłoszenie.
+ * Od 26.11.2026 ta sama blokada chroni też limit pokoi (`assertRoomStock` wywoływane w transakcji):
+ * JEDNA blokada na event dla dodatków i pokoi, zawsze brana jako pierwsza operacja transakcji —
+ * dzięki temu nie ma zakleszczeń (nikt nie trzyma jednej blokady, czekając na drugą).
+ * Klucz blokady zostaje historyczny (`icpe-addons:`), żeby stara i nowa wersja API działające
+ * przez chwilę obok siebie przy wdrożeniu blokowały się wzajemnie.
  */
 export async function lockInstanceAddons(tx: Db, instanceId: string): Promise<void> {
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${'icpe-addons:' + instanceId}))`;
 }
+
+/** Blokada zasobów z limitem jednego eventu (pokoje + dodatki) na czas transakcji — patrz wyżej. */
+export const lockInstanceStock = lockInstanceAddons;
 
 /**
  * Wywoływać W TRANSAKCJI, po `lockInstanceAddons`: przelicza zajętość i rzuca 409 z nazwą

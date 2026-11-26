@@ -641,3 +641,43 @@ export function roomStockShortages(
   }
   return out;
 }
+
+/**
+ * Komunikat o wyczerpanym limicie pokoi w języku gościa (odpowiedź 409 `ROOM_SOLD_OUT`).
+ * Wersja polska ma brzmienie sprzed tej zmiany.
+ */
+export function roomShortageMessage(
+  config: PricingConfig | null | undefined,
+  shortage: { roomId: string; requested: number; available: number },
+  lng = 'pl',
+): string {
+  const l = (lng || 'pl').slice(0, 2);
+  const name = roomLabel(config?.rooms?.find((r) => r.id === shortage.roomId)?.name ?? shortage.roomId, l) || shortage.roomId;
+  const n = shortage.available;
+  const m = shortage.requested;
+  if (n <= 0) {
+    switch (l) {
+      case 'en': return `No rooms of type "${name}" are left. Please choose another room.`;
+      case 'it': return `Non ci sono più camere del tipo «${name}». Scegli un'altra camera.`;
+      case 'ko': return `"${name}" 객실이 모두 마감되었습니다. 다른 객실을 선택해 주세요.`;
+      case 'zh': return `“${name}”房型已订满，请选择其他房型。`;
+      default: return `Brak wolnych pokoi typu „${name}". Wybierz inny pokój.`;
+    }
+  }
+  switch (l) {
+    case 'en': return `Only ${n} ${n === 1 ? 'room' : 'rooms'} of type "${name}" ${n === 1 ? 'is' : 'are'} left (you selected ${m}).`;
+    case 'it': return `${n === 1 ? 'È rimasta solo 1 camera' : `Sono rimaste solo ${n} camere`} del tipo «${name}» (ne hai selezionate ${m}).`;
+    case 'ko': return `"${name}" 객실이 ${n}개만 남았습니다(선택: ${m}개).`;
+    case 'zh': return `“${name}”房型仅剩 ${n} 间（您选择了 ${m} 间）。`;
+    default: return `Zostało tylko ${n} wolnych pokoi typu „${name}" (wybrano ${m}).`;
+  }
+}
+
+/**
+ * Czy skład pokoi dotyka typu z limitem (`stock` > 0). Tylko wtedy zapis zgłoszenia wymaga
+ * blokady eventu i ponownego przeliczenia zajętości — reszta idzie najkrótszą ścieżką.
+ */
+export function touchesRoomStock(config: PricingConfig | null | undefined, rooms: Array<{ roomId: string }> | null | undefined): boolean {
+  const limited = new Set((config?.rooms ?? []).filter((r) => Number(r.stock ?? 0) > 0).map((r) => String(r.id)));
+  return limited.size > 0 && (rooms ?? []).some((r) => !!r && limited.has(String(r.roomId)));
+}

@@ -155,6 +155,13 @@ export default function ManageRegistration() {
       apply(next)
       setMsg({ kind: 'ok', text: t('manage.saved') })
     } catch (e) {
+      // Pokój wyczerpał się między wyświetleniem a zapisem (409 `ROOM_SOLD_OUT`): wybór gościa ZOSTAJE w formularzu,
+      // odświeżamy tylko liczbę wolnych pokoi — lista typów pokaże „brak miejsc” i da się wybrać inny typ.
+      if ((e as { code?: string } | null)?.code === 'ROOM_SOLD_OUT') {
+        void getManagedRegistration(token)
+          .then((fresh) => setReg((prev) => (prev ? { ...prev, roomAvailability: fresh.roomAvailability } : prev)))
+          .catch(() => undefined)
+      }
       setMsg({ kind: 'err', text: `${t('manage.save_error')}${e instanceof Error && e.message ? ` (${e.message})` : ''}` })
     } finally {
       setSaving(false)

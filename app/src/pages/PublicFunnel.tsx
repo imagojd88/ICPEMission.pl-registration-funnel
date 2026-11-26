@@ -1064,6 +1064,8 @@ export default function PublicFunnel() {
     } catch (e: unknown) {
       const detail = e instanceof Error ? e.message : String(e)
       const addonSoldOut = (e as { code?: string } | null)?.code === 'ADDON_SOLD_OUT'
+      // Limit pokoi: kod z API (od 26.11.2026); treść komunikatu — dla starszej wersji API.
+      const roomSoldOut = (e as { code?: string } | null)?.code === 'ROOM_SOLD_OUT' || /wolnych pokoi/i.test(detail)
       // Brak sieci (telefon stracił zasięg) albo serwer nieosiągalny: fetch rzuca TypeError
       // („Failed to fetch” / „Load failed” / „NetworkError…”) — dane formularza zostają, wystarczy ponowić.
       const network =
@@ -1071,7 +1073,7 @@ export default function PublicFunnel() {
         e instanceof TypeError ||
         /failed to fetch|load failed|networkerror|network request failed/i.test(detail)
       track('registration_submit_failed', {
-        reason: network ? 'network' : addonSoldOut ? 'addon_sold_out' : /wolnych pokoi/i.test(detail) ? 'rooms_sold_out' : /zamknięte/i.test(detail) ? 'closed' : 'error',
+        reason: network ? 'network' : addonSoldOut ? 'addon_sold_out' : roomSoldOut ? 'rooms_sold_out' : /zamknięte/i.test(detail) ? 'closed' : 'error',
         payment_method: stepper.paymentMethod,
       })
       // Dodatek wyczerpał się między wyświetleniem a wysłaniem: zgłoszenie NIE przepada (dane zostają),
@@ -1079,6 +1081,14 @@ export default function PublicFunnel() {
       if (addonSoldOut && slug) {
         void getEventConfig(slug).then((cfg) => {
           if (cfg.addonAvailability) setEventConfig((prev) => (prev ? { ...prev, addonAvailability: cfg.addonAvailability } : prev))
+        }).catch(() => undefined)
+      }
+      // Pokój z limitem wyczerpał się między wyświetleniem a wysłaniem (np. ktoś wziął ostatni domek sekundę wcześniej):
+      // zgłoszenie NIE przepada (dane zostają), odświeżamy liczbę wolnych pokoi — krok „Wybór pokoju” pokaże typ jako
+      // niedostępny, a „Dalej” nie przepuści wyczerpanego typu.
+      if (roomSoldOut && !network && slug) {
+        void getEventConfig(slug).then((cfg) => {
+          if (cfg.roomAvailability) setEventConfig((prev) => (prev ? { ...prev, roomAvailability: cfg.roomAvailability } : prev))
         }).catch(() => undefined)
       }
       setSubmitNetworkError(network)

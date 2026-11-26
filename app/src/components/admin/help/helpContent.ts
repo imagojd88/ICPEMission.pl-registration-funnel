@@ -467,6 +467,8 @@ export const HELP_SECTIONS: HelpSection[] = [
           ] },
           { type: 'p', text: 'Pokój z rezerwy przydziela administrator: „Zgłoszenia” ▸ zgłoszenie ▸ „Edytuj zgłoszenie” ▸ zaznacz „Pokoje z rezerwy dla gości specjalnych”. Limit nie blokuje zapisu wykonywanego przez administratora.' },
           { type: 'p', text: 'Każdy typ pokoju ma: nazwę, pojemność, cenę i sposób liczenia — za osobę za noc (każdy płaci tyle za noc) albo za pokój za noc (stała kwota niezależnie od liczby osób).' },
+          { type: 'p', text: 'Gdy dwie osoby wysyłają zgłoszenie na ostatni pokój danego typu w tej samej chwili, pokój dostaje pierwsza. Druga widzi komunikat z nazwą pokoju, wybiera inny typ i wysyła zgłoszenie ponownie — jej dane zostają w formularzu. Tak samo działa zmiana noclegu przez gościa na stronie zgłoszenia.' },
+          { type: 'p', text: 'Uwaga: „Limit miejsc” na całe wydarzenie jest tylko informacją. Strona eventu pokazuje licznik wolnych miejsc, ale po jego wyczerpaniu zapisy NIE zamykają się same i nie ma automatycznej listy rezerwowej. Aby wstrzymać zapisy, kliknij „Zamknij” przy evencie na liście „Eventy”. Zapis blokują tylko limity pokoi i dodatków.' },
         ],
       },
       {

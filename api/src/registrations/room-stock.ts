@@ -1,6 +1,6 @@
 import { ConflictException } from '@nestjs/common';
 import type { PrismaService } from '../prisma/prisma.service';
-import { countRoomsByType, roomAvailability, roomLabel, roomStockShortages, type PricingConfig } from '../shared';
+import { countRoomsByType, roomAvailability, roomShortageMessage, roomStockShortages, type PricingConfig } from '../shared';
 
 export interface RoomUsage {
   /** pokoje zajęte przez zwykłe zgłoszenia (zapis publiczny) */
@@ -59,8 +59,14 @@ export async function instanceRoomStock(prisma: PrismaService, instanceId: strin
 }
 
 /**
- * Rzuca 409, gdy zapis publiczny chce więcej pokoi danego typu, niż zostało.
- * Zgłoszenia „z rezerwy" (admin) nie są tu sprawdzane — admin przydziela świadomie.
+ * Rzuca 409 (`code: 'ROOM_SOLD_OUT'`, komunikat z nazwą pokoju w języku gościa), gdy zapis publiczny
+ * chce więcej pokoi danego typu, niż zostało. Zgłoszenia „z rezerwy" (admin) nie są tu sprawdzane —
+ * admin przydziela świadomie.
+ *
+ * Samo wywołanie NIE chroni przed wyścigiem. Wiążące sprawdzenie robi się W TRANSAKCJI, po
+ * `lockInstanceStock` (wspólna blokada eventu z dodatkami — `addon-stock.ts`), podając klienta
+ * transakcji jako `prisma`: drugie równoczesne zgłoszenie czeka na blokadę i liczy zajętość
+ * już z pierwszym.
  */
 export async function assertRoomStock(
   prisma: PrismaService,
@@ -68,17 +74,20 @@ export async function assertRoomStock(
   cfg: PricingConfig | null,
   rooms: Array<{ roomId: string; participantIndexes: number[] }>,
   excludeRegistrationId?: string,
+  lng = 'pl',
 ): Promise<void> {
   if (!rooms.length || !hasLimits(cfg)) return;
   const available = await instanceRoomAvailability(prisma, instanceId, cfg, excludeRegistrationId);
   const short = roomStockShortages(cfg, rooms, available);
   if (short.length) {
     const s = short[0];
-    const name = roomLabel(cfg?.rooms.find((r) => r.id === s.roomId)?.name ?? s.roomId);
-    throw new ConflictException(
-      s.available === 0
-        ? `Brak wolnych pokoi typu „${name}". Wybierz inny pokój.`
-        : `Zostało tylko ${s.available} wolnych pokoi typu „${name}" (wybrano ${s.requested}).`,
-    );
+    throw new ConflictException({
+      statusCode: 409,
+      error: 'Conflict',
+      message: roomShortageMessage(cfg, s, lng),
+      code: 'ROOM_SOLD_OUT',
+      roomId: s.roomId,
+      available: s.available,
+    });
   }
 }
