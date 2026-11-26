@@ -12,3 +12,4 @@ export * from './guestGroups';
 export * from './diets';
 export * from './addons';
 export * from './configMerge';
+export * from './dashboard';

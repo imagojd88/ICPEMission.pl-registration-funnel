@@ -1,512 +1,226 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { ExternalLink, RefreshCw } from 'lucide-react'
 import {
-  CalendarDays,
-  UserPlus,
-  TrendingUp,
-  BedDouble,
-  RefreshCw,
-} from 'lucide-react'
-import {
-  getAdminSummary,
-  getAdminInstances,
-  getAdminRegistrations,
+  getAdminInstances, getEventAnalytics, getEventDashboard, setEventTargetPeople,
+  type EventAnalytics, type EventDashboard,
 } from '@/lib/api'
-import type { AdminSummaryDto, EventInstanceDto, RegistrationDto } from '@icpe/shared'
+import type { EventInstanceDto } from '@icpe/shared'
 import { useAutoRefresh } from '@/hooks/useAutoRefresh'
+import { isInternalBrowser, markInternalBrowserOnce, setInternalBrowser } from '@/lib/analytics'
+import {
+  AlertsCard, FunnelCard, HeadlineTiles, LodgingCard, MoneyCard, PaceCard, RecentCard, SourcesCard, type NavTarget,
+} from './DashboardSections'
+import { fmtDay, plural } from './labels'
 
-// ── KPI Tile ─────────────────────────────────────────────────────────────────
+/**
+ * Dashboard JEDNEGO eventu: „Czy zdążymy?”, „Gdzie ludzie odpadają?”, „Skąd przychodzą?”,
+ * „Ile mamy pieniędzy?”, „Co jest wyprzedane?” i „Co wymaga uwagi?”.
+ * Liczby o ludziach, wpłatach i pokojach — z bazy (`GET /admin/instances/:id/dashboard`, co 60 s);
+ * zachowanie na stronie — z PostHoga (`…/dashboard/analytics`, cache 5–15 min).
+ */
 
-interface KpiTileProps {
-  label: string
-  value: string
-  delta?: string
-  deltaPositive?: boolean
-  icon: React.ElementType
-}
+const PICK_KEY = 'icpe.dashboard.instance'
 
-function KpiTile({ label, value, delta, deltaPositive = true, icon: Icon }: KpiTileProps) {
-  return (
-    <div
-      className="flex flex-col gap-3 p-5 rounded-[15px] border"
-      style={{
-        background: 'var(--surface)',
-        borderColor: 'var(--border)',
-        boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
-      }}
-    >
-      <div className="flex items-start justify-between">
-        <div
-          className="flex items-center justify-center rounded-[11px]"
-          style={{ width: 44, height: 44, background: 'var(--brand-soft)' }}
-        >
-          <Icon size={20} style={{ color: 'var(--brand)' }} />
-        </div>
-        {delta && (
-          <span
-            className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold"
-            style={{
-              background: deltaPositive ? 'var(--ok-soft)' : 'var(--err-soft)',
-              color: deltaPositive ? 'var(--ok)' : 'var(--err)',
-            }}
-          >
-            {delta}
-          </span>
-        )}
-      </div>
-      <div>
-        <p className="text-xs font-medium mb-1" style={{ color: 'var(--faint)' }}>
-          {label}
-        </p>
-        <p
-          className="font-bold leading-none"
-          style={{
-            fontFamily: 'Newsreader, Georgia, serif',
-            fontSize: 27,
-            color: 'var(--ink)',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {value}
-        </p>
-      </div>
-    </div>
-  )
-}
-
-// ── Bar Chart ─────────────────────────────────────────────────────────────────
-
-const TREND_DATA = [8, 12, 6, 15, 18, 22, 14, 9, 17, 20, 25, 18, 28, 32]
-
-function TrendChart() {
-  const maxVal = Math.max(...TREND_DATA)
-  const chartH = 120
-  const barW = 18
-  const gap = 6
-  const paddingLeft = 32
-  const paddingBottom = 24
-  const totalW = paddingLeft + TREND_DATA.length * (barW + gap) - gap + 8
-
-  const ticks = [0, Math.round(maxVal / 2), maxVal]
-
-  return (
-    <div
-      className="p-5 rounded-[15px] border"
-      style={{
-        background: 'var(--surface)',
-        borderColor: 'var(--border)',
-        boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
-      }}
-    >
-      <p className="font-bold text-base mb-4" style={{ color: 'var(--ink)' }}>
-        Trend zgłoszeń
-      </p>
-      <div style={{ overflowX: 'auto' }}>
-        <svg
-          viewBox={`0 0 ${totalW} ${chartH + paddingBottom}`}
-          style={{ width: '100%', minWidth: totalW, height: chartH + paddingBottom }}
-        >
-          {ticks.map((tick) => {
-            const y = chartH - (tick / maxVal) * chartH
-            return (
-              <g key={tick}>
-                <line
-                  x1={paddingLeft}
-                  y1={y}
-                  x2={totalW}
-                  y2={y}
-                  stroke="var(--border)"
-                  strokeWidth={1}
-                  strokeDasharray="3,3"
-                />
-                <text
-                  x={paddingLeft - 4}
-                  y={y + 4}
-                  textAnchor="end"
-                  fontSize={9}
-                  fill="var(--faint)"
-                >
-                  {tick}
-                </text>
-              </g>
-            )
-          })}
-
-          {TREND_DATA.map((val, i) => {
-            const barH = Math.max(4, (val / maxVal) * chartH)
-            const x = paddingLeft + i * (barW + gap)
-            const y = chartH - barH
-            const isRecent = i >= TREND_DATA.length - 3
-            return (
-              <g key={i}>
-                <rect
-                  x={x}
-                  y={y}
-                  width={barW}
-                  height={barH}
-                  rx={4}
-                  fill={isRecent ? 'var(--accent)' : i % 2 === 0 ? 'var(--brand)' : 'var(--brand-soft)'}
-                  opacity={isRecent ? 1 : 0.8}
-                />
-                <text
-                  x={x + barW / 2}
-                  y={chartH + paddingBottom - 6}
-                  textAnchor="middle"
-                  fontSize={8}
-                  fill="var(--faint)"
-                >
-                  {i + 1}
-                </text>
-              </g>
-            )
-          })}
-        </svg>
-      </div>
-      <p className="mt-1 text-xs" style={{ color: 'var(--faint)' }}>
-        Ostatnie 14 dni
-      </p>
-    </div>
-  )
-}
-
-// ── Nearest Events ────────────────────────────────────────────────────────────
-
-function statusStyle(status: string): { background: string; color: string } {
-  switch (status) {
-    case 'ok':
-    case 'OPEN':
-      return { background: 'var(--ok-soft)', color: 'var(--ok)' }
-    case 'warn':
-    case 'DRAFT':
-      return { background: 'var(--warn-soft)', color: 'var(--warn)' }
-    case 'err':
-    case 'CLOSED':
-    case 'ARCHIVED':
-      return { background: 'var(--err-soft)', color: 'var(--err)' }
-    default:
-      return { background: 'var(--surface-3)', color: 'var(--ink)' }
-  }
-}
-
-function statusLabel(status: string): string {
-  switch (status) {
-    case 'OPEN': return 'Otwarty'
-    case 'DRAFT': return 'Wkrótce'
-    case 'CLOSED': return 'Zamknięty'
-    case 'ARCHIVED': return 'Archiwalny'
-    default: return status
-  }
-}
-
-function resolveTitle(title: unknown): string {
-  if (typeof title === 'string') return title
-  if (title && typeof title === 'object') {
-    const t = title as Record<string, string>
-    return t.pl ?? t.en ?? t.it ?? ''
+function titleOf(t: unknown): string {
+  if (typeof t === 'string') return t
+  if (t && typeof t === 'object') {
+    const m = t as Record<string, string>
+    return m.pl ?? m.en ?? Object.values(m)[0] ?? ''
   }
   return ''
 }
 
-function NearestEvents({ instances, loading }: { instances: EventInstanceDto[]; loading: boolean }) {
-  return (
-    <div
-      className="p-5 rounded-[15px] border h-full"
-      style={{
-        background: 'var(--surface)',
-        borderColor: 'var(--border)',
-        boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
-      }}
-    >
-      <p className="font-bold text-base mb-4" style={{ color: 'var(--ink)' }}>
-        Najbliższe terminy
-      </p>
-      {loading ? (
-        <p className="text-sm" style={{ color: 'var(--faint)' }}>Ładowanie...</p>
-      ) : instances.length === 0 ? (
-        <p className="text-sm" style={{ color: 'var(--faint)' }}>Brak otwartych eventów</p>
-      ) : (
-        <ul className="flex flex-col gap-3">
-          {instances.slice(0, 5).map((ev) => {
-            const d = new Date(ev.startsAt)
-            const day = d.getDate().toString()
-            const month = d.toLocaleDateString('pl-PL', { month: 'short' }).replace('.', '')
-            const name = resolveTitle(ev.title)
-            return (
-              <li key={ev.id} className="flex items-center gap-3">
-                <div
-                  className="flex flex-col items-center justify-center rounded-[10px] shrink-0"
-                  style={{ width: 44, height: 44, background: 'var(--brand-soft)' }}
-                >
-                  <span className="font-bold leading-none" style={{ fontSize: 17, color: 'var(--brand)' }}>
-                    {day}
-                  </span>
-                  <span className="text-xs uppercase" style={{ color: 'var(--brand)', fontSize: 9 }}>
-                    {month}
-                  </span>
-                </div>
-                <p className="flex-1 text-sm font-medium" style={{ color: 'var(--ink)' }}>
-                  {name}
-                </p>
-                <span
-                  className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold"
-                  style={statusStyle(ev.status)}
-                >
-                  {statusLabel(ev.status)}
-                </span>
-              </li>
-            )
-          })}
-        </ul>
-      )}
-    </div>
-  )
+/** Domyślny event: zapamiętany wybór, inaczej najbliższy nadchodzący publiczny, inaczej ostatni. */
+function defaultInstance(list: EventInstanceDto[]): string {
+  try {
+    const saved = window.localStorage.getItem(PICK_KEY)
+    if (saved && list.some((i) => i.id === saved)) return saved
+  } catch {
+    /* brak storage */
+  }
+  const now = Date.now()
+  const upcoming = list.filter((i) => new Date(i.endsAt).getTime() >= now).sort((a, b) => a.startsAt.localeCompare(b.startsAt))
+  return (upcoming.find((i) => !i.unlisted) ?? upcoming[0] ?? list[0])?.id ?? ''
 }
-
-// ── Recent Registrations Table ────────────────────────────────────────────────
-
-interface RegistrationRow {
-  id: string
-  name: string
-  email: string
-  event: string
-  people: number
-  amount: string
-  status: 'ok' | 'warn' | 'err'
-  statusLabel: string
-}
-
-function buildRows(regs: RegistrationDto[], instanceTitle: string): RegistrationRow[] {
-  return regs.slice(0, 5).map((r) => {
-    let status: 'ok' | 'warn' | 'err' = 'warn'
-    let sl = 'Oczekuje'
-    if (r.paymentStatus === 'PAID') { status = 'ok'; sl = 'Opłacone' }
-    else if (r.status === 'WAITLIST') { status = 'err'; sl = 'Lista oczek.' }
-    return {
-      id: r.id,
-      name: `${r.contact.firstName} ${r.contact.lastName}`,
-      email: r.contact.email,
-      event: instanceTitle,
-      people: r.participants.length,
-      amount: `${r.totalPrice} zł`,
-      status,
-      statusLabel: sl,
-    }
-  })
-}
-
-function RecentRegistrations({
-  regs,
-  loading,
-  instanceTitle,
-}: {
-  regs: RegistrationDto[]
-  loading: boolean
-  instanceTitle: string
-}) {
-  const rows = buildRows(regs, instanceTitle)
-
-  return (
-    <div
-      className="rounded-[15px] border"
-      style={{
-        background: 'var(--surface)',
-        borderColor: 'var(--border)',
-        boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
-      }}
-    >
-      <div className="px-5 pt-5 pb-3">
-        <p className="font-bold text-base" style={{ color: 'var(--ink)' }}>
-          Ostatnie zgłoszenia
-        </p>
-      </div>
-      {loading ? (
-        <div className="px-5 pb-5">
-          <p className="text-sm" style={{ color: 'var(--faint)' }}>Ładowanie...</p>
-        </div>
-      ) : rows.length === 0 ? (
-        <div className="px-5 pb-5">
-          <p className="text-sm" style={{ color: 'var(--faint)' }}>Brak zgłoszeń</p>
-        </div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm" style={{ borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                {['Zgłaszający', 'Event', 'Osoby', 'Kwota', 'Status'].map((h) => (
-                  <th
-                    key={h}
-                    className="px-5 py-2.5 text-left font-semibold text-xs"
-                    style={{ color: 'var(--faint)' }}
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row, idx) => (
-                <tr
-                  key={row.id}
-                  style={{
-                    borderBottom: idx < rows.length - 1 ? '1px solid var(--border-2)' : undefined,
-                  }}
-                  className="hover:bg-[var(--surface-2)] transition-colors"
-                >
-                  <td className="px-5 py-3">
-                    <p className="font-medium" style={{ color: 'var(--ink)' }}>{row.name}</p>
-                    <p className="text-xs" style={{ color: 'var(--faint)' }}>{row.email}</p>
-                  </td>
-                  <td className="px-5 py-3" style={{ color: 'var(--muted)' }}>
-                    {row.event}
-                  </td>
-                  <td className="px-5 py-3 text-center" style={{ color: 'var(--ink)' }}>
-                    {row.people}
-                  </td>
-                  <td className="px-5 py-3 font-medium" style={{ color: 'var(--ink)' }}>
-                    {row.amount}
-                  </td>
-                  <td className="px-5 py-3">
-                    <span
-                      className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold"
-                      style={statusStyle(row.status)}
-                    >
-                      {row.statusLabel}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ── Dashboard Screen ──────────────────────────────────────────────────────────
 
 function formatUpdatedAt(d: Date): string {
-  return d.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })
+  return d.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 }
 
-export default function DashboardScreen() {
-  const [summary, setSummary] = useState<AdminSummaryDto | null>(null)
+export default function DashboardScreen({ onNavigate }: { onNavigate?: (s: NavTarget) => void }) {
   const [instances, setInstances] = useState<EventInstanceDto[]>([])
-  const [regs, setRegs] = useState<RegistrationDto[]>([])
-  const [loadingSummary, setLoadingSummary] = useState(true)
-  const [loadingInstances, setLoadingInstances] = useState(true)
-  const [loadingRegs, setLoadingRegs] = useState(false)
+  const [instanceId, setInstanceId] = useState('')
+  const [data, setData] = useState<EventDashboard | null>(null)
+  const [analytics, setAnalytics] = useState<EventAnalytics | null>(null)
+  const [days, setDays] = useState(30)
+  const [loading, setLoading] = useState(true)
+  const [loadingA, setLoadingA] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [internal, setInternal] = useState(() => {
+    markInternalBrowserOnce() // panel otwarty = przeglądarka organizatora (chyba że wyłączył to niżej)
+    return isInternalBrowser()
+  })
 
-  // `silent` (odświeżanie w tle) nie dotyka flag `loading*`, żeby żaden spinner/skeleton
-  // nie mrugał co interwał — podmieniane są wyłącznie dane.
+  useEffect(() => {
+    getAdminInstances()
+      .then((list) => {
+        const visible = list.filter((i) => !i.archived)
+        setInstances(visible)
+        setInstanceId(defaultInstance(visible))
+        if (!visible.length) setLoading(false)
+      })
+      .catch((e: unknown) => {
+        setError(e instanceof Error ? e.message : String(e))
+        setLoading(false)
+      })
+  }, [])
+
   const load = useCallback(async (silent = false) => {
-    if (!silent) setLoadingSummary(true)
+    if (!instanceId) return
+    if (!silent) setLoading(true)
     try {
-      const s = await getAdminSummary()
-      setSummary(s)
+      setData(await getEventDashboard(instanceId))
+      setError(null)
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
-      if (!silent) setLoadingSummary(false)
+      if (!silent) setLoading(false)
     }
+  }, [instanceId])
 
-    if (!silent) setLoadingInstances(true)
+  const loadAnalytics = useCallback(async (refresh = false) => {
+    if (!instanceId) return
+    setLoadingA(true)
     try {
-      const list = await getAdminInstances('OPEN')
-      setInstances(list)
-      if (!silent) setLoadingInstances(false)
-      if (list.length > 0) {
-        if (!silent) setLoadingRegs(true)
-        try {
-          const r = await getAdminRegistrations(list[0].id)
-          setRegs(r)
-        } catch {
-          setRegs([])
-        } finally {
-          if (!silent) setLoadingRegs(false)
-        }
-      }
+      setAnalytics(await getEventAnalytics(instanceId, days, refresh))
     } catch {
-      setInstances([])
-      if (!silent) setLoadingInstances(false)
+      setAnalytics(null)
+    } finally {
+      setLoadingA(false)
     }
-  }, [])
+  }, [instanceId, days])
 
   useEffect(() => {
+    setData(null)
     void load(false)
   }, [load])
 
-  const { lastUpdatedAt, refreshing, refreshNow } = useAutoRefresh(() => load(true), {
-    intervalMs: 30000,
-  })
+  useEffect(() => {
+    void loadAnalytics(false)
+  }, [loadAnalytics])
 
-  const s = summary ?? { openInstances: 0, registrationsToday: 0, revenue: 0, currency: 'PLN', occupancyPct: 0 }
-  const firstInstanceTitle = instances.length > 0 ? resolveTitle(instances[0].title) : ''
+  const { lastUpdatedAt, refreshing, refreshNow } = useAutoRefresh(() => load(true), { intervalMs: 60000 })
+
+  const pick = (id: string) => {
+    setInstanceId(id)
+    setAnalytics(null)
+    try {
+      window.localStorage.setItem(PICK_KEY, id)
+    } catch {
+      /* brak storage */
+    }
+  }
+
+  const sorted = useMemo(() => [...instances].sort((a, b) => b.startsAt.localeCompare(a.startsAt)), [instances])
+
+  const saveTarget = async (v: number | null) => {
+    if (!instanceId) return
+    await setEventTargetPeople(instanceId, v)
+    await load(true)
+  }
+
+  const toggleInternal = () => {
+    setInternalBrowser(!internal)
+    setInternal(!internal)
+  }
+
+  const ev = data?.event
+  const state = !ev
+    ? null
+    : ev.registrationOpen
+      ? { t: 'Zapisy otwarte', c: 'var(--ok)', bg: 'var(--ok-soft)' }
+      : new Date(ev.registrationOpensAt).getTime() > Date.now() && ev.status !== 'CLOSED'
+        ? { t: `Zapisy od ${fmtDay(ev.registrationOpensAt.slice(0, 10), true)}`, c: 'var(--warn)', bg: 'var(--warn-soft)' }
+        : { t: 'Zapisy zamknięte', c: 'var(--muted)', bg: 'var(--border)' }
 
   return (
-    <div className="flex flex-col gap-6">
-      {/* Wskaźnik odświeżania */}
-      <div className="flex items-center justify-end gap-2 -mb-2">
-        {lastUpdatedAt && (
-          <span className="text-xs" style={{ color: 'var(--faint)' }}>
-            Zaktualizowano {formatUpdatedAt(lastUpdatedAt)}
+    <div className="flex flex-col gap-5">
+      {/* Wybór eventu + odświeżanie */}
+      <div className="flex flex-wrap items-center gap-3">
+        <select
+          value={instanceId}
+          onChange={(e) => pick(e.target.value)}
+          className="px-3 py-2 rounded-[10px] text-sm font-semibold"
+          style={{ border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--ink)', minWidth: 280 }}
+          aria-label="Event"
+        >
+          {sorted.map((i) => (
+            <option key={i.id} value={i.id}>
+              {titleOf(i.title)} · {fmtDay(i.startsAt.slice(0, 10), true)}{i.unlisted ? ' · ukryty' : ''}{i.status === 'CLOSED' ? ' · zakończony' : ''}
+            </option>
+          ))}
+        </select>
+        {state && (
+          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold" style={{ background: state.bg, color: state.c }}>{state.t}</span>
+        )}
+        {ev && ev.daysToEvent >= 0 && (
+          <span className="text-xs" style={{ color: 'var(--muted)' }}>
+            do eventu {ev.daysToEvent} {plural(ev.daysToEvent, 'dzień', 'dni', 'dni')}
           </span>
         )}
+        {ev?.slug && (
+          <a href={`https://rejestracja.icpemission.pl/r/${ev.slug}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-medium" style={{ color: 'var(--brand)' }}>
+            Strona zapisów <ExternalLink size={12} />
+          </a>
+        )}
+        <div className="flex-1" />
+        {lastUpdatedAt && <span className="text-xs" style={{ color: 'var(--faint)' }}>Zaktualizowano {formatUpdatedAt(lastUpdatedAt)}</span>}
         <button
           type="button"
-          onClick={() => { void refreshNow() }}
+          onClick={() => {
+            void refreshNow()
+            void loadAnalytics(true)
+          }}
           className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-[8px]"
-          style={{ background: 'var(--surface-2)', color: 'var(--muted)', border: '1px solid var(--border)', cursor: 'pointer' }}
+          style={{ background: 'var(--surface)', color: 'var(--muted)', border: '1px solid var(--border)', cursor: 'pointer' }}
         >
-          <RefreshCw size={13} className={refreshing ? 'animate-spin' : undefined} /> Odśwież
+          <RefreshCw size={13} className={refreshing || loadingA ? 'animate-spin' : undefined} /> Odśwież
         </button>
       </div>
 
       {error && (
-        <div
-          className="px-4 py-3 rounded-[12px] text-sm"
-          style={{ background: 'var(--err-soft)', color: 'var(--err)', border: '1px solid var(--err)' }}
-        >
+        <div className="px-4 py-3 rounded-[12px] text-sm" style={{ background: 'var(--err-soft)', color: 'var(--err)', border: '1px solid var(--err)' }}>
           {error}
         </div>
       )}
 
-      {/* KPI row */}
-      <div className="grid grid-cols-4 gap-4">
-        <KpiTile
-          label="Otwarte edycje"
-          value={loadingSummary ? '—' : String(s.openInstances)}
-          icon={CalendarDays}
-        />
-        <KpiTile
-          label="Zgłoszenia dziś"
-          value={loadingSummary ? '—' : String(s.registrationsToday)}
-          icon={UserPlus}
-        />
-        <KpiTile
-          label="Przychód (bieżący)"
-          value={loadingSummary ? '—' : `${new Intl.NumberFormat('pl-PL').format(s.revenue)} zł`}
-          icon={TrendingUp}
-        />
-        <KpiTile
-          label="Obłożenie pokoi"
-          value={loadingSummary ? '—' : `${s.occupancyPct}%`}
-          icon={BedDouble}
-        />
-      </div>
+      {!instances.length && !loading && !error && (
+        <p className="text-sm" style={{ color: 'var(--faint)' }}>Nie ma jeszcze żadnego eventu.</p>
+      )}
 
-      {/* Chart + Events */}
-      <div className="grid gap-4" style={{ gridTemplateColumns: '1fr 340px' }}>
-        <TrendChart />
-        <NearestEvents instances={instances} loading={loadingInstances} />
-      </div>
+      {loading && !data && <p className="text-sm" style={{ color: 'var(--faint)' }}>Ładowanie…</p>}
 
-      {/* Registrations table */}
-      <RecentRegistrations
-        regs={regs}
-        loading={loadingRegs}
-        instanceTitle={firstInstanceTitle}
-      />
+      {data && (
+        <>
+          <AlertsCard alerts={data.alerts} onNavigate={onNavigate} />
+          <HeadlineTiles d={data} a={analytics} />
+          <PaceCard key={data.event.id} d={data} onSaveTarget={saveTarget} />
+          <FunnelCard a={analytics} d={data} days={days} onDays={setDays} loading={loadingA} />
+          <SourcesCard a={analytics} d={data} />
+          <MoneyCard d={data} />
+          <LodgingCard d={data} />
+          <RecentCard d={data} onNavigate={onNavigate} />
+        </>
+      )}
+
+      <p className="text-xs" style={{ color: 'var(--faint)' }}>
+        Statystyki PostHog: ta przeglądarka {internal ? 'NIE jest liczona' : 'JEST liczona'} (Twoje testy na stronach zapisów{' '}
+        {internal ? 'nie psują lejka' : 'trafiają do lejka'}).{' '}
+        <button type="button" onClick={toggleInternal} className="underline" style={{ color: 'var(--brand)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+          {internal ? 'Licz mnie jednak' : 'Nie licz tej przeglądarki'}
+        </button>
+        {' '}· Na telefonie wystarczy raz zalogować się do panelu.
+      </p>
     </div>
   )
 }

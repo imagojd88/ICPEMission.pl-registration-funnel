@@ -34,6 +34,62 @@ declare global {
 
 let started = false
 
+/**
+ * Przeglądarka organizatora („nie licz mnie w statystykach”). Znacznik ustawia panel admina po
+ * zalogowaniu (ta sama domena → ten sam localStorage). Analityka go tylko CZYTA — u gości nic nie
+ * zapisuje, więc tryb bez cookies / bez storage zostaje nienaruszony.
+ */
+const INTERNAL_KEY = 'icpe.analytics.internal'
+
+export function isInternalBrowser(): boolean {
+  try {
+    return typeof window !== 'undefined' && window.localStorage.getItem(INTERNAL_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+/** Włącza / wyłącza pomijanie tej przeglądarki w statystykach (wywołuje tylko panel admina). */
+export function setInternalBrowser(on: boolean): void {
+  try {
+    // '0' = świadomie wyłączone w panelu — wtedy automat po zalogowaniu już tego nie zmienia.
+    window.localStorage.setItem(INTERNAL_KEY, on ? '1' : '0')
+  } catch {
+    /* tryb prywatny / brak storage — trudno */
+  }
+}
+
+/** Po zalogowaniu do panelu: oznacz przeglądarkę jako organizatora, chyba że admin to wyłączył. */
+export function markInternalBrowserOnce(): void {
+  try {
+    if (window.localStorage.getItem(INTERNAL_KEY) === null) window.localStorage.setItem(INTERNAL_KEY, '1')
+  } catch {
+    /* jw. */
+  }
+}
+
+/** Slug eventu z adresu strony (`/r/<slug>`), zanim lejek wczyta event i zarejestruje kontekst. */
+export function slugFromPath(path: unknown): string | null {
+  if (typeof path !== 'string') return null
+  const m = /^\/r\/([^/?#]+)/.exec(path)
+  if (!m) return null
+  try {
+    return decodeURIComponent(m[1])
+  } catch {
+    return m[1]
+  }
+}
+
+/** Język interfejsu (pl/en/it/ko/zh) z atrybutu `<html lang>`, który ustawia i18n. */
+function uiLang(): string | null {
+  try {
+    const l = (document.documentElement.lang || '').slice(0, 2).toLowerCase()
+    return l || null
+  } catch {
+    return null
+  }
+}
+
 /** Część panelu admina — tam nie śledzimy. */
 function isAdminPath(path: string): boolean {
   return path.startsWith('/admin') || path.startsWith('/panel')
@@ -58,6 +114,8 @@ export function initAnalytics(): void {
   if (isAdminPath(window.location.pathname)) return
   // Podgląd w panelu admina (iframe /r/:slug?preview=1) — nie liczymy w statystykach.
   if (new URLSearchParams(window.location.search).get('preview') === '1') return
+  // Przeglądarka organizatora (zalogował się kiedyś w panelu) — jego testy nie psują statystyk.
+  if (isInternalBrowser()) return
   started = true
 
   // Oficjalny loader PostHog (kolejkuje wywołania do czasu wczytania skryptu z CDN EU).
@@ -81,6 +139,16 @@ export function initAnalytics(): void {
       const p = event.properties ?? {}
       const path = typeof p.$pathname === 'string' ? p.$pathname : window.location.pathname
       if (isAdminPath(path)) return null
+      // Każde zdarzenie (także pierwszy $pageview, wysyłany zanim lejek wczyta event) dostaje slug
+      // eventu z adresu i język interfejsu — bez tego wejścia na stronę eventu nie dało się przypisać.
+      if (!p.event_slug) {
+        const slug = slugFromPath(path)
+        if (slug) p.event_slug = slug
+      }
+      if (!p.ui_lang) {
+        const l = uiLang()
+        if (l) p.ui_lang = l
+      }
       for (const k of URL_PROPS) if (k in p) p[k] = scrubUrl(p[k])
       event.properties = p
       return event

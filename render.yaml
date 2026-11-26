@@ -62,6 +62,10 @@ services:
         sync: false
       - key: TPAY_ROOT_CA_PEM          # opcjonalnie: treść root CA Tpay (PEM); bez niej root CA pobierany z oficjalnego adresu
         sync: false
+      # Dashboard eventu w panelu (sekcje z PostHoga): klucz osobisty PostHog z zakresem „Endpoint: Read”
+      # (PostHog ▸ Settings ▸ Personal API keys). Bez klucza dashboard działa, tylko bez lejka i źródeł.
+      - key: POSTHOG_PERSONAL_API_KEY
+        sync: false
       - key: TPAY_ROOT_CA_FILE         # opcjonalnie: ścieżka do pliku z root CA Tpay (zamiast TPAY_ROOT_CA_PEM)
         sync: false
       # Mail: ustaw w panelu Render (Blueprint nie nadpisuje — sync:false).

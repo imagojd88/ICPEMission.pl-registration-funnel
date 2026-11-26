@@ -11,6 +11,14 @@ import { setAnalyticsContext, track } from '../lib/analytics'
 
 /** Nazwy kroków w analityce (stałe, niezależne od języka). */
 const STEP_NAMES = ['applicant', 'participants', 'preferences', 'accommodation', 'options'] as const
+
+/** Darowizna do analityki jako przedział (nigdy dokładna kwota wpisana przez gościa). */
+function donationBucket(amount: number): string {
+  const a = Number(amount) || 0
+  if (a <= 0) return 'none'
+  if (a === 50 || a === 100 || a === 200) return String(a)
+  return a < 100 ? 'custom_lt100' : a < 500 ? 'custom_100_499' : 'custom_500plus'
+}
 import { clearDraft, clearLeadKey, getLeadKey, loadDraft, pruneExpiredDrafts, saveDraft, type ResumableScreen } from '../lib/funnelDraft'
 
 /** Rozdziela „Imię Nazwisko" na pola DTO. */
@@ -617,6 +625,10 @@ export default function PublicFunnel() {
           event_free: !!cfg.pricing?.free,
           accommodation_optional: isAccommodationOptional(cfg.pricing),
         })
+        // Wejście na stronę eventu ze stanem zapisów (licznik / otwarte / zamknięte) — mianownik lejka.
+        track('event_page_viewed', {
+          registration_state: notYetOpen(e.registrationOpensAt) ? 'countdown' : e.status === 'OPEN' ? 'open' : 'closed',
+        })
       })
       .catch(() => {
         setError(true)
@@ -1059,6 +1071,9 @@ export default function PublicFunnel() {
           people_without_room: hasAccommodation(pricingConfig) ? stepper.participants.length - (stepper.noAccommodation ? 0 : inRooms) : null,
           invited: !!invite,
           discount_used: !!stepper.discountApplied,
+          // Bez danych osobowych: przedział darowizny i identyfikatory typów zakwaterowania z cennika.
+          donation_bucket: donationBucket(pricingConfig.donationEnabled ? stepper.options.donation : 0),
+          room_types: stepper.noAccommodation ? [] : [...new Set(stepper.rooms.map((r) => r.roomId))],
         })
       }
     } catch (e: unknown) {

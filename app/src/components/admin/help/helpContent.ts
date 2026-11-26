@@ -1051,7 +1051,7 @@ export const HELP_SECTIONS: HelpSection[] = [
         title: 'Menu boczne — co gdzie jest',
         blocks: [
           { type: 'table', head: ['Pozycja', 'Do czego służy'], rows: [
-            ['Dashboard', 'Ekran startowy: kilka liczb i skróty. Opis w następnej instrukcji.'],
+            ['Dashboard', 'Ekran startowy: jeden wybrany event — tempo zapisów, lejek, źródła wejść, pieniądze, pokoje i lista spraw do załatwienia. Opis w następnej instrukcji.'],
             ['Eventy', 'Lista wydarzeń, kreator nowego eventu, „Edytuj”, zamykanie i archiwum. Sekcja „Eventy”.'],
             ['Biblioteka', 'Zapisani goście specjalni i miejsca do ponownego użycia w eventach. Sekcja „Biblioteka”.'],
             ['Zgłoszenia', 'Lista zgłoszeń wybranego eventu, szczegóły, edycja, anulowanie, eksport. Sekcja „Zgłoszenia”.'],
@@ -1072,19 +1072,38 @@ export const HELP_SECTIONS: HelpSection[] = [
       },
       {
         id: 'dashboard-kafle',
-        title: 'Dashboard — co pokazują kafle i listy',
+        title: 'Dashboard — jak czytać dashboard eventu',
         blocks: [
-          { type: 'p', text: 'Dashboard jest tylko do podglądu: niczego się na nim nie zmienia. Dane odświeżają się same co 30 sekund, a przycisk „Odśwież” robi to od razu. Obok widać godzinę ostatniego odświeżenia („Zaktualizowano …”).' },
-          { type: 'table', head: ['Element', 'Co naprawdę pokazuje'], rows: [
-            ['„Otwarte edycje”', 'Liczba eventów ze statusem otwartym — wszystkich typów, także ukrytych.'],
-            ['„Zgłoszenia dziś”', 'Zgłoszenia utworzone od północy we wszystkich eventach razem. Doba jest liczona według zegara serwera, więc granica dnia może wypaść godzinę lub dwie po polskiej północy.'],
-            ['„Przychód (bieżący)”', 'Suma kwot zgłoszeń potwierdzonych ze wszystkich eventów. To kwoty zgłoszeń, a nie zaksięgowane wpłaty: zadatki, raty i zwroty jej nie zmieniają. Prawdziwe wpłaty sprawdzaj w „Płatności”.'],
-            ['„Obłożenie pokoi”', 'Mimo nazwy nie liczy pokoi. To liczba zgłoszeń w otwartych eventach, które mają ustawioną „Pojemność (max osób)”, podzielona przez sumę tych pojemności. Liczone są zgłoszenia, nie osoby, i także zgłoszenia anulowane — traktuj wynik jako orientacyjny. Zajętość pokoi sprawdzisz w „Edytuj” przy evencie.'],
-            ['„Najbliższe terminy”', 'Najwyżej 5 otwartych eventów, ułożonych od najpóźniejszej daty rozpoczęcia.'],
-            ['„Ostatnie zgłoszenia”', 'Pięć najnowszych zgłoszeń, ale tylko z jednego eventu — pierwszego na liście „Najbliższe terminy”. Kolumna „Status”: „Opłacone”, „Oczekuje” albo „Lista oczek.”.'],
+          { type: 'p', text: 'Dashboard pokazuje JEDEN event, wybrany z listy u góry (panel zapamiętuje wybór w tej przeglądarce; na start bierze najbliższy nadchodzący event, który nie jest ukryty). Obok: stan zapisów, liczba dni do eventu i link „Strona zapisów”. Liczby z bazy odświeżają się same co minutę, „Odśwież” pobiera od razu także dane z PostHoga.' },
+          { type: 'p', text: 'Wszystkie liczby osób liczą zgłoszenia, które trzymają miejsce: bez anulowanych i bez listy rezerwowej (tak samo jak licznik wolnych miejsc na stronie eventu). Zgłoszenie bez listy uczestników liczy się jako 1 dorosły.' },
+          { type: 'table', head: ['Sekcja', 'Co pokazuje i skąd'], rows: [
+            ['„Co wymaga uwagi”', 'Pojawia się tylko, gdy coś jest nie tak: przekroczony limit miejsc, zaległe wpłaty (termin raty minął), wyczerpane typy pokoi lub dodatki, za wolne tempo zapisów, zgłoszenia czekające na przelew ponad 7 dni bez żadnej wpłaty, zgłoszenia z noclegiem bez pokoju (dopiero 30 dni przed eventem), na wyczerpaniu (≤ 2 wolne), lista rezerwowa, porzucone formularze (ponad 24 h). Przycisk po prawej przenosi do ekranu, na którym to załatwisz.'],
+            ['Kafle u góry', 'Zapisane osoby względem celu (albo limitu miejsc), wpłacone względem należnych, zaległe wpłaty i odsetek odwiedzających strony eventu, którzy wysłali zgłoszenie (PostHog, wybrany okres).'],
+            ['„Czy zdążymy? — tempo zapisów”', 'Wykres osób narastająco dzień po dniu (najedź myszą, żeby zobaczyć dzień), linia celu, limit miejsc, kreskowana linia tempa potrzebnego do celu w dniu zamknięcia zapisów oraz kropki: progi cenowe, terminy rat, start i koniec zapisów. Po prawej: ile brakuje, potrzebne tempo, obecne tempo (średnia z ostatnich 14 dni zapisów) i prognoza na koniec zapisów.'],
+            ['„Ustaw cel frekwencji”', 'Jedyna rzecz, którą zmieniasz na dashboardzie: liczba osób, do której chcesz dojść (np. minimum z umowy z ośrodkiem). Tylko informacja — niczego nie blokuje. Bez celu dashboard porównuje z limitem miejsc eventu. Puste pole i „Zapisz” usuwa cel.'],
+            ['„Gdzie ludzie odpadają? — lejek”', 'Z PostHoga, za wybrany okres (7 / 30 / 90 dni / rok): ile osób weszło na stronę eventu, zaczęło formularz, przeszło każdy krok, wybrało płatność i wysłało zgłoszenie. Czerwony pasek = krok, na którym odpada najwięcej osób. Obok: telefon / komputer i język strony. Niżej: komunikaty, które zatrzymały gości na kroku, nieudane wysyłki z powodem, porzucone formularze z bazy (osoby, które podały e-mail) i wejścia dzień po dniu.'],
+            ['„Skąd przychodzą?”', 'Źródło każdej wizyty (pierwsze wejście) i ile z tych wizyt skończyło się zgłoszeniem. Obok: kraj zamieszkania i język formularza zapisanych osób (baza). Na dole generator linku z oznaczeniem źródła.'],
+            ['„Ile mamy pieniędzy?”', 'Wpłacone (netto po zwrotach), należne łącznie, wymagane do dziś, zadatki, pula darowizn, prognoza wpływów na każdy termin raty (zaległe na czerwono), skąd wpłynęły pieniądze (Tpay, wyciąg, wpis ręczny; testowe osobno) i jaki sposób płatności wybrali goście.'],
+            ['„Co jest wyprzedane?”', 'Każdy typ pokoju: zajęte / limit, wolne w zapisie publicznym, wykorzystanie rezerwy dla gości specjalnych, liczba osób. Pod spodem: przydział pokoi, dodatki z limitem (dostawki, łóżeczka) i liczba osób na każdej diecie.'],
+            ['„Ostatnie zgłoszenia”', 'Osiem najnowszych zgłoszeń tego eventu z kwotą i wpłatą, nad tabelą liczba zgłoszeń w każdym statusie. Pod tabelą: zapisani na powiadomienie o starcie zapisów i anulowane.'],
           ] },
-          { type: 'note', tone: 'warn', text: 'Wykres „Trend zgłoszeń” jest nieczynny: pokazuje stałe, przykładowe słupki, a nie dane z systemu. Nie wyciągaj z niego wniosków.' },
-          { type: 'p', text: 'Dokładne liczby dla jednego eventu (zgłoszenia, wpłaty, zadatki, prognoza) są w „Zgłoszenia” i w kaflach zakładki „Płatności”.' },
+          { type: 'note', tone: 'info', text: 'Liczby z PostHoga to osoby liczone bez cookies: ta sama osoba, która wróci następnego dnia, liczy się drugi raz, a PostHog nie wie nic o imionach ani adresach. Przy małych liczbach traktuj procenty jako sygnał, nie wyrok. Pieniądze, osoby i pokoje pochodzą wyłącznie z bazy i są dokładne.' },
+          { type: 'note', tone: 'warn', text: 'Sekcje z PostHoga działają dopiero, gdy na Renderze (usługa `icpe-api` ▸ Environment) jest zmienna `POSTHOG_PERSONAL_API_KEY` — osobisty klucz PostHog z zakresem „Endpoint: Read”. Bez niej dashboard pokazuje w tym miejscu instrukcję, a reszta działa normalnie.' },
+          { type: 'p', text: 'Twoje własne testy: przeglądarka, w której zalogujesz się do panelu, przestaje być liczona w PostHogu (dotyczy tej przeglądarki na tym urządzeniu — na telefonie zaloguj się raz do panelu). Stan widać na dole dashboardu, tam też „Licz mnie jednak” / „Nie licz tej przeglądarki”.' },
+        ],
+      },
+      {
+        id: 'dashboard-linki-zrodla',
+        title: 'Link z oznaczeniem źródła (Facebook, WhatsApp, newsletter)',
+        blocks: [
+          { type: 'p', text: 'WhatsApp, Messenger, SMS i część aplikacji pocztowych nie mówią stronie, skąd przyszedł gość — w „Skąd przychodzą?” wszystko to wpada do „Bezpośrednio”. Żeby wiedzieć, które ogłoszenie działa, wklejaj w posty i wiadomości link z oznaczeniem.' },
+          { type: 'steps', items: [
+            'Dashboard ▸ wybierz event ▸ sekcja „Skąd przychodzą?” ▸ „Link z oznaczeniem źródła”.',
+            'Wybierz, gdzie wkleisz link (np. „WhatsApp”), i opcjonalnie wpisz nazwę akcji (np. „ogloszenie-styczen”).',
+            '„Kopiuj link” i wklej go zamiast zwykłego adresu `rejestracja.icpemission.pl/r/…`.',
+            'Po kilku dniach w tabeli źródeł pojawi się wiersz „Kampania: whatsapp” z liczbą wizyt i zgłoszeń.',
+          ] },
+          { type: 'note', tone: 'info', text: 'Link prowadzi na tę samą stronę zapisów; oznaczenie nie zawiera żadnych danych osobowych. Dla plakatu zrób z linku kod QR (źródło „Plakat / kod QR”).' },
         ],
       },
       {

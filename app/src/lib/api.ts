@@ -1912,3 +1912,125 @@ export async function setDeskRequestStatus(instanceId: string, requestId: string
     body: JSON.stringify({ status }),
   })
 }
+
+// ── Dashboard eventu (panel ▸ Dashboard) ────────────────────────────────────
+
+export interface DashboardAlertDto {
+  level: 'error' | 'warn' | 'info'
+  code: string
+  text: string
+  count: number
+  screen?: 'registrations' | 'payments' | 'accommodation' | 'events'
+}
+
+export interface DashboardPace {
+  target: number
+  current: number
+  missing: number
+  daysLeft: number
+  neededPerDay: number | null
+  recentPerDay: number
+  projected: number
+  status: 'reached' | 'on_track' | 'behind' | 'closed' | 'not_open'
+}
+
+export interface EventDashboard {
+  generatedAt: string
+  today: string
+  event: {
+    id: string
+    title: string
+    slug: string | null
+    status: string
+    unlisted: boolean
+    startsAt: string
+    endsAt: string
+    registrationOpensAt: string
+    registrationClosesAt: string
+    capacity: number | null
+    targetPeople: number | null
+    currency: string
+    free: boolean
+    daysToEvent: number
+    registrationOpen: boolean
+  }
+  people: {
+    registrations: number
+    people: number
+    adults: number
+    children: number
+    statusCounts: Record<string, number>
+    cancelledRegistrations: number
+    cancelledPeople: number
+    waitlistRegistrations: number
+    waitlistSignups: number
+    waitlistNotified: number
+    leadsOpen: number
+    leadsAbandoned: number
+    leadsReminded: number
+    leadsConverted: number
+    leadsByStep: Record<string, number>
+  }
+  pace: DashboardPace | null
+  daily: Array<{ date: string; registrations: number; people: number; cumulativePeople: number; cumulativeRegistrations: number }>
+  milestones: Array<{ date: string; label: string; kind: 'opens' | 'closes' | 'tier' | 'installment' | 'event' }>
+  finance: InstanceFinance & {
+    byProvider: Array<{ provider: string; amount: number; count: number }>
+    testPayments: number
+    staleAwaitingTransfer: number
+    paymentMethods: Record<string, number>
+  }
+  lodging: {
+    roomTypes: Array<{ id: string; name: string; stock: number | null; reserved: number; usedPublic: number; usedReserved: number; available: number | null; rooms: number; people: number }>
+    needRoom: number
+    assigned: number
+    unassigned: number
+    noLodging: number
+  }
+  addons: Array<{ id: string; name: string; limit: number | null; used: number; available: number | null }>
+  diets: Array<{ id: string; label: string; total: number }>
+  dietPeople: number
+  locales: Array<{ key: string; count: number }>
+  countries: Array<{ key: string; count: number }>
+  recent: Array<{ id: string; createdAt: string; name: string; people: number; total: number; paid: number; status: string; paymentMethod: string | null }>
+  alerts: DashboardAlertDto[]
+}
+
+export interface EventAnalytics {
+  slug: string
+  configured: boolean
+  error?: string
+  days: number
+  fetchedAt: string
+  totals: { sessions: number; pageviews: number }
+  funnel: Array<{ step: string; people: number }>
+  devices: Array<{ device: string; visit: number; start: number; submit: number }>
+  langs: Array<{ lang: string; visit: number; start: number; submit: number }>
+  daily: Array<{ date: string; visit: number; start: number; submit: number }>
+  sources: Array<{ source: string; sessions: number; submits: number }>
+  blocked: Array<{ step: string; count: number }>
+  failed: Array<{ reason: string; count: number }>
+  events: Record<string, number>
+  pageStates: Record<string, number>
+}
+
+export async function getEventDashboard(instanceId: string): Promise<EventDashboard> {
+  const d = await apiFetch<EventDashboard>(`/admin/instances/${instanceId}/dashboard`, { headers: authHeaders() })
+  // JSON nie zna Infinity — „potrzeba X os./dzień” po zamknięciu zapisów przychodzi jako null.
+  if (d.pace && (d.pace.neededPerDay === null || !Number.isFinite(Number(d.pace.neededPerDay)))) d.pace.neededPerDay = null
+  return d
+}
+
+export async function getEventAnalytics(instanceId: string, days: number, refresh = false): Promise<EventAnalytics> {
+  return apiFetch<EventAnalytics>(`/admin/instances/${instanceId}/dashboard/analytics?days=${days}${refresh ? '&refresh=1' : ''}`, {
+    headers: authHeaders(),
+  })
+}
+
+export async function setEventTargetPeople(instanceId: string, targetPeople: number | null): Promise<{ targetPeople: number | null }> {
+  return apiFetch(`/admin/instances/${instanceId}/dashboard-target`, {
+    method: 'PATCH',
+    headers: authHeaders(),
+    body: JSON.stringify({ targetPeople }),
+  })
+}

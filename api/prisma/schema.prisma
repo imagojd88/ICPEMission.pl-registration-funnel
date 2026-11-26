@@ -200,6 +200,9 @@ model EventInstance {
   countryCode          String?
   nights               Int             @default(0)
   capacity             Int?
+  // Cel frekwencji na dashboardzie (np. minimum osób z umowy z ośrodkiem) — tylko informacja dla panelu,
+  // nic nie blokuje. null = bez celu (dashboard porównuje wtedy z limitem miejsc).
+  targetPeople         Int?
   status               InstanceStatus  @default(DRAFT)
   // Kiedy admin ręcznie otworzył ponownie zamknięty event — automat (EventsService.closeExpired)
   // nie zamyka wtedy eventu drugi raz, nawet jeśli minęło 7 dni od końca.

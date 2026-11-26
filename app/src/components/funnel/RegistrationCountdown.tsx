@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { bcp47 } from '../../lib/utils'
 import { joinWaitlist } from '../../lib/api'
+import { track } from '../../lib/analytics'
 
 interface Props {
   /** Start zapisów (ISO). */
@@ -27,6 +28,7 @@ export default function RegistrationCountdown({ opensAt, onOpen, instanceId }: P
     try {
       await joinWaitlist({ instanceId, email: email.trim(), locale: i18n.language.slice(0, 2) })
       setWlState('done')
+      track('waitlist_joined') // bez adresu e-mail — tylko fakt zapisu (slug i język dokleja analityka)
     } catch {
       setWlState('error')
     }

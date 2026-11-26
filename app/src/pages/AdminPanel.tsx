@@ -16,6 +16,7 @@ import CoursesScreen from '@/components/admin/courses/CoursesScreen'
 import LibraryScreen from '@/components/admin/library/LibraryScreen'
 import HelpScreen, { HELP_HASH } from '@/components/admin/help/HelpScreen'
 import PanelVersionBanner from '@/components/admin/PanelVersionBanner'
+import { markInternalBrowserOnce } from '@/lib/analytics'
 
 type AdminScreen =
   | 'dashboard'
@@ -31,7 +32,7 @@ type AdminScreen =
   | 'help'
 
 const SCREEN_TITLES: Record<AdminScreen, { title: string; subtitle?: string }> = {
-  dashboard: { title: 'Dashboard', subtitle: 'Przegląd aktywności i kluczowych wskaźników' },
+  dashboard: { title: 'Dashboard', subtitle: 'Jeden event: tempo zapisów, lejek, źródła, pieniądze, pokoje i to, co wymaga uwagi' },
   events: { title: 'Eventy', subtitle: 'Zarządzaj sesjami i edycjami wydarzeń' },
   library: { title: 'Biblioteka', subtitle: 'Goście specjalni i miejsca do wyboru przy tworzeniu eventów' },
   registrations: { title: 'Zgłoszenia', subtitle: 'Przeglądaj i zarządzaj zgłoszeniami uczestników' },
@@ -57,6 +58,8 @@ export default function AdminPanel() {
   useEffect(() => {
     if (authed) {
       document.title = 'Panel administratora — ICPE Mission'
+      // Twoje własne wejścia na strony rejestracji (testy) nie liczą się w statystykach PostHog.
+      markInternalBrowserOnce()
     }
   }, [authed])
 
@@ -112,7 +115,7 @@ export default function AdminPanel() {
   function renderContent() {
     switch (view) {
       case 'dashboard':
-        return <DashboardScreen />
+        return <DashboardScreen onNavigate={handleNavigate} />
       case 'events':
         return (
           <EventsScreen
