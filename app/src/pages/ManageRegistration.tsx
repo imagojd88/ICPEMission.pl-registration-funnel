@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams } from 'react-router-dom'
 import { Calendar, MapPin } from 'lucide-react'
-import { computePrice, formatMoney, roomLabel, roomStockShortages } from '@icpe/shared'
+import { computePrice, formatMoney, roomLabel, roomStockShortages, eventAddons, addonLines } from '@icpe/shared'
 import { getManagedRegistration, pickLang, updateManagedAccommodation, type ManagedRegistration } from '../lib/api'
 import { funnelPriceInput, isAccommodationOptional } from '../lib/funnelPrice'
 import { formatDateRange } from '../lib/utils'
@@ -211,6 +211,19 @@ export default function ManageRegistration() {
             </span>
           ))}
         </div>
+
+        {/* Zamówione dodatki z limitem (np. dostawka) — tylko do odczytu; zmiana przez organizatora */}
+        {addonLines(eventAddons(cfg), reg.options?.addons, lng).length > 0 && (
+          <div className="rounded-[15px] px-4 py-3 flex flex-col gap-1" style={{ border: '1px solid var(--border)', background: 'var(--surface)' }}>
+            <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--muted)' }}>{t('manage.addons_title')}</span>
+            {addonLines(eventAddons(cfg), reg.options?.addons, lng).map((a) => (
+              <span key={a.id} className="text-sm" style={{ color: 'var(--ink)' }}>
+                {a.name}{a.qty > 1 ? ` × ${a.qty}` : ''}
+              </span>
+            ))}
+            <span className="text-xs" style={{ color: 'var(--muted)' }}>{t('manage.addons_hint')}</span>
+          </div>
+        )}
 
         <div className="flex flex-col gap-3">
           <h2 className="text-base font-semibold" style={{ color: 'var(--ink)' }}>

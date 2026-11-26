@@ -4,6 +4,9 @@ import type { EventInstanceDto } from '@icpe/shared'
 import type { EventConfig } from '@/lib/api'
 import AgeDiscountsEditor, { bracketsFromRows, rowsFromBrackets, type AgeDiscountRow } from './AgeDiscountsEditor'
 import DietOptionsSelect from './DietOptionsSelect'
+import AddonsEditor, { addonsToRows, rowsToAddons, addonsError, type AddonRow } from './AddonsEditor'
+import ConfigHistorySection from './ConfigHistorySection'
+import { clientStamp, usePanelStale, STALE_SAVE_MESSAGE } from '@/lib/panelVersion'
 import { PriceUnitSelect, priceHint } from './RoomPriceFields'
 import RoomStockFields from './RoomStockFields'
 import OptionalStayFields from './OptionalStayFields'
@@ -13,7 +16,7 @@ import RegistrationOpensFields from './RegistrationOpensFields'
 import PriceTiersEditor, { tiersToRows, rowsToTiers, tiersError, type PriceTierRow } from './PriceTiersEditor'
 import PaymentPlanEditor, { EMPTY_PLAN_FORM, planToForm, formToPlan, planFormError, type PaymentPlanForm } from './PaymentPlanEditor'
 import { isoToLocalInputs, localInputsToIso, notYetOpen } from '@/lib/registrationOpens'
-import { useState, useEffect, type ChangeEvent } from 'react'
+import { useState, useEffect, useRef, type ChangeEvent } from 'react'
 import { Plus, Trash2, Upload, Images } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
@@ -38,7 +41,7 @@ import {
   type Place,
 } from '@/lib/api'
 import { SUPERTITLE_PRESETS, isPresetSupertitle } from '@/lib/supertitles'
-import { DEFAULT_PRICING } from '@icpe/shared'
+import { DEFAULT_PRICING, mergePricingConfig, overlayKnown } from '@icpe/shared'
 import type { PricingConfig } from '@icpe/shared'
 
 /** Języki dodatkowe eventu (PL i EN są zawsze). */
@@ -162,6 +165,15 @@ export default function EventEditForm({
   // Poziomy cen z datami (ceny w cenniku = pierwszy poziom).
   const [tierRows, setTierRows] = useState<PriceTierRow[]>([])
   const [baseTierName, setBaseTierName] = useState('')
+  // Dodatki z limitem (np. dostawka, łóżeczko turystyczne) + ich zajętość z API.
+  const [addonRows, setAddonRows] = useState<AddonRow[]>([])
+  const [addonUsage, setAddonUsage] = useState<Record<string, number>>({})
+  // ORYGINAŁ konfiguracji wczytany z API — formularz nakłada na niego swoje pola (mergePricingConfig),
+  // żeby nie zgubić kluczy, których nie obsługuje. `configRev` wraca do API przy zapisie.
+  const origRef = useRef<{ pricing: unknown; customFields: unknown; paymentInfo: unknown; theme: unknown; configRev?: number }>({ pricing: null, customFields: null, paymentInfo: null, theme: null })
+  // Zwiększenie = ponowne wczytanie formularza z API (po zapisie i po przywróceniu wersji z historii).
+  const [reloadKey, setReloadKey] = useState(0)
+  const stalePanel = usePanelStale()
   // Limit pokoi: zajętość z API (publicznie / z rezerwy) i wolne publicznie — do podglądu przy pokojach.
   const [roomUsage, setRoomUsage] = useState<{ pub: Record<string, number>; res: Record<string, number>; free: Record<string, number> }>({ pub: {}, res: {}, free: {} })
   const [overnightMeals, setOvernightMeals] = useState('0')
@@ -283,6 +295,9 @@ export default function EventEditForm({
       .then((cfg: EventEditConfig) => {
         if (cancelled) return
         const pc = cfg.pricingConfig
+        origRef.current = { pricing: pc ?? null, customFields: cfg.customFields ?? null, paymentInfo: cfg.paymentInfo ?? null, theme: cfg.theme ?? null, configRev: cfg.configRev }
+        setAddonRows(addonsToRows(pc?.addons))
+        setAddonUsage(cfg.addonUsage ?? {})
         setEventType(cfg.type ?? '')
         setNameMap((cfg.title as Record<string, string>) ?? {})
         setDescMap((cfg.description as Record<string, string>) ?? {})
@@ -386,7 +401,7 @@ export default function EventEditForm({
       .catch((e: unknown) => { if (!cancelled) setError(e instanceof Error ? e.message : String(e)) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [editTarget.slug])
+  }, [editTarget.slug, reloadKey])
 
   async function handleHeroUpload(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -421,7 +436,10 @@ export default function EventEditForm({
     const n = parseInt(nights) || 0
     const roomIds = roomIdMap()
     const tiers = rowsToTiers(tierRows, (key) => roomIds.get(key))
-    return {
+    const addons = rowsToAddons(addonRows)
+    // Nakładamy pola formularza na ORYGINALNIE wczytany cennik: klucze, których ten formularz nie zna
+    // (na poziomie cennika, pokoju, progu wiekowego, poziomu cen, dodatku), zostają; usunięte tu — znikają.
+    return mergePricingConfig(origRef.current.pricing, {
       free: isFree,
       currency,
       formationFee: parseFloat(formationFee) || 0,
@@ -433,6 +451,7 @@ export default function EventEditForm({
       ...(formToPlan(planForm) ? { paymentPlan: formToPlan(planForm) } : {}),
       ...(tiers.length ? { priceTiers: tiers } : {}),
       ...(baseTierName.trim() ? { baseTierName: baseTierName.trim() } : {}),
+      ...(addons.length ? { addons } : {}),
       ...(parseFloat(overnightMeals) > 0 ? { overnightMealsFee: parseFloat(overnightMeals) } : {}),
       childBrackets: bracketsFromRows(brackets),
       rooms: (() => {
@@ -464,7 +483,7 @@ export default function EventEditForm({
           .filter((d) => d.code.trim())
           .map((d) => [d.code.trim(), (parseFloat(d.pct) || 0) / 100]),
       ),
-    }
+    } as PricingConfig)
   }
 
   // ── Budowanie danych eventu (wspólne dla zapisu i podglądu na żywo) ──
@@ -497,10 +516,14 @@ export default function EventEditForm({
     if (titleColor) theme.titleColor = titleColor
     theme.badge = badge
     theme.supertitle = cleanMap(superMap)
-    return theme
+    // Nieznane klucze motywu (dodane w nowszej wersji) zostają z oryginału.
+    return overlayKnown(origRef.current.theme, theme, ['primaryColor', 'heroImageUrl', 'titleColor', 'badge', 'supertitle'])
   }
   function buildCustomFields() {
+    // Wszystkie pola obsługiwane przez formularz są tu ustawiane jawnie, więc zwykłe nałożenie na oryginał
+    // zachowuje tylko klucze, których formularz nie zna.
     return {
+      ...((origRef.current.customFields && typeof origRef.current.customFields === 'object' ? origRef.current.customFields : {}) as Record<string, unknown>),
       program: program
         .filter((r) => r.time.trim() || Object.keys(cleanMap(r.item)).length)
         .map((r) => ({ time: r.time.trim(), item: cleanMap(r.item) })),
@@ -524,6 +547,9 @@ export default function EventEditForm({
     if (!dateStart) { setError('Podaj datę rozpoczęcia.'); return }
     if (planFormError(planForm)) { setError(planFormError(planForm)); return }
     if (tiersError(tierRows)) { setError(tiersError(tierRows)); return }
+    if (addonsError(addonRows)) { setError(addonsError(addonRows)); return }
+    // Nowa wersja panelu na serwerze → ta karta nie zapisuje (mogłaby skasować nowsze ustawienia).
+    if (stalePanel) { setError(STALE_SAVE_MESSAGE); return }
     // Nocleg przy 0 nocach: pokoje kosztowałyby 0 zł, a gość nie widziałby wyboru noclegu.
     if (optionalStay && rooms.length > 0 && (parseInt(nights) || 0) < 1) {
       setError('Nocleg opcjonalny wymaga liczby nocy co najmniej 1 (np. nocleg z piątku na sobotę = 1). Wpisz ją w polu „Liczba nocy” w sekcji Szczegóły (obok „Limit miejsc”) albo w polu pod „Nocleg opcjonalny” w Cenniku. Przy 0 nocach pokoje kosztują 0 zł.')
@@ -537,6 +563,7 @@ export default function EventEditForm({
       const { startsAt, endsAt } = buildDates()!
 
       const descClean = cleanMap(descMap)
+      const pricingToSave = buildPricing()
       await updateEventInstance(editTarget.instanceId, {
         title: { pl: titleClean.pl ?? Object.values(titleClean)[0] ?? '', ...titleClean },
         description: Object.keys(descClean).length ? descClean : null,
@@ -551,10 +578,17 @@ export default function EventEditForm({
         nights: n,
         capacity: capacity ? parseInt(capacity) : null,
         paymentMethods,
-        pricingConfig: buildPricing(),
+        pricingConfig: pricingToSave,
         shareWithIcpeGo: shareIcpeGo,
         unlisted,
+        // Znacznik panelu: wersja, poziom formularza i numer wersji konfiguracji z chwili wczytania.
+        // API odrzuca zapis cennika bez niego (stara karta) albo gdy konfigurację zmienił ktoś inny.
+        _client: clientStamp(origRef.current.configRev),
       })
+      // Zapis się udał → numer wersji konfiguracji wzrósł o 1 (kolejny zapis z tej karty musi go znać,
+      // także gdy niżej nie powiedzie się zapis strony).
+      if (typeof origRef.current.configRev === 'number') origRef.current.configRev += 1
+      origRef.current.pricing = pricingToSave
 
       const locales = [...activeLocales]
       const theme = buildTheme()
@@ -563,14 +597,14 @@ export default function EventEditForm({
         slug,
         theme,
         enabledFields: { phone: true, address: true, dietary: true, children: true },
-        paymentInfo: {
+        paymentInfo: overlayKnown(origRef.current.paymentInfo, {
           recipient: bankRecipient.trim(),
           account: bankAccount.trim(),
           ...(bankSwift.trim() ? { swift: bankSwift.trim() } : {}),
           ...(bankName.trim() ? { bankName: bankName.trim() } : {}),
           ...(bankAddress.trim() ? { bankAddress: bankAddress.trim() } : {}),
           ...(eventOperator.trim() ? { operator: eventOperator.trim() } : {}),
-        },
+        }, ['recipient', 'account', 'swift', 'bankName', 'bankAddress', 'operator']),
         customFields: buildCustomFields(),
         locales,
         isEvergreen: false,
@@ -876,6 +910,17 @@ export default function EventEditForm({
             onNights={setNights}
           />
           {!isFree && <DonationToggle enabled={donationEnabled} onChange={setDonationEnabled} />}
+          <AddonsEditor
+            rows={addonRows}
+            onChange={setAddonRows}
+            editLang={editLang}
+            langLabel={LANG_LABEL[editLang] ?? editLang.toUpperCase()}
+            usage={addonUsage}
+            currencyLabel={currency === 'PLN' ? 'zł' : currency}
+            free={isFree}
+            inputCls={inputCls}
+            inputStyle={inputStyle}
+          />
           {!isFree && (
             <PriceTiersEditor
               baseName={baseTierName}
@@ -1236,8 +1281,16 @@ export default function EventEditForm({
         </p>
       </Section>
 
+      {/* Historia zmian cennika: stan sprzed każdego zapisu + przywracanie */}
+      <ConfigHistorySection instanceId={editTarget.instanceId} onRestored={() => { setError(null); setReloadKey((k) => k + 1) }} />
+
+      {stalePanel && (
+        <div className="px-4 py-3 rounded-[12px] text-sm" role="alert" style={{ background: 'var(--warn-soft)', color: 'var(--ink)', border: '1px solid var(--warn)' }}>
+          {STALE_SAVE_MESSAGE}
+        </div>
+      )}
       <div className="flex items-center gap-3 pb-4">
-        <Button onClick={() => { void handleSave() }} disabled={saving}>
+        <Button onClick={() => { void handleSave() }} disabled={saving || stalePanel} title={stalePanel ? STALE_SAVE_MESSAGE : undefined}>
           {saving ? 'Zapisuję…' : 'Zapisz zmiany'}
         </Button>
         <Button variant="outline" onClick={onCancel} disabled={saving}>Anuluj</Button>

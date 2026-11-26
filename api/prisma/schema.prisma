@@ -216,6 +216,9 @@ model EventInstance {
   paymentMethods       PaymentMethod[]
   // PricingConfig JSON from @icpe/shared — canonical pricing engine config
   pricingConfig        Json
+  // Numer wersji konfiguracji (rośnie przy każdym zapisie cennika). Panel odsyła wartość odczytaną
+  // przy wczytaniu formularza; inna niż w bazie → 409 (ochrona przed zapisem z nieaktualnej karty).
+  configRev            Int             @default(0)
   options              Json?
   roomTypes            RoomType[]
   rooms                Room[]
@@ -914,4 +917,22 @@ model DeskActionLog {
 
   @@index([instanceId, createdAt])
   @@index([registrationId])
+}
+
+// Historia konfiguracji eventu: stan SPRZED każdego zapisu cennika / kluczowych pól (ostatnie 20 na event).
+// Pozwala odwrócić przypadkowe nadpisanie (panel ▸ Edytuj event ▸ „Historia zmian cennika”).
+model EventConfigHistory {
+  id            String   @id @default(cuid())
+  instanceId    String
+  createdAt     DateTime @default(now())
+  // kto zapisał: e-mail admina panelu albo „service” (token serwisowy)
+  actor         String
+  // panel | service | restore
+  source        String
+  // wersja buildu panelu i poziom formularza (z pola `_client` żądania), gdy podane
+  clientVersion String?
+  // { configRev, instance: {...}, pricingConfig: {...}, page: {...} } — stan przed zapisem
+  snapshot      Json
+
+  @@index([instanceId, createdAt])
 }

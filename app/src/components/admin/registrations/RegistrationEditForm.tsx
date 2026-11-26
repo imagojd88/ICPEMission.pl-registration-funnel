@@ -2,7 +2,8 @@ import { useState, useMemo, useEffect, useRef } from 'react'
 import { X, Plus, Trash2 } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
-import { computePrice, formatMoney, roomLabel, cleanDonation, pricingAt, warsawDate } from '@icpe/shared'
+import { computePrice, formatMoney, roomLabel, cleanDonation, pricingAt, warsawDate, eventAddons, addonLabel, addonLimit, addonPrice, displayDietary } from '@icpe/shared'
+import { usePanelStale, STALE_SAVE_MESSAGE } from '@/lib/panelVersion'
 import { funnelPriceInput, isAccommodationOptional } from '../../../lib/funnelPrice'
 import type { PricingConfig } from '@icpe/shared'
 import type { RegistrationDto } from '@icpe/shared'
@@ -64,7 +65,8 @@ export default function RegistrationEditForm({
       type: p.type === 'child' ? 'child' : 'adult',
       age: p.age != null ? String(p.age) : '',
       gender: p.gender === 'F' ? 'F' : p.gender === 'M' ? 'M' : '',
-      dietary: p.dietary ?? '',
+      // Dawna etykieta diety („Bez laktozy”) pokazywana i zapisywana pod aktualną nazwą („Bez mleka”).
+      dietary: displayDietary(p.dietary),
     })),
   )
   const [rooms, setRooms] = useState<EditRoom[]>(
@@ -82,6 +84,22 @@ export default function RegistrationEditForm({
   const [donationText, setDonationText] = useState(registration.options?.donation ? String(registration.options.donation) : '')
   const donation = cleanDonation(donationText)
   const showDonation = !!pricingConfig.donationEnabled || (registration.options?.donation ?? 0) > 0
+  // Dodatki z limitem (np. dostawka): definicje eventu + sztuki zamówione w tym zgłoszeniu.
+  const addonDefs = useMemo(() => eventAddons(eventPricing), [eventPricing])
+  const [addons, setAddons] = useState<Record<string, number>>({ ...(registration.options?.addons ?? {}) })
+  const addonsChanged = JSON.stringify(Object.entries(addons).filter(([, q]) => q > 0).sort()) !== JSON.stringify(Object.entries(registration.options?.addons ?? {}).filter(([, q]) => Number(q) > 0).sort())
+  const setAddonQty = (id: string, raw: string) => {
+    const q = Math.max(0, Math.min(99, parseInt(raw.replace(/\D/g, '')) || 0))
+    setAddons((prev) => {
+      const next = { ...prev }
+      if (q > 0) next[id] = q
+      else delete next[id]
+      return next
+    })
+  }
+  // Limit dodatku wyczerpany → pytanie, czy przekroczyć (API zwraca 409 z kodem ADDON_SOLD_OUT).
+  const [overLimitAsk, setOverLimitAsk] = useState<string | null>(null)
+  const stalePanel = usePanelStale()
   const [dietaryNotes, setDietaryNotes] = useState(registration.dietaryNotes ?? '')
   // Pokoje z puli zarezerwowanej dla gości specjalnych (nie zmniejszają puli zapisów publicznych).
   const [roomsReserved, setRoomsReserved] = useState(!!registration.roomsReserved)
@@ -127,7 +145,7 @@ export default function RegistrationEditForm({
         participantIndexes: r.pids.map((pid) => participants.findIndex((p) => p.id === pid)).filter((i) => i >= 0),
       })),
       pricingConfig,
-      { transport: options.transport, bedding: options.bedding, donation, ...(adjustment ? { adjustment } : {}) },
+      { transport: options.transport, bedding: options.bedding, donation, addons, ...(adjustment ? { adjustment } : {}) },
       registration.discountCode,
     )
     try {
@@ -136,7 +154,7 @@ export default function RegistrationEditForm({
       return null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rooms, participants, options, donation, pricingConfig, registration.discountCode, JSON.stringify(adjustment)])
+  }, [rooms, participants, options, donation, addons, pricingConfig, registration.discountCode, JSON.stringify(adjustment)])
   const total = priced?.result.total ?? 0
   const lineFor = (pIdx: number) => {
     if (!priced) return undefined
@@ -181,7 +199,8 @@ export default function RegistrationEditForm({
     return null
   }
 
-  async function handleSave() {
+  async function handleSave(overLimit = false) {
+    if (stalePanel) { setError(STALE_SAVE_MESSAGE); return }
     const err = validate()
     if (err) {
       setError(err)
@@ -189,6 +208,7 @@ export default function RegistrationEditForm({
     }
     setSaving(true)
     setError(null)
+    setOverLimitAsk(null)
     try {
       await adminUpdateRegistration(registration.id, {
         contact: {
@@ -213,14 +233,17 @@ export default function RegistrationEditForm({
             participantIndexes: r.pids.map((pid) => participants.findIndex((p) => p.id === pid)).filter((i) => i >= 0),
           }))
           .filter((r) => r.participantIndexes.length > 0),
-        options: { ...options, donation, ...(adjustment ? { adjustment } : {}) },
+        // `addons` wysyłamy tylko po zmianie — bez pola API zostawia zamówione dodatki bez ruszania.
+        options: { ...options, donation, ...(adjustment ? { adjustment } : {}), ...(addonsChanged ? { addons, ...(overLimit ? { addonsOverLimit: true } : {}) } : {}) },
         discountCode: registration.discountCode,
         dietaryNotes: dietaryNotes.trim() || null,
         roomsReserved,
       })
       onSaved()
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e))
+      const message = e instanceof Error ? e.message : String(e)
+      if ((e as { code?: string } | null)?.code === 'ADDON_SOLD_OUT' && !overLimit) setOverLimitAsk(message)
+      else setError(message)
     } finally {
       setSaving(false)
     }
@@ -402,6 +425,51 @@ export default function RegistrationEditForm({
             </section>
           )}
 
+          {/* Dodatki z limitem (np. dostawka, łóżeczko turystyczne) */}
+          {(addonDefs.length > 0 || Object.keys(addons).length > 0) && (
+            <section className="flex flex-col gap-2">
+              <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--faint)' }}>Dodatki z limitem</p>
+              {addonDefs.map((a) => (
+                <div key={a.id} className="flex items-center gap-3 text-sm" style={{ color: 'var(--ink)' }}>
+                  <input
+                    value={addons[a.id] ? String(addons[a.id]) : ''}
+                    onChange={(e) => setAddonQty(a.id, e.target.value)}
+                    inputMode="numeric"
+                    placeholder="0"
+                    aria-label={`Liczba sztuk: ${addonLabel(a.name)}`}
+                    className={inputCls}
+                    style={{ ...inputStyle, width: 64 }}
+                  />
+                  <span className="flex-1">
+                    {addonLabel(a.name)}
+                    <span className="block text-xs" style={{ color: 'var(--muted)' }}>
+                      {addonLimit(a) ? `limit w evencie: ${addonLimit(a)} szt.` : 'bez limitu'} · {addonPrice(a) > 0 ? `${money(addonPrice(a))} / szt.` : 'bezpłatnie'}
+                      {a.childUnderAge ? ` · w formularzu tylko przy dziecku poniżej ${a.childUnderAge} lat` : ''}
+                    </span>
+                  </span>
+                </div>
+              ))}
+              {Object.keys(addons).filter((id) => !addonDefs.some((d) => d.id === id)).map((id) => (
+                <p key={id} className="text-xs" style={{ color: 'var(--warn)' }}>
+                  Zgłoszenie ma dodatek „{id}” ({addons[id]} szt.), którego nie ma już w ustawieniach eventu. Zapis ze zmianą dodatków usunie go ze zgłoszenia.
+                </p>
+              ))}
+              <p className="text-xs" style={{ color: 'var(--faint)' }}>
+                Wpisz liczbę sztuk (puste = brak). Gdy limit jest wyczerpany, panel zapyta, czy go przekroczyć. Zajętość i kolejność: Zgłoszenia ▸ „Diety i dodatki”.
+              </p>
+              {overLimitAsk && (
+                <div className="px-4 py-3 rounded-[12px] text-sm flex flex-col gap-2" role="alert" style={{ background: 'var(--warn-soft)', color: 'var(--ink)', border: '1px solid var(--warn)' }}>
+                  <span><strong>Limit dodatku jest wyczerpany.</strong> {overLimitAsk.replace(/ Odznacz go.*$| Zmniejsz liczbę.*$/, '')} Nic nie zostało zapisane.</span>
+                  <span>Możesz świadomie przekroczyć limit — wtedy to Ty odpowiadasz za zapewnienie dodatkowej sztuki w ośrodku.</span>
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={() => { void handleSave(true) }} disabled={saving || stalePanel}>Zapisz mimo limitu</Button>
+                    <Button size="sm" variant="outline" onClick={() => setOverLimitAsk(null)} disabled={saving}>Anuluj</Button>
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
+
           {/* Cena — rozbicie i ręczna korekta */}
           {!pricingConfig.free && priced && (
             <section className="flex flex-col gap-2">
@@ -486,6 +554,11 @@ export default function RegistrationEditForm({
               {error}
             </div>
           )}
+          {stalePanel && (
+            <div className="px-4 py-3 rounded-[12px] text-sm" role="alert" style={{ background: 'var(--warn-soft)', color: 'var(--ink)', border: '1px solid var(--warn)' }}>
+              {STALE_SAVE_MESSAGE}
+            </div>
+          )}
         </div>
 
         {/* Footer */}
@@ -495,7 +568,7 @@ export default function RegistrationEditForm({
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" onClick={onClose} disabled={saving}>Anuluj</Button>
-            <Button onClick={() => { void handleSave() }} disabled={saving}>{saving ? 'Zapisuję…' : 'Zapisz zmiany'}</Button>
+            <Button onClick={() => { void handleSave() }} disabled={saving || stalePanel} title={stalePanel ? STALE_SAVE_MESSAGE : undefined}>{saving ? 'Zapisuję…' : 'Zapisz zmiany'}</Button>
           </div>
         </div>
       </div>

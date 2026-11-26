@@ -15,6 +15,7 @@ import DeskActivityScreen from '@/components/admin/desk/DeskActivityScreen'
 import CoursesScreen from '@/components/admin/courses/CoursesScreen'
 import LibraryScreen from '@/components/admin/library/LibraryScreen'
 import HelpScreen, { HELP_HASH } from '@/components/admin/help/HelpScreen'
+import PanelVersionBanner from '@/components/admin/PanelVersionBanner'
 
 type AdminScreen =
   | 'dashboard'
@@ -157,6 +158,8 @@ export default function AdminPanel() {
 
       {/* Main content area */}
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+        {/* Nowa wersja panelu na serwerze → nieusuwalny baner + blokada zapisów do odświeżenia */}
+        <PanelVersionBanner />
         {/* Page header — hidden when wizard is open (wizard has its own breadcrumb) */}
         {!(view === 'events' && showWizard) && (
           <PageHeader

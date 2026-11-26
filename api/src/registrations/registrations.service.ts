@@ -7,11 +7,12 @@ import { buildIcs, googleCalendarUrl } from '../shared';
 import { CreateRegistrationDto } from './dto/create-registration.dto';
 import { v4 as uuid } from 'uuid';
 import { guestInviteConfig, guestInvitePageLink, publicAppUrl } from '../invitations/guest-invite-config';
-import { buildPriceInput, normalizeCountryCode, hasAccommodation, roomLabel, leaderDepositSplit, cleanDonation, buildSchedule, hasPaymentPlan, minDepositPctFor, normalizePaymentPlan, warsawDate, pricingAt, contactCountry, onlineProviderFor, PricingConfig, PriceAdjustment } from '../shared';
+import { eventAddons, cleanAddonSelection, validateAddonSelection, addonProblemMessage, addonLines, nextAddonTimes, buildPriceInput, normalizeCountryCode, hasAccommodation, roomLabel, leaderDepositSplit, cleanDonation, buildSchedule, hasPaymentPlan, minDepositPctFor, normalizePaymentPlan, warsawDate, pricingAt, contactCountry, onlineProviderFor, PricingConfig, PriceAdjustment } from '../shared';
 import { configuredOnlineProviders } from '../payments/tpay-config';
 import { netPaidByPayment } from '../payments/refund-ledger';
 import type { MailAccommodation } from '../notifications/notifications.service';
 import { assertRoomStock, instanceRoomAvailability } from './room-stock';
+import { assertAddonStock, lockInstanceAddons } from './addon-stock';
 import { LeadsService } from './leads.service';
 
 type RoomsInput = Array<{ roomId: string; participantIndexes: number[] }>;
@@ -32,13 +33,41 @@ function cleanAdjustment(raw: unknown): PriceAdjustment | undefined {
   return Object.keys(out).length ? out : undefined;
 }
 
-/** Opcje z zapisanego zgłoszenia (transport, pościel, darowizna, ręczna korekta). */
-function storedOptions(optionsJson: unknown): { transport: boolean; bedding: boolean; donation?: number; adjustment?: PriceAdjustment } {
-  const o = (optionsJson ?? {}) as { transport?: boolean; bedding?: boolean; donation?: unknown; adjustment?: unknown };
+/** Zapisany wybór dodatków (id → liczba sztuk) — także dodatki usunięte później z konfiguracji eventu. */
+function storedAddons(raw: unknown): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out;
+  for (const [id, v] of Object.entries(raw as Record<string, unknown>)) {
+    const q = v === true ? 1 : Math.floor(Number(v));
+    if (Number.isFinite(q) && q > 0) out[id] = q;
+  }
+  return out;
+}
+function storedAddonTimes(raw: unknown): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out;
+  for (const [id, v] of Object.entries(raw as Record<string, unknown>)) if (typeof v === 'string' && v) out[id] = v;
+  return out;
+}
+
+/** Opcje z zapisanego zgłoszenia (transport, pościel, darowizna, dodatki z limitem, ręczna korekta). */
+function storedOptions(optionsJson: unknown): { transport: boolean; bedding: boolean; donation?: number; addons?: Record<string, number>; addonsAt?: Record<string, string>; adjustment?: PriceAdjustment } {
+  const o = (optionsJson ?? {}) as { transport?: boolean; bedding?: boolean; donation?: unknown; adjustment?: unknown; addons?: unknown; addonsAt?: unknown };
   const adjustment = cleanAdjustment(o.adjustment);
   const donation = cleanDonation(o.donation);
-  return { transport: !!o.transport, bedding: !!o.bedding, ...(donation > 0 ? { donation } : {}), ...(adjustment ? { adjustment } : {}) };
+  const addons = storedAddons(o.addons);
+  const hasAddons = Object.keys(addons).length > 0;
+  return {
+    transport: !!o.transport,
+    bedding: !!o.bedding,
+    ...(donation > 0 ? { donation } : {}),
+    ...(hasAddons ? { addons, addonsAt: storedAddonTimes(o.addonsAt) } : {}),
+    ...(adjustment ? { adjustment } : {}),
+  };
 }
+
+/** Czy zgłoszenie w tym statusie zajmuje sztuki dodatków (anulowane i lista rezerwowa — nie). */
+const addonHolding = (status: string) => status !== 'CANCELLED' && status !== 'WAITLIST';
 
 /** Link do strony zgłoszenia gościa (zmiana / domówienie noclegu). */
 export function manageRegistrationLink(editToken: string): string {
@@ -193,8 +222,26 @@ export class RegistrationsService {
     await assertRoomStock(this.prisma, dto.instanceId, cfg, rooms);
     // Darowizna na dofinansowanie pobytu innych — tylko gdy event ją włączył.
     const donation = cfg?.donationEnabled ? cleanDonation(dto.options?.donation) : 0;
-    // Gość nie może sam ustawić korekty ceny — tylko transport/pościel/darowiznę.
-    const guestOptions = { transport: !!dto.options?.transport, bedding: !!dto.options?.bedding, ...(donation > 0 ? { donation } : {}) };
+    // Dodatki z limitem (np. dostawka) — tylko gdy event je skonfigurował; inaczej nic się nie zmienia.
+    const addonDefs = eventAddons(cfg);
+    const addonPeople = dto.participants.map((p) => ({ type: p.type, age: p.age ?? 0 }));
+    const addons = addonDefs.length ? cleanAddonSelection((dto.options as { addons?: unknown } | undefined)?.addons, addonDefs) : {};
+    const hasAddons = Object.keys(addons).length > 0;
+    if (hasAddons) {
+      // Reguły niezależne od zajętości (maks. na zgłoszenie, warunek wieku) — od razu 400.
+      const bad = validateAddonSelection(addonDefs, addons, addonPeople, {});
+      if (bad.length) throw new BadRequestException(addonProblemMessage(bad[0], addonDefs, dto.locale));
+      // Wstępne sprawdzenie limitu (bez blokady) — żeby nie liczyć ceny dla zgłoszenia, które i tak odpadnie.
+      // Wiążące sprawdzenie jest niżej, w transakcji z blokadą.
+      await assertAddonStock(this.prisma, dto.instanceId, addonDefs, addons, addonPeople, dto.locale);
+    }
+    // Gość nie może sam ustawić korekty ceny — tylko transport/pościel/darowiznę/dodatki.
+    const guestOptions = {
+      transport: !!dto.options?.transport,
+      bedding: !!dto.options?.bedding,
+      ...(donation > 0 ? { donation } : {}),
+      ...(hasAddons ? { addons, addonsAt: nextAddonTimes(addons, null, new Date().toISOString()) } : {}),
+    };
     const priceInput = buildPriceInput(
       dto.participants.map((p) => ({ type: p.type, age: p.age ?? 0 })),
       rooms,
@@ -207,7 +254,7 @@ export class RegistrationsService {
 
     const editToken = uuid();
 
-    const registration = await this.prisma.registration.create({
+    const createArgs = {
       data: {
         instanceId: dto.instanceId,
         locale: dto.locale,
@@ -235,7 +282,19 @@ export class RegistrationsService {
         },
       } as any,
       include: { participants: true },
-    });
+    };
+    // Bez dodatków: zapis dokładnie jak dotąd. Z dodatkami: blokada eventu + ponowne przeliczenie
+    // zajętości i zapis w JEDNEJ transakcji — dwa równoczesne zgłoszenia nie wezmą tej samej sztuki.
+    // Gdy limit wyczerpał się w międzyczasie → 409 z nazwą dodatku; nic nie zostaje zapisane.
+    const registration = hasAddons
+      ? await this.prisma.$transaction(async (txc: unknown) => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const tx = txc as any;
+          await lockInstanceAddons(tx, dto.instanceId);
+          await assertAddonStock(tx, dto.instanceId, addonDefs, addons, addonPeople, dto.locale);
+          return tx.registration.create(createArgs) as ReturnType<typeof this.prisma.registration.create>;
+        }, { maxWait: 10_000, timeout: 15_000 })
+      : await this.prisma.registration.create(createArgs);
 
     // Rejestracja z osobistego zaproszenia (gość dodany przez uczestnika lub admina na zwykłym
     // evencie): spinamy zaproszenie ze zgłoszeniem, żeby lista gości pokazała „zarejestrowany".
@@ -280,6 +339,7 @@ export class RegistrationsService {
       guestInviteLink,
       leaderDepositPct: cfg?.leaderDepositPct,
       donation: priceResult.donation ?? 0,
+      addons: hasAddons ? addonLines(addonDefs, addons, mailLang(dto.locale)).map((a) => ({ name: a.name, qty: a.qty })) : undefined,
       // Harmonogram wpłat (zadatek + raty z terminami), gdy event go ma.
       schedule: (() => {
         const plan = normalizePaymentPlan(cfg?.paymentPlan);
@@ -332,7 +392,13 @@ export class RegistrationsService {
     contact?: Record<string, unknown>;
     participants: Array<{ type: 'adult' | 'child'; firstName: string; lastName?: string; age?: number; gender?: string; dietary?: string }>;
     rooms: Array<{ roomId: string; participantIndexes: number[] }>;
-    options?: { transport?: boolean; bedding?: boolean; donation?: number; adjustment?: unknown };
+    options?: {
+      transport?: boolean; bedding?: boolean; donation?: number; adjustment?: unknown;
+      /** dodatki z limitem: brak pola = zostają zapisane; obiekt = nowy wybór ({} = usuń wszystkie) */
+      addons?: Record<string, number>;
+      /** admin świadomie przekracza limit sztuk dodatku */
+      addonsOverLimit?: boolean;
+    };
     discountCode?: string;
     dietaryNotes?: string | null;
     locale?: string;
@@ -348,9 +414,24 @@ export class RegistrationsService {
     const donation = dto.options?.donation === undefined
       ? storedOptions((reg as { optionsJson?: unknown }).optionsJson).donation ?? 0
       : cleanDonation(dto.options.donation);
-    const adminOptions = { transport: !!dto.options?.transport, bedding: !!dto.options?.bedding, ...(donation > 0 ? { donation } : {}), ...(adj ? { adjustment: adj } : {}) };
     // Admin może zostawić osoby bez pokoju (np. ktoś zrezygnował z noclegu) — bez blokady.
     const cfg = ((reg as { instance?: { pricingConfig?: unknown } }).instance?.pricingConfig ?? null) as PricingConfig | null;
+    // Dodatki z limitem: klient, który ich nie zna (np. Personal OS), nie wysyła pola → zostają bez zmian.
+    const addonDefs = eventAddons(cfg);
+    const prevOpts = storedOptions((reg as { optionsJson?: unknown }).optionsJson);
+    const prevAddons = prevOpts.addons ?? {};
+    const addonsSent = dto.options?.addons !== undefined && dto.options.addons !== null;
+    const addons = addonsSent ? cleanAddonSelection(dto.options!.addons, addonDefs) : prevAddons;
+    const hasAddons = Object.keys(addons).length > 0;
+    // Limit sprawdzamy tylko, gdy admin zamawia WIĘCEJ niż było (zmiana innych pól zgłoszenia ponad limitem nie blokuje).
+    const addonsIncreased = addonsSent && Object.entries(addons).some(([k, q]) => q > (prevAddons[k] ?? 0));
+    const adminOptions = {
+      transport: !!dto.options?.transport,
+      bedding: !!dto.options?.bedding,
+      ...(donation > 0 ? { donation } : {}),
+      ...(hasAddons ? { addons, addonsAt: nextAddonTimes(addons, prevOpts.addonsAt, new Date().toISOString()) } : {}),
+      ...(adj ? { adjustment: adj } : {}),
+    };
     const rooms = normalizeRooms(dto.rooms, dto.participants.length, cfg);
     const priceInput = buildPriceInput(
       dto.participants.map((pp) => ({ type: pp.type, age: pp.age ?? 0 })),
@@ -362,8 +443,7 @@ export class RegistrationsService {
     const priceResult = await this.pricing.quote(priceInput, reg.instanceId, reg.createdAt);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const p: any = this.prisma;
-    await this.prisma.$transaction([
+    const ops = (p: any) => [
       // Fizyczne przydziały pokoi i uczestnicy są tworzeni od nowa.
       p.roomAssignment.deleteMany({ where: { registrationId: id } }),
       p.participant.deleteMany({ where: { registrationId: id } }),
@@ -397,7 +477,24 @@ export class RegistrationsService {
           },
         },
       }),
-    ]);
+    ];
+    if (addonsIncreased && addonHolding(reg.status)) {
+      // Admin dokłada dodatek: blokada eventu + przeliczenie zajętości + zapis w jednej transakcji.
+      // Ponad limit tylko po wyraźnym potwierdzeniu (`addonsOverLimit: true`) — inaczej 409 z nazwą dodatku.
+      await this.prisma.$transaction(async (txc: unknown) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const tx = txc as any;
+        await lockInstanceAddons(tx, reg.instanceId);
+        // Sprawdzamy tylko dodatki, których admin zamawia więcej niż dotąd (pozostałe już trzymają swoje sztuki).
+        const increased = Object.fromEntries(Object.entries(addons).filter(([k, q]) => q > (prevAddons[k] ?? 0)));
+        await assertAddonStock(tx, reg.instanceId, addonDefs, increased, [], 'pl', {
+          excludeRegistrationId: id, adminOverride: true, ignoreLimit: dto.options?.addonsOverLimit === true,
+        });
+        for (const op of ops(tx)) await op;
+      }, { maxWait: 10_000, timeout: 20_000 });
+    } else {
+      await this.prisma.$transaction(ops(this.prisma));
+    }
 
     const updated = await this.prisma.registration.findUnique({ where: { id }, include: { participants: true } });
     if (!updated) throw new NotFoundException('Registration not found');
@@ -470,6 +567,8 @@ export class RegistrationsService {
       roomAvailability: (reg as { roomsReserved?: boolean }).roomsReserved
         ? {}
         : await instanceRoomAvailability(this.prisma, reg.instanceId, cfg, reg.id),
+      // Zamówione dodatki z limitem (nazwy w języku zgłoszenia) — strona gościa tylko je pokazuje.
+      addons: addonLines(eventAddons(cfg), storedOptions(reg.optionsJson).addons, reg.locale).map((a) => ({ id: a.id, name: a.name, qty: a.qty })),
       lock: this.accommodationLock(reg, inst, cfg),
     };
   }

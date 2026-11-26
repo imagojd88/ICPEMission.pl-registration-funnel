@@ -193,7 +193,7 @@
       "Wegetariańska",
       "Wegańska",
       "Bezglutenowa",
-      "Bez laktozy",
+      "Bez mleka",
       "Bez orzechów",
       "Koszerna"
     ],
@@ -268,7 +268,16 @@
     "donation_title": "Opcjonalna darowizna na rzecz dofinansowania pobytu kogoś, kogo nie stać na udział",
     "donation_hint": "Darowizna jest dobrowolna. Doliczymy ją do kwoty zgłoszenia.",
     "donation_custom": "Dowolna kwota",
-    "donation_custom_label": "Kwota darowizny"
+    "donation_custom_label": "Kwota darowizny",
+    "addons_title": "Dodatki",
+    "addon_left": "Zostało: {{n}}",
+    "addon_sold_out": "Brak dostępnych",
+    "addon_free": "bezpłatnie",
+    "addon_each": "szt.",
+    "addon_limited_hint": "Liczba sztuk jest ograniczona — decyduje kolejność zgłoszeń.",
+    "addon_over": "Zostało mniej sztuk, niż zaznaczono. Zmniejsz liczbę albo odznacz ten dodatek.",
+    "addon_less": "Mniej",
+    "addon_more": "Więcej"
   },
   "payment_method": {
     "title": "Wybierz metodę płatności",
@@ -343,7 +352,8 @@
     "swift": "SWIFT / BIC",
     "bank": "Bank",
     "bank_address": "Adres banku",
-    "operator_note": "Podmiot obsługujący wydarzenie za zgodą Executive Council: {{name}}"
+    "operator_note": "Podmiot obsługujący wydarzenie za zgodą Executive Council: {{name}}",
+    "addons": "Dodatki"
   },
   "success": {
     "paid_title": "Dziękujemy!",
@@ -520,7 +530,9 @@
     "payment_transfer": "Płatność przelewem",
     "payment_online": "Płatność online",
     "transfer_note": "Jeśli kwota wzrosła, prosimy dopłacić różnicę przelewem (tytuł: numer zgłoszenia).",
-    "payment_leader": "Zaliczka u lidera + reszta gotówką na miejscu"
+    "payment_leader": "Zaliczka u lidera + reszta gotówką na miejscu",
+    "addons_title": "Zamówione dodatki",
+    "addons_hint": "Liczba sztuk jest ograniczona — organizator potwierdzi dodatki po przydziale pokoi. Aby coś zmienić, skontaktuj się z organizatorem."
   },
   "leader": {
     "deposit_title": "Zaliczka dla lidera ({{pct}}%)",
@@ -634,7 +646,8 @@
       "contact": "Zgłaszający",
       "phone": "Telefon",
       "reg_no": "Nr zgłoszenia",
-      "arrived_at": "Przyjazd: {{time}}"
+      "arrived_at": "Przyjazd: {{time}}",
+      "addons": "Dodatki"
     },
     "money": {
       "title": "Rozliczenie",

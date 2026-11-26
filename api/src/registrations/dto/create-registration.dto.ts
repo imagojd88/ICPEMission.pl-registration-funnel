@@ -1,4 +1,4 @@
-import { IsString, IsArray, IsOptional, IsBoolean, IsIn, ValidateNested, IsEmail, IsNumber, Min, Max, ArrayNotEmpty, IsInt, Matches } from 'class-validator';
+import { IsString, IsArray, IsOptional, IsBoolean, IsObject, IsIn, ValidateNested, IsEmail, IsNumber, Min, Max, ArrayNotEmpty, IsInt, Matches } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 
@@ -37,6 +37,8 @@ export class OptionsDto {
   @IsOptional() @IsBoolean() bedding?: boolean;
   /** dobrowolna darowizna na dofinansowanie pobytu innych (liczona tylko, gdy event ją włączył) */
   @IsOptional() @IsNumber() @Min(0) @Max(100000) donation?: number;
+  /** „dodatki z limitem”: id dodatku → liczba sztuk (tylko gdy event je skonfigurował; resztę sprawdza serwis) */
+  @IsOptional() @IsObject() addons?: Record<string, number>;
 }
 
 export class ConsentsDto {

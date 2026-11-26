@@ -3,7 +3,7 @@
  * Czysta logika (bez Reacta i bez DOM poza `downloadCsv` / `copyText`) — plik powstaje w przeglądarce
  * z danych, które panel już ma; nic nie jest dociągane z serwera.
  */
-import type { RegistrationDto } from '@icpe/shared'
+import { addonsText, displayDietary, type AddonDef, type RegistrationDto } from '@icpe/shared'
 
 /** Pola, które API listy zwraca ponad typ `RegistrationDto`. */
 type Row = RegistrationDto & { roomSummary?: string; withoutRoom?: number; contact: RegistrationDto['contact'] & { countryCode?: string } }
@@ -70,10 +70,10 @@ export const REGISTRATIONS_CSV_HEADER = [
   'Nr zgłoszenia', 'Data zgłoszenia', 'Status', 'Płatność', 'Imię', 'Nazwisko', 'E-mail', 'Telefon', 'Kraj', 'Język',
   'Adres', 'Parafia', 'Wspólnota', 'Liczba osób', 'Uczestnicy (imię i nazwisko, wiek, typ)', 'Diety uczestników',
   'Pokoje', 'Nr pokoju', 'Uwagi do pokoju', 'Kwota', 'Wpłacono', 'Pozostało', 'Waluta', 'Metoda', 'Operator / źródło wpłat',
-  'Darowizna', 'Kod rabatowy', 'Uwagi / dieta', 'Przyjazd',
+  'Darowizna', 'Kod rabatowy', 'Uwagi / dieta', 'Przyjazd', 'Dodatki',
 ] as const
 
-function registrationCsvRow(r0: RegistrationDto): unknown[] {
+function registrationCsvRow(r0: RegistrationDto, addonDefs: AddonDef[] = []): unknown[] {
   const r = r0 as Row
   const paid = typeof r.paidAmount === 'number' ? r.paidAmount : r.paymentStatus === 'PAID' ? r.totalPrice : 0
   const remaining = typeof r.payment?.remaining === 'number' ? r.payment.remaining : Math.max(0, (r.totalPrice ?? 0) - paid)
@@ -82,7 +82,7 @@ function registrationCsvRow(r0: RegistrationDto): unknown[] {
     const age = typeof p.age === 'number' ? `${p.age} l., ` : ''
     return `${name} (${age}${p.type === 'child' ? 'dziecko' : 'dorosły'})`
   })
-  const diets = (r.participants ?? []).filter((p) => p.dietary).map((p) => `${p.firstName}: ${p.dietary}`)
+  const diets = (r.participants ?? []).filter((p) => p.dietary).map((p) => `${p.firstName}: ${displayDietary(p.dietary)}`)
   const method = METHOD_PL[String(r.paymentMethod ?? '').toLowerCase()] ?? (r.paymentMethod ? String(r.paymentMethod) : '')
   const sources = (r.paidProviders ?? []).map((p) => SOURCE_PL[p] ?? p).join(' + ')
   const donation = Number(r.options?.donation ?? 0) || 0
@@ -116,22 +116,29 @@ function registrationCsvRow(r0: RegistrationDto): unknown[] {
     r.discountCode ?? '',
     r.dietaryNotes ?? '',
     csvDateTime(r.checkedInAt),
+    // Dodatki z limitem (np. „Dostawka, Łóżeczko turystyczne × 2”) — kolumna na końcu, żeby nie przesuwać dotychczasowych.
+    addonsText(addonDefs, r.options?.addons, 'pl'),
   ]
 }
 
 /** Treść pliku CSV: średnik, CRLF, BOM UTF-8 na początku (polski Excel otwiera bez kreatora importu). */
-export function buildRegistrationsCsv(regs: RegistrationDto[]): string {
-  const lines = [REGISTRATIONS_CSV_HEADER as readonly unknown[], ...regs.map(registrationCsvRow)]
+export function buildRegistrationsCsv(regs: RegistrationDto[], addonDefs: AddonDef[] = []): string {
+  const lines = [REGISTRATIONS_CSV_HEADER as readonly unknown[], ...regs.map((r) => registrationCsvRow(r, addonDefs))]
   return `﻿${lines.map((cells) => cells.map(csvCell).join(';')).join('\r\n')}\r\n`
 }
 
+/** Dowolna tabela → CSV w tym samym formacie co lista zgłoszeń (średnik, CRLF, BOM UTF-8). */
+export function buildCsv(rows: ReadonlyArray<ReadonlyArray<unknown>>): string {
+  return `\uFEFF${rows.map((cells) => cells.map(csvCell).join(';')).join('\r\n')}\r\n`
+}
+
 /** Nazwa pliku: `zgloszenia-<event>-2026-11-25.csv` (bez polskich znaków i spacji). */
-export function registrationsCsvFilename(eventTitle: string, now = new Date()): string {
+export function registrationsCsvFilename(eventTitle: string, now = new Date(), prefix = 'zgloszenia'): string {
   const slug = eventTitle
     .normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ł/g, 'l').replace(/Ł/g, 'L')
     .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60)
   const p = (n: number) => String(n).padStart(2, '0')
-  return `zgloszenia-${slug || 'event'}-${now.getFullYear()}-${p(now.getMonth() + 1)}-${p(now.getDate())}.csv`
+  return `${prefix}-${slug || 'event'}-${now.getFullYear()}-${p(now.getMonth() + 1)}-${p(now.getDate())}.csv`
 }
 
 export function downloadCsv(filename: string, content: string): void {

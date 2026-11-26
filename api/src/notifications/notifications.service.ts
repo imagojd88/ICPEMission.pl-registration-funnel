@@ -50,6 +50,22 @@ function greetingLine(lang: MailLang, name = ''): string {
 /** Wybór tekstu wg języka maila. */
 const L = <T,>(lang: MailLang, v: Record<MailLang, T>): T => v[lang];
 
+/** Wiersz „Dodatki” w potwierdzeniu (zamówione dodatki z limitem, np. dostawka); pusty, gdy ich nie ma. */
+function addonMailLines(addons: unknown, lang: MailLang): string[] {
+  const list = (Array.isArray(addons) ? addons : []) as Array<{ name?: unknown; qty?: unknown }>;
+  const items = list
+    .filter((a) => a && typeof a.name === 'string' && a.name && Number(a.qty) > 0)
+    .map((a) => (Number(a.qty) > 1 ? `${a.name} × ${Number(a.qty)}` : String(a.name)));
+  if (!items.length) return [];
+  const joined = items.join(lang === 'zh' ? '，' : ', ');
+  return [L(lang, {
+    pl: `Dodatki: ${joined}. Liczba sztuk jest ograniczona — organizator potwierdzi je po przydziale pokoi.`,
+    en: `Extras: ${joined}. Availability is limited — the organiser will confirm them once rooms have been allocated.`,
+    ko: `추가 항목: ${joined}. 수량이 한정되어 있어 객실 배정 후 주최 측에서 확정해 드립니다.`,
+    zh: `附加项目：${joined}。数量有限，主办方将在分配房间后予以确认。`,
+  })];
+}
+
 /** Linie o noclegu do maila (puste, gdy event nie oferuje noclegów). */
 function accommodationLines(acc: MailAccommodation | undefined, lang: MailLang): string[] {
   if (!acc || !acc.offered) return [];
@@ -533,6 +549,7 @@ export class NotificationsService {
             })]
           : []),
         ...accommodationLines(acc, lang),
+        ...addonMailLines(d.addons, lang),
         ...paymentLines(d.paymentMethod, amount, lang, total, String(d.currency ?? 'PLN'), d.leaderDepositPct as number | undefined),
         ...scheduleLines(d.schedule, String(d.currency ?? 'PLN'), lang),
         '',
@@ -1272,6 +1289,8 @@ export class NotificationsService {
     leaderDepositPct?: number;
     /** Dobrowolna darowizna gościa (już wliczona w totalPrice) — mail za nią dziękuje. */
     donation?: number;
+    /** Zamówione „dodatki z limitem” (nazwa w języku maila + liczba sztuk). */
+    addons?: Array<{ name: string; qty: number }>;
     /** Harmonogram wpłat zgłoszenia (gdy event ma plan rat). */
     schedule?: Array<{ label?: string; dueDate: string; amount: number; atRegistration?: boolean }>;
     /** Link do strony zgłoszenia `/z/:token` (stan i wpłaty) — w każdym potwierdzeniu. */

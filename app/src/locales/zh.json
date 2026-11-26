@@ -187,7 +187,7 @@
       "素食",
       "纯素",
       "无麸质",
-      "无乳糖",
+      "不含乳制品",
       "不含坚果",
       "犹太洁食"
     ],
@@ -258,7 +258,16 @@
     "donation_title": "自愿捐款：资助无力承担费用的人参加",
     "donation_hint": "捐款完全自愿，将计入报名总金额。",
     "donation_custom": "其他金额",
-    "donation_custom_label": "捐款金额"
+    "donation_custom_label": "捐款金额",
+    "addons_title": "附加项目",
+    "addon_left": "剩余：{{n}}",
+    "addon_sold_out": "已无名额",
+    "addon_free": "免费",
+    "addon_each": "每个",
+    "addon_limited_hint": "数量有限，按报名先后顺序安排。",
+    "addon_over": "剩余数量少于您选择的数量。请减少数量或取消勾选此项。",
+    "addon_less": "减少",
+    "addon_more": "增加"
   },
   "payment_method": {
     "title": "选择付款方式",
@@ -333,7 +342,8 @@
     "swift": "SWIFT / BIC",
     "bank": "银行",
     "bank_address": "银行地址",
-    "operator_note": "经 Executive Council 同意承办本次活动的机构：{{name}}"
+    "operator_note": "经 Executive Council 同意承办本次活动的机构：{{name}}",
+    "addons": "附加项目"
   },
   "success": {
     "paid_title": "谢谢！",
@@ -510,7 +520,9 @@
     "payment_transfer": "银行转账",
     "payment_online": "在线支付",
     "transfer_note": "如金额增加，请转账补足差额（附言：报名编号）。",
-    "payment_leader": "负责人定金 + 其余现场现金支付"
+    "payment_leader": "负责人定金 + 其余现场现金支付",
+    "addons_title": "已申请的附加项目",
+    "addons_hint": "数量有限，主办方将在分配房间后予以确认。如需更改，请联系主办方。"
   },
   "leader": {
     "deposit_title": "交给负责人的定金（{{pct}}%）",
@@ -624,7 +636,8 @@
       "contact": "Registered by",
       "phone": "Phone",
       "reg_no": "Registration no.",
-      "arrived_at": "Arrival: {{time}}"
+      "arrived_at": "Arrival: {{time}}",
+      "addons": "附加项目"
     },
     "money": {
       "title": "Payment",

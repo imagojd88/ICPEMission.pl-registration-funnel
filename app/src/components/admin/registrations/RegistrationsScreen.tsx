@@ -19,7 +19,8 @@ import {
   uniqueEmails, mailtoOne, mailtoBcc, emailsForClipboard, copyText,
 } from '@/lib/registrationsExport'
 import type { RegistrationDto, EventInstanceDto, PricingConfig } from '@icpe/shared'
-import { DEFAULT_PRICING } from '@icpe/shared'
+import { DEFAULT_PRICING, addonLines, displayDietary, eventAddons, type AddonDef } from '@icpe/shared'
+import DietSummaryPanel from './DietSummaryPanel'
 import RegistrationEditForm from './RegistrationEditForm'
 import UnfinishedRegistrations from './UnfinishedRegistrations'
 import { useAutoRefresh } from '@/hooks/useAutoRefresh'
@@ -78,6 +79,7 @@ type DrawerDialog = null | 'cancel' | 'restore' | 'delete'
 function RegistrationDrawer({
   registration,
   hasRoomTypes,
+  addonDefs,
   onClose,
   onMarkPaid,
   onStatusChange,
@@ -87,6 +89,8 @@ function RegistrationDrawer({
   registration: RegistrationDto
   /** event ma typy pokoi → edycja zgłoszenia ma sekcję „Pokoje” */
   hasRoomTypes: boolean
+  /** dodatki z limitem skonfigurowane w evencie (nazwy do wyświetlenia) */
+  addonDefs: AddonDef[]
   onClose: () => void
   onMarkPaid: (id: string) => Promise<void>
   onStatusChange: (id: string, status: string) => Promise<void>
@@ -285,6 +289,9 @@ function RegistrationDrawer({
                 >
                   <span style={{ color: 'var(--ink)' }}>
                     {p.firstName} {p.lastName}
+                    {displayDietary(p.dietary) && (
+                      <span className="block text-xs" style={{ color: 'var(--warn)' }}>dieta: {displayDietary(p.dietary)}</span>
+                    )}
                   </span>
                   <div className="flex items-center gap-2">
                     <span style={{ color: 'var(--faint)', fontSize: 12 }}>{p.age} l.</span>
@@ -296,6 +303,24 @@ function RegistrationDrawer({
               ))}
             </ul>
           </section>
+
+          {/* Dodatki z limitem (np. dostawka, łóżeczko turystyczne) */}
+          {addonLines(addonDefs, r.options?.addons).length > 0 && (
+            <section>
+              <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--faint)' }}>Dodatki</p>
+              <ul className="flex flex-col gap-1.5">
+                {addonLines(addonDefs, r.options?.addons).map((a) => (
+                  <li key={a.id} className="flex items-center justify-between text-sm px-3 py-2 rounded-[10px]" style={{ background: 'var(--surface-2)', color: 'var(--ink)' }}>
+                    <span>{a.name}{a.qty > 1 ? ` × ${a.qty}` : ''}</span>
+                    {r.options?.addonsAt?.[a.id] && (
+                      <span className="text-xs" style={{ color: 'var(--faint)' }}>zamówiono {new Date(r.options.addonsAt[a.id]).toLocaleString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              <p className="text-xs mt-1.5" style={{ color: 'var(--faint)' }}>Zmiana: „Edytuj zgłoszenie”. Kolejność i limity: „Diety i dodatki” nad listą.</p>
+            </section>
+          )}
 
           {/* Grid: pokój + kwota */}
           <div className="grid grid-cols-2 gap-3">
@@ -635,6 +660,8 @@ export default function RegistrationsScreen() {
   const [emailsCopied, setEmailsCopied] = useState<boolean | null>(null)
   const [notice, setNotice] = useState<{ tone: 'ok' | 'warn'; text: string } | null>(null)
   const [pricingConfig, setPricingConfig] = useState<PricingConfig>(DEFAULT_PRICING)
+  // Sekcja „Diety i dodatki” (zestawienie dla ośrodka) — zwijana, żeby nie zasłaniać listy.
+  const [dietsOpen, setDietsOpen] = useState(false)
 
   const [instances, setInstances] = useState<EventInstanceDto[]>([])
   const [selectedInstanceId, setSelectedInstanceId] = useState<string>('')
@@ -743,6 +770,7 @@ export default function RegistrationsScreen() {
   const currentInstance = instances.find((i) => i.id === selectedInstanceId)
   const eventTitle = currentInstance ? resolveTitle(currentInstance.title) : ''
   const hasRoomTypes = (pricingConfig.rooms ?? []).length > 0
+  const addonDefs = eventAddons(pricingConfig)
   const bulkPlan = bulkPaidPlan(selectedRegs)
   const bulkEmails = uniqueEmails(selectedRegs.filter((r) => r.status !== 'CANCELLED'))
   const bulkEmailsSkipped = selectedRegs.length - bulkEmails.length
@@ -751,7 +779,7 @@ export default function RegistrationsScreen() {
   /** CSV w przeglądarce: zaznaczone zgłoszenia albo — bez zaznaczenia — wszystkie z bieżącego filtra. */
   function exportCsv(list: RegistrationDto[], what: string) {
     if (list.length === 0) return
-    downloadCsv(registrationsCsvFilename(eventTitle), buildRegistrationsCsv(list))
+    downloadCsv(registrationsCsvFilename(eventTitle), buildRegistrationsCsv(list, addonDefs))
     setNotice({ tone: 'ok', text: `Pobrano plik CSV: ${list.length} zgłoszeń (${what}).` })
   }
 
@@ -814,6 +842,23 @@ export default function RegistrationsScreen() {
           </select>
         )}
 
+        {selectedInstanceId && (
+          <button
+            type="button"
+            onClick={() => setDietsOpen((v) => !v)}
+            aria-expanded={dietsOpen}
+            className="text-sm font-medium px-3 py-2 rounded-[12px]"
+            style={{
+              background: dietsOpen ? 'var(--brand-soft)' : 'var(--surface)',
+              color: dietsOpen ? 'var(--brand)' : 'var(--ink)',
+              border: `1px solid ${dietsOpen ? 'var(--brand)' : 'var(--border)'}`,
+              cursor: 'pointer',
+            }}
+          >
+            {dietsOpen ? 'Ukryj: Diety i dodatki' : 'Diety i dodatki'}
+          </button>
+        )}
+
         {/* Wskaźnik odświeżania */}
         <div className="flex items-center gap-2 ml-auto">
           {lastUpdatedAt && (
@@ -847,6 +892,19 @@ export default function RegistrationsScreen() {
           <span className="flex-1">{notice.text}</span>
           <button type="button" onClick={() => setNotice(null)} className="text-xs font-semibold" style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer' }}>zamknij</button>
         </div>
+      )}
+
+      {/* Diety i dodatki — zestawienie dla ośrodka (liczy z listy zgłoszeń tego eventu) */}
+      {dietsOpen && selectedInstanceId && (
+        <DietSummaryPanel
+          regs={regs}
+          pricingConfig={pricingConfig}
+          eventTitle={eventTitle}
+          startsAt={currentInstance?.startsAt}
+          endsAt={currentInstance?.endsAt}
+          location={currentInstance?.location}
+          onOpen={(r) => setOpenDrawer(r)}
+        />
       )}
 
       {/* Filter bar */}
@@ -1044,6 +1102,7 @@ export default function RegistrationsScreen() {
         <RegistrationDrawer
           registration={openDrawer}
           hasRoomTypes={hasRoomTypes}
+          addonDefs={addonDefs}
           onClose={() => setOpenDrawer(null)}
           onMarkPaid={handleMarkPaid}
           onStatusChange={handleStatusChange}

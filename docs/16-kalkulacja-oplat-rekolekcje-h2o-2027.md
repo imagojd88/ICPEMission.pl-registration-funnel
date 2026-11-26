@@ -123,3 +123,26 @@ VIP-y: 5 pokoi dla małżeństw i 2–3 jedynki dla księży to do 13 osób. Je�
 - Dopłata do pełnej kwoty do 31.07.2027; lista pokoi do ośrodka do 15.08.2027.
 
 Powiązane: `17-plan-tablica-zakwaterowania.md`.
+
+## Odpowiedź ośrodka z 26.11.2026 (wyżywienie dzieci i diety)
+
+- Dzieci płacą mniej z założenia, bo jedzą mniej. Śniadania i kolacje są w formie bufetu. Obiad: zupa w bufecie, drugie danie nakłada obsługa i zawsze pyta o wielkość porcji. Ośrodek nie podał osobnej „porcji dziecięcej” ani innej granicy wieku niż w umowie, więc obowiązują progi z umowy: 3–10 lat taniej, od 10 lat jak dorosły.
+- Dzieci do 3 lat nie płacą, a korzystają z noclegów i wyżywienia.
+- Diety oferowane przez ośrodek: wegetariańska, wegańska, bezglutenowa, bezmleczna.
+- Liczbę osób na poszczególnych dietach ośrodek musi znać na tydzień do dwóch tygodni przed pobytem, czyli między 8 a 15.08.2027 (lista pokoi: do 15.08.2027).
+- Skutki dla systemu: cennik bez zmian (do 3 lat bezpłatnie, 3–9 lat 150 zł mniej za wyżywienie); do włączenia dieta wegańska w evencie `united-in-mission`; potrzebne zestawienie liczby osób według diet do wysłania ośrodkowi.
+
+## Odpowiedź ośrodka z 26.11.2026, część 2 (pytania z sekcji 7)
+
+- Pytanie 3 (netto / brutto): błąd w opisie. Wszystkie ceny, którymi operuje ośrodek, to kwoty BRUTTO. Kalkulacja bez zmian.
+- Pytanie 6 (dostawki): pełnowymiarowe dostawki są tylko w hotelu (8 sztuk wg Załącznika 2). W domkach nie ma miejsca na dostawkę. W hostelu dostawka jest możliwa w ostateczności i TYLKO w pokojach 6-osobowych (są 2 takie pokoje). Ceny dostawki ośrodek nie podał.
+- Łóżeczka turystyczne dla niemowląt: łącznie 5, z pościelą, bezpłatne.
+- Pytanie 8 (łazienki): każda część domku ma własną łazienkę.
+- Nadal bez odpowiedzi: pytanie 1 (czy 10-latek płaci jak dziecko), 2 (rozłożenie 170 osób na 212 łóżek i sztywność podziału 128 / 12 / 30), 4 (termin zadatku: 15.12.2026 czy 14 dni od umowy), 5 (zwrot zaliczek przy rezygnacji przed 30.05.2027), 7 (stawka za osoby powyżej 170), cena dostawki.
+- Skutki dla planu zakwaterowania: rodziny w domkach nie dostaną dostawek, więc dziecko do 3 lat w domku śpi w łóżeczku turystycznym (limit 5 na cały ośrodek), z rodzicami albo na zwykłym łóżku. Wcześniejsze założenie „małym dzieciom proponujemy dostawkę” działa tylko w hotelu. Prośby dodatkowe potrzebują limitów: dostawka 8 (hotel) + ostatecznie 2 pokoje 6-os. w hostelu; łóżeczko turystyczne 5.
+
+## Doprecyzowanie Jacka z 26.11.2026 (pytania 2 i 7)
+
+- 170 osób to minimum, za które płacimy zawsze (169 350 zł). Za każdą osobę ponad 170 płacimy według tych samych stawek: 205 zł / doba w domku, 215 zł / doba w hotelu i hostelu (dziecko 3–10 lat: 175 / 185 zł).
+- Skutek: gości można rozkładać na wszystkie 212 łóżek; limit 170 nie jest sufitem. Osoba nr 171 i kolejne kosztują 1 025–1 075 zł za pobyt (dziecko 875–925 zł) i przy cenach Early bird (1 200 zł) zostawiają 125–175 zł nadwyżki, w wyższych poziomach cen więcej.
+- Nadal otwarte u ośrodka: termin zadatku, zwrot zaliczek przy rezygnacji przed 30.05.2027, cena dostawki, 10-latek.

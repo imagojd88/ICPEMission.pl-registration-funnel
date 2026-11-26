@@ -125,3 +125,35 @@ Istniejące trasy i kształty odpowiedzi kontraktu Personal OS bez zmian. Nowe p
 | PATCH | `/admin/instances/:id/desk-requests/:requestId` | `{ status: 'OPEN' \| 'DONE' }` — tylko JWT admina; dopisuje wpis do dziennika (`REQUEST_DONE` / `REQUEST_REOPEN`, `via: 'panel'`) |
 
 Wszystkie za `JwtAuthGuard` (pomocnik recepcji nie przechodzi). Trasy `/desk/*` bez zmian.
+
+## Diety, dodatki z limitem i bezpieczny zapis konfiguracji (2026-11-26, wyłącznie addytywne)
+
+### Diety
+- `Participant.dietary` to nadal tekst: polskie etykiety zaznaczonych diet + wpis ręczny, rozdzielone przecinkami. W bazie nie ma kluczy diet; klucze (`no_meat`, `vegan`, `gluten_free`, `lactose_free`, `nut_free`, `kosher`) są tylko w ustawieniach eventu (`customFields.diets`).
+- Dieta `lactose_free` od 26.11.2026 ma etykietę „Bez mleka” (EN “Dairy-free”). Nowe zgłoszenia zapisują „Bez mleka”; starsze mają „Bez laktozy”. Oba zapisy oznaczają tę samą dietę — rozpoznaje je `parseDietary` w `shared/src/diets.ts`. Klient, który liczy diety sam, powinien traktować „Bez laktozy” i „Bez mleka” jako jedno. Danych w bazie nie zmieniano.
+- Zestawienie diet dla ośrodka liczy panel z `GET /admin/instances/:id/registrations` (bez nowej trasy).
+
+### Dodatki z limitem
+- Konfiguracja: `pricingConfig.addons?: [{ id, name, desc?, limit?, maxPerRegistration?, price?, childUnderAge? }]` (`name` / `desc`: tekst albo mapa językowa). Brak pola = event bez dodatków, wszystko działa jak dotąd.
+- `POST /registrations`: opcjonalne `options.addons: { [id]: liczbaSztuk }`. Serwer przyjmuje tylko dodatki skonfigurowane w evencie. Błędy: 400 (ponad maksimum na zgłoszenie, niespełniony warunek wieku), **409** z `{ message, code: "ADDON_SOLD_OUT", addonId, available }`, gdy limit jest wyczerpany — zgłoszenie nie powstaje; `message` jest w języku zgłoszenia i zawiera nazwę dodatku.
+- Zapis: `Registration.optionsJson.addons` (id → sztuki) i `optionsJson.addonsAt` (id → chwila zamówienia, ISO). Sztuki zajmują zgłoszenia o statusie innym niż `CANCELLED` i `WAITLIST`.
+- `GET /r/:slug/config` — nowe opcjonalne pola: `addonAvailability: { [id]: wolne }` (tylko dodatki z limitem), `addonUsage: { [id]: zajęte }`, `configRev: number`.
+- Odpowiedzi ze zgłoszeniem (`options`) zawierają `addons` i `addonsAt`, gdy zgłoszenie ma dodatki. `GET /registrations/manage/:token` dodatkowo `addons: [{ id, name, qty }]` (nazwy w języku zgłoszenia). Recepcja (`/desk/…`): `addons: [{ id, qty, name }]` na karcie zgłoszenia.
+- `PATCH /admin/registrations/:id`: opcjonalne `options.addons` (obiekt = nowy wybór, `{}` = usuń) i `options.addonsOverLimit: true` (świadome przekroczenie limitu). **Bez pola `options.addons` zamówione dodatki zostają bez zmian** — klient, który ich nie zna (Personal OS), niczego nie gubi. Dołożenie sztuk ponad limit bez `addonsOverLimit` → 409 `ADDON_SOLD_OUT`.
+- Cena dodatku (`price` × sztuki) wchodzi do `PriceResult.options`; przy cenie 0 kwoty się nie zmieniają.
+
+### Zapis konfiguracji eventu: znacznik panelu, numer wersji, historia
+- `EventInstance.configRev` (Int, domyślnie 0) rośnie o 1 przy każdym zapisie z `pricingConfig`.
+- `PATCH /admin/instances/:id` z polem `pricingConfig` oraz `PUT /admin/instances/:id/pricing` przyjmują opcjonalne `_client: { version: string, configLevel: number, configRev?: number }` (w `PUT …/pricing` pole `_client` jest w ciele obok kluczy cennika i nie jest zapisywane).
+- Reguła (`evaluateConfigWrite`, `shared/src/configMerge.ts`):
+  - żądanie tokenem **zalogowanego admina panelu** (JWT, realm `admin`), które zmienia cennik, MUSI mieć `_client.configLevel` ≥ `MIN_PANEL_CONFIG_LEVEL` (obecnie 2); inaczej **409** z komunikatem „Ta karta panelu działa w starej wersji… Odśwież stronę…” i nic nie jest zapisywane;
+  - gdy podano `_client.configRev` różne od aktualnego → **409** „Ustawienia tego eventu zostały w międzyczasie zmienione…”;
+  - żądanie **tokenem serwisowym** (Personal OS, integracje; realm `service`) nie jest sprawdzane i działa jak dotąd, bez `_client`;
+  - `PATCH /admin/instances/:id` bez `pricingConfig` (np. sam `status`, `unlisted`) — bez zmian, bez wymogu.
+- Historia: tabela `EventConfigHistory` — stan sprzed każdego zapisu cennika, który coś zmienił (instancja, `pricingConfig`, strona), ostatnie 20 na event.
+  | Metoda | Ścieżka | Opis |
+  |---|---|---|
+  | GET | `/admin/instances/:id/config-history` | `{ configRev, currentSummary, keep, items[] { id, createdAt, actor, source, clientVersion, configRev, summary, pricingConfig, instance, page } }` |
+  | POST | `/admin/instances/:id/config-history/:historyId/restore` | body `{ _client }`; tylko JWT admina (token serwisowy → 403). Przywraca `pricingConfig` z wybranej wersji (pozostałe pola bez zmian); obecny stan trafia do historii. `{ ok, configRev }` |
+- CORS: do dozwolonych nagłówków dopisano `X-Panel-Version` (na przyszłość; panel przesyła dziś wersję w ciele żądania, bo nowy nagłówek wysłany przed wdrożeniem API blokowałby wszystkie żądania panelu).
+- Front: build zapisuje `/version.json` `{ build, builtAt }`; panel porównuje go ze swoim znacznikiem co 3 minuty i przy powrocie do karty.

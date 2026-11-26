@@ -4,8 +4,9 @@ import { CourseAccessService } from '../courses/course-access.service';
 import { PaymentPlanService, summarize } from '../registrations/payment-plan.service';
 import { manageRegistrationLink } from '../registrations/registrations.service';
 import { instanceRoomAvailability } from '../registrations/room-stock';
+import { instanceAddonAvailability } from '../registrations/addon-stock';
 import {
-  isDeletableTestPayment, permanentDeleteBlocker, restoredStatus, roomLabel, roomStockShortages, statusAfterPaymentRemoval,
+  eventAddons, addonLabel, isDeletableTestPayment, permanentDeleteBlocker, restoredStatus, roomLabel, roomStockShortages, statusAfterPaymentRemoval,
   PricingConfig,
 } from '../shared';
 import { mapRegStatus } from './personal-os.mapper';
@@ -132,7 +133,7 @@ export class RegistrationAdminService {
     })) as
       | {
           id: string; instanceId: string; status: string; statusBeforeCancel: string | null; totalPrice: unknown; createdAt: Date;
-          roomsJson: unknown; roomsReserved?: boolean | null; paymentMethod: string | null;
+          roomsJson: unknown; optionsJson?: unknown; roomsReserved?: boolean | null; paymentMethod: string | null;
           instance: { id: string; capacity: number | null; pricingConfig: unknown } | null; _count: { participants: number };
         }
       | null;
@@ -176,6 +177,17 @@ export class RegistrationAdminService {
         for (const short of roomStockShortages(cfg, rooms, available)) {
           const name = roomLabel(cfg?.rooms.find((r) => r.id === short.roomId)?.name ?? short.roomId);
           warnings.push(`Pokoje „${name}”: wolnych ${short.available}, a zgłoszenie zajmuje ${short.requested} — po przywróceniu limit tego typu pokoju będzie przekroczony.`);
+        }
+      }
+      // Dodatki z limitem: przywrócone zgłoszenie znów zajmuje swoje sztuki.
+      const wanted = ((reg.optionsJson as { addons?: Record<string, unknown> } | null | undefined)?.addons ?? {}) as Record<string, unknown>;
+      if (wanted && typeof wanted === 'object' && Object.keys(wanted).length) {
+        const left = await instanceAddonAvailability(this.db, reg.instanceId, cfg);
+        for (const def of eventAddons(cfg)) {
+          const q = Math.floor(Number(wanted[def.id]) || 0);
+          if (q > 0 && def.id in left && q > left[def.id]) {
+            warnings.push(`Dodatek „${addonLabel(def.name)}”: wolnych ${left[def.id]}, a zgłoszenie ma zamówione ${q} — po przywróceniu limit tego dodatku będzie przekroczony.`);
+          }
         }
       }
     }

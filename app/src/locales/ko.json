@@ -187,7 +187,7 @@
       "채식",
       "비건",
       "글루텐 프리",
-      "락토스 프리",
+      "유제품 제외",
       "견과류 제외",
       "코셔"
     ],
@@ -258,7 +258,16 @@
     "donation_title": "참가비를 부담하기 어려운 분의 체류비 지원을 위한 선택적 후원금",
     "donation_hint": "후원은 자유입니다. 신청 금액에 합산됩니다.",
     "donation_custom": "직접 입력",
-    "donation_custom_label": "후원 금액"
+    "donation_custom_label": "후원 금액",
+    "addons_title": "추가 항목",
+    "addon_left": "남은 수량: {{n}}",
+    "addon_sold_out": "신청 불가(마감)",
+    "addon_free": "무료",
+    "addon_each": "개당",
+    "addon_limited_hint": "수량이 한정되어 있어 신청 순서대로 배정됩니다.",
+    "addon_over": "선택한 수량보다 남은 수량이 적습니다. 수량을 줄이거나 선택을 해제해 주세요.",
+    "addon_less": "줄이기",
+    "addon_more": "늘리기"
   },
   "payment_method": {
     "title": "결제 방법 선택",
@@ -333,7 +342,8 @@
     "swift": "SWIFT / BIC",
     "bank": "은행",
     "bank_address": "은행 주소",
-    "operator_note": "Executive Council의 동의를 받아 행사를 운영하는 주체: {{name}}"
+    "operator_note": "Executive Council의 동의를 받아 행사를 운영하는 주체: {{name}}",
+    "addons": "추가 항목"
   },
   "success": {
     "paid_title": "감사합니다!",
@@ -510,7 +520,9 @@
     "payment_transfer": "계좌 이체",
     "payment_online": "온라인 결제",
     "transfer_note": "금액이 늘었다면 차액을 이체해 주세요 (이체 메모: 신청 번호).",
-    "payment_leader": "리더 예약금 + 나머지는 현장 현금 결제"
+    "payment_leader": "리더 예약금 + 나머지는 현장 현금 결제",
+    "addons_title": "신청한 추가 항목",
+    "addons_hint": "수량이 한정되어 있어 객실 배정 후 주최 측에서 확정해 드립니다. 변경하려면 주최 측에 문의해 주세요."
   },
   "leader": {
     "deposit_title": "리더에게 전달할 예약금 ({{pct}}%)",
@@ -624,7 +636,8 @@
       "contact": "Registered by",
       "phone": "Phone",
       "reg_no": "Registration no.",
-      "arrived_at": "Arrival: {{time}}"
+      "arrived_at": "Arrival: {{time}}",
+      "addons": "추가 항목"
     },
     "money": {
       "title": "Payment",

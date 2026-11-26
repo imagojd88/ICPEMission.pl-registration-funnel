@@ -1,7 +1,10 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { formatMoney, DONATION_PRESETS, DONATION_MAX, cleanDonation, hasDiscountCodes } from '@icpe/shared'
-import type { PricingConfig } from '@icpe/shared'
+import {
+  formatMoney, DONATION_PRESETS, DONATION_MAX, cleanDonation, hasDiscountCodes,
+  eventAddons, addonVisible, addonLabel, addonPrice, addonMaxPerRegistration,
+} from '@icpe/shared'
+import type { PricingConfig, AddonDef, AddonPerson } from '@icpe/shared'
 import { Input } from '../../ui/Input'
 
 interface Options {
@@ -9,6 +12,8 @@ interface Options {
   bedding: boolean
   /** dobrowolna darowizna (0 = brak) */
   donation: number
+  /** dodatki z limitem: id → liczba sztuk */
+  addons?: Record<string, number>
 }
 
 interface Consents {
@@ -24,6 +29,10 @@ interface Props {
   pricingConfig: PricingConfig
   /** Pole „Kod rabatowy” — tylko gdy event ma aktywny kod (domyślnie: sprawdzamy cennik). */
   showDiscount?: boolean
+  /** Uczestnicy zgłoszenia — warunek wieku dodatków (np. łóżeczko tylko z dzieckiem poniżej 3 lat). */
+  participants?: AddonPerson[]
+  /** Wolne sztuki dodatków (tylko dodatki z limitem; brak klucza = bez limitu). */
+  addonAvailability?: Record<string, number>
   onOptionsChange: (opts: Options) => void
   onDiscountChange: (code: string) => void
   onDiscountApply: (applied: boolean) => void
@@ -89,6 +98,88 @@ function CheckRow({
   )
 }
 
+/**
+ * Dodatek z limitem (np. dostawka): zaznaczenie albo — gdy wolno więcej niż 1 — licznik sztuk.
+ * Pokazuje „Zostało: X”; po wyczerpaniu limitu jest nieaktywny („Brak dostępnych”).
+ * Zaznaczony dodatek zawsze da się odznaczyć (także gdy w międzyczasie się wyczerpał).
+ */
+function AddonRow({
+  def, qty, left, lng, priceText, onChange, t,
+}: {
+  def: AddonDef
+  qty: number
+  /** wolne sztuki; undefined = bez limitu */
+  left: number | undefined
+  lng: string
+  priceText: string
+  onChange: (qty: number) => void
+  t: (key: string, opts?: Record<string, unknown>) => string
+}) {
+  const max = addonMaxPerRegistration(def)
+  const cap = left === undefined ? max : Math.min(max, left)
+  const soldOut = left !== undefined && left <= 0
+  const disabled = soldOut && qty === 0
+  const over = left !== undefined && qty > left
+  const checked = qty > 0
+  const desc = addonLabel(def.desc, lng)
+  return (
+    <div
+      className="flex flex-col gap-2 rounded-[12px] p-4 transition-all duration-150"
+      style={{
+        border: over ? '1.5px solid var(--err)' : checked ? '1.5px solid var(--brand)' : '1.5px solid var(--border)',
+        background: checked ? 'var(--brand-soft)' : 'var(--surface)',
+        opacity: disabled ? 0.6 : 1,
+      }}
+    >
+      <label className="flex items-start justify-between gap-3" style={{ cursor: disabled ? 'not-allowed' : 'pointer' }}>
+        <div className="flex items-start gap-3 flex-1">
+          <div
+            className="flex items-center justify-center shrink-0 rounded-[6px] transition-all duration-150 mt-0.5"
+            style={{ width: 20, height: 20, border: checked ? '2px solid var(--brand)' : '2px solid var(--border)', background: checked ? 'var(--brand)' : 'transparent' }}
+          >
+            {checked && (
+              <svg width="11" height="8" viewBox="0 0 11 8" fill="none">
+                <path d="M1 4L4 7L10 1" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            )}
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-sm font-medium" style={{ color: 'var(--ink)' }}>{addonLabel(def.name, lng)}</span>
+            {desc && <span className="text-xs leading-relaxed" style={{ color: 'var(--muted)' }}>{desc}</span>}
+          </div>
+        </div>
+        <div className="flex flex-col items-end gap-0.5 shrink-0">
+          <span className="text-sm font-semibold" style={{ color: 'var(--brand)' }}>{priceText}</span>
+          {left !== undefined && (
+            <span className="text-xs font-medium" style={{ color: soldOut ? 'var(--err)' : 'var(--muted)' }}>
+              {soldOut ? t('options.addon_sold_out') : t('options.addon_left', { n: left })}
+            </span>
+          )}
+        </div>
+        <input
+          type="checkbox"
+          className="sr-only"
+          checked={checked}
+          disabled={disabled}
+          onChange={(e) => onChange(e.target.checked ? 1 : 0)}
+        />
+      </label>
+      {checked && max > 1 && (
+        <div className="flex items-center gap-2 pl-8">
+          <button type="button" aria-label={t('options.addon_less')} onClick={() => onChange(Math.max(0, qty - 1))}
+            className="rounded-[10px] text-base font-semibold" style={{ width: 36, height: 36, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--ink)', cursor: 'pointer' }}>−</button>
+          <span className="text-sm font-semibold tabular-nums" style={{ minWidth: 24, textAlign: 'center', color: 'var(--ink)' }} aria-live="polite">{qty}</span>
+          <button type="button" aria-label={t('options.addon_more')} disabled={qty >= cap} onClick={() => onChange(Math.min(cap, qty + 1))}
+            className="rounded-[10px] text-base font-semibold" style={{ width: 36, height: 36, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--ink)', cursor: qty >= cap ? 'not-allowed' : 'pointer', opacity: qty >= cap ? 0.5 : 1 }}>+</button>
+        </div>
+      )}
+      {over && (
+        <p className="text-xs font-medium" role="alert" style={{ color: 'var(--err)' }}>{t('options.addon_over')}</p>
+      )}
+    </div>
+  )
+}
+
 export default function Step4Options({
   options,
   discountCode,
@@ -96,6 +187,8 @@ export default function Step4Options({
   consents,
   pricingConfig,
   showDiscount,
+  participants,
+  addonAvailability,
   onOptionsChange,
   onDiscountChange,
   onDiscountApply,
@@ -160,6 +253,15 @@ export default function Step4Options({
   const beddingPrice = pricingConfig.options.bedding
   const showTransport = transportPrice > 0
   const showBedding = beddingPrice > 0
+  // Dodatki z limitem widoczne dla tego składu osób (event bez dodatków → pusta lista, nic się nie pokazuje).
+  const addons = eventAddons(pricingConfig).filter((a) => addonVisible(a, participants))
+  const anyLimited = addons.some((a) => addonAvailability && a.id in addonAvailability)
+  const setAddon = (id: string, qty: number) => {
+    const next = { ...(options.addons ?? {}) }
+    if (qty > 0) next[id] = qty
+    else delete next[id]
+    onOptionsChange({ ...options, addons: next })
+  }
 
   return (
     <div className="flex flex-col gap-5 px-[22px] py-5">
@@ -185,6 +287,30 @@ export default function Step4Options({
           checked={options.bedding}
           onChange={(v) => onOptionsChange({ ...options, bedding: v })}
         />
+      )}
+
+      {/* Dodatki z limitem (np. dostawka, łóżeczko turystyczne) — tylko gdy event je ma */}
+      {addons.length > 0 && (
+        <div className="flex flex-col gap-2" role="group" aria-label={t('options.addons_title')}>
+          <p className="text-sm font-medium" style={{ color: 'var(--ink)' }}>{t('options.addons_title')}</p>
+          {addons.map((a) => {
+            const price = addonPrice(a)
+            const max = addonMaxPerRegistration(a)
+            return (
+              <AddonRow
+                key={a.id}
+                def={a}
+                qty={options.addons?.[a.id] ?? 0}
+                left={addonAvailability && a.id in addonAvailability ? addonAvailability[a.id] : undefined}
+                lng={i18n.language}
+                priceText={pricingConfig.free || price === 0 ? t('options.addon_free') : `+${money(price)}${max > 1 ? ` / ${t('options.addon_each')}` : ''}`}
+                onChange={(q) => setAddon(a.id, q)}
+                t={t as unknown as (key: string, opts?: Record<string, unknown>) => string}
+              />
+            )
+          })}
+          {anyLimited && <p className="text-xs" style={{ color: 'var(--muted)' }}>{t('options.addon_limited_hint')}</p>}
+        </div>
       )}
 
       {/* Darowizna na dofinansowanie pobytu innych — tylko gdy event ją włączył */}

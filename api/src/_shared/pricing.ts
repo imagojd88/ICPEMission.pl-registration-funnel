@@ -19,6 +19,7 @@
 
 import type { ParticipantType } from './types';
 import type { PaymentPlan } from './paymentPlan';
+import type { AddonDef } from './addons';
 
 // Lokalne kopie pomocników dat z `paymentPlan.ts` — bez importu wykonywalnego, żeby `node --test`
 // (uruchamiany na plikach .ts bez bundlera) nie musiał rozwiązywać ścieżek bez rozszerzeń.
@@ -162,6 +163,11 @@ export interface PricingConfig {
   priceTiers?: PriceTier[];
   /** Nazwa pierwszego poziomu (cen bazowych), np. „Early bird". */
   baseTierName?: string | Record<string, string>;
+  /**
+   * „Dodatki z limitem” (np. dostawka, łóżeczko turystyczne) — patrz `addons.ts`.
+   * Brak / pusta lista = event bez dodatków (działa jak dotąd).
+   */
+  addons?: AddonDef[];
 }
 
 const TIER_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -279,6 +285,8 @@ export interface PriceOptions {
    * Liczona tylko, gdy event ma `donationEnabled`; doliczana PO rabatach i ręcznej korekcie.
    */
   donation?: number;
+  /** Zamówione „dodatki z limitem”: id dodatku → liczba sztuk (cena × sztuki doliczana do opcji). */
+  addons?: Record<string, number>;
   /** Ręczna korekta ceny zgłoszenia przez admina (zapisywana w `Registration.optionsJson`). */
   adjustment?: PriceAdjustment;
 }
@@ -443,6 +451,12 @@ export function computePrice(input: PriceInput, config: PricingConfig = DEFAULT_
   let opts = 0;
   if (input.options?.transport) opts += config.options.transport;
   if (input.options?.bedding) opts += config.options.bedding * people;
+  // Dodatki z limitem: cena za sztukę × liczba sztuk (domyślnie 0 zł — wtedy nic nie zmieniają).
+  for (const a of Array.isArray(config.addons) ? config.addons : []) {
+    const qty = Math.floor(Number(input.options?.addons?.[a?.id]) || 0);
+    const price = Number(a?.price) || 0;
+    if (qty > 0 && price > 0) opts += Math.round(price * qty * 100) / 100;
+  }
 
   const subtotal = formation + accommodation + meals + opts;
 

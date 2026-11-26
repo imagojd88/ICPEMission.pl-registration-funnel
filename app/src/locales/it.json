@@ -189,7 +189,7 @@
       "Vegetariana",
       "Vegana",
       "Senza glutine",
-      "Senza lattosio",
+      "Senza latticini",
       "Senza frutta secca",
       "Kosher"
     ],
@@ -262,7 +262,16 @@
     "donation_title": "Donazione facoltativa per contribuire al soggiorno di chi non può permettersi di partecipare",
     "donation_hint": "La donazione è volontaria. Verrà aggiunta all'importo dell'iscrizione.",
     "donation_custom": "Altro importo",
-    "donation_custom_label": "Importo della donazione"
+    "donation_custom_label": "Importo della donazione",
+    "addons_title": "Extra",
+    "addon_left": "Disponibili: {{n}}",
+    "addon_sold_out": "Non disponibile",
+    "addon_free": "gratuito",
+    "addon_each": "cad.",
+    "addon_limited_hint": "La disponibilità è limitata: vale l’ordine di iscrizione.",
+    "addon_over": "Ne restano meno di quanti ne hai selezionati. Riduci il numero o deseleziona questo extra.",
+    "addon_less": "Meno",
+    "addon_more": "Più"
   },
   "payment_method": {
     "title": "Scegli il metodo di pagamento",
@@ -337,7 +346,8 @@
     "swift": "SWIFT / BIC",
     "bank": "Banca",
     "bank_address": "Indirizzo della banca",
-    "operator_note": "Soggetto che gestisce l'evento con il consenso dell'Executive Council: {{name}}"
+    "operator_note": "Soggetto che gestisce l'evento con il consenso dell'Executive Council: {{name}}",
+    "addons": "Extra"
   },
   "success": {
     "paid_title": "Grazie!",
@@ -514,7 +524,9 @@
     "payment_transfer": "Bonifico bancario",
     "payment_online": "Pagamento online",
     "transfer_note": "Se l’importo è aumentato, ti preghiamo di versare la differenza (causale: numero di iscrizione).",
-    "payment_leader": "Acconto al responsabile + saldo in contanti sul posto"
+    "payment_leader": "Acconto al responsabile + saldo in contanti sul posto",
+    "addons_title": "Extra richiesti",
+    "addons_hint": "La disponibilità è limitata: l’organizzatore confermerà gli extra dopo l’assegnazione delle camere. Per modificare qualcosa, contatta l’organizzatore."
   },
   "leader": {
     "deposit_title": "Acconto per il responsabile ({{pct}}%)",
@@ -628,7 +640,8 @@
       "contact": "Iscritto da",
       "phone": "Telefono",
       "reg_no": "N. di iscrizione",
-      "arrived_at": "Arrivo: {{time}}"
+      "arrived_at": "Arrivo: {{time}}",
+      "addons": "Extra"
     },
     "money": {
       "title": "Pagamento",

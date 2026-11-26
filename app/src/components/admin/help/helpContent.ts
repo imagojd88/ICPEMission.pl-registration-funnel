@@ -18,7 +18,7 @@
  * przepisujemy dosłownie z interfejsu, w cudzysłowach „…”.
  */
 
-export const HELP_UPDATED = '2026-11-25'
+export const HELP_UPDATED = '2026-11-26'
 
 export type HelpBlock =
   | { type: 'p'; text: string }
@@ -531,6 +531,72 @@ export const HELP_SECTIONS: HelpSection[] = [
         ],
       },
       {
+        id: 'eventy-diety',
+        title: 'Diety do wyboru w formularzu',
+        blocks: [
+          { type: 'p', text: 'Diety włączasz w „Edytuj” ▸ „Formularz zapisu” ▸ „Diety do wyboru (krok „Preferencje”)”. Domyślnie żadna nie jest włączona — gość widzi wtedy tylko pole na alergie.' },
+          { type: 'table', head: ['Nazwa w panelu i formularzu', 'Nazwa w ośrodku'], rows: [
+            ['„Bez mięsa”', 'wegetariańska'],
+            ['„Wegańska”', 'wegańska'],
+            ['„Bez glutenu”', 'bezglutenowa'],
+            ['„Bez mleka”', 'bezmleczna'],
+            ['„Bez orzechów”', 'bez orzechów'],
+            ['„Koszerna”', 'koszerna'],
+          ] },
+          { type: 'list', items: [
+            'Gość zaznacza diety osobno dla każdego uczestnika; alergie opisuje w polu tekstowym.',
+            'Dieta bezmleczna nazywa się „Bez mleka” (od 26.11.2026; wcześniej „Bez laktozy”). To nie to samo: osoba z alergią na białko mleka nie może jeść produktów bez laktozy.',
+            'Starsze zgłoszenia z zapisem „Bez laktozy” liczą się do diety „Bez mleka” i tak są pokazywane w panelu, na Recepcji i w eksporcie. Niczego nie trzeba poprawiać ręcznie.',
+            'Włącz tylko te diety, które ośrodek faktycznie przygotowuje.',
+          ] },
+        ],
+      },
+      {
+        id: 'eventy-dodatki',
+        title: 'Dodatki z limitem (dostawka, łóżeczko turystyczne)',
+        blocks: [
+          { type: 'p', text: 'Dodatek z limitem to coś, czego w ośrodku jest ograniczona liczba sztuk. Gość zaznacza go w kroku „Opcje”, widzi „Zostało: X”, a po wyczerpaniu limitu opcja jest nieaktywna z napisem „Brak dostępnych”. Realizowane są tylko pierwsze zamówienia — nie ma listy rezerwowej dodatków.' },
+          { type: 'steps', items: [
+            '„Eventy” ▸ „Edytuj” przy wydarzeniu ▸ sekcja „Cennik” ▸ „Dodatki z limitem”.',
+            'Kliknij szablon: „Dostawka (dodatkowe łóżko)” albo „Łóżeczko turystyczne dla niemowlęcia”. Nazwa i opis wstawiają się od razu w PL, EN, IT, KO i ZH. Własny dodatek: „Własny dodatek”.',
+            'Sprawdź pola: „Limit sztuk w evencie”, „Maks. na zgłoszenie”, „Cena za sztukę” (puste = bezpłatnie), „Tylko gdy jest dziecko poniżej (lat)” (puste = zawsze widoczny).',
+            'Kliknij „Zapisz zmiany” na dole formularza.',
+          ] },
+          { type: 'table', head: ['Szablon', 'Ustawienia'], rows: [
+            ['„Dostawka (dodatkowe łóżko)”', 'Limit 8, 1 na zgłoszenie, bezpłatnie. Opis mówi, że dostawki są tylko w pokojach hotelowych, więc zamówienie jest prośbą — organizator potwierdza po przydziale pokoi.'],
+            ['„Łóżeczko turystyczne dla niemowlęcia”', 'Limit 5, do 2 na zgłoszenie, bezpłatnie, widoczne tylko gdy w zgłoszeniu jest dziecko poniżej 3 lat.'],
+          ] },
+          { type: 'list', items: [
+            'Sztuki zajmują zgłoszenia aktywne. Anulowanie zgłoszenia zwalnia je od razu; lista rezerwowa ich nie zajmuje.',
+            'Gdy dwie osoby wysyłają zgłoszenie w tej samej chwili, ostatnią sztukę dostaje pierwsza. Druga widzi komunikat z nazwą dodatku, odznacza go i wysyła zgłoszenie ponownie — jej dane zostają w formularzu.',
+            'Zamówienia i kolejność: „Zgłoszenia” ▸ „Diety i dodatki” ▸ tabela „Dodatki z limitem”.',
+            'Dodatek przy zgłoszeniu zmienisz w „Edytuj zgłoszenie” ▸ „Dodatki z limitem”. Przy wyczerpanym limicie panel pyta, czy zapisać „mimo limitu”.',
+            'Gość widzi zamówione dodatki w mailu z potwierdzeniem i na swojej stronie zgłoszenia, ale sam ich tam nie zmienia. Pomocnik widzi je na karcie zgłoszenia w Recepcji (tylko odczyt).',
+            'Cena dodatku (jeśli ją wpiszesz) dolicza się do „Opcji dodatkowych” i podlega kodom rabatowym tak jak transport.',
+            'Zmniejszenie limitu poniżej liczby zamówień niczego nie anuluje — po prostu nikt więcej nie zamówi.',
+          ] },
+          { type: 'note', tone: 'warn', text: 'Zmiana statusu z listy rezerwowej na aktywny nie sprawdza limitu dodatków. Po takiej zmianie zajrzyj do tabeli „Dodatki z limitem” — przekroczenie jest oznaczone na czerwono.' },
+        ],
+      },
+      {
+        id: 'eventy-historia-cennika',
+        title: 'Historia zmian cennika i przywracanie',
+        blocks: [
+          { type: 'p', text: 'Przy każdym zapisie, który zmienia ustawienia wydarzenia, system zachowuje stan sprzed zapisu: cennik, kluczowe pola wydarzenia i ustawienia strony. Trzymane jest 20 ostatnich wersji na wydarzenie.' },
+          { type: 'steps', items: [
+            '„Eventy” ▸ „Edytuj” ▸ na dole formularza rozwiń „Historia zmian cennika”.',
+            'Przy każdej wersji widać: kiedy, kto zapisał, z jakiej wersji panelu i krótki opis cennika (liczba pokoi, poziomów cen, dodatków). „szczegóły” pokazuje pełny zapis.',
+            'Kliknij „Przywróć” i potwierdź. Formularz wczyta się od nowa.',
+          ] },
+          { type: 'list', items: [
+            '„Przywróć” podmienia cały cennik: ceny, pokoje, poziomy cen, zniżki wiekowe, harmonogram wpłat, dodatki i kody rabatowe. Nazwa, daty, strona i dane przelewu zostają bez zmian.',
+            'Stan sprzed przywrócenia też trafia do historii, więc przywrócenie można cofnąć.',
+            'Ceny już złożonych zgłoszeń się nie zmieniają.',
+            'Historia zbiera się od 26.11.2026 — wcześniejszych zmian w niej nie ma.',
+          ] },
+        ],
+      },
+      {
         id: 'eventy-dane-przelewu',
         title: 'Dane do przelewu',
         blocks: [
@@ -601,11 +667,32 @@ export const HELP_SECTIONS: HelpSection[] = [
             'Tylko wybrane: zaznacz zgłoszenia polami wyboru i kliknij „Eksport CSV” w pasku zaznaczenia.',
             'Plik `zgloszenia-<event>-<data>.csv` zapisuje się w folderze pobranych. Otwórz go w Excelu — polskie znaki i kolumny układają się same.',
           ] },
-          { type: 'p', text: 'Kolumny pliku: numer zgłoszenia, data, status, płatność, imię, nazwisko, e-mail, telefon, kraj, język, adres, parafia, wspólnota, liczba osób, uczestnicy (imię i nazwisko, wiek, typ), diety uczestników, pokoje, numer pokoju, uwagi do pokoju, kwota, wpłacono, pozostało, waluta, metoda, operator lub źródło wpłat, darowizna, kod rabatowy, uwagi / dieta, przyjazd.' },
+          { type: 'p', text: 'Kolumny pliku: numer zgłoszenia, data, status, płatność, imię, nazwisko, e-mail, telefon, kraj, język, adres, parafia, wspólnota, liczba osób, uczestnicy (imię i nazwisko, wiek, typ), diety uczestników, pokoje, numer pokoju, uwagi do pokoju, kwota, wpłacono, pozostało, waluta, metoda, operator lub źródło wpłat, darowizna, kod rabatowy, uwagi / dieta, przyjazd, dodatki.' },
           { type: 'list', items: [
             'Plik powstaje w przeglądarce z danych widocznych w panelu — nic nie jest wysyłane na zewnątrz.',
             'Zaznaczenie obejmuje też zgłoszenia ukryte przez filtr; pasek pokazuje, ile ich jest. Po zmianie eventu zaznaczenie się czyści.',
             'Plik zawiera dane osobowe. Przechowuj go i przekazuj tak ostrożnie jak listę uczestników.',
+          ] },
+        ],
+      },
+      {
+        id: 'zgloszenia-diety-dla-osrodka',
+        title: 'Diety i dodatki — zestawienie dla ośrodka',
+        blocks: [
+          { type: 'note', tone: 'warn', text: 'Ośrodek musi dostać liczbę osób na poszczególnych dietach na 1–2 tygodnie przed pobytem. Wyślij zestawienie w tym terminie i ponownie, jeśli lista uczestników się zmieni.' },
+          { type: 'steps', items: [
+            '„Zgłoszenia” ▸ wybierz wydarzenie ▸ kliknij „Diety i dodatki” obok listy wyboru wydarzenia.',
+            'Sprawdź tabelę: wiersz na każdą dietę i „Standard (bez diety)”, kolumny z grupami wiekowymi, na dole „Suma kontrolna”.',
+            'Przeczytaj „Lista imienna” i „Uwagi wpisane do całego zgłoszenia” — alergii wpisanych własnymi słowami nie da się policzyć.',
+            'Kliknij „Kopiuj podsumowanie” i wklej tekst do e-maila do ośrodka. Plik z listą imienną: „Eksport CSV”.',
+          ] },
+          { type: 'list', items: [
+            'Liczone są osoby, nie zgłoszenia — z aktywnych zgłoszeń, czyli bez anulowanych i bez listy rezerwowej. Suma kontrolna równa się liczbie zajętych miejsc.',
+            'Grupy wiekowe biorą się z progów w „Zniżki wiekowe (dzieci)” danego wydarzenia, np. „Dzieci do 3 lat”, „Dzieci 3–9 lat”, „Dorośli (i dzieci od 10 lat)”. Bez progów: „Dorośli” i „Dzieci”.',
+            'Osoba z kilkoma dietami jest w jednym wierszu łączonym, np. „Bez glutenu + Bez mleka”.',
+            'Skopiowane podsumowanie zawiera: nazwę wydarzenia, termin, stan na dzień, liczby (z nazwami diet używanymi przez ośrodek) i treść alergii bez imion i nazwisk. Lista imienna jest tylko w panelu i w pliku CSV.',
+            'Sekcja „Dodatki z limitem” pokazuje: zamówiono / limit oraz zgłoszenia w kolejności zamówienia; pozycje ponad limit są oznaczone.',
+            'Plik CSV zawiera dane osobowe, także dzieci. Przekazuj go tylko osobom, które muszą go mieć.',
           ] },
         ],
       },
@@ -645,6 +732,7 @@ export const HELP_SECTIONS: HelpSection[] = [
             'Uczestników trzeba przypisać do pokoi; wyjątkiem jest wydarzenie z noclegiem opcjonalnym.',
             'Cena liczy się według poziomu cen z dnia zgłoszenia, nie z dnia edycji.',
             'Darowizna gościa zostaje, jeśli jej nie zmienisz.',
+            'Dodatki z limitem (np. dostawka): wpisz liczbę sztuk w sekcji „Dodatki z limitem”. Gdy limit jest wyczerpany, panel pokaże pytanie i przycisk „Zapisz mimo limitu”.',
           ] },
         ],
       },
@@ -1702,6 +1790,26 @@ export const HELP_SECTIONS: HelpSection[] = [
         ],
       },
       {
+        id: 'wdrazanie-nowa-wersja-panelu',
+        title: 'Baner „Dostępna jest nowa wersja panelu”',
+        blocks: [
+          { type: 'p', text: 'Panel co kilka minut i przy powrocie do karty sprawdza, czy na serwerze nie ma nowszej wersji. Jeśli jest, u góry pojawia się baner „Dostępna jest nowa wersja panelu — odśwież stronę przed zapisaniem zmian”. Baneru nie da się zamknąć.' },
+          { type: 'steps', items: [
+            'Jeśli masz otwarty formularz z niezapisanymi zmianami — zanotuj je.',
+            'Kliknij „Odśwież” w banerze (albo Ctrl+R / Cmd+R).',
+            'Wprowadź zmiany ponownie i zapisz.',
+          ] },
+          { type: 'list', items: [
+            'Dopóki nie odświeżysz, przyciski zapisu w „Edytuj event”, kreatorze i „Edytuj zgłoszenie” są zablokowane.',
+            'Powód: formularz wydarzenia zapisuje cały cennik. Karta otwarta przed wdrożeniem nie zna nowych pól i zapisem mogłaby je skasować — tak 25–26.11.2026 zniknęły poziomy cen jednego wydarzenia.',
+            'Drugie zabezpieczenie jest w API: zapis cennika z karty w starej wersji jest odrzucany z komunikatem o odświeżeniu, a nic nie zostaje zapisane.',
+            'Komunikat „Ustawienia tego eventu zostały w międzyczasie zmienione” oznacza, że ktoś inny (albo Ty w innej karcie) zapisał wydarzenie po tym, jak otworzyłeś formularz. Odśwież stronę i wprowadź zmiany ponownie.',
+            'Jeśli mimo wszystko coś zniknęło z cennika: „Edytuj” ▸ „Historia zmian cennika” ▸ „Przywróć”.',
+          ] },
+          { type: 'note', tone: 'info', text: 'Dobra praktyka: nie zostawiaj formularza „Edytuj event” otwartego na wiele godzin. Otwórz, zmień, zapisz.' },
+        ],
+      },
+      {
         id: 'wdrazanie-wolne-api',
         title: 'Pierwsze wejście po przerwie bywa wolne',
         blocks: [
@@ -1796,6 +1904,10 @@ export const HELP_SECTIONS: HelpSection[] = [
         title: 'Eventy i zgłoszenia',
         blocks: [
           { type: 'table', head: ['Objaw', 'Co zrobić'], rows: [
+            ['Przy zapisie eventu: „Ta karta panelu działa w starej wersji…”.', 'Odśwież stronę (Ctrl+R / Cmd+R) i wprowadź zmiany ponownie. Nic nie zostało zapisane. Patrz „Baner »Dostępna jest nowa wersja panelu«”.'],
+            ['Przy zapisie eventu: „Ustawienia tego eventu zostały w międzyczasie zmienione…”.', 'Ktoś zapisał wydarzenie po otwarciu Twojego formularza. Odśwież stronę, sprawdź ustawienia i wprowadź zmiany ponownie.'],
+            ['Z cennika zniknęły poziomy cen, zniżki albo dodatki.', '„Edytuj” ▸ „Historia zmian cennika” ▸ wybierz wersję sprzed zmiany ▸ „Przywróć”.'],
+            ['Gość pisze, że dodatek (np. dostawka) jest nieaktywny.', 'Limit jest wyczerpany. Zajętość: „Zgłoszenia” ▸ „Diety i dodatki”. Możesz dopisać dodatek ręcznie w „Edytuj zgłoszenie” („Zapisz mimo limitu”) albo zwiększyć limit w „Edytuj event”.'],
             ['Zmiana w evencie nie jest widoczna na stronie.', 'Sprawdź, czy kliknięto „Zapisz zmiany” na dole formularza. Odśwież stronę zapisów.'],
             ['Nowa funkcja w panelu pokazuje błąd albo niczego nie zapisuje.', 'API nie zostało wdrożone. Zrób „Manual Deploy” usługi `icpe-api`.'],
             ['Na stronie jest licznik zamiast przycisku zapisu.', 'Ustawiono przyszłą datę w „Otwarcie zapisów”. Kliknij „otwórz od razu” i zapisz.'],

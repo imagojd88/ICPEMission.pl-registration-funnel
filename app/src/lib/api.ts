@@ -154,15 +154,18 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   if (!res.ok) {
     // Wyciągnij czytelny komunikat z ciała odpowiedzi (NestJS: { message: string | string[] }).
     let detail = ''
+    let errCode: string | undefined
     try {
-      const body = (await res.json()) as { message?: unknown; error?: unknown }
+      const body = (await res.json()) as { message?: unknown; error?: unknown; code?: unknown }
+      if (typeof body?.code === 'string') errCode = body.code
       const m = body?.message ?? body?.error
       if (Array.isArray(m)) detail = m.filter((x) => typeof x === 'string').join(' ')
       else if (typeof m === 'string') detail = m
     } catch {
       /* brak JSON w odpowiedzi */
     }
-    throw new Error(detail || `Błąd serwera (${res.status})`)
+    // Kod HTTP i (gdy API go podało) kod błędu — np. 409 + ADDON_SOLD_OUT przy wyczerpanym dodatku.
+    throw Object.assign(new Error(detail || `Błąd serwera (${res.status})`), { status: res.status, code: errCode })
   }
   return res.json() as Promise<T>
 }
@@ -476,6 +479,8 @@ export interface EventConfig {
   customFields?: EventContent
   /** Limit pokoi: wolne pokoje per typ (tylko typy z limitem; brak klucza = bez limitu). */
   roomAvailability?: Record<string, number>
+  /** Dodatki z limitem: wolne sztuki per dodatek (tylko dodatki z limitem; brak klucza = bez limitu). */
+  addonAvailability?: Record<string, number>
   /** Czy event ma aktywny kod rabatowy (flaga z API; bez niej lejek sprawdza cennik). */
   hasDiscountCodes?: boolean
 }
@@ -494,6 +499,7 @@ export async function getEventConfig(slug: string, locale = 'pl'): Promise<Event
       paymentInfo: raw.paymentInfo as BankInfo | undefined,
       customFields: raw.customFields as EventContent | undefined,
       roomAvailability: (raw.roomAvailability as Record<string, number> | undefined) ?? {},
+      addonAvailability: (raw.addonAvailability as Record<string, number> | undefined) ?? {},
       hasDiscountCodes: typeof raw.hasDiscountCodes === 'boolean' ? raw.hasDiscountCodes : undefined,
     }
   } catch {
@@ -1196,6 +1202,10 @@ export interface AdminEditRegistrationDto {
     donation?: number
     /** ręczna korekta ceny (rabat %, rabat kwotowy, kwota końcowa, notatka) */
     adjustment?: { discountPct?: number; discountAmount?: number; overrideTotal?: number; note?: string }
+    /** dodatki z limitem: id → sztuki ({} = usuń wszystkie); brak pola = zostają bez zmian */
+    addons?: Record<string, number>
+    /** admin świadomie przekracza limit dodatku (po potwierdzeniu) */
+    addonsOverLimit?: boolean
   }
   discountCode?: string
   dietaryNotes?: string | null
@@ -1417,6 +1427,36 @@ export interface UpdateInstancePayload {
   countryCode?: string | null
   /** Ukryty event — dostępny tylko przez link /r/<slug>, pomijany na publicznych listach. */
   unlisted?: boolean
+  /**
+   * Znacznik panelu — WYMAGANY przy zapisie z `pricingConfig` (API odrzuca zapis cennika z panelu bez niego):
+   * wersja buildu, poziom formularza i `configRev` odczytane przy wczytaniu. Buduje go `clientStamp()`.
+   */
+  _client?: { version: string; configLevel: number; configRev?: number }
+}
+
+/** Jedna wersja z historii konfiguracji eventu (stan SPRZED zapisu). */
+export interface ConfigHistoryItem {
+  id: string
+  createdAt: string
+  actor: string
+  source: string
+  clientVersion: string | null
+  configRev: number | null
+  summary: string
+  pricingConfig: PricingConfig | null
+}
+
+export function getConfigHistory(instanceId: string): Promise<{ configRev: number; currentSummary: string; keep: number; items: ConfigHistoryItem[] }> {
+  return apiFetch(`/admin/instances/${instanceId}/config-history`, { headers: authHeaders() })
+}
+
+/** Przywraca cennik z wybranej wersji historii (pozostałe pola eventu bez zmian). */
+export function restoreConfigVersion(instanceId: string, historyId: string, client: UpdateInstancePayload['_client']): Promise<{ ok: boolean; configRev: number }> {
+  return apiFetch(`/admin/instances/${instanceId}/config-history/${historyId}/restore`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ _client: client }),
+  })
 }
 
 /** Edycja istniejącego eventu (instancji). */
@@ -1455,6 +1495,11 @@ export interface EventEditConfig {
   roomAvailability?: Record<string, number>
   roomUsage?: Record<string, number>
   roomUsageReserved?: Record<string, number>
+  /** Dodatki z limitem: wolne sztuki (tylko dodatki z limitem) i zajętość. Brak = event bez dodatków. */
+  addonAvailability?: Record<string, number>
+  addonUsage?: Record<string, number>
+  /** Numer wersji konfiguracji — odsyłany przy zapisie (`_client.configRev`). */
+  configRev?: number
   enabledFields?: Record<string, boolean>
   locales: string[]
   theme?: { primaryColor?: string; heroImageUrl?: string; titleColor?: string; badge?: string; supertitle?: LangText }
@@ -1588,7 +1633,9 @@ export interface ManagedRegistration {
   contact: { firstName: string; lastName: string; email: string }
   participants: Array<{ type: 'adult' | 'child'; name: string; age: number }>
   rooms: Array<{ roomId: string; participantIndexes: number[] }>
-  options: { transport?: boolean; bedding?: boolean; donation?: number; adjustment?: { discountPct?: number; discountAmount?: number; overrideTotal?: number; note?: string } }
+  options: { transport?: boolean; bedding?: boolean; donation?: number; addons?: Record<string, number>; adjustment?: { discountPct?: number; discountAmount?: number; overrideTotal?: number; note?: string } }
+  /** Zamówione dodatki z limitem (nazwy w języku zgłoszenia) — tylko do odczytu. */
+  addons?: Array<{ id: string; name: string; qty: number }>
   discountCode?: string
   totalPrice: number
   currency: 'PLN' | 'EUR' | 'USD'

@@ -1,7 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { PaymentPlanService, summarize } from '../registrations/payment-plan.service';
-import { DESK_REQUEST_KINDS, DeskScope, EVENT_STAFF_ROLE, PricingConfig, effectiveDeskScopes, warsawDate } from '../shared';
+import { DESK_REQUEST_KINDS, DeskScope, EVENT_STAFF_ROLE, PricingConfig, effectiveDeskScopes, warsawDate, displayDietary, eventAddons, addonLines } from '../shared';
 import type { DeskActor } from './desk-auth.guard';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -28,6 +28,7 @@ interface RegRow {
   currency: string;
   createdAt: Date;
   roomsJson: unknown;
+  optionsJson?: unknown;
   roomLabel: string | null;
   roomNote: string | null;
   checkedInAt: Date | null;
@@ -51,6 +52,7 @@ const REG_SELECT = {
   currency: true,
   createdAt: true,
   roomsJson: true,
+  optionsJson: true,
   roomLabel: true,
   roomNote: true,
   checkedInAt: true,
@@ -149,9 +151,15 @@ export class DeskService {
       contact: { firstName: c.firstName ?? '', lastName: c.lastName ?? '', email: c.email ?? '', phone: c.phone ?? '' },
       people: r.participants.map((p) => {
         const child = p.type === 'CHILD' || (p.age !== null && p.age < 18);
-        return { id: p.id, firstName: p.firstName, lastName: p.lastName, child, age: child ? p.age : null, diet: p.dietary ?? null };
+        return { id: p.id, firstName: p.firstName, lastName: p.lastName, child, age: child ? p.age : null, diet: displayDietary(p.dietary) || null };
       }),
       dietaryNotes: r.dietaryNotes ?? null,
+      // Zamówione dodatki z limitem (np. dostawka, łóżeczko) — tylko do odczytu; nazwy w językach eventu.
+      addons: (() => {
+        const defs = eventAddons(cfg);
+        const sel = (r.optionsJson as { addons?: unknown } | null | undefined)?.addons;
+        return addonLines(defs, sel, 'pl').map((a) => ({ id: a.id, qty: a.qty, name: defs.find((d) => d.id === a.id)?.name ?? a.name }));
+      })(),
       roomLabel: r.roomLabel ?? null,
       roomNote: r.roomNote ?? null,
       checkedInAt: iso(r.checkedInAt),

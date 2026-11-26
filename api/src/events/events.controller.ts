@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Patch, Param, Query, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Param, Query, Body, Req, UseGuards, HttpCode, HttpStatus, ForbiddenException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { EventsService } from './events.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -78,15 +78,38 @@ export class EventsController {
   @ApiBearerAuth()
   @Put('admin/instances/:id/pricing')
   @ApiOperation({ summary: 'Update pricing config' })
-  updatePricing(@Param('id') id: string, @Body() dto: Record<string, unknown>) {
-    return this.events.updatePricing(id, dto);
+  updatePricing(@Param('id') id: string, @Body() dto: Record<string, unknown>, @Req() req: { user?: { realm?: string; email?: string } }) {
+    return this.events.updatePricing(id, dto, { realm: req.user?.realm, email: req.user?.email });
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Get('admin/instances/:id/config-history')
+  @ApiOperation({ summary: 'Historia konfiguracji eventu (stan sprzed każdego zapisu cennika; ostatnie 20)' })
+  configHistory(@Param('id') id: string) {
+    return this.events.configHistory(id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Post('admin/instances/:id/config-history/:historyId/restore')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Przywróć cennik z wybranej wersji historii — tylko JWT admina' })
+  restoreConfig(
+    @Param('id') id: string,
+    @Param('historyId') historyId: string,
+    @Body() dto: Record<string, unknown>,
+    @Req() req: { user?: { realm?: string; email?: string } },
+  ) {
+    if (req.user?.realm !== 'admin' || !req.user?.email) throw new ForbiddenException('Przywracanie cennika — tylko zalogowany administrator.');
+    return this.events.restoreConfig(id, historyId, dto, { realm: req.user.realm, email: req.user.email });
   }
 
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @Patch('admin/instances/:id')
   @ApiOperation({ summary: 'Edit existing event instance (core fields, pricing, payments)' })
-  updateInstance(@Param('id') id: string, @Body() dto: Record<string, unknown>) {
-    return this.events.updateInstance(id, dto);
+  updateInstance(@Param('id') id: string, @Body() dto: Record<string, unknown>, @Req() req: { user?: { realm?: string; email?: string } }) {
+    return this.events.updateInstance(id, dto, { realm: req.user?.realm, email: req.user?.email });
   }
 }

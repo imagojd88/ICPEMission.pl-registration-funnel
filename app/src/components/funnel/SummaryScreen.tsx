@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { computePrice, formatMoney, roomLabel, buildIcs, googleCalendarUrl, hasAccommodation, leaderDepositSplit, buildSchedule, minDepositPctFor, warsawDate } from '@icpe/shared'
+import { computePrice, formatMoney, roomLabel, buildIcs, googleCalendarUrl, hasAccommodation, leaderDepositSplit, buildSchedule, minDepositPctFor, warsawDate, eventAddons, visibleAddonSelection, addonLines } from '@icpe/shared'
 import type { EventInstanceDto, PricingConfig, PriceLine } from '@icpe/shared'
 import type { StepperState } from '../../pages/PublicFunnel'
 import { bcp47 } from '../../lib/utils'
@@ -60,11 +60,15 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
     }
   })()
 
+  // Dodatki z limitem — tylko te widoczne dla tego składu osób (tak samo liczy lejek i API).
+  const addonDefs = eventAddons(pricingConfig)
+  const chosenAddons = visibleAddonSelection(state.options.addons, addonDefs, state.participants)
+  const addonRows = addonLines(addonDefs, chosenAddons, i18n.language)
   const { input: priceInput, owners } = funnelPriceInput(
     state.participants,
     state.rooms,
     pricingConfig,
-    { transport: state.options.transport, bedding: state.options.bedding, donation: state.options.donation },
+    { transport: state.options.transport, bedding: state.options.bedding, donation: state.options.donation, addons: chosenAddons },
     state.discountApplied ? state.discountCode : '',
   )
 
@@ -331,6 +335,29 @@ export default function SummaryScreen({ state, event, pricingConfig, onSubmit, o
                 {money(price.meals)}
               </span>
             </div>
+
+            {/* Dodatki z limitem (np. dostawka) — nazwy i liczba sztuk; cena (gdy jest) wchodzi w „Opcje dodatkowe” */}
+            {addonRows.length > 0 && (
+              <div className="flex justify-between items-start gap-3 px-4 py-3">
+                <span className="text-sm" style={{ color: 'var(--muted)' }}>
+                  {t('summary.addons')}
+                </span>
+                <span className="text-sm font-medium text-right" style={{ color: 'var(--ink)' }}>
+                  {addonRows.map((a) => (
+                    <span key={a.id} className="block">
+                      {a.name}{a.qty > 1 ? ` × ${a.qty}` : ''}{a.price > 0 ? ` · ${money(a.price)}` : ` · ${t('options.addon_free')}`}
+                    </span>
+                  ))}
+                  <button
+                    onClick={() => onEdit(4)}
+                    className="text-xs font-semibold mt-1"
+                    style={{ color: 'var(--brand)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                  >
+                    {t('summary.change')}
+                  </button>
+                </span>
+              </div>
+            )}
 
             {/* Options */}
             {price.options > 0 && (

@@ -1,8 +1,9 @@
-import { BadRequestException, Injectable, Logger, NotFoundException, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { instanceRoomStock } from '../registrations/room-stock';
+import { instanceAddonUsage } from '../registrations/addon-stock';
 import type { PricingConfig } from '../shared';
-import { hasDiscountCodes } from '../shared';
+import { hasDiscountCodes, eventAddons, addonAvailability, evaluateConfigWrite, readConfigWriteMeta, pricingSnapshotSummary, type ConfigWriteMeta } from '../shared';
 import {
   toLocalized,
   localizedName,
@@ -17,6 +18,20 @@ import { netPaidByPayment } from '../payments/refund-ledger';
 export const AUTO_CLOSE_DAYS = 7;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const INSTANCE_STATUSES = ['DRAFT', 'OPEN', 'CLOSED', 'ARCHIVED'];
+/** Ile wersji historii konfiguracji trzymamy na event. */
+const CONFIG_HISTORY_KEEP = 20;
+
+/** Kto zapisuje konfigurację: `realm` z tokenu (`admin` = panel, `service` = Personal OS / integracje). */
+export interface ConfigCaller { realm?: string; email?: string }
+
+/** JSON z kluczami w stałej kolejności — do porównania „czy coś się zmieniło” (jsonb nie trzyma kolejności kluczy). */
+function stableJson(v: unknown): string {
+  if (v === null || typeof v !== 'object') return JSON.stringify(v) ?? 'null';
+  if (v instanceof Date) return JSON.stringify(v.toISOString());
+  if (Array.isArray(v)) return `[${v.map(stableJson).join(',')}]`;
+  const o = v as Record<string, unknown>;
+  return `{${Object.keys(o).filter((k) => o[k] !== undefined).sort().map((k) => `${JSON.stringify(k)}:${stableJson(o[k])}`).join(',')}}`;
+}
 
 @Injectable()
 export class EventsService implements OnModuleInit, OnModuleDestroy {
@@ -189,6 +204,144 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
     return instanceRoomStock(this.prisma, instanceId, cfg);
   }
 
+  private async addonStock(instanceId: string, cfg: PricingConfig | null) {
+    const defs = eventAddons(cfg);
+    if (!defs.length) return {};
+    const used = await instanceAddonUsage(this.prisma, instanceId);
+    return { addonAvailability: addonAvailability(defs, used), addonUsage: used };
+  }
+
+  // ── Bezpieczny zapis konfiguracji + historia ───────────────────────────────────────────
+
+  private get anyDb() {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return this.prisma as any;
+  }
+
+  /** Stan konfiguracji eventu do historii (instancja + cennik + strona). */
+  private async configSnapshot(instanceId: string): Promise<{ rev: number; seriesId: string; snapshot: Record<string, unknown> } | null> {
+    const inst = (await this.anyDb.eventInstance.findUnique({ where: { id: instanceId } })) as Record<string, unknown> | null;
+    if (!inst) return null;
+    const page = (await this.anyDb.registrationPage.findUnique({ where: { seriesId: inst.seriesId } }).catch(() => null)) as Record<string, unknown> | null;
+    const isoOf = (d: unknown) => (d instanceof Date ? d.toISOString() : d ?? null);
+    return {
+      rev: Number(inst.configRev ?? 0),
+      seriesId: String(inst.seriesId),
+      snapshot: {
+        configRev: Number(inst.configRev ?? 0),
+        instance: {
+          title: inst.title ?? null,
+          description: inst.description ?? null,
+          startsAt: isoOf(inst.startsAt),
+          endsAt: isoOf(inst.endsAt),
+          registrationOpensAt: isoOf(inst.registrationOpensAt),
+          registrationClosesAt: isoOf(inst.registrationClosesAt),
+          location: inst.location ?? null,
+          countryCode: inst.countryCode ?? null,
+          nights: inst.nights ?? null,
+          capacity: inst.capacity ?? null,
+          paymentMethods: inst.paymentMethods ?? [],
+          unlisted: inst.unlisted ?? false,
+          shareWithIcpeGo: inst.shareWithIcpeGo ?? false,
+        },
+        pricingConfig: inst.pricingConfig ?? null,
+        page: page
+          ? { slug: page.slug ?? null, theme: page.theme ?? null, customFields: page.customFields ?? null, paymentInfo: page.paymentInfo ?? null, locales: page.locales ?? null, enabledFields: page.enabledFields ?? null }
+          : null,
+      },
+    };
+  }
+
+  /** Dopisuje wersję do historii i przycina do ostatnich `CONFIG_HISTORY_KEEP`. Błąd historii nie blokuje zapisu eventu. */
+  private async pushConfigHistory(instanceId: string, snapshot: Record<string, unknown>, caller: ConfigCaller | undefined, meta: ConfigWriteMeta, source?: string) {
+    try {
+      await this.anyDb.eventConfigHistory.create({
+        data: {
+          instanceId,
+          actor: caller?.email || caller?.realm || 'system',
+          source: source ?? (caller?.realm === 'admin' ? 'panel' : caller?.realm === 'service' ? 'service' : 'system'),
+          clientVersion: meta.clientVersion || meta.configLevel ? `${meta.clientVersion ?? '?'} (poziom ${meta.configLevel ?? '?'})` : null,
+          snapshot,
+        },
+      });
+      const old = (await this.anyDb.eventConfigHistory.findMany({
+        where: { instanceId }, orderBy: { createdAt: 'desc' }, skip: CONFIG_HISTORY_KEEP, select: { id: true },
+      })) as Array<{ id: string }>;
+      if (old.length) await this.anyDb.eventConfigHistory.deleteMany({ where: { id: { in: old.map((o) => o.id) } } });
+    } catch (e) {
+      this.logger.error(`Historia konfiguracji eventu ${instanceId}: zapis nieudany — ${(e as Error).message}`);
+    }
+  }
+
+  /**
+   * Zapis pól instancji z ochroną cennika:
+   *  - panel (JWT admina) musi podać `_client.configLevel` ≥ wymaganego — stara karta przeglądarki dostaje 409,
+   *  - `_client.configRev` inne niż w bazie → 409 (konfigurację zmienił ktoś inny / inna karta),
+   *  - zapis warunkowy po `configRev` (dwa równoczesne zapisy: drugi dostaje 409),
+   *  - stan sprzed zapisu trafia do historii, gdy cokolwiek się zmieniło.
+   * Token serwisowy (Personal OS) nie podaje `_client` i nie jest sprawdzany.
+   */
+  private async writeInstanceConfig(instanceId: string, data: Record<string, unknown>, rawClient: unknown, caller: ConfigCaller | undefined, source?: string) {
+    const meta = readConfigWriteMeta(rawClient);
+    const before = await this.configSnapshot(instanceId);
+    if (!before) throw new NotFoundException('Event not found');
+    const verdict = evaluateConfigWrite({ realm: caller?.realm, touchesPricing: true, meta, currentRev: before.rev });
+    if (!verdict.ok) {
+      this.logger.warn(`Odrzucony zapis konfiguracji eventu ${instanceId} (${verdict.code}) — ${caller?.email ?? caller?.realm ?? '?'}, klient: ${meta.clientVersion ?? 'brak'} / poziom ${meta.configLevel ?? 'brak'}`);
+      throw new ConflictException(verdict.message);
+    }
+    const upd = (await this.anyDb.eventInstance.updateMany({
+      where: { id: instanceId, configRev: before.rev },
+      data: { ...data, configRev: { increment: 1 } },
+    })) as { count: number };
+    if (upd.count !== 1) {
+      throw new ConflictException('Ustawienia tego eventu zostały przed chwilą zmienione przez kogoś innego. NIC nie zostało zapisane. Odśwież stronę i wprowadź zmiany ponownie.');
+    }
+    const after = await this.configSnapshot(instanceId);
+    const strip = (s: Record<string, unknown> | undefined) => stableJson({ ...(s ?? {}), configRev: 0 });
+    if (strip(before.snapshot) !== strip(after?.snapshot)) {
+      await this.pushConfigHistory(instanceId, before.snapshot, caller, meta, source);
+    }
+    return before.rev + 1;
+  }
+
+  /** Lista wersji historii (od najnowszej): kiedy, kto, wersja panelu, krótki opis cennika + pełna migawka. */
+  async configHistory(instanceId: string) {
+    const inst = (await this.anyDb.eventInstance.findUnique({ where: { id: instanceId }, select: { id: true, configRev: true, pricingConfig: true } })) as { configRev?: number; pricingConfig: unknown } | null;
+    if (!inst) throw new NotFoundException('Event not found');
+    const rows = (await this.anyDb.eventConfigHistory.findMany({ where: { instanceId }, orderBy: { createdAt: 'desc' }, take: CONFIG_HISTORY_KEEP })) as Array<{
+      id: string; createdAt: Date; actor: string; source: string; clientVersion: string | null; snapshot: { pricingConfig?: unknown; instance?: unknown; page?: unknown; configRev?: number } | null;
+    }>;
+    return {
+      configRev: Number(inst.configRev ?? 0),
+      currentSummary: pricingSnapshotSummary(inst.pricingConfig),
+      keep: CONFIG_HISTORY_KEEP,
+      items: rows.map((r) => ({
+        id: r.id,
+        createdAt: r.createdAt.toISOString(),
+        actor: r.actor,
+        source: r.source,
+        clientVersion: r.clientVersion,
+        configRev: r.snapshot?.configRev ?? null,
+        summary: pricingSnapshotSummary(r.snapshot?.pricingConfig),
+        pricingConfig: r.snapshot?.pricingConfig ?? null,
+        instance: r.snapshot?.instance ?? null,
+        page: r.snapshot?.page ?? null,
+      })),
+    };
+  }
+
+  /** Przywraca CENNIK (`pricingConfig`) z wybranej wersji historii. Pozostałe pola eventu i strona zostają bez zmian. */
+  async restoreConfig(instanceId: string, historyId: string, dto: Record<string, unknown>, caller: ConfigCaller) {
+    const row = (await this.anyDb.eventConfigHistory.findUnique({ where: { id: historyId } })) as { instanceId: string; snapshot: { pricingConfig?: unknown } | null } | null;
+    if (!row || row.instanceId !== instanceId) throw new NotFoundException('Nie ma takiej wersji w historii tego eventu.');
+    const pc = row.snapshot?.pricingConfig;
+    if (!pc || typeof pc !== 'object') throw new BadRequestException('Ta wersja historii nie zawiera cennika.');
+    const configRev = await this.writeInstanceConfig(instanceId, { pricingConfig: pc }, dto?._client, caller, 'restore');
+    this.logger.log(`Przywrócono cennik eventu ${instanceId} z wersji ${historyId} — ${caller.email}`);
+    return { ok: true, configRev };
+  }
+
   async getSlugConfig(slug: string, locale: string) {
     const { page, instance } = await this.findBySlug(slug);
     const seriesType = (page.series as { type?: string }).type ?? 'ONE_TIME';
@@ -217,8 +370,12 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       pricingConfig: instance.pricingConfig,
       // Czy event ma choć jeden aktywny kod rabatowy — lejek pokazuje pole „Kod rabatowy” tylko wtedy.
       hasDiscountCodes: hasDiscountCodes(instance.pricingConfig as unknown as PricingConfig | null),
+      // Numer wersji konfiguracji — panel odsyła go przy zapisie (ochrona przed nadpisaniem z nieaktualnej karty).
+      configRev: Number((instance as { configRev?: number }).configRev ?? 0),
       // Limit pokoi: wolne pokoje per typ (tylko typy z limitem) + zajętość (dla panelu).
       ...(await this.roomStock(instance.id, instance.pricingConfig as unknown as PricingConfig | null)),
+      // Dodatki z limitem: wolne sztuki (tylko dodatki z limitem) + zajętość. Event bez dodatków → brak pól.
+      ...(await this.addonStock(instance.id, instance.pricingConfig as unknown as PricingConfig | null)),
       roomTypes: (instance.roomTypes as Array<{
         id: string; name: unknown; capacity: number;
         pricingModel: string; price: { toString(): string }; quantity: number;
@@ -457,11 +614,11 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
     return page;
   }
 
-  async updatePricing(instanceId: string, pricingConfig: unknown) {
-    return this.prisma.eventInstance.update({
-      where: { id: instanceId },
-      data: { pricingConfig: pricingConfig as any },
-    });
+  async updatePricing(instanceId: string, pricingConfig: unknown, caller?: ConfigCaller) {
+    // `_client` (znacznik panelu) nie jest częścią cennika — nie zapisujemy go.
+    const { _client, ...config } = (pricingConfig && typeof pricingConfig === 'object' ? pricingConfig : {}) as Record<string, unknown>;
+    await this.writeInstanceConfig(instanceId, { pricingConfig: config }, _client, caller);
+    return this.prisma.eventInstance.findUnique({ where: { id: instanceId } });
   }
 
   /** Edycja istniejącego eventu (instancji) — pola podstawowe + cennik + metody płatności. */
@@ -483,7 +640,10 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       shareWithIcpeGo?: boolean;
       countryCode?: string | null;
       unlisted?: boolean;
+      /** Znacznik panelu: { version, configLevel, configRev } — wymagany przy zapisie cennika z panelu. */
+      _client?: unknown;
     },
+    caller?: ConfigCaller,
   ) {
     const data: Record<string, unknown> = {};
     if (dto.countryCode !== undefined) {
@@ -520,7 +680,12 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
         void resumeUptimeMonitor();
       }
     }
-    await this.prisma.eventInstance.update({ where: { id: instanceId }, data });
+    if (dto.pricingConfig !== undefined) {
+      // Zapis z cennikiem: ochrona przed nieaktualnym panelem + historia (patrz `writeInstanceConfig`).
+      await this.writeInstanceConfig(instanceId, data, dto._client, caller);
+    } else {
+      await this.prisma.eventInstance.update({ where: { id: instanceId }, data });
+    }
     return this.getInstanceContract(instanceId);
   }
 }

@@ -32,7 +32,8 @@ async function bootstrap() {
   app.enableCors({
     origin: true, // reflect request origin → allow all
     credentials: false,
-    allowedHeaders: ['Authorization', 'Content-Type'],
+    // X-Panel-Version: zarezerwowany na przyszłość (panel dziś przesyła wersję w ciele żądania, pole `_client`).
+    allowedHeaders: ['Authorization', 'Content-Type', 'X-Panel-Version'],
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   });
 

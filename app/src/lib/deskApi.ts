@@ -159,6 +159,8 @@ export interface DeskRegistration {
   contact: { firstName: string; lastName: string; email: string; phone: string }
   people: DeskPerson[]
   dietaryNotes: string | null
+  /** Zamówione dodatki z limitem (np. dostawka) — tylko do odczytu; `name`: tekst albo mapa językowa. */
+  addons?: Array<{ id: string; qty: number; name: string | Record<string, string> }>
   roomLabel: string | null
   roomNote: string | null
   checkedInAt: string | null

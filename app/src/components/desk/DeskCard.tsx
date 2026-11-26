@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Check, KeyRound, Banknote, MessageSquarePlus, Undo2 } from 'lucide-react'
-import { DESK_REQUEST_KINDS, type DeskRequestKind, type DeskScope } from '@icpe/shared'
+import { DESK_REQUEST_KINDS, addonLabel, type DeskRequestKind, type DeskScope } from '@icpe/shared'
 import {
   DeskError,
   deskAddPayment,
@@ -217,6 +217,11 @@ export default function DeskCard({ instanceId, reg, scopes, full, onUpdated, onO
         {reg.dietaryNotes && (
           <p className="text-sm" style={{ color: 'var(--muted)' }}>
             {t('desk.card.diet_notes')}: {reg.dietaryNotes}
+          </p>
+        )}
+        {(reg.addons ?? []).length > 0 && (
+          <p className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
+            {t('desk.card.addons')}: {(reg.addons ?? []).map((a) => `${addonLabel(a.name, lng)}${a.qty > 1 ? ` × ${a.qty}` : ''}`).join(', ')}
           </p>
         )}
       </Block>

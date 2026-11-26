@@ -3,7 +3,7 @@ import { notYetOpen } from '../lib/registrationOpens'
 import { useTranslation } from 'react-i18next'
 import { useParams, useSearchParams } from 'react-router-dom'
 import type { EventInstanceDto, CreateRegistrationDto, RegistrationStatus, PaymentMethod } from '@icpe/shared'
-import { computePrice, DEFAULT_PRICING, validateRoomCapacity, roomLabel, hasAccommodation, roomStockShortages, buildSchedule, minDepositPctFor, warsawDate, pricingAt, onlineProviderFor, isPolishLanguage, normalizeCountryCode, hasDiscountCodes } from '@icpe/shared'
+import { computePrice, DEFAULT_PRICING, validateRoomCapacity, roomLabel, hasAccommodation, roomStockShortages, buildSchedule, minDepositPctFor, warsawDate, pricingAt, onlineProviderFor, isPolishLanguage, normalizeCountryCode, hasDiscountCodes, eventAddons, visibleAddonSelection, validateAddonSelection, addonProblemMessage } from '@icpe/shared'
 import type { PricingConfig } from '@icpe/shared'
 import { getEventBySlug, getEventConfig, createRegistration, registerGuest, getInvitation, getRegistrationLead, saveRegistrationLead, pickLang, getPaymentsConfig, startManagedPayment, type EventConfig } from '../lib/api'
 import { funnelPriceInput, isAccommodationOptional, funnelSteps, effectiveStep, showsRoomStep, ROOM_STEP } from '../lib/funnelPrice'
@@ -102,7 +102,7 @@ export interface StepperState {
   rooms: RoomEntry[]
   /** Nocleg opcjonalny: gość zaznaczył „Nie potrzebuję noclegu" (pokoje wtedy puste). */
   noAccommodation: boolean
-  options: { transport: boolean; bedding: boolean; donation: number }
+  options: { transport: boolean; bedding: boolean; donation: number; /** dodatki z limitem: id → sztuki */ addons?: Record<string, number> }
   discountCode: string
   discountApplied: boolean
   consents: { rodo: boolean; regulamin: boolean }
@@ -234,6 +234,7 @@ function StepperView({
   error,
   affiliation,
   roomAvailability,
+  addonAvailability,
   dietKeys,
   lastStepLabel,
   steps,
@@ -254,6 +255,8 @@ function StepperView({
   error?: string | null
   /** Limit pokoi: wolne pokoje per typ (brak klucza = bez limitu). */
   roomAvailability?: Record<string, number>
+  /** Dodatki z limitem: wolne sztuki per dodatek (brak klucza = bez limitu). */
+  addonAvailability?: Record<string, number>
   /** Diety włączone w evencie (`customFields.diets`). */
   dietKeys?: string[]
   /** Napis przycisku w ostatnim kroku (zależny od tego, czy jest jeszcze wybór płatności). */
@@ -312,6 +315,8 @@ function StepperView({
             consents={state.consents}
             pricingConfig={pricingConfig}
             showDiscount={showDiscount}
+            participants={state.participants}
+            addonAvailability={addonAvailability}
             onOptionsChange={(options) => onChange({ options })}
             onDiscountChange={(discountCode) => onChange({ discountCode })}
             onDiscountApply={(discountApplied) => onChange({ discountApplied })}
@@ -700,6 +705,9 @@ export default function PublicFunnel() {
     if (loading || roomStepShown) return
     setStepper((prev) => (prev.rooms.length > 0 || prev.noAccommodation ? { ...prev, rooms: [], noAccommodation: false } : prev))
   }, [loading, roomStepShown])
+  // Dodatki z limitem: definicje eventu i wybór gościa ograniczony do dodatków widocznych dla jego składu osób.
+  const addonDefs = eventAddons(pricingConfig)
+  const chosenAddons = visibleAddonSelection(stepper.options.addons, addonDefs, stepper.participants)
   // Pole „Kod rabatowy” tylko, gdy event ma aktywny kod (cennik; flaga z API na wypadek, gdy kody przestaną być publiczne).
   const showDiscount = hasDiscountCodes(pricingConfig) || (!preview && eventConfig?.hasDiscountCodes === true)
 
@@ -859,6 +867,15 @@ export default function PublicFunnel() {
         })
       }
     }
+    // Krok „Opcje" (4): dodatek z limitem, którego zostało mniej niż zaznaczono → komunikat z nazwą dodatku.
+    if (curStep === 4) {
+      const problems = validateAddonSelection(addonDefs, chosenAddons, stepper.participants, eventConfig?.addonAvailability ?? {})
+      if (problems.length) {
+        setStepError(addonProblemMessage(problems[0], addonDefs, lng))
+        track('registration_step_blocked', { step: 4, step_name: 'options' })
+        return
+      }
+    }
     track('registration_step_completed', { step: curStep, step_name: STEP_NAMES[curStep] })
     const pos = steps.indexOf(curStep)
     saveLead((steps[pos + 1] ?? curStep) + (pos < steps.length - 1 ? 0 : 1))
@@ -991,6 +1008,8 @@ export default function PublicFunnel() {
           transport: stepper.options.transport,
           bedding: stepper.options.bedding,
           ...(pricingConfig.donationEnabled && stepper.options.donation > 0 ? { donation: stepper.options.donation } : {}),
+          // Dodatki z limitem — tylko widoczne dla tego składu osób (usunięte dziecko → łóżeczko nie idzie).
+          ...(Object.keys(chosenAddons).length ? { addons: chosenAddons } : {}),
         },
         discountCode: stepper.discountApplied ? stepper.discountCode : undefined,
         paymentMethod: toPaymentMethod(stepper.paymentMethod),
@@ -1044,6 +1063,7 @@ export default function PublicFunnel() {
       }
     } catch (e: unknown) {
       const detail = e instanceof Error ? e.message : String(e)
+      const addonSoldOut = (e as { code?: string } | null)?.code === 'ADDON_SOLD_OUT'
       // Brak sieci (telefon stracił zasięg) albo serwer nieosiągalny: fetch rzuca TypeError
       // („Failed to fetch” / „Load failed” / „NetworkError…”) — dane formularza zostają, wystarczy ponowić.
       const network =
@@ -1051,9 +1071,16 @@ export default function PublicFunnel() {
         e instanceof TypeError ||
         /failed to fetch|load failed|networkerror|network request failed/i.test(detail)
       track('registration_submit_failed', {
-        reason: network ? 'network' : /wolnych pokoi/i.test(detail) ? 'rooms_sold_out' : /zamknięte/i.test(detail) ? 'closed' : 'error',
+        reason: network ? 'network' : addonSoldOut ? 'addon_sold_out' : /wolnych pokoi/i.test(detail) ? 'rooms_sold_out' : /zamknięte/i.test(detail) ? 'closed' : 'error',
         payment_method: stepper.paymentMethod,
       })
+      // Dodatek wyczerpał się między wyświetleniem a wysłaniem: zgłoszenie NIE przepada (dane zostają),
+      // odświeżamy liczbę wolnych sztuk — w kroku „Opcje” dodatek pokaże „Brak dostępnych” i da się go odznaczyć.
+      if (addonSoldOut && slug) {
+        void getEventConfig(slug).then((cfg) => {
+          if (cfg.addonAvailability) setEventConfig((prev) => (prev ? { ...prev, addonAvailability: cfg.addonAvailability } : prev))
+        }).catch(() => undefined)
+      }
       setSubmitNetworkError(network)
       setSubmitError(network ? t('summary.network_error') : t('summary.submit_error', { error: detail.replace(/[.\s]+$/, '') }))
     } finally {
@@ -1086,7 +1113,7 @@ export default function PublicFunnel() {
     stepper.participants,
     stepper.rooms,
     pricingConfig,
-    { transport: stepper.options.transport, bedding: stepper.options.bedding, donation: stepper.options.donation },
+    { transport: stepper.options.transport, bedding: stepper.options.bedding, donation: stepper.options.donation, addons: chosenAddons },
     stepper.discountApplied ? stepper.discountCode : '',
   )
 
@@ -1222,6 +1249,7 @@ export default function PublicFunnel() {
           error={stepError}
           affiliation={affiliation}
           roomAvailability={eventConfig?.roomAvailability}
+          addonAvailability={eventConfig?.addonAvailability}
           dietKeys={eventConfig?.customFields?.diets ?? []}
         />
       )}

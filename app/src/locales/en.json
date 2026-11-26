@@ -187,7 +187,7 @@
       "Vegetarian",
       "Vegan",
       "Gluten-free",
-      "Lactose-free",
+      "Dairy-free",
       "Nut-free",
       "Kosher"
     ],
@@ -258,7 +258,16 @@
     "donation_title": "Optional donation to help cover the stay of someone who cannot afford to take part",
     "donation_hint": "The donation is voluntary. It will be added to your registration total.",
     "donation_custom": "Other amount",
-    "donation_custom_label": "Donation amount"
+    "donation_custom_label": "Donation amount",
+    "addons_title": "Extras",
+    "addon_left": "Left: {{n}}",
+    "addon_sold_out": "None available",
+    "addon_free": "free of charge",
+    "addon_each": "each",
+    "addon_limited_hint": "Availability is limited — requests are served in the order of registration.",
+    "addon_over": "Fewer are left than you selected. Reduce the number or untick this extra.",
+    "addon_less": "Fewer",
+    "addon_more": "More"
   },
   "payment_method": {
     "title": "Choose payment method",
@@ -333,7 +342,8 @@
     "swift": "SWIFT / BIC",
     "bank": "Bank",
     "bank_address": "Bank address",
-    "operator_note": "Event operator, with the consent of the Executive Council: {{name}}"
+    "operator_note": "Event operator, with the consent of the Executive Council: {{name}}",
+    "addons": "Extras"
   },
   "success": {
     "paid_title": "Thank you!",
@@ -510,7 +520,9 @@
     "payment_transfer": "Bank transfer",
     "payment_online": "Online payment",
     "transfer_note": "If the amount went up, please transfer the difference (reference: registration number).",
-    "payment_leader": "Leader deposit + rest in cash on site"
+    "payment_leader": "Leader deposit + rest in cash on site",
+    "addons_title": "Requested extras",
+    "addons_hint": "Availability is limited — the organiser will confirm extras once rooms have been allocated. To change anything, please contact the organiser."
   },
   "leader": {
     "deposit_title": "Deposit for your leader ({{pct}}%)",
@@ -624,7 +636,8 @@
       "contact": "Registered by",
       "phone": "Phone",
       "reg_no": "Registration no.",
-      "arrived_at": "Arrival: {{time}}"
+      "arrived_at": "Arrival: {{time}}",
+      "addons": "Extras"
     },
     "money": {
       "title": "Payment",

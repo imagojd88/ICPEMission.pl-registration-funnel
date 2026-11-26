@@ -9,3 +9,6 @@ export * from './refunds';
 export * from './leads';
 export * from './registrationStatus';
 export * from './guestGroups';
+export * from './diets';
+export * from './addons';
+export * from './configMerge';

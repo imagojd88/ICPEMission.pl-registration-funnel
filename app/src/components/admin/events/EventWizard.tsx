@@ -25,7 +25,8 @@ import {
 } from '@/lib/api'
 import { describeHousehold, parseHouseholdLines } from '@/lib/households'
 import { SUPERTITLE_PRESETS, isPresetSupertitle } from '@/lib/supertitles'
-import { DEFAULT_PRICING, wizardPricingCore, slugifyEventName } from '@icpe/shared'
+import { DEFAULT_PRICING, wizardPricingCore, slugifyEventName, mergePricingConfig, overlayKnown, WIZARD_MANAGED } from '@icpe/shared'
+import { clientStamp, usePanelStale, STALE_SAVE_MESSAGE } from '@/lib/panelVersion'
 import PaymentPlanEditor, { EMPTY_PLAN_FORM, planToForm, formToPlan, planFormError, type PaymentPlanForm } from './PaymentPlanEditor'
 import type { PricingConfig, AgeBracket } from '@icpe/shared'
 import type { EventEditConfig, Place, InvitationItem, Invitee } from '@/lib/api'
@@ -173,6 +174,11 @@ interface WizardState {
   // poziomy cen z datami (edytowane w „Edytuj event") — kreator przenosi je bez zmian
   priceTiers?: PricingConfig['priceTiers']
   baseTierName?: PricingConfig['baseTierName']
+  // tryb edycji: ORYGINALNY cennik i motyw z API (kreator nakłada na nie swoje pola — nie gubi tego, czego nie zna)
+  // oraz numer wersji konfiguracji odsyłany przy zapisie
+  origPricing?: unknown
+  origTheme?: unknown
+  configRev?: number
   // posiłki tylko dla nocujących, za osobę za noc (np. kolacja + śniadanie)
   overnightMeals: string
   // program wydarzenia: godzina + punkt
@@ -419,6 +425,9 @@ function mapEditConfigToState(prev: WizardState, cfg: EventEditConfig, slug: str
     planForm: planToForm(pc?.paymentPlan),
     priceTiers: pc?.priceTiers,
     baseTierName: pc?.baseTierName,
+    origPricing: pc ?? null,
+    origTheme: cfg.theme ?? null,
+    configRev: cfg.configRev,
     overnightMeals: String(pc?.overnightMealsFee ?? 0),
     diets: Array.isArray(cfg.customFields?.diets) ? cfg.customFields!.diets! : prev.diets,
     ageBrackets: ageBrackets.length > 0 ? ageBrackets : prev.ageBrackets,
@@ -1794,6 +1803,7 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
   })
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const stalePanel = usePanelStale()
   const [createdSlug, setCreatedSlug] = useState<string | null>(null)
   const [createdInvites, setCreatedInvites] = useState<InvitationItem[]>([])
   const [skippedConfirmed, setSkippedConfirmed] = useState(0)
@@ -1840,6 +1850,8 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
   const goPrev = () => (curIdx === 0 ? onCancel() : setStep(activeSteps[curIdx - 1]))
 
   async function handlePublish() {
+    // Nowa wersja panelu na serwerze → ta karta nie zapisuje (mogłaby skasować nowsze ustawienia).
+    if (stalePanel) { setSubmitError(STALE_SAVE_MESSAGE); return }
     if (!state.name) { setSubmitError('Podaj nazwę eventu.'); return }
     if (!state.slug) { setSubmitError('Podaj slug (adres strony).'); return }
     if (!state.dateStart) { setSubmitError('Podaj datę rozpoczęcia.'); return }
@@ -1920,12 +1932,16 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
           nights,
           capacity: state.capacity ? parseInt(state.capacity) : null,
           paymentMethods,
-          pricingConfig,
+          // Nakładamy pola kreatora na oryginalny cennik: poziomy cen, dodatki z limitem i wszystkie pola,
+          // których kreator nie edytuje, zostają bez zmian.
+          pricingConfig: mergePricingConfig(state.origPricing, pricingConfig, WIZARD_MANAGED),
           unlisted: state.unlisted,
+          _client: clientStamp(state.configRev),
         })
         await configureSeriesPage(editTarget.seriesId, {
           slug: state.slug,
-          theme,
+          // Motyw: pola, których kreator nie ma (np. tag nad tytułem), zostają z oryginału.
+          theme: overlayKnown(state.origTheme, theme, ['primaryColor', 'heroImageUrl', 'titleColor', 'supertitle']),
           enabledFields: { phone: true, address: true, dietary: true, children: true },
           locales,
           isEvergreen: state.eventType === 'evergreen',
@@ -2139,7 +2155,8 @@ export default function EventWizard({ onCancel, onSuccess, editTarget }: EventWi
                 goNext()
               }
             }}
-            disabled={submitting}
+            disabled={submitting || (isLast && stalePanel)}
+            title={isLast && stalePanel ? STALE_SAVE_MESSAGE : undefined}
           >
             {isLast ? (submitting ? 'Tworzenie...' : 'Publikuj stronę') : 'Dalej'}
           </Button>
